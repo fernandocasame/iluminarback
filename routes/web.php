@@ -1093,5 +1093,6 @@ Route::get('listadoComunicaciones','ComunicacionesController@listadoComunicacion
 Route::get('cambiarEstadoComunicado','ComunicacionesController@cambiarEstadoComunicado');
 Route::get('cambiarEstadoMessage','ComunicacionesController@cambiarEstadoMessage');
 //===================FIN COMUNICACIONES=========================
+Route::get('getUsuariosPorRol/{id}','UsuarioController@getUsuariosPorRol');
 
 

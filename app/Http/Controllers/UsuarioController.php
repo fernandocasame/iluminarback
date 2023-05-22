@@ -1257,6 +1257,21 @@ class UsuarioController extends Controller
             DB::UPDATE("UPDATE `codigoslibros` SET `idusuario` = ?,`idusuario_creador_codigo`=14818, `id_periodo`=16 WHERE `codigo` = ?", [$usuario_find[0]->idusuario, $codigos[$i]]);
         }
     }
-
-
+    public function getUsuariosPorRol($id)
+    {
+        $dato = DB::table('usuario as u')
+        ->leftjoin('sys_group_users as g','u.id_group','=','g.id')
+        ->leftjoin('estado as e','u.estado_idEstado','=','e.idEstado')
+        ->leftjoin('institucion as i','u.institucion_idInstitucion','=','i.idInstitucion')
+        ->select(
+            DB::raw('CONCAT(u.nombres, " " ,u.apellidos ) AS usuario'),'u.cedula','u.name_usuario',
+            'g.level as grupo', 'u.nombres','u.apellidos',
+            'u.cargo_id','u.fecha_nacimiento','u.id_group', 'u.email','u.estado_idEstado',
+            'u.institucion_idInstitucion','u.telefono','u.iniciales','u.idusuario','u.foto_user',
+            'i.nombreInstitucion','e.nombreestado'
+        )
+        ->where('u.id_group','=',$id)
+        ->get();
+        return $dato;
+    }
 }
