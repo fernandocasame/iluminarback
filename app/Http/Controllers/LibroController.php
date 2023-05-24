@@ -377,13 +377,20 @@ class LibroController extends Controller
 
     //Para listar la tabla de libros
     public function listaLibro(){
-        $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,  ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
-        FROM libro l, asignatura a , libros_series ls, series s
-         WHERE  l.asignatura_idasignatura  = a.idasignatura
-         and l.idlibro = ls.idLibro
-         and ls.id_serie = s.id_serie
-         ORDER  BY l.idlibro  DESC
-       ");
+    //     $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,  ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
+    //     FROM libro l, asignatura a , libros_series ls, series s
+    //      WHERE  l.asignatura_idasignatura  = a.idasignatura
+    //      and l.idlibro = ls.idLibro
+    //      and ls.id_serie = s.id_serie
+    //      ORDER  BY l.idlibro  DESC
+    //    ");
+    $libros = DB::SELECT("SELECT l.* ,
+    ls.iniciales,
+    ls.codigo_liquidacion, ls.year, ls.version,s.id_serie, s.nombre_serie
+    FROM libro l
+    LEFT JOIN libros_series ls ON l.idlibro = ls.idLibro
+    LEFT JOIN series s ON ls.id_serie = s.id_serie
+   ");
 
     $asignatura = DB::SELECT("SELECT asignatura.* FROM asignatura 
     WHERE estado = '1' 

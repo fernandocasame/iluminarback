@@ -30,7 +30,7 @@ class AreaController extends Controller
     {
         //$area = Area::paginate(5);
         // return $area;
-        $area = DB::SELECT("SELECT * FROM areas where estado = '1'");
+        $area = DB::SELECT("SELECT * FROM area where estado = '1'");
         foreach ($area as $key => $post) {
             // $respuesta = DB::SELECT("SELECT DISTINCT a.idasignatura as id, a.nombreasignatura as name
             // FROM asignatura  a

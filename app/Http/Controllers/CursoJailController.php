@@ -69,6 +69,10 @@ class CursoJailController extends Controller
         if($request->valoresPensiones){
             return $this->valoresPensiones($request->id_matricula);
         }
+        //listado docentes
+        if($request->listadoDocentes){
+            return $this->listadoDocentes($request->institucion_id,$request->periodo_id);
+        }
         //DOCENTE
         if($request->getCursosDocente){
             return $this->getCursosDocente($request->institucion_id,$request->periodo_id,$request->docente_id);
@@ -124,8 +128,10 @@ class CursoJailController extends Controller
         return $validate;
     }
     public function listadoTodosEstudiantesInstitucion($institucion,$periodo){
-        $usuarios = DB::SELECT("SELECT u.*,i.nombreInstitucion, CONCAT(u.nombres, ' ',u.apellidos) AS estudiante,
-            u.apellidos
+        $usuarios = DB::SELECT("SELECT u.*,i.nombreInstitucion,
+         CONCAT(u.nombres, ' ',u.apellidos) AS estudiante,
+            u.apellidos,u.name_usuario,u.nombres,u.telefono,u.acceso_cursos,
+            u.id_group,u.institucion_idInstitucion,u.estado_idEstado,u.fecha_nacimiento
             FROM usuario u
             LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
             WHERE u.institucion_idInstitucion = '$institucion'
@@ -137,8 +143,10 @@ class CursoJailController extends Controller
     }
     public function listadoTodosEstudiantesInstitucionIndividual($institucion,$periodo,$busqueda,$tipo){
         if($tipo == 'cedula'){
-            $usuarios = DB::SELECT("SELECT u.*,i.nombreInstitucion, CONCAT(u.nombres, ' ',u.apellidos) AS estudiante,
-                u.apellidos
+            $usuarios = DB::SELECT("SELECT u.*,i.nombreInstitucion, 
+                CONCAT(u.nombres, ' ',u.apellidos) AS estudiante,
+                u.apellidos,u.name_usuario,u.nombres,u.telefono,u.acceso_cursos,
+                u.id_group,u.institucion_idInstitucion,u.estado_idEstado,u.fecha_nacimiento
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 WHERE u.institucion_idInstitucion = '$institucion'
@@ -149,7 +157,8 @@ class CursoJailController extends Controller
         }
         if($tipo == 'apellidos'){
             $usuarios = DB::SELECT("SELECT u.*,i.nombreInstitucion, CONCAT(u.nombres, ' ',u.apellidos) AS estudiante,
-                u.apellidos
+                u.apellidos,u.name_usuario,u.nombres,u.telefono,u.acceso_cursos,
+                u.id_group,u.institucion_idInstitucion,u.estado_idEstado,u.fecha_nacimiento
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 WHERE u.institucion_idInstitucion = '$institucion'
@@ -185,15 +194,24 @@ class CursoJailController extends Controller
                 }
             }
             $datos[$key] = [
-                "nombreInstitucion" => $item->nombreInstitucion,
-                "idusuario"         => $item->idusuario,
-                "cedula"            => $item->cedula,
-                "telefono"          => $item->telefono,
-                "estudiante"        => $item->estudiante,
-                "apellidos"         => $item->apellidos,
-                "matricula"         => $estudiantes,
-                "becado"            => $item->becado,
-                "estadoMatricula"   => count($estudiantes) > 0 ? $estudiantes[0]->estado_matricula: '5'
+                "nombreInstitucion"         => $item->nombreInstitucion,
+                "idusuario"                 => $item->idusuario,
+                "name_usuario"              => $item->name_usuario,
+                "cedula"                    => $item->cedula,
+                "telefono"                  => $item->telefono,
+                "estudiante"                => $item->estudiante,
+                "nombres"                   => $item->nombres,
+                "apellidos"                 => $item->apellidos,
+                "email"                     => $item->email,
+                "telefono"                  => $item->telefono,
+                "acceso_cursos"             => $item->acceso_cursos,
+                "id_group"                  => $item->id_group,
+                "institucion_idInstitucion" => $item->institucion_idInstitucion,
+                "estado_idEstado"           => $item->estado_idEstado,
+                "fecha_nacimiento"          => $item->fecha_nacimiento,
+                "matricula"                 => $estudiantes,
+                "becado"                    => $item->becado,
+                "estadoMatricula"           => count($estudiantes) > 0 ? $estudiantes[0]->estado_matricula: '5'
              ];  
         }
         return $datos;
@@ -322,6 +340,51 @@ class CursoJailController extends Controller
         WHERE id_matricula = '$id_matricula'
         ORDER BY num_cuota +0");
         return $cuotas;
+    }
+    //listado docentes
+    public function listadoDocentes($institucion,$periodo){
+        $query = DB::SELECT("SELECT u.*,i.nombreInstitucion
+            FROM usuario u
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+            WHERE u.institucion_idInstitucion = '1'
+            AND u.estado_idEstado = '1'
+            AND u.id_group = '6'
+        ");
+        $datos = [];
+        if(empty($query)){
+            return $datos;
+        }
+        $contador = 0;
+        foreach($query as $key=> $item){
+            $cursos  = DB::SELECT("SELECT DISTINCT mt.idcurso, mt.docente_id,
+            c.nombrenivel AS curso,
+            pl.descripcion AS paralelo
+            FROM asignaturausuario mt
+            LEFT JOIN mat_niveles_institucion n ON mt.idcurso = n.nivelInstitucion_id
+            LEFT JOIN nivel  c ON  n.nivel_id = c.idnivel
+            LEFT JOIN mat_paralelos pl ON n.paralelo_id = pl.paralelo_id
+            WHERE mt.docente_id = '$item->idusuario'
+            AND  n.institucion_id = '$institucion'
+            AND n.periodo_id = '$periodo'
+            ORDER BY c.nombrenivel desc
+            ");
+            $datos[$contador] = [
+                "idusuario"                 => $item->idusuario,
+                "nombres"                   => $item->nombres,
+                "apellidos"                 => $item->apellidos,
+                "cedula"                    => $item->cedula,
+                "name_usuario"              => $item->name_usuario,
+                "email"                     => $item->email,
+                "id_group"                  => $item->id_group,
+                "institucion_idInstitucion" => $item->institucion_idInstitucion,
+                "nombreInstitucion"         => $item->nombreInstitucion,
+                "fecha_nacimiento"          => $item->fecha_nacimiento,
+                "estado_idEstado"           => $item->estado_idEstado,
+                "cursos"                    => $cursos
+            ];
+            $contador++;
+        }
+        return $datos;
     }
     public function getCursosDocente($institucion,$periodo,$docente_id){
         $datosCursos = [];
