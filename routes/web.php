@@ -1243,5 +1243,7 @@ Route::post('guardarDocente','RegistroDocenteController@guardarDocente');
 Route::resource('convenio','ConvenioController');
 //API CODIGOS ESTUDIANTE
 Route::get('getEstudianteCodigos/{valores}','CodigosLibrosController@getEstudianteCodigos');
+///ILUMINAR
+Route::get('getAllBooks','LibroController@getAllBooks');
 
 

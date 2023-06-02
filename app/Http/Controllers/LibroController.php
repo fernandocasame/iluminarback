@@ -40,6 +40,20 @@ class LibroController extends Controller
         }
         return $libro;
     }
+    //api:get/getAllBooks
+    public function getAllBooks(Request $request){
+        $query = DB::SELECT("SELECT l.nombrelibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
+        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
+         FROM libros_series ls
+         LEFT JOIN series s ON ls.id_serie = s.id_serie
+         LEFT JOIN libro l ON ls.idLibro = l.idlibro
+         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+         LEFT JOIN area ar ON a.area_idarea = ar.idarea
+         WHERE l.Estado_idEstado = '1'
+         AND a.estado = '1'        
+        ");
+        return $query;
+    }
     public function librosEstudiante(Request $request)
     {
         $idregion='';
@@ -570,6 +584,7 @@ class LibroController extends Controller
                 $libro->guiadidactica               = $request->guiadidactica;
                 $libro->asignatura_idasignatura     = $request->asignatura_idasignatura;
                 $libro->portada                     = $request->portada;
+                $libro->demo                        = $request->demo;
                 //DATOS SIERRA
                 $libro->s_weblibro                  = ($request->s_weblibro      == null     || $request->s_weblibro      == "null") ? null : $request->s_weblibro;
                 $libro->s_pdfsinguia                = ($request->s_pdfsinguia    == null     || $request->s_pdfsinguia    == "null") ? null : $request->s_pdfsinguia;
