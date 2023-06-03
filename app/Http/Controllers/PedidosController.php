@@ -180,6 +180,7 @@ class PedidosController extends Controller
             $aprobado = $request->anticipo_aprobado;
             $pedido = Pedidos::findOrFail($request->id_pedido);
             $pedido->anticipo_aprobado = $aprobado;
+            $pedido->ifagregado_anticipo_aprobado   = 1;
             $pedido->save();
             //actualizar anticipo facturacion
             $form_data = [
@@ -2307,7 +2308,9 @@ class PedidosController extends Controller
         // $array = json_decode($test);
         // return  $array;
         try {
-            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=13930"); 
+            $extractValues = explode(',',$request->codigosM);
+            $escuela = $extractValues[0];
+            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$escuela); 
             $JsonDocumentos = json_decode($dato, true);
             return $JsonDocumentos; 
         } catch (\Exception  $ex) {

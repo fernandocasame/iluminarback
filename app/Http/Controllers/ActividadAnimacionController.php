@@ -263,8 +263,8 @@ class ActividadAnimacionController extends Controller
 
 	public function f_todoVarios()
     {
-        //$query = DB::SELECT("SELECT  * from varios");
-        $query = Varios::all();
+        $query = DB::SELECT("SELECT  * from varios");
+        // $query = Varios::all();
         return $query;
     }
 
