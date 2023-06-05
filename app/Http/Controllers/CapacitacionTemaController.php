@@ -17,7 +17,7 @@ class CapacitacionTemaController extends Controller
      */
     public function index()
     {
-        $dato = capacitacionTema::where('estado','<>','2')->get();
+        $dato = capacitacionTema::where('estado','<>','2')->OrderBy('id','desc')->get();
         return $dato;
     }
 
@@ -44,15 +44,17 @@ class CapacitacionTemaController extends Controller
         }else{
             $contenido = new capacitacionTema();
         }
-        
-        $contenido->tema = $request->tema;
-        $contenido->capacitador = $request->capacitador;
-        $contenido->area = $request->area;
-        $contenido->nueva_area = $request->nueva_area;
-        $contenido->estado = $request->estado;
-        
+        $contenido->tema        = $request->tema;
+        if($request->capacitador == "" || $request->capacitador == "null"){
+            $contenido->capacitador = null;
+        }else{
+            $contenido->capacitador = $request->capacitador;
+        }
+        $contenido->area        = $request->area;
+        $contenido->nueva_area  = $request->nueva_area;
+        $contenido->estado      = $request->estado;
+        $contenido->observacion = $request->observacion;
         $contenido->save();        
-        
         return $contenido;
     }
 

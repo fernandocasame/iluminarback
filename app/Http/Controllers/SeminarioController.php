@@ -182,25 +182,27 @@ class SeminarioController extends Controller
     ///SEMINARIOS V2
     public function get_seminarios($id_periodo){
 
-        $seminarios = DB::SELECT("SELECT s.*, i.nombreInstitucion AS nombre_institucion, c.nombre AS nombre_ciudad, t.ciudad,
-        te.tema,a.nombrearea, CONCAT(u.nombres,' ',u.apellidos) as asesor ,u.cedula,i.nombreInstitucion,
-        (case when (s.estado_institucion_temporal = 1) then s.nombre_institucion_temporal  else i.nombreInstitucion end) as institucionFinal,
-        (case when (s.estado_capacitacion = 2) then 'Realizada' when (s.estado_capacitacion = 1) then 'Pendiente' else 'Cancelada' end) as estadoCapacitacion,
-        COUNT(sr.id_seminario) AS cant_respuestas
-         FROM seminarios s
-         LEFT JOIN institucion i ON s.id_institucion = i.idInstitucion
-         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-         LEFT JOIN seminario_respuestas sr ON s.id_seminario = sr.id_seminario
-         LEFT JOIN seguimiento_institucion_temporal t on s.institucion_id_temporal = t.institucion_temporal_id
-         LEFT JOIN capacitacion_temas te ON  s.tema_id = te.id
-         LEFT JOIN area a on te.area = a.idarea
-         LEFT JOIN usuario u ON s.id_usuario = u.idusuario
-         WHERE s.estado = '1'
-         and  s.periodo_id = $id_periodo
-         GROUP BY s.id_seminario
-         ORDER BY s.id_seminario DESC
-         "
-         );
+        $seminarios = DB::SELECT("SELECT s.*, i.nombreInstitucion AS nombre_institucion,
+            c.nombre AS nombre_ciudad, t.ciudad,
+            te.tema,a.nombrearea, CONCAT(u.nombres,' ',u.apellidos) as asesor ,u.cedula,i.nombreInstitucion,
+            (case when (s.estado_institucion_temporal = 1) then s.nombre_institucion_temporal  else i.nombreInstitucion end) as institucionFinal,
+            (case when (s.estado_capacitacion = 2) then 'Realizada' when (s.estado_capacitacion = 1) then 'Pendiente' else 'Cancelada' end) as estadoCapacitacion,
+            COUNT(sr.id_seminario) AS cant_respuestas,
+            CONCAT(cap.nombres,' ',cap.apellidos) as capacitador
+            FROM seminarios s
+            LEFT JOIN institucion i ON s.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN seminario_respuestas sr ON s.id_seminario = sr.id_seminario
+            LEFT JOIN seguimiento_institucion_temporal t on s.institucion_id_temporal = t.institucion_temporal_id
+            LEFT JOIN capacitacion_temas te ON  s.tema_id = te.id
+            LEFT JOIN area a on te.area = a.idarea
+            LEFT JOIN usuario u ON s.id_usuario = u.idusuario
+            LEFT JOIN usuario cap ON s.capacitador_id = cap.idusuario
+            WHERE s.estado = '1'
+            and  s.periodo_id = '$id_periodo'
+            GROUP BY s.id_seminario
+            ORDER BY s.id_seminario DESC
+       ");
         return $seminarios;
     }
     //traer las instituciones temporales
@@ -655,15 +657,19 @@ class SeminarioController extends Controller
                         $capacitacion->periodo_id = $obtenerPeriodo;   
                     }
                 }
-               $capacitacion->estado_institucion_temporal =$request->estado_institucion_temporal;
-               $capacitacion->fecha_inicio = $request->fecha_inicio;
-               $capacitacion->fecha_fin = $request->fecha_fin;
-               $capacitacion->descripcion = $request->fecha_inicio;
-               $capacitacion->cant_asistentes = $request->cant_asistentes;
-               $capacitacion->observacion_admin = $request->observacion;
-               $capacitacion->link_reunion = $request->link_reunion;
-               $capacitacion->estado_capacitacion = $request->estado_capacitacion;
-               $capacitacion->asistencia_activa = $request->asistencia_activa;
+               $capacitacion->estado_institucion_temporal   = $request->estado_institucion_temporal;
+               $capacitacion->fecha_inicio                  = $request->fecha_inicio;
+               $capacitacion->fecha_fin                     = $request->fecha_fin;
+               $capacitacion->descripcion                   = $request->fecha_inicio;
+               $capacitacion->cant_asistentes               = $request->cant_asistentes;
+               $capacitacion->observacion_admin             = $request->observacion;
+               $capacitacion->link_reunion                  = $request->link_reunion;
+               $capacitacion->estado_capacitacion           = $request->estado_capacitacion;
+               $capacitacion->asistencia_activa             = $request->asistencia_activa;
+               $capacitacion->capacitador_id                = $request->capacitador_id;
+               if($request->capacitador_id > 0){
+                 $capacitacion->capacitador                 = $request->capacitador;
+               }
                $capacitacion->save();
                if($capacitacion){
                 return ["status" => "1","message" => "Se actualizo correctamente"];

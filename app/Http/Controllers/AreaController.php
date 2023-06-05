@@ -16,7 +16,6 @@ class AreaController extends Controller
     public function index()
     {   
         // return csrf_token();
-        return  "hola mundo";
         $area = DB::SELECT("SELECT a.*, t.nombretipoarea
          FROM area a 
          LEFT JOIN tipoareas t ON a.tipoareas_idtipoarea  = t.idtipoarea 

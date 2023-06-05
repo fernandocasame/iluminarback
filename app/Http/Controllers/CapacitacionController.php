@@ -179,7 +179,7 @@ class CapacitacionController extends Controller
         $agenda->hora_inicio = $request->hora_inicio;
         $agenda->hora_fin = $request->hora_fin;
         $agenda->tema_id = $request->tema_id;
-        $agenda->capacitador = $request->capacitador;
+        // $agenda->capacitador = $request->capacitador;
         $agenda->estado_institucion_temporal =$request->estado_institucion_temporal;
         $agenda->save();
         return 
@@ -241,5 +241,12 @@ class CapacitacionController extends Controller
         WHERE  p.estado = '1'
         ");
         return $periodo;
+    }
+    public function getCapacitadores(){
+        $query = DB::SELECT("SELECT u.idusuario, CONCAT(u.nombres, ' ',u.apellidos) AS capacitador
+        FROM 
+       usuario u
+       WHERE u.capacitador = '1'");
+       return $query;
     }
 }
