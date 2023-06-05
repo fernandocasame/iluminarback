@@ -182,9 +182,13 @@ class CodigosLibrosController extends Controller
         if(!empty($codigos_libros)){
             foreach ($codigos_libros as $key => $value) {
                 $nivel = $value->nivel_idnivel;
-                $free = DB::SELECT("SELECT l.*, a.* FROM free_estudiante_libro f
+                $free = DB::SELECT("SELECT l.*, a.*,s.nombre_serie as serieCodigo,
+                ls.year as anio, ls.updated_at  as fechaUpdate
+                 FROM free_estudiante_libro f
                 JOIN libro l ON f.libro_id  = l.idlibro
                 JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
+                LEFT JOIN series s ON ls.id_serie = s.id_serie
                 WHERE f.institucion_id = '$institucion'
                 AND f.nivel_id = '$nivel'
                 ");
@@ -223,6 +227,10 @@ class CodigosLibrosController extends Controller
                 $guiadidactica  = $item->c_guiadidactica;
             }
         }
+        $mostratCode = "";
+        if(isset($item->codigo)){
+            $mostratCode  = $item->codigo;
+        }
         $datos[$key] =[
             "idlibro"                   => $item->idlibro,
             "nombrelibro"               => $item->nombrelibro,
@@ -230,7 +238,7 @@ class CodigosLibrosController extends Controller
             "serie"                     => $item->serieCodigo,
             "anio"                      => $item->anio,
             "fechaUpdate"               => $item->fechaUpdate,
-            "codigo"                    => $item->codigo,
+            "codigo"                    => $mostratCode,
             "titulo"                    => $item->titulo,
             "portada"                   => $portada,
             "weblibro"                  => $weblibro,
