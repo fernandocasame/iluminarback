@@ -81,7 +81,7 @@
 
             <div class="content">
                 <div class="title m-b-md">
-                    PROLIPA
+                    Iluminareditores
                 </div>
 
                 <!-- <div class="links">
@@ -96,7 +96,7 @@
                 <div id="app">
                     <example-component></example-component>
                 </div>
-                
+
             </div>
         </div>
         <script src="{{ asset('js/app.js') }}" defer></script>
