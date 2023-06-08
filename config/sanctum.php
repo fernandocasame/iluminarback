@@ -15,7 +15,7 @@ return [
 
     'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
         '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8080,162.254.200.43:8000,162.254.200.43,http://localhost:8080,::1',
+        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8080,162.254.200.43:8000,162.254.200.43,http://localhost:8080,https://plataforma.iluminareditores.com,::1',
         env('APP_URL') ? ','.parse_url(env('APP_URL'), PHP_URL_HOST) : ''
     ))),
 
