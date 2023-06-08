@@ -15,6 +15,6 @@ jobs:
       - name: Install Dependencies
         run: composer install
       - name: Directory Permissions Rol
-        run: chown -R :nginx storage bootstrap/cache
+        run: chown -R root:nginx storage bootstrap/cache
       - name: Directory Permissions
-        run: script.sh
+        run: chmod -R 0777 storage bootstrap/cache
