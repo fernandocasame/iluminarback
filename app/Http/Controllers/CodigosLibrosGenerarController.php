@@ -112,19 +112,17 @@ class CodigosLibrosGenerarController extends Controller
             $codigos_libros->save();
     }
     public function generarCodigos(Request $request){
-        $repetidos = array();
-        $resp_search = array();
-        $repetido_gen = array();
-        $codigos_validacion = array();
-        $longitud  = $request->longitud;
-        $code = $request->code;
-        $cantidad = $request->cantidad;
+        $repetidos              = array();
+        $resp_search            = array();
+        $repetido_gen           = array();
+        $codigos_validacion     = array();
+        $longitud               = $request->longitud;
+        $code                   = $request->code;
+        $cantidad               = $request->cantidad;
         $codigos = [];
         for ($i = 0; $i < $cantidad; $i++) {
-
             $caracter = $this->makeid($longitud);
             $codigo = $code.$caracter;
-
             // valida repetidos en generacion
             $valida_gen = 1;
             $cant_int = 0;
@@ -145,8 +143,6 @@ class CodigosLibrosGenerarController extends Controller
                     $valida_gen = 0;
                 }
             }
-
-
             if( $codigo != 'no_disponible' ){
                 // valida repetidos en DB
                 $validar = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo'");
@@ -163,25 +159,21 @@ class CodigosLibrosGenerarController extends Controller
                         $validar = ['repetido' => 'repetido'];
                     }
                 }
-
                 if( $codigo_disponible == 1 ){
                     array_push($codigos_validacion, $codigo);
                     array_push($codigos, ["codigo" => $codigo]);
                     // $codigos[$i] = ["codigo" => $codigo];
                 }
             }
-
         }
         return ["codigos" => $codigos, "repetidos" => $resp_search];
     }
-
     //api::Get/contadorCodigo
     public function contadorCodigo(Request $request){
-        // $obtenerNumero = DB::SELECT("SELECT max(contador) as contador FROM codigoslibros c
-        // WHERE codigo LIKE '%$request->serie%'
-        // ");
+        //CONTADOR LIBROS ANTERIORES
         $obtenerNumero = DB::SELECT("SELECT max(contador) as contador FROM codigoslibros c
         WHERE  c.libro_idlibro = '$request->libro'
+        AND c.prueba_diagnostica = '0'
         ");
         $contador = 1;
         if(count($obtenerNumero) > 0){
@@ -190,58 +182,131 @@ class CodigosLibrosGenerarController extends Controller
         if($contador == null || $contador == ""){
             $contador = 1;
         }
+        //CONTADOR PRUEBA DIANOSTICO
+        $obtenerNumeroDiagnostica = DB::SELECT("SELECT max(contador) as contador FROM codigoslibros c
+         WHERE  c.libro_idlibro = '$request->libro'
+         AND c.prueba_diagnostica = '1'
+        ");
+        $contadorDiagnostica = 1;
+        if(count($obtenerNumeroDiagnostica) > 0){
+            $contadorDiagnostica = $obtenerNumeroDiagnostica[0]->contador;
+        }
+        if($contadorDiagnostica == null || $contadorDiagnostica == ""){
+            $contadorDiagnostica = 1;
+        }
         $datos = [
-            "contador" => $contador
+            "contador"              => $contador,
+            "contadorDiagnostica"   => $contadorDiagnostica
         ];
         return $datos;
     }
 
+    // public function store(Request $request)
+    // {
+    //     set_time_limit(600000);
+    //     ini_set('max_execution_time', 600000);
+    //     $porcentaje = 0;
+    //     $contador   = $request->contador;
+    //     $codigos    = explode(",", $request->codigo);
+    //     $tam        = sizeof($codigos);
+    //     $codigosError = [];
+    //     for( $i=0; $i<$tam; $i++ ){
+    //         $codigos_libros                             = new CodigosLibros();
+    //         $codigos_libros->serie                      = $request->serie;
+    //         $codigos_libros->libro                      = $request->libro;
+    //         $codigos_libros->anio                       = $request->anio;
+    //         $codigos_libros->libro_idlibro              = $request->idlibro;
+    //         $codigos_libros->estado                     = $request->estado;
+	// 		$codigos_libros->idusuario                  = 0;
+    //         $codigos_libros->bc_estado                  = 1;
+    //         $codigos_libros->idusuario_creador_codigo = $request->idusuario;
+    //         $codigo_verificar = $codigos[$i];
+    //         $verificar_codigo = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo_verificar'");
+    //         if( $verificar_codigo ){
+    //             $codigoNoIngresado = $codigos[$i];
+    //             $codigosError[$i] = [
+    //                 "codigos" => $codigoNoIngresado
+    //             ];
+    //         }else{
+    //             $codigos_libros->codigo = $codigos[$i];
+    //             $codigos_libros->contador = ++$contador;
+    //             $codigos_libros->save();
+    //             $porcentaje++;
+    //         }
+    //     }
+    //     return ["porcentaje" =>$porcentaje ,"codigosNoIngresados" => $codigosError] ;
+    // }
     public function store(Request $request)
     {
         set_time_limit(600000);
         ini_set('max_execution_time', 600000);
-
-        $porcentaje = 0;
-        $contador = $request->contador;
-
-        $codigos = explode(",", $request->codigo);
-        $tam = sizeof($codigos);
-
-        $codigosError = [];
+        $codigos                            = explode(",", $request->codigo);
+        $codigosDiagnostico                 = explode(",", $request->codigosDiagnostico);
+        $porcentajeAnterior                 = 0;
+        $porcentajeDiagnostico              = 0;
+        $codigosNoIngresadosAnterior        = [];
+        $codigosNoIngresadosDiagnostico     = [];
+        //only codigos
+        if($request->tipoCodigo == 0){
+            $resultado                      = $this->save_Codigos($request,$codigos,0,$request->contador);
+            $porcentajeAnterior             = $resultado["porcentaje"];
+            $codigosNoIngresadosAnterior    = $resultado["codigosNoIngresados"];
+        }
+        //only diagnostico
+        if($request->tipoCodigo == 1){
+            $resultado                      = $this->save_Codigos($request,$codigosDiagnostico,1,$request->contadorDiagnostico);
+            $porcentajeDiagnostico          = $resultado["porcentaje"];
+            $codigosNoIngresadosDiagnostico = $resultado["codigosNoIngresados"];
+        }
+        //Ambos
+        if($request->tipoCodigo == 2){
+            $resultado                      = $this->save_Codigos($request,$codigos,0,$request->contador);
+            $resultadoDiagnostico           = $this->save_Codigos($request,$codigosDiagnostico,1,$request->contadorDiagnostico);
+            //only codigos
+            $porcentajeAnterior             = $resultado["porcentaje"];
+            $codigosNoIngresadosAnterior    = $resultado["codigosNoIngresados"];
+            //diagnostico
+            $porcentajeDiagnostico          = $resultadoDiagnostico["porcentaje"];
+            $codigosNoIngresadosDiagnostico = $resultadoDiagnostico["codigosNoIngresados"];
+        }
+        return[
+            "porcentajeAnterior"            => $porcentajeAnterior,
+            "codigosNoIngresadosAnterior"   => $codigosNoIngresadosAnterior,
+            "porcentajeDiagnostico"         => $porcentajeDiagnostico,
+            "codigosNoIngresadosDiagnostico"=> $codigosNoIngresadosDiagnostico,
+        ];
+    }
+    public function save_Codigos($request,$codigos,$prueba_diagnostica,$contador){
+        $tam            = sizeof($codigos);
+        $porcentaje     = 0;
+        $codigosError   = [];
         for( $i=0; $i<$tam; $i++ ){
-            $codigos_libros = new CodigosLibros();
-
-            $codigos_libros->serie = $request->serie;
-            $codigos_libros->libro = $request->libro;
-            $codigos_libros->anio = $request->anio;
-            $codigos_libros->libro_idlibro = $request->idlibro;
-            $codigos_libros->estado = $request->estado;
-			$codigos_libros->idusuario = 0;
-            $codigos_libros->bc_estado = 1;
-            $codigos_libros->idusuario_creador_codigo = $request->idusuario;
-
-            $codigo_verificar = $codigos[$i];
+            $codigos_libros                             = new CodigosLibros();
+            $codigos_libros->serie                      = $request->serie;
+            $codigos_libros->libro                      = $request->libro;
+            $codigos_libros->anio                       = $request->anio;
+            $codigos_libros->libro_idlibro              = $request->idlibro;
+            $codigos_libros->estado                     = $request->estado;
+			$codigos_libros->idusuario                  = 0;
+            $codigos_libros->bc_estado                  = 1;
+            $codigos_libros->idusuario_creador_codigo   = $request->idusuario;
+            $codigos_libros->prueba_diagnostica         = $prueba_diagnostica;
+            $codigo_verificar                           = $codigos[$i];
             $verificar_codigo = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo_verificar'");
-
             if( $verificar_codigo ){
                 $codigoNoIngresado = $codigos[$i];
                 $codigosError[$i] = [
                     "codigos" => $codigoNoIngresado
                 ];
             }else{
-                
                 $codigos_libros->codigo = $codigos[$i];
                 $codigos_libros->contador = ++$contador;
                 $codigos_libros->save();
                 $porcentaje++;
             }
-
         }
-
         return ["porcentaje" =>$porcentaje ,"codigosNoIngresados" => $codigosError] ;
-
     }
-
     /**
      * Display the specified resource.
      *
@@ -312,25 +377,17 @@ class CodigosLibrosGenerarController extends Controller
     public function codigosLibrosFecha($datos)
     {
         $data = explode("*", $datos);
-
         if( $data[0] != "" ){
             $datalibro = explode("-", $data[0]);
             $fecha = $data[1];
-
             $libro = $datalibro[1];
             $serie = $datalibro[0];
-            //SELECT c.idusuario, c.codigo, l.nombrelibro as libro, c.serie, c.anio, c.fecha_create, s.id_serie, s.nombre_serie, c.libro_idlibro, u.nombres, u.apellidos, u.cedula, i.nombreInstitucion from codigoslibros c, series s, libro l, usuario u, institucion i WHERE c.serie = s.nombre_serie AND c.libro_idlibro = l.idlibro AND c.libro = '$libro' AND c.serie = '$serie' AND c.created_at like '$fecha%' AND c.idusuario = u.idusuario AND u.institucion_idInstitucion = i.idInstitucion
             $codigos_libros = DB::SELECT("SELECT c.idusuario, c.codigo, l.nombrelibro as libro, c.serie, c.anio, c.fecha_create, s.id_serie, s.nombre_serie, c.libro_idlibro, u.nombres, u.apellidos, u.cedula, i.nombreInstitucion FROM codigoslibros c INNER JOIN series s ON c.serie = s.nombre_serie INNER JOIN libro l ON c.libro_idlibro = l.idlibro LEFT JOIN usuario u ON c.idusuario = u.idusuario LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion WHERE c.libro = '$libro' AND c.serie = '$serie' AND c.created_at like '$fecha%'");
-
             return $codigos_libros;
-
         }else{
             return 0;
         }
-
     }
-
-
     public function codigosLibrosCodigo($codigo)
     {
        
@@ -458,7 +515,9 @@ class CodigosLibrosGenerarController extends Controller
         $datos = explode("*", $data);
         $usuario = $datos[0];
         $cantidad = $datos[1];
-        $codigos_libros = DB::SELECT("SELECT * from codigoslibros WHERE idusuario_creador_codigo = '$usuario'
+        $codigos_libros = DB::SELECT("SELECT * 
+        from codigoslibros 
+        WHERE idusuario_creador_codigo = '$usuario'
         ORDER BY fecha_create
         DESC LIMIT $cantidad");
         return $codigos_libros;
