@@ -6,3 +6,4 @@ chmod -R 0775 /var/www/html/iluminarback/iluminarback/bootstrap/cache/
 semanage fcontext -a -t httpd_sys_rw_content_t '/var/www/html/iluminarback/iluminarback/storage(/.*)?'
 semanage fcontext -a -t httpd_sys_rw_content_t '/var/www/html/iluminarback/iluminarback/bootstrap/cache(/.*)?'
 restorecon -Rv '/var/www/html/iluminarback/iluminarback'
+sudo cp -rf /var/www/html/plataformaprolipa_server/vendor /var/www/html/iluminarback/iluminarback
