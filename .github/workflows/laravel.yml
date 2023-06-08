@@ -2,20 +2,17 @@ name: Laravel
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 jobs:
   laravel-tests:
-
     runs-on: self-hosted
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Copy .env
-      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
-    - name: Install Dependencies
-      run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
-    - name: Directory Permissions
-      run: chmod -R 777 storage bootstrap/cache
+      - uses: actions/checkout@v3
+      - name: Install Dependencies
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+      - name: Directory Permissions
+        run: chmod -R 777 storage bootstrap/cache
