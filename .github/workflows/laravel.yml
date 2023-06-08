@@ -18,3 +18,5 @@ jobs:
         run: chown -R root:nginx storage bootstrap/cache
       - name: Directory Permissions
         run: chmod 777 -R storage bootstrap/cache
+      - name: Directory Permissions ug
+        run: chmod u+w,g+w -R storage bootstrap/cache
