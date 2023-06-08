@@ -17,6 +17,6 @@ jobs:
       - name: Directory Permissions Rol
         run: chown -R root:nginx storage bootstrap/cache
       - name: Directory Permissions
-        run: chmod 777 -R storage bootstrap/cache
+        run: chmod 777 script.sh
       - name: Directory Permissions ug
-        run: chmod u+w,g+w -R storage bootstrap/cache
+        run: sh script.sh
