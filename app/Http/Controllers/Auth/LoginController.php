@@ -45,15 +45,15 @@ class LoginController extends Controller
     {
         $credentials=$request->only('name_usuario', 'password');
 
-        if (Auth::attempt(['name_usuario' => $request->name_usuario, 'password' => $request->password, 'estado_idEstado' => 1])) {
+        if (Auth::attempt(['name_usuario' => (string) $request->name_usuario, 'password' => $request->password, 'estado_idEstado' => 1])) {
             // Authentication passed...
             // return redirect()->intended('dashboard');
-            
-        }
-        
-       
 
-        
+        }
+
+
+
+
         else{
             $buscarUser =DB::select("SELECT * FROM usuario where name_usuario = '$request->name_usuario'");
 
@@ -79,12 +79,12 @@ class LoginController extends Controller
 
                 }
 
-                
+
             }
             else{
                 return response()->json(['errors' => 'Estas credenciales no coinciden con nuestros registros.'], 412);
             }
-            
+
         }
     }
 
