@@ -407,7 +407,10 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarCodigo($codigo){
-            $codigos_libros = DB::SELECT("SELECT u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
+            $codigos_libros = DB::SELECT("SELECT
+            c.prueba_diagnostica, 
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+             u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
             (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
             FROM codigos_devolucion d
             WHERE d.codigo = c.codigo

@@ -83,6 +83,8 @@ class CodigoLibrosController extends Controller
                 }else{
                     $codigosLeidos[$contador] = [
                         "codigo" => $item->codigo,
+                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"         => $validar[0]->tipoCodigo,
                         "barrasEstado" => $validar[0]->barrasEstado,
                         "codigoEstado" => $validar[0]->codigoEstado,
                         "liquidacion" => $validar[0]->liquidacion,
@@ -161,7 +163,10 @@ class CodigoLibrosController extends Controller
             //SI ENVIAN POR INSTITUCION
             //USAN Y LIQUIDAN /VENTA DIRECTA
              //validar si el codigo existe
-            $validar = DB::SELECT("SELECT c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.contador,
+            $validar = DB::SELECT("SELECT 
+                c.prueba_diagnostica, 
+                IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+                c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.contador,
                 c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
                 CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
                 i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
@@ -237,6 +242,8 @@ class CodigoLibrosController extends Controller
                         }else{
                             $codigosDemas[$contador] = [
                                 "codigo" => $item->codigo,
+                                "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                                "tipoCodigo"         => $validar[0]->tipoCodigo,
                                 "barrasEstado" => $validar[0]->barrasEstado,
                                 "codigoEstado" => $validar[0]->codigoEstado,
                                 "liquidacion" => $validar[0]->liquidacion,
@@ -289,6 +296,8 @@ class CodigoLibrosController extends Controller
                         }else{
                             $codigosDemas[$contador] = [
                                 "codigo" => $item->codigo,
+                                "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                                "tipoCodigo"         => $validar[0]->tipoCodigo,
                                 "barrasEstado" => $validar[0]->barrasEstado,
                                 "codigoEstado" => $validar[0]->codigoEstado,
                                 "liquidacion" => $validar[0]->liquidacion,
@@ -337,6 +346,8 @@ class CodigoLibrosController extends Controller
                     }else{
                         $codigosDemas[$contador] = [
                             "codigo" => $item->codigo,
+                            "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                            "tipoCodigo"         => $validar[0]->tipoCodigo,
                             "barrasEstado" => $validar[0]->barrasEstado,
                             "codigoEstado" => $validar[0]->codigoEstado,
                             "liquidacion" => $validar[0]->liquidacion,
@@ -385,6 +396,8 @@ class CodigoLibrosController extends Controller
                     }else{
                         $codigosDemas[$contador] = [
                             "codigo" => $item->codigo,
+                            "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                            "tipoCodigo"         => $validar[0]->tipoCodigo,
                             "barrasEstado" => $validar[0]->barrasEstado,
                             "codigoEstado" => $validar[0]->codigoEstado,
                             "liquidacion" => $validar[0]->liquidacion,
@@ -451,7 +464,10 @@ class CodigoLibrosController extends Controller
      public function getTipoVenta(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $tipoVenta = DB::SELECT("SELECT c.contrato,
+        $tipoVenta = DB::SELECT("SELECT 
+        c.prueba_diagnostica, 
+        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.contrato,
         c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
         ib.nombreInstitucion as institucion_barras,
@@ -527,6 +543,8 @@ class CodigoLibrosController extends Controller
                 }else{
                     $codigoLiquidados[$contador] = [
                         "codigo" => $item->codigo,
+                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"         => $validar[0]->tipoCodigo,
                         "barrasEstado" => $validar[0]->barrasEstado,
                         "codigoEstado" => $validar[0]->codigoEstado,
                         "liquidacion" => $validar[0]->liquidacion,
@@ -560,7 +578,9 @@ class CodigoLibrosController extends Controller
         ];
      }
      public function getCodigos($codigo){
-        $consulta = DB::SELECT("SELECT  c.libro as book,c.serie,c.created_at,
+        $consulta = DB::SELECT("SELECT c.prueba_diagnostica, 
+        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.libro as book,c.serie,c.created_at,
         (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
         FROM codigos_devolucion d
         WHERE d.codigo = c.codigo
@@ -642,6 +662,8 @@ class CodigoLibrosController extends Controller
                 }else{
                     $codigosConUsuario[$contador] = [
                         "codigo" => $item->codigo,
+                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"         => $validar[0]->tipoCodigo,
                         "barrasEstado" => $validar[0]->barrasEstado,
                         "codigoEstado" => $validar[0]->codigoEstado,
                         "liquidacion" => $validar[0]->liquidacion,
@@ -781,6 +803,8 @@ class CodigoLibrosController extends Controller
                     }else{
                         $codigosConUsuario[$contador] = [
                             "codigo" => $item->codigo,
+                            "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                            "tipoCodigo"         => $validar[0]->tipoCodigo,
                             "barrasEstado" => $validar[0]->barrasEstado,
                             "codigoEstado" => $validar[0]->codigoEstado,
                             "liquidacion" => $validar[0]->liquidacion,
@@ -857,6 +881,8 @@ class CodigoLibrosController extends Controller
                 }else{
                     $codigosConUsuario[$contador] = [
                         "codigo" => $item->codigo,
+                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"         => $validar[0]->tipoCodigo,
                         "barrasEstado" => $validar[0]->barrasEstado,
                         "codigoEstado" => $validar[0]->codigoEstado,
                         "liquidacion" => $validar[0]->liquidacion,
@@ -958,6 +984,8 @@ class CodigoLibrosController extends Controller
                     }else{
                         $codigosConLiquidacion[$contador] = [
                             "codigo" => $item->codigo,
+                            "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                            "tipoCodigo"         => $validar[0]->tipoCodigo,
                             "barrasEstado" => $validar[0]->barrasEstado,
                             "codigoEstado" => $validar[0]->codigoEstado,
                             "liquidacion" => $validar[0]->liquidacion,
@@ -1016,6 +1044,8 @@ class CodigoLibrosController extends Controller
                         }
                         $codigosConLiquidacion[$contador] = [
                             "codigo" => $item->codigo,
+                            "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                            "tipoCodigo"         => $validar[0]->tipoCodigo,
                             "barrasEstado" => $validar[0]->barrasEstado,
                             "codigoEstado" => $validar[0]->codigoEstado,
                             "liquidacion" => $validar[0]->liquidacion,
@@ -1130,6 +1160,8 @@ class CodigoLibrosController extends Controller
                     }
                     $codigosConLiquidacion[$contador] = [
                         "codigo" => $getCodigo,
+                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"         => $validar[0]->tipoCodigo,
                         "liquidacion" => $validar[0]->liquidacion,
                         "institucionBarra" => $validar[0]->institucion_barras,
                         "periodo_barras" => $validar[0]->periodo_barras,
@@ -1166,7 +1198,10 @@ class CodigoLibrosController extends Controller
         $fecha  = date('Y-m-d H:i:s');   
         foreach($codigos as $key => $item){
         //validar si el codigo existe
-            $validar = DB::SELECT("SELECT c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
+            $validar = DB::SELECT("SELECT
+            c.prueba_diagnostica, 
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
             c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
             CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
             i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
@@ -1250,6 +1285,8 @@ class CodigoLibrosController extends Controller
                 }else{
                     $codigoSinDevolucion[$contador] = [
                         "codigo" => $item->codigo,
+                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"         => $validar[0]->tipoCodigo,
                         "barrasEstado" => $validar[0]->barrasEstado,
                         "codigoEstado" => $validar[0]->codigoEstado,
                         "liquidacion" => $validar[0]->liquidacion,
