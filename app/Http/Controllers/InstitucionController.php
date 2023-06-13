@@ -431,6 +431,7 @@ class InstitucionController extends Controller
                         "asesor_id" =>         $item->asesor_id,
                         "nombre_asesor" =>     $item->nombre_asesor,
                         "apellido_asesor" =>   $item->apellido_asesor,
+                        "asesor"           =>  $item->nombre_asesor." ".$item->apellido_asesor,
                         "fecha_registro" =>    $item->fecha_registro,
                         "nombreregion" =>      $item->nombreregion,
                         "periodo_id" =>        $periodoInstitucion[0]->periodo_id,
