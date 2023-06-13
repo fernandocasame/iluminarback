@@ -12,8 +12,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-      - name: Install Dependencies
-        run: composer install
       - name: Directory Permissions Rol
         run: chown -R root:nginx storage bootstrap/cache
       - name: Directory Permissions
