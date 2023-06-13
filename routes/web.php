@@ -55,6 +55,9 @@ Route::resource('capacitacion','CapacitacionController');
 Route::get('delete_agenda_asesor/{id}','CapacitacionController@delete_agenda_asesor');
 Route::get('temasCapacitacion','CapacitacionController@temasCapacitacion');
 Route::get('getCapacitadores','CapacitacionController@getCapacitadores');
+//API PARA REPORTE CAPACITACIONES
+Route::get('reporteCapacitaciones/{valores}','CapacitacionController@reporteCapacitaciones');
+Route::get('/reporteCapacitacionesGrupal/{periodo}','CapacitacionController@reporteCapacitacionesGrupal');
 //capacitacion temas
 // Route::resource('capacitacionTema','CapacitacionTemaController');
 
