@@ -14,6 +14,9 @@ use App\Models\Institucion;
 use App\Models\PedidosClienteInstitucion;
 use App\Models\PedidosAnticiposSolicitados;
 use App\Models\PedidoAlcance;
+use App\Models\PedidoAlcanceHistorico;
+use App\Models\PedidoConvenio;
+use App\Models\PedidoConvenioDetalle;
 use App\Models\PedidoHistoricoActas;
 use App\Models\PedidosGuiasBodega;
 use App\Models\PedidoGuiaEntrega;
@@ -72,7 +75,20 @@ class PedidosController extends Controller
         }
         return $datos;
     }
-
+    public function getConvenioInstitucion($institucion){
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios c
+        WHERE c.institucion_id = '$institucion'
+        AND c.estado = '1'
+        ");
+        return $query;
+    }
+    public function contadorAniosConvenio($idConvenio){
+        $estadoConvenio = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
+        WHERE cd.pedido_convenio_institucion = '$idConvenio'
+        AND cd.estado = '1'
+        ");
+        return $estadoConvenio;
+    }
     public function store(Request $request)
     {
         //validar un pedido de institucion por periodo solo para cuando va a guardar no el editar
@@ -109,10 +125,27 @@ class PedidosController extends Controller
                 if($request->ifagregado_anticipo_aprobado == 1){
                     $this->aprobarAnticipo($request->id_pedido);
                 }
-                //Actualizar fecha creacion del pedido
-                //$this->UpdateFechaCreacionPedido($request->id_pedido);
             }else{
                 $pedido = new Pedidos();
+                //si existe convenio de la institucion
+                $getConvenio = $this->getConvenioInstitucion($request->institucion);
+                if(!empty($getConvenio)){
+                    $idConvenio     = $getConvenio[0]->id;
+                    $aniosConvenio  = $getConvenio[0]->convenio_anios;
+                    //valido que si el convenio ya tiene los anios cumplidos lo cierro
+                    $estadoConvenio = $this->contadorAniosConvenio($idConvenio);
+                    $contadorAnios = sizeOf($estadoConvenio);
+                    //si ya paso los años finalizo el convenio
+                    if($contadorAnios >= $aniosConvenio){
+                        $convenio = PedidoConvenio::findOrFail($idConvenio);
+                        $convenio->estado = 0;
+                        $convenio->save();
+                    }
+                    //si aun falta anios agrego convenio a este pedido 
+                    else{
+                        $pedido->convenio_origen = $getConvenio[0]->id_pedido;    
+                    }
+                }
             }
             $pedido->tipo_venta             = $request->tipo_venta;
             $pedido->tipo_venta_descr       = $request->tipo_venta_descr;
@@ -154,6 +187,14 @@ class PedidosController extends Controller
                 $pedido->convenio_anios     = $request->convenio_anios;
             }
             $pedido->save();
+            //ACTUALIZAR INSTITUCION
+            $uinstitucion = Institucion::findOrFail($request->institucion);
+            $uinstitucion->telefonoInstitucion         = $request->telefonoInstitucion;
+            $uinstitucion->direccionInstitucion        = $request->direccionInstitucion;
+            $uinstitucion->ruc                         = $request->ruc;
+            $uinstitucion->nivel                       = $request->nivel;
+            $uinstitucion->tipo_descripcion            = $request->tipo_descripcion;
+            $uinstitucion->save();
             if($request->generarNuevo == 'yes'){
                 //Si se genera un pedido apartir de un  pedido anulado
                 $this->changeBeneficiariosLibros($request->pedidoAnterior,$pedido->id_pedido);
@@ -179,7 +220,7 @@ class PedidosController extends Controller
             $contrato = $request->contrato;
             $aprobado = $request->anticipo_aprobado;
             $pedido = Pedidos::findOrFail($request->id_pedido);
-            $pedido->anticipo_aprobado = $aprobado;
+            $pedido->anticipo_aprobado              = $aprobado;
             $pedido->ifagregado_anticipo_aprobado   = 1;
             $pedido->save();
             //actualizar anticipo facturacion
@@ -508,6 +549,7 @@ class PedidosController extends Controller
     public function anular_pedido_asesor($id_pedido, $id_usuario,$contrato)
     {
         DB::SELECT("UPDATE `pedidos` SET `id_usuario_verif`=$id_usuario, `estado`=2 WHERE `id_pedido` = $id_pedido");
+        DB::SELECT("UPDATE `pedidos_convenios` SET estado=2 WHERE `id_pedido` = $id_pedido");
         if($contrato == "null" || $contrato == null || $contrato == "undefined" ||  $contrato == "" ){
         }else{
             DB::UPDATE("UPDATE temporadas SET estado = '0' WHERE contrato ='$contrato'");
@@ -1723,8 +1765,6 @@ class PedidosController extends Controller
          } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
-        // $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
-        // $json_contrato = json_decode($contrato, true);
          //GUARDAR DETALLE DE VENTA
         //DETALLE DE VENTA
         $detalleVenta = $this->get_val_pedidoInfo($id_pedido);
@@ -1770,7 +1810,26 @@ class PedidosController extends Controller
         //ACTUALIZAR EN EL HISTORICO
         $queryHistorico = "UPDATE `pedidos_historico` SET `fecha_generar_contrato` = '$fechaActual', `estado` = '2' WHERE `id_pedido` = $id_pedido;";
         DB::UPDATE($queryHistorico);
+        //ASIGNAR A TABLA CONVENIO HIJOS
+        $getConvenio = $this->asignarToConvenio($institucion,$id_pedido,$codigo_ven);
         return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
+    }
+    public function asignarToConvenio($institucion,$id_pedido,$contrato){
+        $getConvenio = $this->getConvenioInstitucion($institucion);
+        if(!empty($getConvenio)){
+            $idConvenio = $getConvenio[0]->id;
+            //validate que el contrato hijo convenio no este creado
+            $query = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
+            WHERE cd.id_pedido = '$id_pedido'");
+            if(empty($query)){
+                $hijoConvenio = new PedidoConvenioDetalle();
+                $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
+                $hijoConvenio->id_pedido                    = $id_pedido;
+                $hijoConvenio->contrato                     = $contrato;
+                $hijoConvenio->save();
+            }
+        }
+
     }
     public function guardarContratoTemporada($contrato,$institucion,$asesor_id,$temporadas,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion){
         //validar que el contrato no existe
@@ -2746,10 +2805,128 @@ class PedidosController extends Controller
         }
         
     }
+    //api:post/AceptarAlcance
+    public function AceptarAlcance(Request $request){
+        $contrato       = $request->contrato;
+        $id_pedido      = $request->id_pedido;
+        $id_alcance     = $request->id_alcance;
+        $ventaBruta     = $request->ventaBruta;
+        $user_created   = $request->user_created;
+        //validar que el pedido alcance este abierto
+        $validateAbierto     = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id = '$id_alcance' AND pa.estado_alcance = '0'");
+        if(empty($validateAbierto)){
+            return ["status" => "0", "message" => "El alcance no se encuentra activo"];
+        }
+        //validar que no haya verificaciones
+        $validateVerificacion = DB::SELECT("SELECT * FROM verificaciones v WHERE v.contrato = '$contrato'
+        ");
+        if(count($validateVerificacion) > 0){
+            return ["status" => "0", "message" => "Ya existe verificaciones no se puede aprobar el alcance"];
+        }
+        try {
+            //BUSCAR EL CONTRATO SI EXISTE
+            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato); 
+            $JsonContrato = json_decode($dato, true);
+            if($JsonContrato == "" || $JsonContrato == null){
+                return ["status" => "0", "message" => "No existe el contrato en facturación"];
+            }
+            $convertido             = "";
+            $convertido             = $JsonContrato["veN_CONVERTIDO"];
+            if($convertido == null || $convertido == ""){
+                $convertido          = "";
+            }
+            $estado                 = $JsonContrato["esT_VEN_CODIGO"];
+            if($estado != 3 && !str_starts_with($convertido , 'C')){
+                //===PROCESO======
+                //ACTUALIZAR DETALLE DE VENTA
+                $nuevoIngreso       = $this->get_val_pedidoInfo_alcance($id_pedido,$id_alcance);
+                if(!empty($nuevoIngreso)){
+                    foreach($nuevoIngreso as $key => $item){
+                        $proCodigo      = $item["codigo_liquidacion"];
+                        $cantidad       = $item["valor"];
+                        $precio         = $item["precio"];
+                        $form_data      = [];
+                        //consultar si hay codigo registrado en el contrato en el detalle de venta
+                        $responseBook   = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$contrato."&pro_codigo=".$proCodigo);
+                        $JsonLibro      = json_decode($responseBook, true);
+                        //si no  existe : creo
+                        if(sizeOf($JsonLibro["detalle_venta"]) == 0){
+                            $form_data = [
+                                "venCodigo"             => $contrato,
+                                "proCodigo"             => $proCodigo,
+                                "detVenCantidad"        => intval($cantidad),
+                                "detVenValorU"          => floatval($precio),
+                                "detVenIva"             => 0,
+                                "detVenDescontar"       => false,
+                                "detVenInicio"          => false,
+                                "detVenCantidadReal"    => intval($cantidad),
+                            ];
+                            $saveLibros     = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/CreateOrUpdateDetalleVenta',$form_data);
+                            $JsonLibroSave  = json_decode($saveLibros, true);
+                            //GUARDAR EN EL HISTORICO ALCANCE LIBROS
+                            $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,0,$cantidad,$user_created,1);
+                        }
+                        //no existe : actualizo
+                        else{
+                            $cantidadAnterior = $JsonLibro["detalle_venta"][0]["detVenCantidad"];
+                            //sumo la cantidad anterior + la nueva
+                            $resultadoLibro = intvaL($cantidadAnterior) + intval($cantidad);
+                            $form_data = [
+                                'detVenCantidad'        => intval($resultadoLibro),
+                                'detVenCantidadReal'    => intval($resultadoLibro),
+                            ];
+                            $updateLibros = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/UpdateDetallveVenta?venCodigo='.$contrato.'&proCodigo='.$proCodigo, $form_data);
+                            $json_saveLibros = json_decode($updateLibros, true);
+                            //GUARDAR EN EL HISTORICO ALCANCE LIBROS
+                            $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidadAnterior,$resultadoLibro,$user_created,1);
+                        }
+                    }  
+                    ////////=========
+                    ///============PROCESO  DE GUARDADO TABLA VENTA====
+                    //GUARDAR NUEVO VEN_VALOR VENTA
+                    $cantidad_anterior  = $JsonContrato["veN_VALOR"];
+                    $nueva_cantidad     = floatval($cantidad_anterior) + floatval($ventaBruta);
+                    $datos = [ 
+                        "venValor"        => floatval($nueva_cantidad)
+                    ];
+                    $saveValor          = Http::post('http://186.46.24.108:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
+                    //GUARDAR EN EL HISTORICO ALCANCE VEN_VALOR
+                    $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,0);
+                    //CERRAR ALCANCE
+                    $alcance = PedidoAlcance::findOrFail($id_alcance);
+                    $alcance->estado_alcance = 1;
+                    $alcance->save();
+                    return $alcance;
+                }else{
+                    return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
+                }
+             
+            }else{
+                return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
+            }
+            
+        } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        } 
+    }
+    public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
+        if(empty($query)){
+            $historico                      = new PedidoAlcanceHistorico();
+            $historico->contrato            = $contrato;
+            $historico->id_pedido           = $id_pedido;
+            $historico->alcance_id          = $id_alcance;
+            $historico->cantidad_anterior   = $cantidad_anterior;
+            $historico->nueva_cantidad      = $nueva_cantidad;
+            $historico->user_created        = $user_created;
+            $historico->tipo                = $tipo;
+            $historico->save();
+        }
+    }
     //listar alcaces pedido
     //api:get/>getAlcancePedido
     public function getAlcancePedido(Request $request){
-        $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad
+        $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad,
+        p.contrato_generado
         FROM pedidos_alcance pa
         LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion

@@ -1176,6 +1176,7 @@ Route::post('f_deleteVarios','ActividadAnimacionController@f_deleteVarios');
 Route::post('changeEstadoAlcance','PedidosController@changeEstadoAlcance');
 Route::post('guardarValorAlcance','PedidosController@guardarValorAlcance');
 Route::get('getAlcancePedido','PedidosController@getAlcancePedido');
+Route::post('AceptarAlcance','PedidosController@AceptarAlcance');
 Route::post('eliminarAlcance','PedidosController@eliminarAlcance');
 Route::get('get_val_pedidoInfo_alcance/{pedido}/{alcance}','PedidosController@get_val_pedidoInfo_alcance');
 Route::get('milton_test','AdminController@pruebaApi');

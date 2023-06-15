@@ -72,6 +72,12 @@ class ObsequioController extends Controller
         }
         //variables 
         $contrato = $query[0]->contrato;
+        //validar que si tiene verificaciones en prolipa
+        $validate = DB::SELECT("SELECT * FROM verificaciones v
+        WHERE v.contrato = '$contrato'");
+        if(empty($validate)){
+            return ["status" => "0", "message" => "El contrato $contrato no tiene verificaciones"];
+        }
         try {
             $dataFinally    = [];
             $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
