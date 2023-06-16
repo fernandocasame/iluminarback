@@ -1250,5 +1250,7 @@ Route::resource('convenio','ConvenioController');
 Route::get('getEstudianteCodigos/{valores}','CodigosLibrosController@getEstudianteCodigos');
 ///ILUMINAR
 Route::get('getAllBooks','LibroController@getAllBooks');
-
+//=====RUTAS PARA DESCUENTO DE CODIGOS==============================
+Route::post('guardarDescuentoCodigos','GestionCodigosController@guardarDescuentoCodigos');
+//=====FIN RUTAS PARA CODIGOS=======================================
 

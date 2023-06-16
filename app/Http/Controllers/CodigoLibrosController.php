@@ -100,7 +100,8 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                     ];
                     $contador++;
                 }
@@ -166,7 +167,7 @@ class CodigoLibrosController extends Controller
             $validar = DB::SELECT("SELECT 
                 c.prueba_diagnostica, 
                 IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-                c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.contador,
+                c.porcentaje_descuento,c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.contador,
                 c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
                 CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
                 i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
@@ -467,7 +468,7 @@ class CodigoLibrosController extends Controller
         $tipoVenta = DB::SELECT("SELECT 
         c.prueba_diagnostica, 
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.contrato,
+        c.contrato,c.porcentaje_descuento,
         c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
         ib.nombreInstitucion as institucion_barras,
@@ -560,7 +561,8 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                     ];
                     $contador++;
                 }
@@ -580,6 +582,7 @@ class CodigoLibrosController extends Controller
      public function getCodigos($codigo){
         $consulta = DB::SELECT("SELECT c.prueba_diagnostica, 
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.porcentaje_descuento,
         c.libro as book,c.serie,c.created_at,
         (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
         FROM codigos_devolucion d
@@ -681,6 +684,7 @@ class CodigoLibrosController extends Controller
                         "status" => $validar[0]->status,
                         "contador" => $validar[0]->contador,
                         "contrato" => $validar[0]->contrato,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                     ];
                     $contador++;
                  }
@@ -820,7 +824,8 @@ class CodigoLibrosController extends Controller
                             "estado_liquidacion" => $validar[0]->estado_liquidacion,
                             "estado" => $validar[0]->estado,
                             "status" => $validar[0]->status,
-                            "contador" => $validar[0]->contador
+                            "contador" => $validar[0]->contador,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                         ];
                         $contador++;
                     }
@@ -898,7 +903,8 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                     ];
                     $contador++;
                 }
@@ -1002,7 +1008,8 @@ class CodigoLibrosController extends Controller
                             "estado" => $validar[0]->estado,
                             "status" => $validar[0]->status,
                             "contador" => $validar[0]->contador,
-                            "contrato" => $validar[0]->contrato
+                            "contrato" => $validar[0]->contrato,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                         ];
                         $contador++;
                     }   
@@ -1201,7 +1208,7 @@ class CodigoLibrosController extends Controller
             $validar = DB::SELECT("SELECT
             c.prueba_diagnostica, 
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.porcentaje_descuento,
             c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
             CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
             i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
@@ -1264,7 +1271,8 @@ class CodigoLibrosController extends Controller
                         'verif8'                => null,
                         'verif9'                => null,
                         'verif10'               => null,
-                        'venta_lista_institucion'=> '0'
+                        'venta_lista_institucion'=> '0',
+                        'porcentaje_descuento'  => '0'
                     ]);
                     if($codigo){
                         $porcentaje++;
@@ -1302,7 +1310,8 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento
                     ];
                     $contador++;
                 }

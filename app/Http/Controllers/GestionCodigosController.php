@@ -508,4 +508,17 @@ class GestionCodigosController extends Controller
     {
         
     }
+    public function guardarDescuentoCodigos(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        //variables 
+        $valor = $request->valor;
+        $codigos = json_decode($request->codigos);  
+        foreach($codigos as $key => $item){
+            $codigo = CodigosLibros::findOrFail($item->codigo);
+            $codigo->porcentaje_descuento   = $valor;
+            $codigo->save();
+        }
+        return ["status" => "1", "message" => "Se guardo correctamente"];
+    }
 }
