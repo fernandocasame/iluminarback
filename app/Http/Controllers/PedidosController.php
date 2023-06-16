@@ -1551,6 +1551,7 @@ class PedidosController extends Controller
         $pedido->id_periodo             = $request->periodo;
         $pedido->id_asesor              = $request->id_asesor; //asesor/vendedor
         $pedido->id_responsable         = $request->id_asesor;
+        $pedido->observacion            = $request->observacion;
         $pedido->id_usuario_verif       = 0; //$request->id_usuario_verif; //facturador se guarda al generar el pedido
         $pedido->tipo                   = 1;
         $pedido->save();
