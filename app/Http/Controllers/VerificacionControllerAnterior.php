@@ -70,7 +70,6 @@ class VerificacionControllerAnterior extends Controller
 
      public function liquidacionVerificacion($contrato){
         set_time_limit(0);
-
         //validar si el contrato esta activo
         $validarContrato = DB::select("SELECT t.*
         FROM temporadas t
@@ -80,13 +79,19 @@ class VerificacionControllerAnterior extends Controller
         if(count($validarContrato) > 0){
             return ["status"=>"0", "message" => "El contrato esta inactivo"]; 
         }
-
+        //validar que el contrato este en pedidos 
+        $query = DB::SELECT("SELECT * FROM pedidos p
+        WHERE p.contrato_generado = '$contrato'
+        AND p.estado = '1'
+        ");
+        if(empty($query)){
+            return ["status"=>"0", "message" => "El contrato no se encuentre en pedidos"]; 
+        }
         $buscarContrato= DB::select("SELECT t.*, p.idperiodoescolar
         FROM temporadas t, periodoescolar p
         WHERE t.id_periodo = p.idperiodoescolar
         AND contrato = '$contrato'
         ");
-    
         if(count($buscarContrato) <= 0){
             return ["status"=>"0", "message" => "No existe el contrato o no tiene asignado a un período"]; 
         }else{
