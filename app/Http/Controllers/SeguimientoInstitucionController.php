@@ -155,20 +155,27 @@ class SeguimientoInstitucionController extends Controller
     public function GuardarInstitucionTemporal(Request $request){
   
         //obtener el periodo de la region
-        $buscarPeriodo = $this->periodosActivosIndividual($request->region);
-        $periodo = $buscarPeriodo[0]->idperiodoescolar;
+        // $buscarPeriodo = $this->periodosActivosIndividual($request->region);
+        // $periodo = $buscarPeriodo[0]->idperiodoescolar;
+        //validar que no se repitan las instituciones temporales en un periodo
+        $query = DB::SELECT("SELECT * FROM seguimiento_institucion_temporal t
+        WHERE nombre_institucion = '$request->nombre_institucion'
+        AND periodo_id = '$request->periodo'
+        ");
+        if(count($query) > 0){
+            return ["status" => "0","message" => "Ya existe la institucion ".$request->nombre_institucion.' creada en ese periodo'];
+        }
         $institucion = new SeguimientoInstitucionTemporal;
-        $institucion->nombre_institucion = $request->nombre_institucion;
-        $institucion->ciudad = $request->ciudad;
-        $institucion->region = $request->region;
-        $institucion->asesor_id = $request->asesor_id;
-        $institucion->periodo_id = $periodo;
+        $institucion->nombre_institucion    = $request->nombre_institucion;
+        $institucion->ciudad                = $request->ciudad;
+        $institucion->region                = $request->region;
+        $institucion->asesor_id             = $request->asesor_id;
+        $institucion->periodo_id            = $request->periodo;
         if($request->tipo){
-            $institucion->tipo = '1';
+            $institucion->tipo              = '1';
         }
         $institucion->save();
         return $institucion;
-       
     }
 
     public function periodosActivosIndividual($region){

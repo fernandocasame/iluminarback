@@ -2578,6 +2578,7 @@ class PedidosController extends Controller
                 WHERE p.contrato_generado = '$item->contrato'
                 ");
                 if(empty($pedido)){
+                    $verificaciones =  $this->getVerificaciones($item->contrato);
                     $datosContratos[$contador] = [
                         "VEN_VALOR"         => $item->VEN_VALOR,
                         "ven_neta"          => $item->ven_neta,
@@ -2588,8 +2589,11 @@ class PedidosController extends Controller
                         "venFecha"          => $item->venFecha,
                         //prolipa
                         "id_pedido"         => null,
+                        "verificaciones"    => sizeOf($verificaciones),
+                        "estado_verificacion"=> 0,
                     ];
                 }else{
+                    $verificaciones = $this->getVerificaciones($pedido[0]->contrato_generado);
                     $datosContratos[$contador] = [
                         "VEN_VALOR"         => $item->VEN_VALOR,
                         "ven_neta"          => $item->ven_neta,
@@ -2603,7 +2607,9 @@ class PedidosController extends Controller
                         "contrato_generado" => $pedido[0]->contrato_generado,
                         "tipo_venta"        => $pedido[0]->tipo_venta,
                         "estado"            => $pedido[0]->estado,
+                        "estado_verificacion"=> $pedido[0]->estado_verificacion,
                         "historicoEstado"   => $pedido[0]->historicoEstado,
+                        "verificaciones"    => sizeOf($verificaciones)
                     ];
                 }
                 $contador++;
@@ -2615,6 +2621,14 @@ class PedidosController extends Controller
             } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
+    }
+    public function getVerificaciones($contrato){
+        $query = DB::SELECT("SELECT * FROM verificaciones 
+            WHERE contrato =  '$contrato'
+            and nuevo = '1'
+            and estado = '0'
+        ");
+        return $query;
     }
     //api:Get/detalleContratoFacturacion
     public function detalleContratoFacturacion(Request $request){
@@ -3588,10 +3602,16 @@ class PedidosController extends Controller
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
             WHERE contrato_generado = '$request->contrato'
         ");
-       
         if(count($validate) > 0){
             return ["status" => "0","message" => "El contrato ya existe en prolipa"];
         }
+        $validate2 = DB::SELECT("SELECT p.*, CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+            u.cedula,i.nombreInstitucion
+            FROM pedidos p 
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            WHERE id_pedido = '$request->id_pedido'
+        ");
         //obtener que tenga beneficiarios
         $query3 = DB::SELECT("SELECT  b.*,
           CONCAT(u.nombres, ' ', u.apellidos) AS docente,
@@ -3616,9 +3636,9 @@ class PedidosController extends Controller
         $usuario_fact       = 64394;
         $fechaContrato      = $request->fechaContrato;
         $fecha_Gerencia     = $request->fecha_Gerencia;
-        $asesor             = $validate[0]->asesor;
-        $nombreInstitucion  = $validate[0]->nombreInstitucion;
-        $cedulaAsesor       = $validate[0]->cedula;
+        $asesor             = $validate2[0]->asesor;
+        $nombreInstitucion  = $validate2[0]->nombreInstitucion;
+        $cedulaAsesor       = $validate2[0]->cedula;
         $nombreDocente      = $query3[0]->docente; 
         $cedulaDocente      = $query3[0]->cedula; 
         $query = "UPDATE `pedidos` SET `contrato_generado` = '$contrato', `id_usuario_verif` = $usuario_fact,`fecha_generacion_contrato` = '$fechaContrato', `facturacion_vee` = '1' WHERE `id_pedido` = $id_pedido;";

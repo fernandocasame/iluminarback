@@ -87,6 +87,15 @@ class VerificacionControllerAnterior extends Controller
         if(empty($query)){
             return ["status"=>"0", "message" => "El contrato no se encuentre en pedidos"]; 
         }
+        $id_pedido = $query[0]->id_pedido;
+        //validar que el pedido no tenga alcaces abiertos o activos
+        $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa
+        WHERE pa.id_pedido = '$id_pedido'
+        AND pa.estado_alcance = '0'
+        ");
+        if(count($query2) > 0){
+            return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; 
+        }
         $buscarContrato= DB::select("SELECT t.*, p.idperiodoescolar
         FROM temporadas t, periodoescolar p
         WHERE t.id_periodo = p.idperiodoescolar
@@ -170,10 +179,8 @@ class VerificacionControllerAnterior extends Controller
                 AND nuevo = '1'
                 ORDER BY id DESC
                 ");
-                
                 //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
                 if(count($vericacionContrato) >0){
-                   
                     //obtener el numero de verificacion en el que se quedo el contrato
                     $traerNumeroVerificacion =  $vericacionContrato[0]->num_verificacion;
                     $traeridVerificacion     =  $vericacionContrato[0]->id;
@@ -217,7 +224,6 @@ class VerificacionControllerAnterior extends Controller
                     $verificacion->estado = "0";
                     $verificacion->nuevo = '1';
                     $verificacion->save();
-                  
                         //Obtener Verificacion actual
                         $encontrarVerificacionContratoInicial = DB::select("SELECT  
                             * FROM verificaciones 
@@ -225,7 +231,6 @@ class VerificacionControllerAnterior extends Controller
                             AND nuevo = '1'
                             ORDER BY id DESC
                         ");
-                    
                         //obtener el numero de verificacion en el que se quedo el contrato
                         $traerNumeroVerificacionInicial =  $encontrarVerificacionContratoInicial[0]->num_verificacion;
                         //obtener la clave primaria de la verificacion actual
@@ -247,8 +252,9 @@ class VerificacionControllerAnterior extends Controller
                         "verificaciones"=>"Ha alzancado el limite de verificaciones permitidas",
                         'temporada'=>$temporadas,
                         'codigos_libros' => $data
-                     ];
+                    ];
                 }else{
+                    DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
                     return ['temporada'=>$temporadas,'codigos_libros' => $data];
                 }
             }else{
@@ -319,17 +325,16 @@ class VerificacionControllerAnterior extends Controller
      
          //PARA VER LA INFORMACION DE LAS VERIFICACIONES DEL CONTRATO
          if($request->informacion){     
-             $verificaciones = DB::SELECT("SELECT * FROM verificaciones
-             WHERE contrato = '$request->contrato'
-             AND  nuevo = '1'
-             ");
-             $institucion = DB::SELECT("SELECT t.*, i.nombreInstitucion
-             FROM temporadas t
-             LEFT JOIN institucion i ON i.idInstitucion = t.idInstitucion
-             WHERE t.contrato = '$request->contrato'
-             ");
-             return ["verificaciones" => $verificaciones, "institucion" => $institucion];
-          
+            $verificaciones = DB::SELECT("SELECT * FROM verificaciones
+            WHERE contrato = '$request->contrato'
+            AND  nuevo = '1'
+            ");
+            $institucion = DB::SELECT("SELECT t.*, i.nombreInstitucion
+            FROM temporadas t
+            LEFT JOIN institucion i ON i.idInstitucion = t.idInstitucion
+            WHERE t.contrato = '$request->contrato'
+            ");
+            return ["verificaciones" => $verificaciones, "institucion" => $institucion];
          }   
          //para ver el historico de contrato liquidacion
          if($request->historico){
@@ -703,8 +708,29 @@ class VerificacionControllerAnterior extends Controller
             $historico->contrato_actual = $contrato;
             $historico->save();
         }
-
-      
-
+    }
+    //SOLICITAR VERIFICACION
+    //api:post/solicitarVerificacion
+    public function solicitarVerificacion(Request $request){
+        $fechaActual = null;
+        $fechaActual = date('Y-m-d H:i:s');
+        DB::UPDATE("UPDATE pedidos SET estado_verificacion = '1' , fecha_solicita_verificacion = '$fechaActual' WHERE contrato_generado = '$request->contrato'");
+    }
+    //api:get/notificacionesVerificaciones
+    public function notificacionesVerificaciones(){
+        $query = DB::SELECT("SELECT 
+            CONCAT(u.nombres,' ',u.apellidos) as asesor,
+            i.nombreInstitucion,
+            pe.region_idregion, c.nombre AS ciudad,
+            p.contrato_generado,p.fecha_solicita_verificacion
+            FROM pedidos p
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            WHERE p.estado = '1'
+            AND p.estado_verificacion ='1'
+        ");
+        return $query;
     }
 }

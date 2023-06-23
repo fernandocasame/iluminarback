@@ -490,12 +490,15 @@ class InstitucionController extends Controller
         }
         //traer las instituciones temporales  creadas por el asesor
         if($request->temporales){
-            $instituciones = DB::SELECT("SELECT t.institucion_temporal_id,IF(t.region = 2,'Costa','Sierra') AS nombreregion, t.nombre_institucion AS nombreInstitucion,
-            t.periodo_id,t.asesor_id,t.ciudad
-
-             FROM seguimiento_institucion_temporal t
+            $instituciones = DB::SELECT("SELECT t.institucion_temporal_id,
+            IF(t.region = 2,'Costa','Sierra') AS nombreregion, 
+            t.nombre_institucion AS nombreInstitucion,
+            t.periodo_id,t.asesor_id,t.ciudad,pe.periodoescolar AS periodo
+            FROM seguimiento_institucion_temporal t
+         	LEFT JOIN periodoescolar pe ON t.periodo_id = pe.idperiodoescolar
             WHERE t.asesor_id = '$request->asesor_id'
             ORDER BY t.institucion_temporal_id DESC
+            
             ");
             return $instituciones;
         }
