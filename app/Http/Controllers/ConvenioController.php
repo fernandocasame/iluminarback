@@ -162,16 +162,37 @@ class ConvenioController extends Controller
             AND cd.institucion_id = '$request->institucion_id'
             ");
             if(empty($query)){
-                $contrato = "";
                 //si es un convenio fuera de prolipa
                 if($request->convenioFuera == 1){
-                    $contrato = $request->contratoFuera;
-                    $hijoConvenio = new PedidoConvenioDetalle();
-                    $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
-                    $hijoConvenio->id_pedido                    = $request->id_pedido;
-                    $hijoConvenio->contrato                     = $contrato;
-                    $hijoConvenio->institucion_id               = $request->institucion_id;
-                    $hijoConvenio->save();
+                    $datos = explode("*", $request->contratosFuera);
+                    $tam   = sizeof($datos);
+                    for( $i=0; $i<$tam; $i++ ){
+                        $hijoConvenio = new PedidoConvenioDetalle();
+                        $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
+                        $hijoConvenio->id_pedido                    = $request->id_pedido;
+                        $hijoConvenio->contrato                     = $datos[$i];
+                        $hijoConvenio->institucion_id               = $request->institucion_id;
+                        $hijoConvenio->save();
+                    }
+                    // si ya existe el contrato hecho y quiere convenio de valores anteriores
+                    $query2 = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
+                    WHERE cd.id_pedido = '$request->tempid_pedido'
+                    AND cd.institucion_id = '$request->institucion_id'
+                    ");
+                    if(empty($query2)){
+                        //solo se va a crear si tiene contrato
+                        $pedido = Pedidos::findOrFail($request->tempid_pedido);
+                        $contrato = $pedido->contrato_generado;
+                        if($contrato == null || $contrato == ""){
+                        }else{  
+                            $hijoConvenio = new PedidoConvenioDetalle();
+                            $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
+                            $hijoConvenio->id_pedido                    = $request->tempid_pedido;
+                            $hijoConvenio->contrato                     = $contrato;
+                            $hijoConvenio->institucion_id               = $request->institucion_id;
+                            $hijoConvenio->save();
+                        }
+                    }
                 }
                 //convenio dentro de prolipa
                 else{

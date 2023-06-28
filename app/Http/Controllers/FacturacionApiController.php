@@ -110,10 +110,18 @@ class FacturacionApiController extends Controller
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
+    public function Get_Productocompleto()
+    {
+        $dato = Http::get("http://186.46.24.108:9095/api/f_Producto");
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
     public function Get_Productoxbusquedayrazonbusqueda(Request $request)
     {
         $valor = $request->busqueda;
         $valor2 = $request->razonbusqueda;
+        //return $valor;
+        //return $request;
         $dato = Http::get("http://186.46.24.108:9095/api/f_Producto/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
@@ -335,5 +343,60 @@ class FacturacionApiController extends Controller
         $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
+    }
+    //DETALLE DE VERIFICACION
+    public function Get_DVerificacionxvencodigoyprocodigo(Request $request)
+    {
+        $valor = $request->busqueda;
+        $valor2 = $request->razonbusqueda;
+        //return $valor;
+        //return $request;
+        $dato = Http::get("http://186.46.24.108:9095/api/f_DetalleVerificacion/Getxvencodigoyprocodigo?ven_codigo=".$valor."&pro_codigo=".$valor2);
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
+
+    public function Post_EditarDetalleVerificacionxdet_ver_id(Request $request)
+    {
+        $valor = $request->det_ver_id;
+        $form_data = [
+            'detVenCantidadReal' => $request->detVerCantidad,
+        ];
+        // return $valor;
+        $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Updatedvcantidadxdetverid?det_ver_id=".$valor, $form_data);
+        $prueba_update = json_decode($dato, true);
+        return $prueba_update;
+    }
+
+    public function Post_DeleteDetalleVerificacionxdet_ver_id(Request $request)
+    {
+        $valor = $request->det_ver_id;
+        // return $valor;
+        $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Deletexdetverid?det_ver_id=".$valor);
+        $prueba_delete = json_decode($dato, true);
+        return $prueba_delete;
+    }
+    //DETALLE DE VENTA
+    public function Get_DVentaxvencodigoyprocodigo(Request $request)
+    {
+        $valor = $request->busqueda;
+        $valor2 = $request->razonbusqueda;
+        //return $valor;
+        //return $request;
+        $dato = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$valor."&pro_codigo=".$valor2);
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
+
+    public function Post_EditarDetalleVentaxdet_ven_codigo(Request $request)
+    {
+        $valor = $request->det_ven_codigo;
+        $form_data = [
+            'detVenCantidadReal' => $request->detVenCantidadReal,
+        ];
+        // return $valor;
+        $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVenta/Updatexdetvencodigo?det_ven_codigo=".$valor, $form_data);
+        $prueba_update = json_decode($dato, true);
+        return $prueba_update;
     }
 }

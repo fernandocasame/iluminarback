@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\HistoricoCodigos;
+use App\Models\TemporadaVerificacionHistorico;
 use App\Models\Verificacion;
 use App\Models\VerificacionHasInstitucion;
 use Illuminate\Http\Request;
@@ -74,27 +75,33 @@ class VerificacionControllerAnterior extends Controller
         $validarContrato = DB::select("SELECT t.*
         FROM temporadas t
         WHERE t.contrato = '$contrato'
-        and t.estado = '0'
         ");
-        if(count($validarContrato) > 0){
-            return ["status"=>"0", "message" => "El contrato esta inactivo"]; 
+        if(empty($validarContrato)){
+            return ["status" => "0", "message" => "No existe el contrato"]; 
         }
-        //validar que el contrato este en pedidos 
-        $query = DB::SELECT("SELECT * FROM pedidos p
-        WHERE p.contrato_generado = '$contrato'
-        AND p.estado = '1'
-        ");
-        if(empty($query)){
-            return ["status"=>"0", "message" => "El contrato no se encuentre en pedidos"]; 
+        $estado = $validarContrato[0]->estado;
+        $year   = $validarContrato[0]->year;
+        if($estado == '0'){
+            return ["status" => "0", "message" => "El contrato esta inactivo"]; 
         }
-        $id_pedido = $query[0]->id_pedido;
-        //validar que el pedido no tenga alcaces abiertos o activos
-        $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa
-        WHERE pa.id_pedido = '$id_pedido'
-        AND pa.estado_alcance = '0'
-        ");
-        if(count($query2) > 0){
-            return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; 
+        if($year > 2022){
+            //validar que el contrato este en pedidos 
+            $query = DB::SELECT("SELECT * FROM pedidos p
+            WHERE p.contrato_generado = '$contrato'
+            AND p.estado = '1'
+            ");
+            if(empty($query)){
+                return ["status" => "0", "message" => "El contrato no se encuentra en pedidos"]; 
+            }
+            $id_pedido = $query[0]->id_pedido;
+            //validar que el pedido no tenga alcaces abiertos o activos
+            $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa
+            WHERE pa.id_pedido = '$id_pedido'
+            AND pa.estado_alcance = '0'
+            ");
+            if(count($query2) > 0){
+                return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; 
+            }
         }
         $buscarContrato= DB::select("SELECT t.*, p.idperiodoescolar
         FROM temporadas t, periodoescolar p
@@ -254,7 +261,9 @@ class VerificacionControllerAnterior extends Controller
                         'codigos_libros' => $data
                     ];
                 }else{
+                    $fecha2 = date('Y-m-d H:i:s');
                     DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+                    DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' WHERE contrato = '$contrato' AND estado = '1'");
                     return ['temporada'=>$temporadas,'codigos_libros' => $data];
                 }
             }else{
@@ -715,6 +724,18 @@ class VerificacionControllerAnterior extends Controller
         $fechaActual = null;
         $fechaActual = date('Y-m-d H:i:s');
         DB::UPDATE("UPDATE pedidos SET estado_verificacion = '1' , fecha_solicita_verificacion = '$fechaActual' WHERE contrato_generado = '$request->contrato'");
+        //registrar trazabilidad
+        //validar que no este registrado 
+        $query = DB::SELECT("SELECT * FROM temporadas_verificacion_historico th
+        WHERE th.contrato = '$request->contrato'
+        AND th.estado = '1'");
+        if(empty($query)){
+            $trazabilidad = new TemporadaVerificacionHistorico();
+            $trazabilidad->contrato                     = $request->contrato;
+            $trazabilidad->fecha_solicita_verificacion  = $fechaActual;
+            $trazabilidad->estado                       = 1;
+            $trazabilidad->save();
+        }
     }
     //api:get/notificacionesVerificaciones
     public function notificacionesVerificaciones(){
@@ -730,6 +751,22 @@ class VerificacionControllerAnterior extends Controller
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             WHERE p.estado = '1'
             AND p.estado_verificacion ='1'
+        ");
+        return $query;
+    }
+    //api para traer la trazabilidad de las verificaciones
+    //api:get/getTrazabilidadVerificacion
+    public function getTrazabilidadVerificacion(Request $request){
+        $query = DB::SELECT("SELECT th.*,
+            CONCAT(u.nombres,' ', u.apellidos) AS asesor, i.nombreInstitucion,
+            c.nombre AS ciudad
+            FROM temporadas_verificacion_historico th
+            LEFT JOIN temporadas t ON th.contrato = t.contrato
+            LEFT JOIN usuario u ON t.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad 
+            WHERE th.contrato = '$request->contrato'
+            AND t.estado = '1'
         ");
         return $query;
     }

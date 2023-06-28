@@ -123,7 +123,6 @@ class InstitucionController extends Controller
             if($request->enviarArchivo){
                 //eliminar el archivo anterior si existe
                 if($archivo == "" || $archivo == null || $archivo == 0){
-
                 }else{
                     if(file_exists('archivos/instituciones_logos/'.$archivo) ){
                         unlink('archivos/instituciones_logos/'.$archivo);
@@ -146,26 +145,25 @@ class InstitucionController extends Controller
                     $file = $request->file('imagenInstitucion');
                     $fileName = uniqid().$file->getClientOriginalName();
                     $file->move($ruta,$fileName);
-
                 }
-                $cambio->imgenInstitucion = $fileName;
+                $cambio->imgenInstitucion       = $fileName;
             }
-
         }
-        $cambio->idcreadorinstitucion   = $request->idcreadorinstitucion;
-        $cambio->nombreInstitucion      = $request->nombreInstitucion;
-        $cambio->direccionInstitucion   = $request->direccionInstitucion;
-        $cambio->telefonoInstitucion    = $request->telefonoInstitucion;
-        $cambio->solicitudInstitucion   = $request->solicitudInstitucion;
-        $cambio->codigo_institucion_milton   = $request->codigo_institucion_milton;
-        $cambio->vendedorInstitucion    = $request->vendedorInstitucion;
-        $cambio->tipo_institucion       = $request->tipo_institucion;
-        $cambio->region_idregion        = $request->region_idregion;
-        $cambio->ciudad_id              = $request->ciudad_id;
-        $cambio->estado_idEstado        = $request->estado;
-        $cambio->aplica_matricula       = $request->aplica_matricula;
-        $cambio->punto_venta            = $request->punto_venta;
-        $cambio->asesor_id              = $request->asesor_id;
+        $cambio->idcreadorinstitucion           = $request->idcreadorinstitucion;
+        $cambio->nombreInstitucion              = $request->nombreInstitucion;
+        $cambio->direccionInstitucion           = $request->direccionInstitucion;
+        $cambio->telefonoInstitucion            = $request->telefonoInstitucion;
+        $cambio->solicitudInstitucion           = $request->solicitudInstitucion;
+        $cambio->codigo_institucion_milton      = $request->codigo_institucion_milton;
+        $cambio->vendedorInstitucion            = $request->vendedorInstitucion;
+        $cambio->tipo_institucion               = $request->tipo_institucion;
+        $cambio->region_idregion                = $request->region_idregion;
+        $cambio->ciudad_id                      = $request->ciudad_id;
+        $cambio->estado_idEstado                = $request->estado;
+        $cambio->aplica_matricula               = $request->aplica_matricula;
+        $cambio->punto_venta                    = $request->punto_venta;
+        $cambio->asesor_id                      = $request->asesor_id;
+        $cambio->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
         $cambio->save();
         return $cambio;
     }

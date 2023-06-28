@@ -51,7 +51,9 @@ class CodigoLibrosController extends Controller
                 $ifid_periodo       = $validar[0]->id_periodo;
                 //validar que el venta_estado sea cero o igual al enviado desde el front 
                 $ifventa_estado     = $validar[0]->venta_estado;
-                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
+                //validar el bc_periodo
+                $ifbc_periodo       = $validar[0]->bc_periodo;
+                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
                     $codigo =  DB::table('codigoslibros')
                     ->where('codigo', $item->codigo)
                     ->where('bc_estado', '1')

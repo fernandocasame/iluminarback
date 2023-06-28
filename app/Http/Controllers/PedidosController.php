@@ -1755,7 +1755,6 @@ class PedidosController extends Controller
             'veN_ESTADO_TRANSPORTE' => false, // por defecto
             'veN_FIRMADO' => 'DS', // por defecto
             'veN_TEMPORADA' => $pedido[0]->region_idregion == 1 ? 0 :1 ,
-            //'veN_TEMPORADA' => $pedido[0]->id_pedido,
             'cueN_NUMERO' => strval($setNumCuenta)
         ];
         //guardar en la tabla de temporadas
@@ -1827,6 +1826,7 @@ class PedidosController extends Controller
                 $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
                 $hijoConvenio->id_pedido                    = $id_pedido;
                 $hijoConvenio->contrato                     = $contrato;
+                $hijoConvenio->institucion_id               = $institucion;
                 $hijoConvenio->save();
             }
         }
@@ -2700,7 +2700,9 @@ class PedidosController extends Controller
     //ver las notificaciones
     //api:get>>/verNotificacionPedidos
     public function verNotificacionPedidos(Request $request){
-        $datos=[];
+       $datos=[];
+       $fecha       = date("Y-m-d");
+       $Resta30dias = date("Y-m-d",strtotime($fecha."- 30 days")); 
        //obtener los ids de los pedidos
        $queryids = DB::SELECT("SELECT   pc.id_pedido,p.id_asesor,
        i.nombreInstitucion, c.nombre AS ciudad,
@@ -2712,6 +2714,7 @@ class PedidosController extends Controller
        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
        LEFT JOIN usuario ase ON p.id_asesor = ase.idusuario
        WHERE pe.estado = '1' 
+       AND pc.created_at > '$Resta30dias'
        ORDER BY pc.created_at DESC      
        ");
        $seTearArray = [];

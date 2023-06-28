@@ -185,6 +185,9 @@ Route::get('nliquidacion/verificacion/{contrato}/{numero}','VerificacionControll
 Route::get('changeLiquidacion','VerificacionControllerAnterior@changeLiquidacion');
 Route::post('guardarChangeLiquidacion','VerificacionControllerAnterior@guardarChangeLiquidacion');
 Route::post('crearVerificacion','VerificacionControllerAnterior@crearVerificacion');
+Route::post('solicitarVerificacion','VerificacionControllerAnterior@solicitarVerificacion');
+Route::get('notificacionesVerificaciones','VerificacionControllerAnterior@notificacionesVerificaciones');
+Route::get('getTrazabilidadVerificacion','VerificacionControllerAnterior@getTrazabilidadVerificacion');
 //=========================FIN DE API DE LIQUIDACIONES=======================
 
 //=========================API PARA LIQUIDACIONES CON CODIGOS DE BARRAS==========================
@@ -1176,8 +1179,8 @@ Route::post('f_deleteVarios','ActividadAnimacionController@f_deleteVarios');
 Route::post('changeEstadoAlcance','PedidosController@changeEstadoAlcance');
 Route::post('guardarValorAlcance','PedidosController@guardarValorAlcance');
 Route::get('getAlcancePedido','PedidosController@getAlcancePedido');
-Route::post('AceptarAlcance','PedidosController@AceptarAlcance');
 Route::post('eliminarAlcance','PedidosController@eliminarAlcance');
+Route::post('AceptarAlcance','PedidosController@AceptarAlcance');
 Route::get('get_val_pedidoInfo_alcance/{pedido}/{alcance}','PedidosController@get_val_pedidoInfo_alcance');
 Route::get('milton_test','AdminController@pruebaApi');
 //APIS DE GUIAS
@@ -1207,6 +1210,7 @@ Route::post('Post_VendedorCrear','FacturacionApiController@Post_VendedorCrear');
 Route::post('Post_VendedorEditar','FacturacionApiController@Post_VendedorEditar');
 //PRODUCTO
 Route::get('Get_Producto','FacturacionApiController@Get_Producto');
+Route::get('Get_Productocompleto','FacturacionApiController@Get_Productocompleto');
 Route::get('Get_Productoxbusquedayrazonbusqueda','FacturacionApiController@Get_Productoxbusquedayrazonbusqueda');
 Route::post('Post_ProductoEditar','FacturacionApiController@Post_ProductoEditar');
 //INSTITUCION
@@ -1224,6 +1228,14 @@ Route::post('Post_VentaEditarestado','FacturacionApiController@Post_VentaEditare
 Route::get('Get_Clientexbusquedayrazonbusqueda','FacturacionApiController@Get_Clientexbusquedayrazonbusqueda');
 Route::post('Post_ClienteCrear','FacturacionApiController@Post_ClienteCrear');
 Route::post('Post_ClienteEditar','FacturacionApiController@Post_ClienteEditar');
+//DETALLE DE VERIFICACION
+Route::get('Get_DVerificacionxvencodigoyprocodigo','FacturacionApiController@Get_DVerificacionxvencodigoyprocodigo');
+Route::post('Post_EditarDetalleVerificacionxdet_ver_id','FacturacionApiController@Post_EditarDetalleVerificacionxdet_ver_id');
+Route::post('Post_DeleteDetalleVerificacionxdet_ver_id','FacturacionApiController@Post_DeleteDetalleVerificacionxdet_ver_id');
+//DETALLE DE VENTA
+Route::get('Get_DVentaxvencodigoyprocodigo','FacturacionApiController@Get_DVentaxvencodigoyprocodigo');
+Route::post('Post_EditarDetalleVentaxdet_ven_codigo','FacturacionApiController@Post_EditarDetalleVentaxdet_ven_codigo');
+//FIN APIS FACTURACION
 
 
 //configurar periodos institucion para carga de libros en bodega
