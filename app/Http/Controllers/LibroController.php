@@ -42,7 +42,7 @@ class LibroController extends Controller
     }
     //api:get/getAllBooks
     public function getAllBooks(Request $request){
-        $query = DB::SELECT("SELECT l.nombrelibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
+        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
         a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
          FROM libros_series ls
          LEFT JOIN series s ON ls.id_serie = s.id_serie
