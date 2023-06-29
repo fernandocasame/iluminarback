@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\VerificacionHistorico;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -347,8 +348,8 @@ class FacturacionApiController extends Controller
     //DETALLE DE VERIFICACION
     public function Get_DVerificacionxvencodigoyprocodigo(Request $request)
     {
-        $valor = $request->busqueda;
-        $valor2 = $request->razonbusqueda;
+        $valor = $request->ven_codigo;
+        $valor2 = $request->pro_codigo;
         //return $valor;
         //return $request;
         $dato = Http::get("http://186.46.24.108:9095/api/f_DetalleVerificacion/Getxvencodigoyprocodigo?ven_codigo=".$valor."&pro_codigo=".$valor2);
@@ -360,7 +361,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->det_ver_id;
         $form_data = [
-            'detVenCantidadReal' => $request->detVerCantidad,
+            'detVerCantidad' => intval($request->detVerCantidad),
         ];
         // return $valor;
         $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Updatedvcantidadxdetverid?det_ver_id=".$valor, $form_data);
@@ -379,8 +380,8 @@ class FacturacionApiController extends Controller
     //DETALLE DE VENTA
     public function Get_DVentaxvencodigoyprocodigo(Request $request)
     {
-        $valor = $request->busqueda;
-        $valor2 = $request->razonbusqueda;
+        $valor = $request->ven_codigo;
+        $valor2 = $request->pro_codigo;
         //return $valor;
         //return $request;
         $dato = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$valor."&pro_codigo=".$valor2);
@@ -392,11 +393,28 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->det_ven_codigo;
         $form_data = [
-            'detVenCantidadReal' => $request->detVenCantidadReal,
+            'detVenCantidadReal' => intval($request->detVenCantidadReal),
         ];
-        // return $valor;
+        try {
+        //return $formdata;
         $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVenta/Updatexdetvencodigo?det_ven_codigo=".$valor, $form_data);
         $prueba_update = json_decode($dato, true);
+        $historico = new VerificacionHistorico();
+        $historico->vencodigo = 'prueba1';
+        $historico->procodigo = 'prueba';
+        $historico->tipo = '1';
+        $historico->accion = '1';
+        $historico->cantidadanterior = 35555.10;
+        $historico->cantidadactual = 55555.10;
+        $historico->save();
+        if($historico){
+            echo " se guartdo  sea";
+        }else{
+            echo "no se guardo";
+        }
         return $prueba_update;
+    } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+    }
     }
 }

@@ -1237,6 +1237,12 @@ Route::get('Get_DVentaxvencodigoyprocodigo','FacturacionApiController@Get_DVenta
 Route::post('Post_EditarDetalleVentaxdet_ven_codigo','FacturacionApiController@Post_EditarDetalleVentaxdet_ven_codigo');
 //FIN APIS FACTURACION
 
+//HISTORICOS
+Route::get('historicoverificacionsinparametros','VerificacionHistoricoController@historicoverificacionsinparametros');
+Route::get('dventaxvencodigo/{vencodigo}','VerificacionHistoricoController@dventaxvencodigo');
+Route::get('dverificacionxvencodigo/{vencodigo}','VerificacionHistoricoController@dverificacionxvencodigo');
+//FIN HISTORICOS
+
 
 //configurar periodos institucion para carga de libros en bodega
 Route::get('getInstitucionConfiguracion','InstitucionController@getInstitucionConfiguracion');

@@ -898,7 +898,8 @@ class PedidosController extends Controller
         (
             SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
             WHERE pa.id_pedido = p.id_pedido
-        ) AS contador_alcance
+        ) AS contador_alcance,
+        (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones
         FROM pedidos p
         INNER JOIN usuario u ON p.id_asesor = u.idusuario
         INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -929,7 +930,8 @@ class PedidosController extends Controller
             (
                 SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
                 WHERE pa.id_pedido = p.id_pedido
-            ) AS contador_alcance
+            ) AS contador_alcance,
+            (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones
             FROM pedidos p
             INNER JOIN usuario u ON p.id_asesor = u.idusuario
             INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
