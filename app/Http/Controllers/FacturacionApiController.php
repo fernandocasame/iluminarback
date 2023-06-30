@@ -359,23 +359,57 @@ class FacturacionApiController extends Controller
 
     public function Post_EditarDetalleVerificacionxdet_ver_id(Request $request)
     {
-        $valor = $request->det_ver_id;
+        $valor = $request->detVerId;
         $form_data = [
             'detVerCantidad' => intval($request->detVerCantidad),
         ];
-        // return $valor;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Updatedvcantidadxdetverid?det_ver_id=".$valor, $form_data);
-        $prueba_update = json_decode($dato, true);
-        return $prueba_update;
+        try {
+            // return $valor;
+            $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Updatedvcantidadxdetverid?det_ver_id=".$valor, $form_data);
+            $prueba_update = json_decode($dato, true);
+            $historico = new VerificacionHistorico();
+            $historico->vencodigo = $request->venCodigo;
+            $historico->procodigo = $request->proCodigo;
+            $historico->tipo = '2';
+            $historico->accion = '1';
+            $historico->cantidadanterior = floatval($request->detVerCantidadAnterior);
+            $historico->cantidadactual = floatval($request->detVerCantidad);
+            $historico->save();
+            if($historico){
+                echo " se guartdo  sea";
+            }else{
+                echo "no se guardo";
+            }
+            return $prueba_update;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
     }
 
     public function Post_DeleteDetalleVerificacionxdet_ver_id(Request $request)
     {
-        $valor = $request->det_ver_id;
+        $valor = $request->detVerId;
         // return $valor;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Deletexdetverid?det_ver_id=".$valor);
-        $prueba_delete = json_decode($dato, true);
-        return $prueba_delete;
+        try {
+            $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Deletexdetverid?det_ver_id=".$valor);
+            $prueba_delete = json_decode($dato, true);
+            $historico = new VerificacionHistorico();
+            $historico->vencodigo = $request->venCodigo;
+            $historico->procodigo = $request->proCodigo;
+            $historico->tipo = '2';
+            $historico->accion = '2';
+            $historico->cantidadanterior = floatval($request->detVerCantidadAnterior);
+            $historico->cantidadactual = floatval($request->detVerCantidad);
+            $historico->save();
+            if($historico){
+                echo " se guartdo  sea";
+            }else{
+                echo "no se guardo";
+            }
+            return $prueba_delete;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
     }
     //DETALLE DE VENTA
     public function Get_DVentaxvencodigoyprocodigo(Request $request)
@@ -391,30 +425,30 @@ class FacturacionApiController extends Controller
 
     public function Post_EditarDetalleVentaxdet_ven_codigo(Request $request)
     {
-        $valor = $request->det_ven_codigo;
+        $valor = $request->detVenCodigo;
         $form_data = [
             'detVenCantidadReal' => intval($request->detVenCantidadReal),
         ];
         try {
-        //return $formdata;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVenta/Updatexdetvencodigo?det_ven_codigo=".$valor, $form_data);
-        $prueba_update = json_decode($dato, true);
-        $historico = new VerificacionHistorico();
-        $historico->vencodigo = 'prueba1';
-        $historico->procodigo = 'prueba';
-        $historico->tipo = '1';
-        $historico->accion = '1';
-        $historico->cantidadanterior = 35555.10;
-        $historico->cantidadactual = 55555.10;
-        $historico->save();
-        if($historico){
-            echo " se guartdo  sea";
-        }else{
-            echo "no se guardo";
+            //return $formdata;
+            $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVenta/Updatexdetvencodigo?det_ven_codigo=".$valor, $form_data);
+            $prueba_update = json_decode($dato, true);
+            $historico = new VerificacionHistorico();
+            $historico->vencodigo = $request->venCodigo;
+            $historico->procodigo = $request->proCodigo;
+            $historico->tipo = '1';
+            $historico->accion = '1';
+            $historico->cantidadanterior = floatval($request->detVenCantidadRealAnterior);
+            $historico->cantidadactual = floatval($request->detVenCantidadReal);
+            $historico->save();
+            if($historico){
+                echo " se guartdo  sea";
+            }else{
+                echo "no se guardo";
+            }
+            return $prueba_update;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
-        return $prueba_update;
-    } catch (\Exception  $ex) {
-        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-    }
     }
 }
