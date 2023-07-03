@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Seminario;
+use App\Models\SeminarioCapacitador;
 use App\Models\SeminarioEncuesta;
 use App\Models\SeminarioHasUsuario;
 use App\Models\Seminarios;
 use Illuminate\Http\Request;
 use DB;
-
+use Illuminate\Support\Collection;
 class SeminarioController extends Controller
 {
     /**
@@ -188,7 +189,7 @@ class SeminarioController extends Controller
             (case when (s.estado_institucion_temporal = 1) then s.nombre_institucion_temporal  else i.nombreInstitucion end) as institucionFinal,
             (case when (s.estado_capacitacion = 2) then 'Realizada' when (s.estado_capacitacion = 1) then 'Pendiente' else 'Cancelada' end) as estadoCapacitacion,
             COUNT(sr.id_seminario) AS cant_respuestas,
-            CONCAT(cap.nombres,' ',cap.apellidos) as capacitador
+            CONCAT(cap.nombres,' ',cap.apellidos) as capacitador, s.capacitador as capacitadores
             FROM seminarios s
             LEFT JOIN institucion i ON s.id_institucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
@@ -636,55 +637,130 @@ class SeminarioController extends Controller
     }
 
     public function guardar_seminario(Request $request){
-        if( $request->id_seminario ){
-            if($request->capacitacion){
-               $capacitacion = Seminarios::findOrFail($request->id_seminario);
-               //si crean una insitucion temporal
-                if($request->estado_institucion_temporal == 1){
-                    $capacitacion->periodo_id = $request->periodo_id_temporal;
-                    $capacitacion->institucion_id_temporal = $request->institucion_id_temporal;
-                    $capacitacion->nombre_institucion_temporal = $request->nombreInstitucion;
-                    $capacitacion->id_institucion = "";
-                } 
-                if($request->estado_institucion_temporal == 0){
-                    $capacitacion->id_institucion = $request->institucion_id;
-                    $capacitacion->institucion_id_temporal = "";
-                    $capacitacion->nombre_institucion_temporal = "";
-                    //para traer el periodo
-                    $buscarPeriodo = $this->traerPeriodo($request->institucion_id);
-                    if($buscarPeriodo["status"] == "1"){
-                        $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
-                        $capacitacion->periodo_id = $obtenerPeriodo;   
-                    }
+        //CAPACITACIONES
+        if($request->capacitacion == "yes"){
+            $datos = json_decode($request->capacitadores);
+            foreach($datos as $key => $item){
+                //validar que el capacitador solo pueda 2 capacitaciones por dia
+                $validate  = $this->buscarCapacitacionesXCapacitador($item->idusuario,substr($request->fecha_inicio, 0, 10),$request->id_seminario); // Extraer la subcadena
+                if(sizeof($validate) > 1){
+                    return ["status" => "0", "message" => "El capacitador $item->capacitador ya tiene 2 capacitaciones en el mismo día"];
                 }
-               $capacitacion->estado_institucion_temporal   = $request->estado_institucion_temporal;
-               $capacitacion->fecha_inicio                  = $request->fecha_inicio;
-               $capacitacion->fecha_fin                     = $request->fecha_fin;
-               $capacitacion->descripcion                   = $request->fecha_inicio;
-               $capacitacion->cant_asistentes               = $request->cant_asistentes;
-               $capacitacion->observacion_admin             = $request->observacion;
-               $capacitacion->link_reunion                  = $request->link_reunion;
-               $capacitacion->estado_capacitacion           = $request->estado_capacitacion;
-               $capacitacion->asistencia_activa             = $request->asistencia_activa;
-               $capacitacion->capacitador_id                = $request->capacitador_id;
-               if($request->capacitador_id > 0){
-                 $capacitacion->capacitador                 = $request->capacitador;
-               }
-               $capacitacion->save();
-               if($capacitacion){
-                return ["status" => "1","message" => "Se actualizo correctamente"];
-               }else{
-                return ["status" => "0","message" => "No se pudo actualizar"]; 
-               }
-               
-            }else{
-                DB::UPDATE("UPDATE `seminarios` SET `nombre`=?,`descripcion`=?,`fecha_inicio`=?,`fecha_fin`=?,`id_institucion`=?, `link_reunion`=?,`capacitador`=?,`cant_asistentes`=?,`asistencia_activa`=?,`tipo_webinar`=?,`link_recurso`=?,`clave_recurso`=? WHERE `id_seminario` = ?", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->id_institucion,$request->link_reunion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->link_recurso,$request->clave_recurso,$request->id_seminario]);
             }
-         
-        }else{
+            //editar
+            if($request->id_seminario > 0){
+                $capacitacion = Seminarios::findOrFail($request->id_seminario);
+            }
+            //crear
+            else{
+                $capacitacion = new Seminarios();
+                $capacitacion->id_usuario                = $request->idusuario;
+                $capacitacion->nombre                    = $request->nombre;
+                $capacitacion->label                     = 'Baja';
+                $capacitacion->classes                   = "event-success";
+                $capacitacion->tipo                      = $request->tipo;
+                $capacitacion->hora_inicio               = $request->hora_inicio;
+                $capacitacion->hora_fin                  = $request->hora_fin;
+                $capacitacion->tema_id                   = $request->tema_id;
+            }
+           //si crean una insitucion temporal
+            if($request->estado_institucion_temporal == 1){
+                // $capacitacion->periodo_id = $request->periodo_id_temporal;
+                $capacitacion->institucion_id_temporal = $request->institucion_id_temporal;
+                $capacitacion->nombre_institucion_temporal = $request->nombreInstitucion;
+                $capacitacion->id_institucion = "";
+            } 
+            if($request->estado_institucion_temporal == 0){
+                $capacitacion->id_institucion = $request->institucion_id;
+                $capacitacion->institucion_id_temporal = "";
+                $capacitacion->nombre_institucion_temporal = "";
+                // //para traer el periodo
+                // $buscarPeriodo = $this->traerPeriodo($request->institucion_id);
+                // if($buscarPeriodo["status"] == "1"){
+                //     $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
+                // }
+            }
+           $capacitacion->periodo_id                    = $request->periodo_id; 
+           $capacitacion->descripcion                   = $request->fecha_inicio;
+           $capacitacion->tipo_webinar                  = "2";
+           $capacitacion->estado_institucion_temporal   = $request->estado_institucion_temporal;
+           $capacitacion->fecha_inicio                  = $request->fecha_inicio;
+           $capacitacion->fecha_fin                     = $request->fecha_fin;
+           $capacitacion->cant_asistentes               = $request->cant_asistentes;
+           $capacitacion->observacion_admin             = $request->observacion;
+           $capacitacion->link_reunion                  = $request->link_reunion;
+           $capacitacion->estado_capacitacion           = $request->estado_capacitacion;
+           $capacitacion->asistencia_activa             = $request->asistencia_activa;
+           $capacitacion->capacitador                   = $request->capacitador;
+           $capacitacion->save();
+          return $this->crearCapacitadores($request,$capacitacion);
+           if($capacitacion){
+            return ["status" => "1","message" => "Se actualizo correctamente"];
+           }else{
+            return ["status" => "0","message" => "No se pudo actualizar"]; 
+           }
+              
+        }
+        //SEMINARIOS
+        if( $request->id_seminario ){
+            DB::UPDATE("UPDATE `seminarios` SET `nombre`=?,`descripcion`=?,`fecha_inicio`=?,`fecha_fin`=?,`id_institucion`=?, `link_reunion`=?,`capacitador`=?,`cant_asistentes`=?,`asistencia_activa`=?,`tipo_webinar`=?,`link_recurso`=?,`clave_recurso`=? WHERE `id_seminario` = ?", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->id_institucion,$request->link_reunion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->link_recurso,$request->clave_recurso,$request->id_seminario]);
+        }
+        else{
             DB::INSERT("INSERT INTO `seminarios`(`nombre`, `descripcion`, `fecha_inicio`, `fecha_fin`, `link_reunion`, `id_institucion`, `capacitador`, `cant_asistentes`, `asistencia_activa`, `tipo_webinar`,`periodo_id`, `link_recurso`,`clave_recurso`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->link_reunion,$request->id_institucion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->periodo_id,$request->link_recurso,$request->clave_recurso]);
         }
-
+    }
+    public function buscarCapacitacionesXCapacitador($idusuario,$fecha,$id_seminario){
+        $query = DB::SELECT("SELECT sc.*
+        FROM seminarios_capacitador sc
+        LEFT JOIN seminarios s ON s.id_seminario = sc.seminario_id
+        WHERE sc.idusuario = '$idusuario'
+        AND DATE(s.fecha_inicio) = '$fecha'
+        AND s.estado = '1'
+        AND s.id_seminario <> '$id_seminario'
+        ");
+        return $query;
+    }
+    public function getCapacitadoresXCapacitacion($id_seminario){
+        $getCapacitadores = DB::SELECT("SELECT c.*, 
+        CONCAT(u.nombres,' ',u.apellidos) AS capacitador
+        FROM seminarios_capacitador c
+        LEFT JOIN usuario u ON c.idusuario = u.idusuario
+        WHERE c.seminario_id = '$id_seminario'
+        ");
+        return $getCapacitadores;
+    }
+    public function crearCapacitadores($request,$arreglo){
+        $datos = json_decode($request->capacitadores);
+        //eliminar si ya han quitado al capacitador
+        $getCapacitadores = $this->getCapacitadoresXCapacitacion($arreglo->id_seminario);
+        if(sizeOf($getCapacitadores) > 0){
+            foreach($getCapacitadores as $key => $item){
+                $capacitador        = "";
+                $capacitador        = $item->idusuario;
+                $searchCapacitador  = collect($datos)->filter(function ($objeto) use ($capacitador) {
+                    // Condición de filtro
+                    return $objeto->idusuario == $capacitador;
+                });
+                if(sizeOf($searchCapacitador) == 0){
+                    DB::DELETE("DELETE FROM seminarios_capacitador
+                      WHERE seminario_id = '$arreglo->id_seminario'
+                      AND idusuario = '$capacitador'
+                    ");
+                }
+            }
+        }
+        //guardar los capacitadores
+        foreach($datos as $key => $item){
+            $query = DB::SELECT("SELECT * FROM seminarios_capacitador c
+            WHERE c.idusuario = '$item->idusuario'
+            AND c.seminario_id = '$arreglo->id_seminario'");
+            if(empty($query)){
+                $capacitador = new SeminarioCapacitador();
+                $capacitador->idusuario      = $item->idusuario;
+                $capacitador->seminario_id   = $arreglo->id_seminario;
+                $capacitador->save();
+            }
+        }
     }
     public function traerPeriodo($institucion_id){
         $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = ( 

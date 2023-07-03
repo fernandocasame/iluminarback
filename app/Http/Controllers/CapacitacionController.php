@@ -70,10 +70,10 @@ class CapacitacionController extends Controller
             LEFT JOIN capacitacion_temas t ON  c.tema_id = t.id
             WHERE c.fecha_inicio_temp = '$request->fecha'
             AND c.estado = '1'
-            AND c.tipo_webinar = '2' 
+            AND c.tipo_webinar = '2'
             ");
             return $capacitaciones;
-            
+
         }
         else{
             $temas = DB::SELECT("SELECT c.*   FROM capacitacion_temas c
@@ -81,7 +81,7 @@ class CapacitacionController extends Controller
             ");
             return $temas;
         }
-    
+
     }
     public function solicitarTema(Request $request){
         //para eliminar la solicitud
@@ -102,7 +102,7 @@ class CapacitacionController extends Controller
       if($ingreso){
             return ["status" => "1","message" => "Se solicito correctamente"];
       }else{
-            return ["status" => "0","message" => "No se pudo solicitar"]; 
+            return ["status" => "0","message" => "No se pudo solicitar"];
       }
     }
     public function editarSolicitudTema(Request $request){
@@ -112,7 +112,7 @@ class CapacitacionController extends Controller
         ->update([
             'comentario_admin' => $request->comentario,
             'estado' => $request->estado,
-            
+
         ]);
         return "se editor correctamente";
     }
@@ -138,11 +138,11 @@ class CapacitacionController extends Controller
         //para editar la capacitacion agenda
         if( $request->id != 0 ){
             $agenda = Seminarios::find($request->id);
-        //para guardar la capacitacion agenda  
+        //para guardar la capacitacion agenda
         }else{
             $agenda = new Seminarios();
             $agenda->fecha_fin = $request->fecha_fin;
-        } 
+        }
         //si crean una insitucion temporal
         if($request->estado_institucion_temporal == 1 ){
             $agenda->periodo_id                     = $request->periodo_id_temporal;
@@ -175,9 +175,9 @@ class CapacitacionController extends Controller
           $agenda->capacitador                      = $request->capacitador;
         }
         if($request->observacion_admin == "null"){
-            $agenda->observacion_admin = "";    
+            $agenda->observacion_admin = "";
         }else{
-            $agenda->observacion_admin              = $request->observacion_admin;   
+            $agenda->observacion_admin              = $request->observacion_admin;
         }
         $agenda->hora_inicio                        = $request->hora_inicio;
         $agenda->hora_fin                           = $request->hora_fin;
@@ -185,13 +185,12 @@ class CapacitacionController extends Controller
         // $agenda->capacitador = $request->capacitador;
         $agenda->estado_institucion_temporal        = $request->estado_institucion_temporal;
         $agenda->save();
-        return 
-        $agenda;
+        return $agenda;
     }
     public function traerPeriodo($institucion_id){
-        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = ( 
+        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
             SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
-            from institucion i,  periodoescolar_has_institucion pir         
+            from institucion i,  periodoescolar_has_institucion pir
             WHERE i.idInstitucion = pir.institucion_idInstitucion
             AND pir.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi
             WHERE phi.institucion_idInstitucion = i.idInstitucion
@@ -226,15 +225,15 @@ class CapacitacionController extends Controller
         //almacenar los periodos
         // $periodo1 = $periodo[0]->idperiodoescolar;
         // $periodo2 = $periodo[1]->idperiodoescolar;
-        $filtro = DB::SELECT("SELECT p.periodoescolar, i.nombreInstitucion, a.*  
-        FROM seminarios a 
+        $filtro = DB::SELECT("SELECT p.periodoescolar, i.nombreInstitucion, a.*
+        FROM seminarios a
         LEFT JOIN institucion i ON a.id_institucion = i.idInstitucion
         LEFT JOIN periodoescolar p ON a.periodo_id = p.idperiodoescolar
         WHERE a.id_usuario = '$request->asesor_id'
         AND a.tipo_webinar = '2'
         AND a.estado = '1'
         ORDER BY a.id_seminario DESC
-        LIMIT 100    
+        LIMIT 100
         ");
         return $filtro;
     }
@@ -246,8 +245,9 @@ class CapacitacionController extends Controller
         return $periodo;
     }
     public function getCapacitadores(){
-        $query = DB::SELECT("SELECT u.idusuario, CONCAT(u.nombres, ' ',u.apellidos) AS capacitador
-        FROM 
+        $query = DB::SELECT("SELECT u.idusuario,
+        CONCAT(u.nombres, ' ',u.apellidos) AS capacitador
+        FROM
        usuario u
        WHERE u.capacitador = '1'
        AND u.estado_idEstado = '1'
@@ -264,12 +264,19 @@ class CapacitacionController extends Controller
             $contador = 0;
             foreach($capacitadores as $key => $item){
                 //capacitaciones
-                $query = DB::SELECT("SELECT *
-                from seminarios s
-                WHERE s.tipo_webinar = '2'
-                AND s.capacitador_id = '$item->idusuario'
-                AND s.periodo_id = '$periodo'
+                // $query = DB::SELECT("SELECT *
+                // from seminarios s
+                // WHERE s.tipo_webinar = '2'
+                // AND s.capacitador_id = '$item->idusuario'
+                // AND s.periodo_id = '$periodo'
+                // AND s.estado = '1'
+                // ");
+                $query = DB::SELECT("SELECT s.*
+                FROM seminarios_capacitador sc
+                LEFT JOIN seminarios s ON s.id_seminario = sc.seminario_id
+                WHERE sc.idusuario = '$item->idusuario'
                 AND s.estado = '1'
+                AND s.periodo_id = '$periodo'
                 ");
                 $datos[$contador] = [
                     "idusuario"     => $item->idusuario,
@@ -355,88 +362,162 @@ class CapacitacionController extends Controller
             s.periodo_id,temp.ciudad AS ciudad_temporal,
             c.nombre AS ciudad, p.periodoescolar AS periodo,
             CONCAT(u.nombres,' ',u.apellidos) AS asesor
-            FROM seminarios s
+            FROM seminarios_capacitador sa
+            LEFT JOIN seminarios s ON sa.seminario_id = s.id_seminario
             LEFT JOIN institucion i ON s.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON c.idciudad = i.ciudad_id 
+            LEFT JOIN ciudad c ON c.idciudad = i.ciudad_id
             LEFT JOIN seguimiento_institucion_temporal temp ON s.institucion_id_temporal = temp.institucion_temporal_id
             LEFT JOIN periodoescolar p ON s.periodo_id = p.idperiodoescolar
             LEFT JOIN usuario u ON s.id_usuario = u.idusuario
-            WHERE s.tipo_webinar = '2'
-            -- AND s.id_usuario ='$idusuario' 
-            AND s.capacitador_id = '$idusuario'
+            WHERE sa.idusuario = '$idusuario'
             AND s.estado = '1'
+            AND s.tipo_webinar = '2'
         ");
         return $query;
+        // $query = DB::SELECT("SELECT DISTINCT s.id_usuario,s.id_institucion,
+        //     s.estado_institucion_temporal,i.nombreInstitucion,s.nombre_institucion_temporal,
+        //     s.periodo_id,temp.ciudad AS ciudad_temporal,
+        //     c.nombre AS ciudad, p.periodoescolar AS periodo,
+        //     CONCAT(u.nombres,' ',u.apellidos) AS asesor
+        //     FROM seminarios s
+        //     LEFT JOIN institucion i ON s.id_institucion = i.idInstitucion
+        //     LEFT JOIN ciudad c ON c.idciudad = i.ciudad_id
+        //     LEFT JOIN seguimiento_institucion_temporal temp ON s.institucion_id_temporal = temp.institucion_temporal_id
+        //     LEFT JOIN periodoescolar p ON s.periodo_id = p.idperiodoescolar
+        //     LEFT JOIN usuario u ON s.id_usuario = u.idusuario
+        //     WHERE s.tipo_webinar = '2'
+        //     AND s.capacitador_id = '$idusuario'
+        //     AND s.estado = '1'
+        // ");
     }
     //========FILTRO POR PERIODO=========
     public function getReportePeriodoInstitucion($idusuario,$periodo,$institucion){
-        $query = DB::SELECT("SELECT s.nombre as tema, s.fecha_inicio_temp,s.capacitador
-            from seminarios s
-            WHERE s.tipo_webinar = '2'
-            -- AND s.id_usuario ='$idusuario'
-            AND s.capacitador_id = '$idusuario'
-            AND s.id_institucion = '$institucion'
-            AND s.periodo_id = '$periodo'
-            AND s.estado = '1'
+        // $query = DB::SELECT("SELECT s.nombre as tema,  SUBSTRING(s.fecha_inicio, 1, 10) AS fecha_inicio,s.capacitador
+        //     from seminarios s
+        //     WHERE s.tipo_webinar = '2'
+        //     AND s.capacitador_id = '$idusuario'
+        //     AND s.id_institucion = '$institucion'
+        //     AND s.periodo_id = '$periodo'
+        //     AND s.estado = '1'
+        // ");
+        $query = DB::SELECT("SELECT s.nombre as tema,
+        SUBSTRING(s.fecha_inicio, 1, 10) AS fecha_inicio,s.capacitador
+        FROM seminarios_capacitador sa
+        LEFT JOIN seminarios s ON sa.seminario_id = s.id_seminario
+        WHERE s.tipo_webinar = '2'
+        AND sa.idusuario = '$idusuario'
+        AND s.id_institucion = '$institucion'
+        AND s.periodo_id = '$periodo'
+        AND s.estado = '1'
         ");
         return $query;
     }
     public function getReportePeriodoInstitucionTemporal($idusuario,$periodo,$institucion){
-        $query = DB::SELECT("SELECT
-            s.nombre as tema, s.fecha_inicio_temp,s.capacitador
-            from seminarios s
-            WHERE s.tipo_webinar = '2'
-            -- AND s.id_usuario ='$idusuario'
-            AND s.capacitador_id = '$idusuario'
-            AND s.nombre_institucion_temporal = '$institucion'
-            AND s.periodo_id = '$periodo'
-            AND s.estado = '1'
+        // $query = DB::SELECT("SELECT
+        //     s.nombre as tema, s.fecha_inicio_temp,s.capacitador
+        //     from seminarios s
+        //     WHERE s.tipo_webinar = '2'
+        //     AND s.capacitador_id = '$idusuario'
+        //     AND s.nombre_institucion_temporal = '$institucion'
+        //     AND s.periodo_id = '$periodo'
+        //     AND s.estado = '1'
+        // ");
+        // return $query;
+        $query = DB::SELECT("SELECT s.nombre as tema,
+        SUBSTRING(s.fecha_inicio, 1, 10) AS fecha_inicio,s.capacitador
+        FROM seminarios_capacitador sa
+        LEFT JOIN seminarios s ON sa.seminario_id = s.id_seminario
+        WHERE s.tipo_webinar = '2'
+        AND sa.idusuario = '$idusuario'
+        AND s.nombre_institucion_temporal = '$institucion'
+        AND s.periodo_id = '$periodo'
+        AND s.estado = '1'
         ");
         return $query;
     }
     //========FILTRO POR MESES===========
     public function getReporteInstitucion($idusuario,$anio,$institucion){
+        // $reporteMes = DB::SELECT("SELECT
+        // sum(case when month(fecha_inicio) = 1 then 1 else 0 end) Ene
+        // , sum(case when month(fecha_inicio) = 2 then 1 else 0 end) Feb
+        // , sum(case when month(fecha_inicio) = 3 then 1 else 0 end) Mar
+        // , sum(case when month(fecha_inicio) = 4 then 1 else 0 end) Abr
+        // , sum(case when month(fecha_inicio) = 5 then 1 else 0 end) May
+        // , sum(case when month(fecha_inicio) = 6 then 1 else 0 end) Jun
+        // , sum(case when month(fecha_inicio) = 7 then 1 else 0 end) Jul
+        // , sum(case when month(fecha_inicio) = 8 then 1 else 0 end) Ago
+        // , sum(case when month(fecha_inicio) = 9 then 1 else 0 end) Sep
+        // , sum(case when month(fecha_inicio) = 10 then 1 else 0 end) Oct
+        // , sum(case when month(fecha_inicio) = 11 then 1 else 0 end) Nov
+        // , sum(case when month(fecha_inicio) = 12 then 1 else 0 end) Dic
+        // from seminarios s
+        // WHERE s.tipo_webinar = '2'
+        //     AND s.capacitador_id = '$idusuario'
+        //     and YEAR(s.fecha_inicio) = '$anio'
+        //     AND s.id_institucion = '$institucion'
+        //     AND s.estado = '1'
+        // ");
         $reporteMes = DB::SELECT("SELECT
-        sum(case when month(fecha_inicio) = 1 then 1 else 0 end) Ene
-        , sum(case when month(fecha_inicio) = 2 then 1 else 0 end) Feb
-        , sum(case when month(fecha_inicio) = 3 then 1 else 0 end) Mar
-        , sum(case when month(fecha_inicio) = 4 then 1 else 0 end) Abr
-        , sum(case when month(fecha_inicio) = 5 then 1 else 0 end) May
-        , sum(case when month(fecha_inicio) = 6 then 1 else 0 end) Jun
-        , sum(case when month(fecha_inicio) = 7 then 1 else 0 end) Jul
-        , sum(case when month(fecha_inicio) = 8 then 1 else 0 end) Ago
-        , sum(case when month(fecha_inicio) = 9 then 1 else 0 end) Sep
-        , sum(case when month(fecha_inicio) = 10 then 1 else 0 end) Oct
-        , sum(case when month(fecha_inicio) = 11 then 1 else 0 end) Nov
-        , sum(case when month(fecha_inicio) = 12 then 1 else 0 end) Dic
-        from seminarios s
-        WHERE s.tipo_webinar = '2'
-            -- AND s.id_usuario ='$idusuario'
-            AND s.capacitador_id = '$idusuario'
+            sum(case when MONTH(s.fecha_inicio) = 1 then 1 else 0 end) Ene
+            , sum(case when month(s.fecha_inicio) = 2 then 1 else 0 end) Feb
+            , sum(case when month(s.fecha_inicio) = 3 then 1 else 0 end) Mar
+            , sum(case when month(s.fecha_inicio) = 4 then 1 else 0 end) Abr
+            , sum(case when month(s.fecha_inicio) = 5 then 1 else 0 end) May
+            , sum(case when month(s.fecha_inicio) = 6 then 1 else 0 end) Jun
+            , sum(case when month(s.fecha_inicio) = 7 then 1 else 0 end) Jul
+            , sum(case when month(s.fecha_inicio) = 8 then 1 else 0 end) Ago
+            , sum(case when month(s.fecha_inicio) = 9 then 1 else 0 end) Sep
+            , sum(case when month(s.fecha_inicio) = 10 then 1 else 0 end) Oct
+            , sum(case when month(s.fecha_inicio) = 11 then 1 else 0 end) Nov
+            , sum(case when month(s.fecha_inicio) = 12 then 1 else 0 end) Dic
+            FROM seminarios_capacitador sa
+            LEFT JOIN seminarios s ON sa.seminario_id = s.id_seminario
+            WHERE s.tipo_webinar = '2'
+            AND sa.idusuario = '$idusuario'
             and YEAR(s.fecha_inicio) = '$anio'
             AND s.id_institucion = '$institucion'
             AND s.estado = '1'
-        ");
+         ");
         return $reporteMes;
     }
     public function getReporteInstitucionTemporal($idusuario,$anio,$institucion){
+        // $reporteMes = DB::SELECT("SELECT
+        // sum(case when month(fecha_inicio) = 1 then 1 else 0 end) Ene
+        // , sum(case when month(fecha_inicio) = 2 then 1 else 0 end) Feb
+        // , sum(case when month(fecha_inicio) = 3 then 1 else 0 end) Mar
+        // , sum(case when month(fecha_inicio) = 4 then 1 else 0 end) Abr
+        // , sum(case when month(fecha_inicio) = 5 then 1 else 0 end) May
+        // , sum(case when month(fecha_inicio) = 6 then 1 else 0 end) Jun
+        // , sum(case when month(fecha_inicio) = 7 then 1 else 0 end) Jul
+        // , sum(case when month(fecha_inicio) = 8 then 1 else 0 end) Ago
+        // , sum(case when month(fecha_inicio) = 9 then 1 else 0 end) Sep
+        // , sum(case when month(fecha_inicio) = 10 then 1 else 0 end) Oct
+        // , sum(case when month(fecha_inicio) = 11 then 1 else 0 end) Nov
+        // , sum(case when month(fecha_inicio) = 12 then 1 else 0 end) Dic
+        // from seminarios s
+        // WHERE s.tipo_webinar = '2'
+        //     AND s.capacitador_id = '$idusuario'
+        //     and YEAR(s.fecha_inicio) = '$anio'
+        //     AND s.nombre_institucion_temporal = '$institucion'
+        //     AND s.estado = '1'
+        // ");
         $reporteMes = DB::SELECT("SELECT
-        sum(case when month(fecha_inicio) = 1 then 1 else 0 end) Ene
-        , sum(case when month(fecha_inicio) = 2 then 1 else 0 end) Feb
-        , sum(case when month(fecha_inicio) = 3 then 1 else 0 end) Mar
-        , sum(case when month(fecha_inicio) = 4 then 1 else 0 end) Abr
-        , sum(case when month(fecha_inicio) = 5 then 1 else 0 end) May
-        , sum(case when month(fecha_inicio) = 6 then 1 else 0 end) Jun
-        , sum(case when month(fecha_inicio) = 7 then 1 else 0 end) Jul
-        , sum(case when month(fecha_inicio) = 8 then 1 else 0 end) Ago
-        , sum(case when month(fecha_inicio) = 9 then 1 else 0 end) Sep
-        , sum(case when month(fecha_inicio) = 10 then 1 else 0 end) Oct
-        , sum(case when month(fecha_inicio) = 11 then 1 else 0 end) Nov
-        , sum(case when month(fecha_inicio) = 12 then 1 else 0 end) Dic
-        from seminarios s
-        WHERE s.tipo_webinar = '2'
-            -- AND s.id_usuario = '$idusuario'
-            AND s.capacitador_id = '$idusuario'
+            sum(case when MONTH(s.fecha_inicio) = 1 then 1 else 0 end) Ene
+            , sum(case when month(s.fecha_inicio) = 2 then 1 else 0 end) Feb
+            , sum(case when month(s.fecha_inicio) = 3 then 1 else 0 end) Mar
+            , sum(case when month(s.fecha_inicio) = 4 then 1 else 0 end) Abr
+            , sum(case when month(s.fecha_inicio) = 5 then 1 else 0 end) May
+            , sum(case when month(s.fecha_inicio) = 6 then 1 else 0 end) Jun
+            , sum(case when month(s.fecha_inicio) = 7 then 1 else 0 end) Jul
+            , sum(case when month(s.fecha_inicio) = 8 then 1 else 0 end) Ago
+            , sum(case when month(s.fecha_inicio) = 9 then 1 else 0 end) Sep
+            , sum(case when month(s.fecha_inicio) = 10 then 1 else 0 end) Oct
+            , sum(case when month(s.fecha_inicio) = 11 then 1 else 0 end) Nov
+            , sum(case when month(s.fecha_inicio) = 12 then 1 else 0 end) Dic
+            FROM seminarios_capacitador sa
+            LEFT JOIN seminarios s ON sa.seminario_id = s.id_seminario
+            WHERE s.tipo_webinar = '2'
+            AND sa.idusuario = '$idusuario'
             and YEAR(s.fecha_inicio) = '$anio'
             AND s.nombre_institucion_temporal = '$institucion'
             AND s.estado = '1'

@@ -13,6 +13,7 @@ use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
 use App\Models\RepresentanteEconomico;
 use App\Models\RepresentanteLegal;
+use App\Models\SeminarioCapacitador;
 use App\Models\Temporada;
 use App\Models\Usuario;
 use DB;
@@ -101,7 +102,7 @@ class AdminController extends Controller
                 //asesores
                 $teran = ["OT","OAT"];
                 $galo  = ["EZ","EZP"];
-                //buscar el codigo periodo 
+                //buscar el codigo periodo
                 $search = DB::SELECT("SELECT * FROM periodoescolar pe
                 WHERE pe.idperiodoescolar = '$periodo'
                 ");
@@ -125,7 +126,7 @@ class AdminController extends Controller
                 }else{
                     $menosUno = "C".substr(($anio-1),-2);
                 }
-               
+
                 //ASESORES QUE TIENE MAS DE UNA INICIAL
                 $valores     = [];
                 $arrayAsesor = [];
@@ -149,9 +150,9 @@ class AdminController extends Controller
                 $resultado = array_filter($JsonEnviar, function($p) {
                     return $p["estVenCodigo"] != 3 && !str_starts_with($p["venConvertido"] , 'C');
                     // print_r($p );
-                }); 
+                });
                 $renderSet = array_values($resultado);
-                //enviar valores 
+                //enviar valores
                 $dataFinally = array();
                 $contador = 0;
                 foreach($renderSet as $key => $item){
@@ -228,7 +229,7 @@ class AdminController extends Controller
                     "sin_contratos" => $arraySinContrato
                 ];
                 //====VENTA ANTERIOR======/
-                //VENTA BRUTA ANTERIOR 
+                //VENTA BRUTA ANTERIOR
                     $queryMenosUno = DB::SELECT("SELECT   t.VEN_VALOR,t.PERIODO,
                     ( t.VEN_VALOR - ((t.VEN_VALOR * t.VEN_DESCUENTO)/100)) AS ven_neta
                     FROM temp_reporte t
@@ -247,7 +248,7 @@ class AdminController extends Controller
                     "contratosEnviar"       => $contratosEnviar,
                     "MenosUno"              => $queryMenosUno,
                 ];
-              
+
             }//FIN FOR EACH ASESORES
             return $datos;
             } catch (\Exception  $ex) {
@@ -277,7 +278,7 @@ class AdminController extends Controller
         }
         try {
             //BUSCAR EL CONTRATO SI EXISTE
-            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato); 
+            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
             $JsonContrato = json_decode($dato, true);
             if($JsonContrato == "" || $JsonContrato == null){
                 return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -332,13 +333,13 @@ class AdminController extends Controller
                             //GUARDAR EN EL HISTORICO ALCANCE LIBROS
                             $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidadAnterior,$resultadoLibro,$user_created,1);
                         }
-                    }  
+                    }
                     ////////=========
                     ///============PROCESO  DE GUARDADO TABLA VENTA====
                     //GUARDAR NUEVO VEN_VALOR VENTA
                     $cantidad_anterior  = $JsonContrato["veN_VALOR"];
                     $nueva_cantidad     = floatval($cantidad_anterior) + floatval($ventaBruta);
-                    $datos = [ 
+                    $datos = [
                         "venValor"        => floatval($nueva_cantidad)
                     ];
                     $saveValor          = Http::post('http://186.46.24.108:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
@@ -352,14 +353,14 @@ class AdminController extends Controller
                 }else{
                     return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
                 }
-             
+
             }else{
                 return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
             }
-            
+
         } catch (\Exception  $ex) {
         return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        } 
+        }
 
 
         // $json = '
@@ -399,11 +400,11 @@ class AdminController extends Controller
         // // Convertir la cadena JSON a un array de objetos
         // $arrayObjetos = json_decode($json);
         // return $arrayObjetos;
-        // //variables 
+        // //variables
         // $contrato = "C-C20-0000008-LJ";
         // try {
         //     $dataFinally    = [];
-        //     $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato); 
+        //     $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
         //     $JsonContrato = json_decode($dato, true);
         //     if($JsonContrato == "" || $JsonContrato == null){
         //         return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -419,10 +420,10 @@ class AdminController extends Controller
         //         // return $dataFinally;
         //         return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
         //     }
-            
+
         // } catch (\Exception  $ex) {
         // return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-        // } 
+        // }
     }
     public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
         //vadidate that it's not exists
@@ -536,7 +537,7 @@ class AdminController extends Controller
         }
     }
 
-    
+
     /**
      * Show the form for creating a new resource.
      *
@@ -551,52 +552,106 @@ class AdminController extends Controller
     public function guardarData(Request $request){
         set_time_limit(6000);
         ini_set('max_execution_time', 6000);
-        $query = DB::SELECT("SELECT * FROM temporadas t
-        WHERE t.temporal_institucion IS NULL 
-        AND t.year = '2023'
-        AND t.id_periodo <> '20'
-        and t.estado  = '1'
+        //pasar los capacitadores
+        $query = DB::SELECT("SELECT * FROM seminarios s
+        WHERE s.tipo_webinar = '2'
+        AND s.capacitador_id IS NOT NULL
+        and s.estado = '1'
         ");
         $contador = 0;
-        foreach($query as $key => $item){ 
-            $contrato = $item->contrato;
-            //validar que el contrato exista en pedidos
-            $validate = DB::SELECT("SELECT p.id_periodo, p.id_institucion,p.id_asesor,
-            pe.periodoescolar as periodo,
-                CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
-                u.cedula AS cedulaAsesor,
-                CONCAT(ur.nombres, ' ', ur.apellidos) AS nombreDocente,
-                ur.cedula AS cedulaDocente,
-                i.nombreInstitucion, c.nombre AS ciudad,
-                SUBSTRING(pe.codigo_contrato, 1,1 ) AS temporada
-                FROM pedidos p
-                LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-                LEFT JOIN usuario ur ON p.id_responsable = ur.idusuario
-                LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-                LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-                LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-                WHERE contrato_generado = '$contrato'
-                and p.estado = '1'
-                LIMIT 1
-            ");
-            if(sizeOf($validate) > 0){
-        
-                $id_institucion     = $validate[0]->id_institucion;
-                $asesor_id          = $validate[0]->id_asesor;
-                $temporada          = $validate[0]->temporada;
-                $periodo            = $validate[0]->id_periodo;
-                $ciudad             = $validate[0]->ciudad;
-                $asesor             = $validate[0]->asesor;
-                $cedulaAsesor       = $validate[0]->cedulaAsesor;
-                $nombreDocente      = $validate[0]->nombreDocente;
-                $cedulaDocente      = $validate[0]->cedulaDocente;
-                $nombreInstitucion  = $validate[0]->nombreInstitucion;
-                $this->guardarContratoTemporada($contrato,$id_institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
-                $contador ++;
+        foreach($query as $key => $item){
+            //validar que el no este registrado
+            $validate = DB::SELECT("SELECT * FROM seminarios_capacitador
+            WHERE seminario_id = '$item->id_seminario'
+            AND idusuario = '$item->capacitador_id'");
+            if(empty($validate)){
+                $capacitador = new SeminarioCapacitador();
+                $capacitador->idusuario      = $item->capacitador_id;
+                $capacitador->seminario_id   = $item->id_seminario;
+                $capacitador->save();
+                $contador++;
             }
-           
         }
-        return "se guardo $contador correctamente";
+        return "Se guardo $contador";
+        // $query = DB::SELECT("SELECT * FROM temporadas t
+        // WHERE t.temporal_institucion IS NULL
+        // AND t.year = '2023'
+        // AND t.id_periodo <> '20'
+        // and t.estado  = '1'
+        // ");
+        // $contador = 0;
+        // foreach($query as $key => $item){
+        //     $contrato = $item->contrato;
+        //     //validar que el contrato exista en pedidos
+        //     $validate = DB::SELECT("SELECT p.id_periodo, p.id_institucion,p.id_asesor,
+        //     pe.periodoescolar as periodo,
+        //         CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+        //         u.cedula AS cedulaAsesor,
+        //         CONCAT(ur.nombres, ' ', ur.apellidos) AS nombreDocente,
+        //         ur.cedula AS cedulaDocente,
+        //         i.nombreInstitucion, c.nombre AS ciudad,
+        //         SUBSTRING(pe.codigo_contrato, 1,1 ) AS temporada
+        //         FROM pedidos p
+        //         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        //         LEFT JOIN usuario ur ON p.id_responsable = ur.idusuario
+        //         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        //         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        //         LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        //         WHERE contrato_generado = '$contrato'
+        //         and p.estado = '1'
+        //         LIMIT 1
+        //     ");
+        //     if(sizeOf($validate) > 0){
+
+        //         $id_institucion     = $validate[0]->id_institucion;
+        //         $asesor_id          = $validate[0]->id_asesor;
+        //         $temporada          = $validate[0]->temporada;
+        //         $periodo            = $validate[0]->id_periodo;
+        //         $ciudad             = $validate[0]->ciudad;
+        //         $asesor             = $validate[0]->asesor;
+        //         $cedulaAsesor       = $validate[0]->cedulaAsesor;
+        //         $nombreDocente      = $validate[0]->nombreDocente;
+        //         $cedulaDocente      = $validate[0]->cedulaDocente;
+        //         $nombreInstitucion  = $validate[0]->nombreInstitucion;
+        //         $this->guardarContratoTemporada($contrato,$id_institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
+        //         $contador ++;
+        //     }
+
+        // }
+        // return "se guardo $contador correctamente";
+    }
+    public function crearCapacitadores($request,$arreglo){
+        $datos = json_decode($request->capacitadores);
+        //eliminar si ya han quitado al capacitador
+        $getCapacitadores = $this->getCapacitadoresXCapacitacion($arreglo->id_seminario);
+        if(sizeOf($getCapacitadores) > 0){
+            foreach($getCapacitadores as $key => $item){
+                $capacitador        = "";
+                $capacitador        = $item->idusuario;
+                $searchCapacitador  = collect($datos)->filter(function ($objeto) use ($capacitador) {
+                    // Condición de filtro
+                    return $objeto->idusuario == $capacitador;
+                });
+                if(sizeOf($searchCapacitador) == 0){
+                    DB::DELETE("DELETE FROM seminarios_capacitador
+                      WHERE seminario_id = '$arreglo->id_seminario'
+                      AND idusuario = '$capacitador'
+                    ");
+                }
+            }
+        }
+        //guardar los capacitadores
+        foreach($datos as $key => $item){
+            $query = DB::SELECT("SELECT * FROM seminarios_capacitador c
+            WHERE c.idusuario = '$item->idusuario'
+            AND c.seminario_id = '$arreglo->id_seminario'");
+            if(empty($query)){
+                $capacitador = new SeminarioCapacitador();
+                $capacitador->idusuario      = $item->idusuario;
+                $capacitador->seminario_id   = $arreglo->id_seminario;
+                $capacitador->save();
+            }
+        }
     }
 
     public function guardarContratoTemporada($contrato,$institucion,$asesor_id,$temporadas,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion){
@@ -615,9 +670,9 @@ class AdminController extends Controller
             $temporada->id_periodo              = $periodo;
             $temporada->id_profesor             = "0";
             $temporada->idInstitucion           = $institucion;
-            $temporada->temporal_nombre_docente = $nombreDocente; 
-            $temporada->temporal_cedula_docente = $cedulaDocente; 
-            $temporada->temporal_institucion    = $nombreInstitucion; 
+            $temporada->temporal_nombre_docente = $nombreDocente;
+            $temporada->temporal_cedula_docente = $cedulaDocente;
+            $temporada->temporal_institucion    = $nombreInstitucion;
             $temporada->nombre_asesor           = $asesor;
             $temporada->cedula_asesor           = $cedulaAsesor;
             $temporada->save();
@@ -628,9 +683,9 @@ class AdminController extends Controller
             $temporada->id_periodo              = $periodo;
             $temporada->idInstitucion           = $institucion;
             $temporada->id_asesor               = $asesor_id;
-            $temporada->temporal_nombre_docente = $nombreDocente; 
-            $temporada->temporal_cedula_docente = $cedulaDocente; 
-            $temporada->temporal_institucion    = $nombreInstitucion; 
+            $temporada->temporal_nombre_docente = $nombreDocente;
+            $temporada->temporal_cedula_docente = $cedulaDocente;
+            $temporada->temporal_institucion    = $nombreInstitucion;
             $temporada->nombre_asesor           = $asesor;
             $temporada->cedula_asesor           = $cedulaAsesor;
             $temporada->save();

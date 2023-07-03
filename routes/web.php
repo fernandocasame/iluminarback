@@ -484,6 +484,8 @@ Route::get('get_instituciones', 'SeminarioController@get_instituciones');
 Route::post('guardar_seminario', 'SeminarioController@guardar_seminario');
 Route::get('eliminar_seminario/{id}', 'SeminarioController@eliminar_seminario');
 Route::get('get_periodos_seminarios', 'SeminarioController@get_periodos_seminarios');
+//obtener capacitador x seminarios
+Route::get('getCapacitadoresXCapacitacion/{id_seminario}','SeminarioController@getCapacitadoresXCapacitacion');
 Route::apiResource('inscripcion', 'InscripcionController');
 Route::apiResource('nivel', 'NivelController');
 Route::get('getNiveles','NivelController@getNiveles');
