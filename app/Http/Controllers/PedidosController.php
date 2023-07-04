@@ -899,7 +899,23 @@ class PedidosController extends Controller
             SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
             WHERE pa.id_pedido = p.id_pedido
         ) AS contador_alcance,
-        (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones
+        (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
+        (
+            SELECT COUNT(a.id) AS contadorAlcanceAbierto
+            FROM pedidos_alcance a
+            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+            WHERE  a.id_pedido = p.id_pedido
+            AND a.estado_alcance  = '0'
+            AND ped.estado = '1'
+        ) as contadorAlcanceAbierto,
+        (
+            SELECT COUNT(a.id) AS contadorAlcanceCerrado
+            FROM pedidos_alcance a
+            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+            WHERE  a.id_pedido = p.id_pedido
+            AND a.estado_alcance  = '1'
+            AND ped.estado = '1'
+        ) as contadorAlcanceCerrado
         FROM pedidos p
         INNER JOIN usuario u ON p.id_asesor = u.idusuario
         INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -908,7 +924,6 @@ class PedidosController extends Controller
         WHERE p.id_periodo = $periodo
         AND p.tipo = '0'
         AND p.estado <> '0'
-        -- AND p.facturacion_vee = '1'
         ORDER BY p.id_pedido DESC
         ");
         return $pedidos;
@@ -931,7 +946,23 @@ class PedidosController extends Controller
                 SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
                 WHERE pa.id_pedido = p.id_pedido
             ) AS contador_alcance,
-            (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones
+            (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
+            (
+                SELECT COUNT(a.id) AS contadorAlcanceAbierto
+                FROM pedidos_alcance a
+                LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+                WHERE  a.id_pedido = p.id_pedido
+                AND a.estado_alcance  = '0'
+                AND ped.estado = '1'
+            ) as contadorAlcanceAbierto,
+            (
+                SELECT COUNT(a.id) AS contadorAlcanceCerrado
+                FROM pedidos_alcance a
+                LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+                WHERE  a.id_pedido = p.id_pedido
+                AND a.estado_alcance  = '1'
+                AND ped.estado = '1'
+            ) as contadorAlcanceCerrado
             FROM pedidos p
             INNER JOIN usuario u ON p.id_asesor = u.idusuario
             INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
