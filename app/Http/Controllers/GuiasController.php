@@ -616,4 +616,12 @@ class GuiasController extends Controller
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
     }
+    public function corregirChequeContabilidad(Request $request){
+        DB::UPDATE("UPDATE pedidos_historico
+        SET `fecha_subir_cheque` = null,
+        `evidencia_cheque` = null,
+         `estado` = '$request->estado'
+         WHERE `id_pedido` = '$request->id_pedido'
+         ");
+    }
 }

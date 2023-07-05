@@ -17,6 +17,7 @@ use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
 use App\Models\PedidoConvenio;
 use App\Models\PedidoConvenioDetalle;
+use App\Models\PedidoDocumentoAnterior;
 use App\Models\PedidoHistoricoActas;
 use App\Models\PedidosGuiasBodega;
 use App\Models\PedidoGuiaEntrega;
@@ -1593,7 +1594,7 @@ class PedidosController extends Controller
     //api:post//guardarContratoBdMilton
     public function guardarContratoBdMilton(Request $request){
         //variables
-        $fecha_formato = date('Y-m-d');
+        $fecha_formato      = date('Y-m-d');
         $codigo_ven         = $request->contrato_generado;
         $verificador        = $request->cod_usuario_verif;
         $iniciales          = $request->iniciales;
@@ -1602,34 +1603,81 @@ class PedidosController extends Controller
         $region_idregion    = $request->region_idregion;
         $descuento          = $request->descuento;
         $cedulaAsesor       = $request->cedula;
+        $id_responsable     = $request->id_responsable;
+        $institucion        = $request->id_institucion;
+        $asesor_id          = $request->id_asesor;
+        $asesor             = $request->asesor;
+        $temporada          = substr($request->codigo_contrato,0,1);
+        $periodo            = $request->id_periodo;
+        $ciudad             = $request->nombre_ciudad;
+        $nombreInstitucion  = $request->nombreInstitucion;
         //fin variables
-        //condiciones
-        // $observacion = null;
-        // if($request->observacion == null || $request->observacion == "" || $request->observacion == "null"){
-        //     $observacion        = null;
-        // }else{
-        //     $observacion        = $request->observacion;
-        // }
-        // $setAnticipo = 0;
-        // if($request->anticipo == null || $request->anticipo == ""){
-        //     $setAnticipo = 0;
-        // }else{
-        //     $setAnticipo = $request->anticipo;
-        // }
-        // $setNumCuenta = 0;
-        // if($request->num_cuenta == null || $request->num_cuenta == "" || $request->num_cuenta == "null"){
-        //     $setNumCuenta = 0;
-        // }else{
-        //     $setNumCuenta = $request->num_cuenta;
-        // }
-        // //obtener el cli inst codigo
-        // $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
-        // WHERE `id_asesor` = ? AND `id_institucion` = ?
-        // AND `id_docente` = ?",
-        // [$iniciales, $request->codigo_institucion_milton, $cedulaAsesor]);
-        // if(empty($cli_ins_cod)){
-        //     return ["status" => "0","message" => "No existe el ins cliente codigo"];
-        // }
+        $observacion = null;
+        if($request->observacion == null || $request->observacion == "" || $request->observacion == "null"){
+            $observacion        = null;
+        }else{
+            $observacion        = $request->observacion;
+        }
+        $setAnticipo = 0;
+        if($request->anticipo_aprobado == null || $request->anticipo_aprobado == ""){
+            $setAnticipo = 0;
+        }else{
+            $setAnticipo = $request->anticipo_aprobado;
+        }
+        $setNumCuenta = 0;
+        if($request->num_cuenta == null || $request->num_cuenta == "" || $request->num_cuenta == "null"){
+            $setNumCuenta = 0;
+        }else{
+            $setNumCuenta = $request->num_cuenta;
+        }
+        //OBTENER EL DOCENTE
+        $docente = DB::SELECT("SELECT u.cedula,  CONCAT(u.nombres, ' ', u.apellidos) AS docente FROM  usuario u WHERE `idusuario` = ?", [$id_responsable]);
+        $nombreDocente      = $docente[0]->docente;
+        $cedulaDocente      = $docente[0]->cedula;
+        //cli ins codigo
+        $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
+        WHERE `id_asesor` = ? AND `id_institucion` = ?
+        AND `id_docente` = ?", [$iniciales,
+        $request->codigo_institucion_milton, $docente[0]->cedula]);
+        if(empty($cli_ins_cod)){
+            return ["status" => "0","message" => "No existe el ins cliente codigo"];
+        }
+        if (strlen($observacion) > 500) {
+            $cadenaRecortada = substr($observacion, 0, 500); // Recorta la cadena a 500 caracteres
+        } else {
+            $cadenaRecortada = $observacion; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
+        }
+        //GUARDAR VENTA
+        $form_data = [
+            'veN_CODIGO'            => $codigo_ven, //codigo formato milton
+            'usU_CODIGO'            => strval($verificador),
+            'veN_D_CODIGO'          => $iniciales, // codigo del asesor
+            'clI_INS_CODIGO'        => floatval($cli_ins_cod[0]->cli_ins_codigo),
+            'tiP_veN_CODIGO'        => intval($tipo_venta),
+            'esT_veN_CODIGO'        => 2, // por defecto
+            'veN_OBSERVACION'       => $cadenaRecortada,
+            'veN_VALOR'             => floatval($total_venta),
+            'veN_PAGADO'            => 0.00, // por defecto
+            'veN_ANTICIPO'          => floatval($setAnticipo),
+            'veN_DESCUENTO'         => floatval($descuento),
+            'veN_FECHA'             => $fecha_formato,
+            'veN_CONVERTIDO'        => '', // por defecto
+            'veN_TRANSPORTE'        => 0.00, // por defecto
+            'veN_ESTADO_TRANSPORTE' => false, // por defecto
+            'veN_FIRMADO'           => 'DS', // por defecto
+            'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
+            'cueN_NUMERO'           => strval($setNumCuenta)
+        ];
+        // return $form_data;
+        //guardar en la tabla de temporadas
+        $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
+        try {
+            $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $json_contrato = json_decode($contrato, true);
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+
         //DETALLE DE VENTA
         $detalleVenta = $this->get_val_pedidoInfo($request->id_pedido);
         //Si no hay nada en detalle de venta
@@ -1650,31 +1698,9 @@ class PedidosController extends Controller
                 "DET_VEN_CANTIDAD_REAL" => intval($detalleVenta[$i]["valor"]),
             ];
             $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleVenta);
-           $json_detalle = json_decode($detalle, true);
+        $json_detalle = json_decode($detalle, true);
         }
-        //fin condiciones
-        // $form_data = [
-        //     'veN_CODIGO'            => $codigo_ven, //codigo formato milton
-        //     'usU_CODIGO'            => strval($verificador),
-        //     'veN_D_CODIGO'          => $iniciales, // codigo del asesor
-        //     'clI_INS_CODIGO'        => floatval($cli_ins_cod[0]->cli_ins_codigo),
-        //     'tiP_veN_CODIGO'        => intval($tipo_venta),
-        //     'esT_veN_CODIGO'        => 2, // por defecto
-        //     'veN_OBSERVACION'       => $observacion,
-        //     'veN_VALOR'             => floatval($total_venta),
-        //     'veN_PAGADO'            => 0.00, // por defecto
-        //     'veN_ANTICIPO'          => floatval($setAnticipo),
-        //     'veN_DESCUENTO'         => floatval($descuento),
-        //     'veN_FECHA'             => $fecha_formato,
-        //     'veN_CONVERTIDO'        => '', // por defecto
-        //     'veN_TRANSPORTE'        => 0.00, // por defecto
-        //     'veN_ESTADO_TRANSPORTE' => false, // por defecto
-        //     'veN_FIRMADO'           => 'DS', // por defecto
-        //     'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
-        //     'cueN_NUMERO'           => strval($setNumCuenta)
-        // ];
-        // $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
-        // $json_contrato = json_decode($contrato, true);
+        return $json_contrato;
         // //actualizar en pedidos que envio a la bd de milton
         // DB::UPDATE("UPDATE pedidos SET enviarMilton = '1' WHERE id_pedido = '$request->id_pedido' ");
         // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
@@ -2236,10 +2262,10 @@ class PedidosController extends Controller
     //api:get/getContratosPedidos
     public function getContratosPedidos(Request $request){
         $query = DB::SELECT("SELECT p.*,
-        CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula, u.iniciales,
+        CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula, u.iniciales,
         CONCAT(uv.nombres,' ',uv.apellidos) as verificador, uv.cod_usuario,
         i.nombreInstitucion,i.codigo_institucion_milton,
-        pe.region_idregion, c.nombre AS nombre_ciudad
+        pe.region_idregion, c.nombre AS nombre_ciudad,pe.codigo_contrato
         FROM pedidos p
         LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
         LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
@@ -3818,6 +3844,127 @@ class PedidosController extends Controller
         $date = Carbon::now();   
         $temporada->ultima_fecha            = $date;
         $temporada->save();
+        //actualizar documentos
+        $this->updateDocumentoAnterior($request->id_pedido,1);
         return $pedido->id_responsable;
     }
+    //==APIS DOCUMENTOS ANTERIORES=========
+    //api get/getTraerDocumentoDocente
+    public function getTraerDocumentoDocente($id_pedido){
+        ///validar que el pedido exista y este activo
+        $query = DB::SELECT("SELECT p.*, u.cedula,
+        CONCAT(u.nombres, ' ', u.apellidos) AS docente 
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_responsable = u.idusuario
+        WHERE p.id_pedido = '$id_pedido'
+        AND (p.estado  = '0' OR  p.estado = '1')
+        AND p.contrato_generado IS NULL
+        AND p.imagen IS NULL
+        ");
+        $datos = [];
+        if(sizeOf($query) > 0){
+            //variables
+            $institucion                = $query[0]->id_institucion;
+            $cedulaDocente              = $query[0]->cedula;
+            $docente                    = $query[0]->docente;
+            $query2 = DB::SELECT("SELECT * FROM pedidos_documentos_anteriores pd
+            WHERE pd.institucion_id = '$institucion'
+            AND pd.cedula_docente = '$cedulaDocente'
+            LIMIT 1
+            ");  
+            foreach($query2 as $key => $item){
+                $datos[$key] = [
+                    "id"                => $item->id,
+                    "institucion_id"    => $item->institucion_id,
+                    "doc_cedula"        => $item->doc_cedula,   
+                    "doc_ruc"           => $item->doc_ruc,
+                    "docente"           => $docente,
+                    "cedulaDocente"     => $cedulaDocente
+                ];
+            }
+        }
+        return $datos;
+    }
+    //api:Get/updateDocumentoAnterior/{id_pedido}/{withContrato}
+    public function updateDocumentoAnterior($id_pedido,$withContrato){
+        ///validar que el pedido exista y este activo
+        $query = DB::SELECT("SELECT p.*, u.cedula,
+        CONCAT(u.nombres, ' ', u.apellidos) AS docente 
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_responsable = u.idusuario
+        WHERE p.id_pedido = '$id_pedido'
+        AND p.tipo = '0'
+        AND p.estado = '1'
+        AND p.ifanticipo  = '1'
+        AND p.imagen IS NOT NULL
+        ");
+        if(sizeOf($query) > 0){
+            //variables
+            $institucion                = $query[0]->id_institucion;
+            $cedulaDocente              = $query[0]->cedula;
+            $doc_cedula                 = $query[0]->imagen;     
+            $doc_ruc                    = $query[0]->doc_ruc; 
+            $contrato                   = $query[0]->contrato_generado;
+            //withContrato=> 0 =  guardar sin contrato;  1 = guardarcon contrato
+            //si quiero actualizar los documentos pero envio por parametro sin contrato Entonces valido que no tenga contrato
+            if($withContrato == 0){
+                if($contrato != null || $contrato != ""){
+                    return ["status" => "0", "message" => "El pedido ya tiene contrato"];
+                }
+            }  
+            //validar si existe edito si no guardo
+            $validate = DB::SELECT("SELECT * FROM pedidos_documentos_anteriores pd
+            WHERE pd.institucion_id = '$institucion'
+            -- AND pd.cedula_docente = '$cedulaDocente'
+            ");  
+            if(empty($validate)){
+                //Guardar        
+                $documento              = new PedidoDocumentoAnterior();
+            }
+            else{
+                $id                     = $validate[0]->id;
+                //Editar        
+                $documento              = PedidoDocumentoAnterior::findOrFail($id);
+            }
+            $documento->institucion_id  = $institucion;
+            $documento->cedula_docente  = $cedulaDocente;
+            $documento->doc_cedula      = $doc_cedula;
+            $documento->doc_ruc         = $doc_ruc;
+            $documento->save();
+            if($documento){
+                return ["status" => "1","message" => "Se guardo correctamente"];
+            }else{
+                return ["status" => "0","message" => "Se guardo correctamente"];
+            }
+        }
+        return ["status" => "0","message" => "-"];
+    }
+    //api:post/agregarDocumentosAnteriorPedido
+    public function agregarDocumentosAnteriorPedido(Request $request){
+        $pedido         = Pedidos::find($request->id_pedido);
+        $fileName       = $request->doc_cedula;
+        $fileNameRuc    = $request->doc_ruc;
+        if($pedido->contrato_generado != null || $pedido->contrato_generado != ""){
+            return ["status" => "0", "messsage" => "El pedido ya tiene contrato no se puede actualizar los documentos"];
+        }
+        //CEDULA
+        if($fileName == "null" || $fileName == null || $fileName == 'undefined'){
+            $pedido->imagen             = null;
+        }else{
+            $pedido->imagen             = $fileName;
+        }
+        //RUC
+        if($fileNameRuc == "null" || $fileNameRuc == null || $fileNameRuc == 'undefined'){
+            $pedido->doc_ruc            = null;
+        }else{
+            $pedido->doc_ruc            = $fileNameRuc;
+        }
+        $pedido->save();
+        if($pedido){
+            return ["status" => "1", "messsage" => "Se guardo correctamente"];
+        }else{
+            return ["status" => "0", "messsage" => "No se pudo guardar"];
+        }
+    }
+    //===FIN APIS DOCUMENTOS ANTERIORES====
 }

@@ -372,6 +372,7 @@ class FacturacionApiController extends Controller
             $historico->procodigo = $request->proCodigo;
             $historico->tipo = '2';
             $historico->accion = '1';
+            $historico->numverificacion = $request->detVerVerificacion;
             $historico->cantidadanterior = floatval($request->detVerCantidadAnterior);
             $historico->cantidadactual = floatval($request->detVerCantidad);
             $historico->save();
@@ -398,6 +399,7 @@ class FacturacionApiController extends Controller
             $historico->procodigo = $request->proCodigo;
             $historico->tipo = '2';
             $historico->accion = '2';
+            $historico->numverificacion = $request->detVerVerificacion;
             $historico->cantidadanterior = floatval($request->detVerCantidadAnterior);
             $historico->cantidadactual = floatval($request->detVerCantidad);
             $historico->save();

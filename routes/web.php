@@ -1041,6 +1041,7 @@ Route::post('generarContratoFacturacion','PedidosController@generarContratoFactu
 Route::get('getPedidosContabilidad','PedidosController@getPedidosContabilidad');
 //Api para gerencia(reporte)
 Route::get('getPedidosGerencia','PedidosController@getPedidosGerencia');
+Route::post('corregirChequeContabilidad','GuiasController@corregirChequeContabilidad');
 //fin Apis para contabilidad
 ///generar historico anticipo
 Route::get('pedidosConAnticipo','PedidosController@pedidosConAnticipo');
@@ -1273,4 +1274,9 @@ Route::get('getAllBooks','LibroController@getAllBooks');
 //=====RUTAS PARA DESCUENTO DE CODIGOS==============================
 Route::post('guardarDescuentoCodigos','GestionCodigosController@guardarDescuentoCodigos');
 //=====FIN RUTAS PARA CODIGOS=======================================
+///====RUTAS PARA DOCUMENTOS ANTERIORES=============================
+Route::get('getTraerDocumentoDocente/{id_pedido}','PedidosController@getTraerDocumentoDocente');
+Route::get('updateDocumentoAnterior/{id_pedido}/{withContrato}','PedidosController@updateDocumentoAnterior');
+Route::post('agregarDocumentosAnteriorPedido','PedidosController@agregarDocumentosAnteriorPedido');
+//=====FIN RUTAS PARA DOCUMENTOS ANTERIORES=========================
 

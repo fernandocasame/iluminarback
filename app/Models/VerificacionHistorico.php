@@ -17,6 +17,7 @@ class VerificacionHistorico extends Model
         'procodigo',
         'tipo',
         'accion',
+        'numverificacion',
         'cantidadanterior',
         'cantidadactual'
     ];
