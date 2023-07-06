@@ -256,113 +256,89 @@ class AdminController extends Controller
         }
     }
     public function pruebaData(Request $request){
-        // $contrato       = "PRBBBC-C23";
-        $contrato       = "C-C40-0000011-LJ";
-        $id_pedido      = "88";
-        $id_alcance     = "7";
-        $ventaBruta     = "10";
-        $user_created   = 10;
-        //validar que el pedido alcance este abierto
-        $validateAbierto     = DB::SELECT("SELECT * FROM pedidos_alcance pa
-        WHERE pa.id = '$id_alcance'
-        AND pa.estado_alcance = '0'");
-        if(empty($validateAbierto)){
-            return ["status" => "0", "message" => "El alcance no se encuentra activo"];
-        }
-        //validar que no haya verificaciones
-        $validateVerificacion = DB::SELECT("SELECT * FROM verificaciones  v
-        WHERE v.contrato = '$contrato'
+        $dato = DB::SELECT("SELECT p.id_pedido as pedido_id,
+            p.ifagregado_anticipo_aprobado,phi.*,
+            u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
+            p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
+            p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
+            p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
+            p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
+            p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton
+            FROM pedidos p
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            WHERE (p.ifagregado_anticipo_aprobado = '0' OR p.ifagregado_anticipo_aprobado = '2' )
+            AND ifanticipo = '1'
+            AND pe.estado = '1'
+            AND p.anticipo > 0
+            AND p.estado = '1'
+            AND p.facturacion_vee = '1'
+            AND pe.pedido_gerencia = '1'
+            ORDER BY p.fecha_creacion_pedido DESC
         ");
-        if(count($validateVerificacion) > 0){
-            return ["status" => "0", "message" => "Ya existe verificaciones no se puede aprobar el alcance"];
-        }
+        $datos = [];
         try {
-            //BUSCAR EL CONTRATO SI EXISTE
-            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
-            $JsonContrato = json_decode($dato, true);
-            if($JsonContrato == "" || $JsonContrato == null){
-                return ["status" => "0", "message" => "No existe el contrato en facturación"];
+            foreach($dato as $key => $item){
+                //traer valores anteriores
+                $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton); 
+                $JsonDocumentos = json_decode($dato, true);
+                $datos[$key] =[
+                    "pedido_id"                         => $item->pedido_id,
+                    "ifagregado_anticipo_aprobado"      => $item->ifagregado_anticipo_aprobado,
+                    "id"                                => $item->id,
+                    "periodo_id"                        => $item->periodo_id,
+                    "id_pedido"                         => $item->id_pedido,
+                    "estado"                            => $item->estado,
+                    "fecha_creacion_pedido"             => $item->fecha_creacion_pedido,
+                    "fecha_generar_contrato"            => $item->fecha_generar_contrato,
+                    "fecha_aprobacion_anticipo_gerencia" => $item->fecha_aprobacion_anticipo_gerencia,
+                    "fecha_rechazo_gerencia"            => $item->fecha_rechazo_gerencia,
+                    "fecha_contabilidad_recibe"         => $item->fecha_contabilidad_recibe,
+                    "fecha_contabilidad_sube_cheque_sin_firmar" => $item->fecha_contabilidad_sube_cheque_sin_firmar,
+                    "fecha_subir_cheque"                => $item->fecha_subir_cheque,
+                    "fecha_facturador_recibe_cheque"    => $item->fecha_facturador_recibe_cheque,
+                    "fecha_envio_cheque_for_asesor"     => $item->fecha_envio_cheque_for_asesor,
+                    "fecha_orden_firmada" =>            $item->fecha_orden_firmada,
+                    "fecha_que_recibe_orden_firmada"    => $item->fecha_que_recibe_orden_firmada,
+                    "fecha_que_recibe_orden_firmada_contabilidad" => $item->fecha_que_recibe_orden_firmada_contabilidad,
+                    "tipo_pago"                         => $item->tipo_pago,
+                    "evidencia_cheque_sin_firmar"       => $item->evidencia_cheque_sin_firmar,
+                    "evidencia_cheque"                  => $item->evidencia_cheque,
+                    "evidencia_pagare"                  => $item->evidencia_pagare,
+                    "contador_anticipo"                 => $item->contador_anticipo,
+                    "contador_liquidacion" =>           $item->contador_liquidacion,
+                    "created_at"                        =>  $item->created_at,
+                    "updated_at"                        =>  $item->updated_at,
+                    "idusuario"                         => $item->idusuario,
+                    "nombres"                           => $item->nombres,
+                    "apellidos"                         => $item->apellidos,
+                    "anticipo_aprobado"                 => $item->anticipo_aprobado,
+                    "pendiente_liquidar"                => $item->pendiente_liquidar,
+                    "anticipo_solicitud_for_gerencia"   => $item->anticipo_solicitud_for_gerencia,
+                    "anticipo_solicitud_observacion"    => $item->anticipo_solicitud_observacion,
+                    "anticipo_aprobado_gerencia"        => $item->anticipo_aprobado_gerencia,
+                    "nombreInstitucion"                 => $item->nombreInstitucion,
+                    "nombre_ciudad"                     => $item->nombre_ciudad,
+                    "fechaCreacionPedido"               => $item->fechaCreacionPedido,
+                    "anticipo_sugerido"                 => $item->anticipo_sugerido,
+                    "convenio_anios"                    => $item->convenio_anios,
+                    "observacion"                       => $item->observacion,
+                    "periodo"                           => $item->periodo,
+                    "total_venta"                       => $item->total_venta,
+                    "total_series_basicas"              => $item->total_series_basicas,
+                    "descuento"                         => $item->descuento,
+                    "codigo_institucion_milton"         => $item->codigo_institucion_milton,
+                    "valoresAnteriores"                 => $JsonDocumentos
+                ];
             }
-            $convertido             = "";
-            $convertido             = $JsonContrato["veN_CONVERTIDO"];
-            if($convertido == null || $convertido == ""){
-                $convertido          = "";
-            }
-            $estado                 = $JsonContrato["esT_VEN_CODIGO"];
-            if($estado != 3 && !str_starts_with($convertido , 'C')){
-                //===PROCESO======
-                //ACTUALIZAR DETALLE DE VENTA
-                $nuevoIngreso       = $this->get_val_pedidoInfo_alcance($id_pedido,$id_alcance);
-                if(!empty($nuevoIngreso)){
-                    foreach($nuevoIngreso as $key => $item){
-                        $proCodigo      = $item["codigo_liquidacion"];
-                        $cantidad       = $item["valor"];
-                        $precio         = $item["precio"];
-                        $form_data      = [];
-                        //consultar si hay codigo registrado en el contrato en el detalle de venta
-                        $responseBook   = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$contrato."&pro_codigo=".$proCodigo);
-                        $JsonLibro      = json_decode($responseBook, true);
-                        //si no  existe : creo
-                        if(sizeOf($JsonLibro["detalle_venta"]) == 0){
-                            $form_data = [
-                                "venCodigo"             => $contrato,
-                                "proCodigo"             => $proCodigo,
-                                "detVenCantidad"        => intval($cantidad),
-                                "detVenValorU"          => floatval($precio),
-                                "detVenIva"             => 0,
-                                "detVenDescontar"       => false,
-                                "detVenInicio"          => false,
-                                "detVenCantidadReal"    => intval($cantidad),
-                            ];
-                            $saveLibros     = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/CreateOrUpdateDetalleVenta',$form_data);
-                            $JsonLibroSave  = json_decode($saveLibros, true);
-                            //GUARDAR EN EL HISTORICO ALCANCE LIBROS
-                            $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,0,$cantidad,$user_created,1);
-                        }
-                        //no existe : actualizo
-                        else{
-                            $cantidadAnterior = $JsonLibro["detalle_venta"][0]["detVenCantidad"];
-                            //sumo la cantidad anterior + la nueva
-                            $resultadoLibro = intvaL($cantidadAnterior) + intval($cantidad);
-                            $form_data = [
-                                'detVenCantidad'        => intval($resultadoLibro),
-                                'detVenCantidadReal'    => intval($resultadoLibro),
-                            ];
-                            $updateLibros = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/UpdateDetallveVenta?venCodigo='.$contrato.'&proCodigo='.$proCodigo, $form_data);
-                            $json_saveLibros = json_decode($updateLibros, true);
-                            //GUARDAR EN EL HISTORICO ALCANCE LIBROS
-                            $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidadAnterior,$resultadoLibro,$user_created,1);
-                        }
-                    }
-                    ////////=========
-                    ///============PROCESO  DE GUARDADO TABLA VENTA====
-                    //GUARDAR NUEVO VEN_VALOR VENTA
-                    $cantidad_anterior  = $JsonContrato["veN_VALOR"];
-                    $nueva_cantidad     = floatval($cantidad_anterior) + floatval($ventaBruta);
-                    $datos = [
-                        "venValor"        => floatval($nueva_cantidad)
-                    ];
-                    $saveValor          = Http::post('http://186.46.24.108:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
-                    //GUARDAR EN EL HISTORICO ALCANCE VEN_VALOR
-                    $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,0);
-                    //CERRAR ALCANCE
-                    $alcance = PedidoAlcance::findOrFail($id_alcance);
-                    $alcance->estado_alcance = 1;
-                    $alcance->save();
-                    return $alcance;
-                }else{
-                    return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
-                }
-
-            }else{
-                return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
-            }
-
+            return $datos;
         } catch (\Exception  $ex) {
-        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        }
-
-
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor de facturación"];
+        } 
+      
         // $json = '
         //     [
         //         {
