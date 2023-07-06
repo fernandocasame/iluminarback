@@ -890,10 +890,13 @@ class PedidosController extends Controller
     public function get_pedidos_periodo($periodo)
     {
         $pedidos = DB::SELECT("SELECT p.*,
+        SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
+        SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
         CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
         i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
         CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
         ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
+        IF(p.estado = 2,'Anulado','Activo') AS estadoPedido,
         (SELECT f.id_facturador from pedidos_asesores_facturador 
         f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
         (
@@ -938,9 +941,12 @@ class PedidosController extends Controller
         foreach($query as $key => $item){
             $pedidos = DB::SELECT("SELECT p.*,
             CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
+            SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
+            SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
             i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
             CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
             ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
+            IF(p.estado = 2,'Desactivado','Activo') AS estadoPedido,
             (SELECT f.id_facturador from pedidos_asesores_facturador 
             f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
             (
