@@ -1273,6 +1273,8 @@ Route::resource('convenio','ConvenioController');
 Route::get('getEstudianteCodigos/{valores}','CodigosLibrosController@getEstudianteCodigos');
 ///ILUMINAR
 Route::get('getAllBooks','LibroController@getAllBooks');
+Route::get('getxNombredemo/{nombrelike}','LibroController@getxNombredemo');
+Route::get('getxAreasdemo/{nombrearea}','LibroController@getxAreasdemo');
 //=====RUTAS PARA DESCUENTO DE CODIGOS==============================
 Route::post('guardarDescuentoCodigos','GestionCodigosController@guardarDescuentoCodigos');
 //=====FIN RUTAS PARA CODIGOS=======================================
