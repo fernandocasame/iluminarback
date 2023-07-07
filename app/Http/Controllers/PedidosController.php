@@ -1258,11 +1258,15 @@ class PedidosController extends Controller
 
     public function get_responsables_pedidos(Request $request)
     {
-        $responsables = DB::SELECT("SELECT *,
-         CONCAT(nombres,' ', apellidos, ' - ', cedula) AS 'nombres_responsable'
-          FROM `usuario` WHERE `estado_idEstado` = 1
-          AND (`id_group` = 6 OR `id_group` = 10)
-          AND cedula like '%$request->cedula%'
+        $responsables = DB::SELECT("SELECT u.idusuario,u.nombres, u.apellidos,
+         u.email,u.id_group,u.cedula,
+         CONCAT(u.nombres,' ', u.apellidos, ' - ', u.cedula) AS 'nombres_responsable',
+         g.deskripsi as rol
+          FROM usuario u
+          LEFT JOIN sys_group_users g ON g.id = id_group
+          WHERE u.estado_idEstado = 1
+          AND (u.id_group = 6 OR u.id_group = 10)
+          AND u.cedula like '%$request->cedula%'
           ");
         return $responsables;
     }
@@ -2430,7 +2434,8 @@ class PedidosController extends Controller
         p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
         p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
         p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
-        p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton
+        p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton,
+        p.contrato_generado
         FROM pedidos p
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
@@ -2498,6 +2503,7 @@ class PedidosController extends Controller
                 "total_series_basicas"              => $item->total_series_basicas,
                 "descuento"                         => $item->descuento,
                 "codigo_institucion_milton"         => $item->codigo_institucion_milton,
+                "contrato_generado"                 => $item->contrato_generado,
                 "valoresAnteriores"                 => $JsonDocumentos
             ];
         }
@@ -2559,6 +2565,17 @@ class PedidosController extends Controller
                 'anticipo_aprobado_gerencia'   => $datos->cantidadAprobar,
                 'anticipo_aprobado'            => $datos->cantidadAprobar
             ]);
+            //si tiene contrato guardo en facturacion
+            //actualizar anticipo facturacion 
+            $contrato = $datos->contrato_generado;
+            if($contrato == null || $contrato  == "null" || $contrato == ""){
+            }else{
+                $form_data = [ 
+                    'venAnticipo'   => floatval($datos->cantidadAprobar), 
+                ]; 
+                $dato = Http::post("http://186.46.24.108:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data); 
+                $prueba_get = json_decode($dato, true);
+            }
             //HISTORICO
            return $this->aprobarAnticipo($datos->pedido_id);
             return 'Pedido aprobado';
@@ -4348,4 +4365,14 @@ class PedidosController extends Controller
         }
     }
     //===FIN APIS DOCUMENTOS ANTERIORES====
+    //===CARGAR FORMATO ANTERIORES VALORES=====
+    public function cargarPeriodoFormatoPedidos(){
+        $query = DB::SELECT("SELECT DISTINCT pf.id_periodo, pe.periodoescolar
+        FROM pedidos_formato pf
+        LEFT JOIN periodoescolar pe ON pf.id_periodo = pe.idperiodoescolar
+        ORDER BY pe.periodoescolar
+        ");
+        return $query;
+    }
+    //===FIN CARGAR FORMATO ANTERIORES VALORES===
 }

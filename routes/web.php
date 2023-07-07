@@ -995,6 +995,8 @@ Route::get('series_formato_full/{periodo}','SeriesController@series_formato_full
 Route::get('series_formato_periodo/{periodo}','SeriesController@series_formato_periodo');
 Route::get('get_pvp_planes_periodo/{periodo}','PedidosController@get_pvp_planes_periodo');
 Route::post('save_niveles_area_formato','PedidosController@save_niveles_area_formato');
+//api para traer los periodos que tienen cargado formato pedidos
+Route::get('cargarPeriodoFormatoPedidos','PedidosController@cargarPeriodoFormatoPedidos');
 Route::get('get_pedidos_periodo/{periodo}','PedidosController@get_pedidos_periodo');
 Route::get('get_pedidos_periodo_facturador/{periodo}/{id_facturador}','PedidosController@get_pedidos_periodo_facturador');
 Route::get('get_pedidos_periodoxContrato/{contrato}','PedidosController@get_pedidos_periodo_contrato');
@@ -1014,7 +1016,7 @@ Route::post('guardar_comentario','PedidosController@guardar_comentario');
 Route::get('get_instituciones_asesor/{cedula}','PedidosController@get_instituciones_asesor');
 Route::get('get_responsables_pedidos','PedidosController@get_responsables_pedidos');
 Route::post('guardar_responsable_pedido','PedidosController@guardar_responsable_pedido');
-Route::get('guardar_total_pedido/{id_pedido}/{total_usd}/{total_unid}/{total_guia}','PedidosController@guardar_total_pedido');
+Route::get('guardar_total_pedido/{id_pedido}/{total_usd}/{total_unid}/{total_guia}/{total_serie_basicas}','PedidosController@guardar_total_pedido');
 Route::get('cargar_codigos_vendedores','PedidosController@cargar_codigos_vendedores');
 Route::get('cargar_codigo_institucion1','PedidosController@cargar_codigo_institucion1');
 Route::get('cargar_codigo_institucion','PedidosController@cargar_codigo_institucion');
@@ -1034,7 +1036,7 @@ Route::post('entregarPedido','PedidosController@entregarPedido');
 Route::get('generarSeriesBasicasPeriodo','SeriesController@generarSeriesBasicasPeriodo');
 Route::get('getSeriesBasicas/{periodo}','SeriesController@getSeriesBasicas');
 Route::get('changePorcentajeAnticipo','PedidosController@changePorcentajeAnticipo');
-//
+Route::post('traspasarFormatoPedidos','SeriesController@traspasarFormatoPedidos');
 Route::get('contratoFacturacion/{contrato}','PedidosController@contratoFacturacion');
 Route::post('generarContratoFacturacion','PedidosController@generarContratoFacturacion');
 //Api para contabilidad
@@ -1279,4 +1281,5 @@ Route::get('getTraerDocumentoDocente/{id_pedido}','PedidosController@getTraerDoc
 Route::get('updateDocumentoAnterior/{id_pedido}/{withContrato}','PedidosController@updateDocumentoAnterior');
 Route::post('agregarDocumentosAnteriorPedido','PedidosController@agregarDocumentosAnteriorPedido');
 //=====FIN RUTAS PARA DOCUMENTOS ANTERIORES=========================
+
 
