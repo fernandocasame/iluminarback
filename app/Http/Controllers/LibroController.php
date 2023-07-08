@@ -28,10 +28,10 @@ class LibroController extends Controller
         }else{
             $libro = DB::SELECT("SELECT libro . * ,asignatura.* , libros_series.id_serie
             FROM libro
-            LEFT JOIN libros_series ON libro.idlibro = libros_series.idLibro 
+            LEFT JOIN libros_series ON libro.idlibro = libros_series.idLibro
             JOIN asignaturausuario ON libro.asignatura_idasignatura = asignaturausuario.asignatura_idasignatura
             JOIN asignatura ON asignatura.idasignatura = asignaturausuario.asignatura_idasignatura
-            WHERE asignaturausuario.usuario_idusuario = $idusuario 
+            WHERE asignaturausuario.usuario_idusuario = $idusuario
             AND `Estado_idEstado` = 1
             AND asignaturausuario.periodo_id = '$request->periodo_id'
             GROUP BY libro.idlibro
@@ -50,7 +50,8 @@ class LibroController extends Controller
          LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
-         AND a.estado = '1'        
+         AND a.estado = '1'
+         AND l.weblibro IS NOT NULL
         ");
         return $query;
     }
@@ -163,7 +164,7 @@ class LibroController extends Controller
         // return $request->niveles;
     }
 
-    
+
     public function guardarLibroFree(Request $request){
         $libro = new FreeEstudianteLibro();
         $libro->institucion_id = $request->institucion_id;
@@ -171,12 +172,12 @@ class LibroController extends Controller
         $libro->libro_id = $request->idlibro;
         $libro->serie_id = $request->serie_id;
         $libro->nivel_id = $request->nivel_id;
-      
+
         $libro->save();
         if($libro){
             return ["status" => "1", "message"=> "Se guardo correctamente"];
         }else{
-            return ["status" => "0", "message"=> "No se pudo guardar"]; 
+            return ["status" => "0", "message"=> "No se pudo guardar"];
         }
 
     }
@@ -199,7 +200,7 @@ class LibroController extends Controller
         $getPeriodo = $this->traerPeriodo($request->institucion_id);
 
         $periodo = $getPeriodo[0]->periodo;
-     
+
 
         $libros = DB::SELECT("SELECT n.orden, ls.nombre_serie,  n.nombrenivel, l.nombrelibro, f.* FROM free_estudiante_libro f
         LEFT JOIN nivel n ON f.nivel_id = n.idnivel
@@ -337,7 +338,7 @@ class LibroController extends Controller
 
     public function desgloselibrousuario($libro,$region)
     {
-     
+
         // $libro = DB::select('CALL desgloselibro(?)',[$libro]);
         // return $libro;
         $libro = DB::select('CALL desgloselibro(?)',[$libro]);
@@ -351,8 +352,8 @@ class LibroController extends Controller
             $portada        = $item->portada;
             $pdfsinguia     = $item->pdfsinguia;
             $pdfconguia     = $item->pdfconguia;
-            $guiadidactica  = $item->guiadidactica; 
-            //sierra 
+            $guiadidactica  = $item->guiadidactica;
+            //sierra
             if($region == 1){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->s_weblibro != null || $item->s_weblibro != ""){
@@ -360,10 +361,10 @@ class LibroController extends Controller
                     $portada        = $item->s_portada;
                     $pdfsinguia     = $item->s_pdfsinguia;
                     $pdfconguia     = $item->s_pdfconguia;
-                    $guiadidactica  = $item->s_guiadidactica;            
+                    $guiadidactica  = $item->s_guiadidactica;
                 }
             }
-            //costa 
+            //costa
             if($region == 2){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->c_weblibro != null || $item->c_weblibro != ""){
@@ -403,7 +404,7 @@ class LibroController extends Controller
         }
         return $datos;
         // return $libro;
-    
+
     }
 
 
@@ -420,18 +421,18 @@ class LibroController extends Controller
         foreach($unidades as $key => $item){
             //variables por defecto
             $weblibro       = $item->weblibro;
-            //sierra 
+            //sierra
             if($region == 1){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->s_weblibro != null || $item->s_weblibro != ""){
-                    $weblibro       = $item->s_weblibro;         
+                    $weblibro       = $item->s_weblibro;
                 }
             }
-            //costa 
+            //costa
             if($region == 2){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->c_weblibro != null || $item->c_weblibro != ""){
-                    $weblibro       = $item->c_weblibro; 
+                    $weblibro       = $item->c_weblibro;
                 }
             }
             $datos[$key] =[
@@ -504,7 +505,7 @@ class LibroController extends Controller
         if($request->getLibrosDocente){
             return $this->getLibrosDocente($request->docente_id);
         }
-        $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura, 
+        $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
         ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
         FROM libro l, asignatura a , libros_series ls, series s
          WHERE  l.asignatura_idasignatura  = a.idasignatura
@@ -512,8 +513,8 @@ class LibroController extends Controller
          and ls.id_serie = s.id_serie
          ORDER  BY l.nombrelibro  asc
        ");
-        $asignatura = DB::SELECT("SELECT asignatura.* FROM asignatura 
-        WHERE estado = '1' 
+        $asignatura = DB::SELECT("SELECT asignatura.* FROM asignatura
+        WHERE estado = '1'
         AND tipo_asignatura = '1'
         ORDER BY idasignatura DESC");
         return["libros" => $libros, "asignatura" => $asignatura];
@@ -521,35 +522,35 @@ class LibroController extends Controller
     public function LibroBusqueda(Request $request){
         //0 = libro; 1 = serie; 2 codigo
         if($request->tipo == '0'){
-            $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura, 
+            $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
                 ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
                 FROM libro l
                 LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
                 LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
                 LEFT JOIN series s ON s.id_serie = ls.id_serie
-                WHERE l.nombrelibro LIKE '%$request->busqueda%' 
+                WHERE l.nombrelibro LIKE '%$request->busqueda%'
                 ORDER  BY l.nombrelibro  asc
            ");
         }
         if($request->tipo == '1'){
-            $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura, 
+            $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
             ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
                 FROM libro l
                 LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
                 LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
                 LEFT JOIN series s ON s.id_serie = ls.id_serie
-                WHERE s.nombre_serie LIKE '%$request->busqueda%' 
+                WHERE s.nombre_serie LIKE '%$request->busqueda%'
                 ORDER  BY l.nombrelibro  asc
             ");
         }
         if($request->tipo == '2'){
-            $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura, 
+            $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
             ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
                 FROM libro l
                 LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
                 LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
                 LEFT JOIN series s ON s.id_serie = ls.id_serie
-                WHERE ls.codigo_liquidacion LIKE '%$request->busqueda%' 
+                WHERE ls.codigo_liquidacion LIKE '%$request->busqueda%'
                 ORDER  BY l.nombrelibro  asc
             ");
         }
