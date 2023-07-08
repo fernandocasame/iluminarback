@@ -40,7 +40,7 @@ class LibroController extends Controller
         }
         return $libro;
     }
-    
+
     //api:get/getAllBooks
     public function getAllBooks(Request $request){
         $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
@@ -53,6 +53,7 @@ class LibroController extends Controller
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
          AND l.weblibro IS NOT NULL
+         AND TRIM(l.weblibro) <> ''
         ");
         return $query;
     }
@@ -88,7 +89,7 @@ class LibroController extends Controller
         ");
         return $query;
     }
-    
+
     public function librosEstudiante(Request $request)
     {
         $idregion='';
