@@ -51,7 +51,9 @@ class CodigoLibrosController extends Controller
                 $ifid_periodo       = $validar[0]->id_periodo;
                 //validar que el venta_estado sea cero o igual al enviado desde el front 
                 $ifventa_estado     = $validar[0]->venta_estado;
-                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
+                //validar el bc_periodo
+                $ifbc_periodo       = $validar[0]->bc_periodo;
+                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
                     $codigo =  DB::table('codigoslibros')
                     ->where('codigo', $item->codigo)
                     ->where('bc_estado', '1')
@@ -100,7 +102,9 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                        "factura"               => $validar[0]->factura
                     ];
                     $contador++;
                 }
@@ -162,60 +166,26 @@ class CodigoLibrosController extends Controller
             //y colocar los del usuario quemado
             //SI ENVIAN POR INSTITUCION
             //USAN Y LIQUIDAN /VENTA DIRECTA
-             //validar si el codigo existe
-            $validar = DB::SELECT("SELECT 
-                c.prueba_diagnostica, 
-                IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-                c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.contador,
-                c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
-                CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
-                i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
-                IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-                (case when (c.estado_liquidacion = '0') then 'liquidado'
-                    when (c.estado_liquidacion = '1') then 'sin liquidar'
-                    when (c.estado_liquidacion = '2') then 'codigo regalado'
-                    when (c.estado_liquidacion = '3') then 'codigo devuelto'
-                end) as liquidacion,
-                (case when (c.bc_estado = '2') then 'codigo leido'
-                when (c.bc_estado = '1') then 'codigo sin leer'
-                end) as barrasEstado,
-                (case when (c.codigos_barras = '1') then 'con código de barras'
-                    when (c.codigos_barras = '0')  then 'sin código de barras'
-                end) as status,
-                (case when (c.venta_estado = '0') then ''
-                    when (c.venta_estado = '1') then 'Venta directa'
-                    when (c.venta_estado = '2') then 'Venta por lista'
-                end) as ventaEstado,c.venta_lista_institucion,
-                ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-                p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
-                FROM codigoslibros c
-                LEFT JOIN usuario u ON c.idusuario = u.idusuario
-                LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-                LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-                LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-                LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
-                LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-                WHERE codigo = '$item->codigo'
-             ");
-             //valida que el codigo existe
+            //validar si el codigo existe
+            $validar = $this->getCodigos($item->codigo);
+            //valida que el codigo existe
             if(count($validar)>0){
                 //VENTA DIRECTA/VENTA POR LISTA
                 if($request->regalado == '0'){
-                      //validar si el codigo ya haya sido leido
-                      $ifLeido            = $validar[0]->bc_estado;
-                      //validar si el codigo ya esta liquidado
-                      $ifLiquidado        = $validar[0]->estado_liquidacion;
-                      //validar si el codigo no este liquidado
-                      $ifBloqueado        = $validar[0]->estado;
-                      //validar si tiene bc_institucion
-                      $ifBc_Institucion   = $validar[0]->bc_institucion;
-                      //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-                     $ifid_periodo   = $validar[0]->id_periodo;  
-                      //validar si el codigo tiene venta_estado 
-                      $venta_estado = $validar[0]->venta_estado;
-                      //venta lista
-                      $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
-
+                    //validar si el codigo ya haya sido leido
+                    $ifLeido            = $validar[0]->bc_estado;
+                    //validar si el codigo ya esta liquidado
+                    $ifLiquidado        = $validar[0]->estado_liquidacion;
+                    //validar si el codigo no este liquidado
+                    $ifBloqueado        = $validar[0]->estado;
+                    //validar si tiene bc_institucion
+                    $ifBc_Institucion   = $validar[0]->bc_institucion;
+                    //validar que el periodo del estudiante sea 0 o sea igual al que se envia
+                    $ifid_periodo   = $validar[0]->id_periodo;  
+                    //validar si el codigo tiene venta_estado 
+                    $venta_estado = $validar[0]->venta_estado;
+                    //venta lista
+                    $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
                     //VENTA DIRECTA
                     if($request->venta_estado == '1'){
                         //(SE QUITARA PARA AHORA EL ESTUDIANTE envia los codigos por formulario)if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ( $ifBc_Institucion == 0 || $ifBc_Institucion == $institucion_id )  && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2 && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null")){  
@@ -225,10 +195,10 @@ class CodigoLibrosController extends Controller
                             ->where('estado_liquidacion', '=', '1')
                             //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
                             ->update([
-                                // 'bc_estado' => '1',
-                                'bc_institucion' => $request->institucion_id,
-                                'bc_periodo' =>  $request->periodo_id,
-                                'venta_estado' => $request->venta_estado,
+                                'factura'           => $request->factura,
+                                'bc_institucion'    => $request->institucion_id,
+                                'bc_periodo'        => $request->periodo_id,
+                                'venta_estado'      => $request->venta_estado,
                         ]);
                             if($codigo){
                                 $porcentaje++;
@@ -261,6 +231,8 @@ class CodigoLibrosController extends Controller
                                 "status" => $validar[0]->status,
                                 "contador" => $validar[0]->contador,
                                 "InstitucionLista" => $validar[0]->InstitucionLista,
+                                "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                                "factura"               => $validar[0]->factura
                             ];
                             $contador++;
                         }
@@ -279,10 +251,10 @@ class CodigoLibrosController extends Controller
                             ->where('estado_liquidacion', '=', '1')
                             //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
                             ->update([
-                                // 'bc_estado' => '1',
-                                'venta_lista_institucion' => $request->institucion_id,
-                                'bc_periodo' => $request->periodo_id,
-                                'venta_estado' => $request->venta_estado,
+                                'factura'                   => $request->factura,
+                                'venta_lista_institucion'   => $request->institucion_id,
+                                'bc_periodo'                => $request->periodo_id,
+                                'venta_estado'              => $request->venta_estado,
                             ]);  
                             if($codigo){
                                 $porcentaje++;
@@ -315,6 +287,8 @@ class CodigoLibrosController extends Controller
                                 "status" => $validar[0]->status,
                                 "contador" => $validar[0]->contador,
                                 "InstitucionLista" => $validar[0]->InstitucionLista,
+                                "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                                "factura"               => $validar[0]->factura
                             ];
                             $contador++;
                         }
@@ -365,6 +339,8 @@ class CodigoLibrosController extends Controller
                             "status" => $validar[0]->status,
                             "contador" => $validar[0]->contador,
                             "InstitucionLista" => $validar[0]->InstitucionLista,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                            "factura"               => $validar[0]->factura
                         ];
                         $contador++;
                     }
@@ -415,6 +391,8 @@ class CodigoLibrosController extends Controller
                             "status" => $validar[0]->status,
                             "contador" => $validar[0]->contador,
                             "InstitucionLista" => $validar[0]->InstitucionLista,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                            "factura"               => $validar[0]->factura
                         ];
                         $contador++;
                     }
@@ -465,9 +443,9 @@ class CodigoLibrosController extends Controller
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $tipoVenta = DB::SELECT("SELECT 
-        c.prueba_diagnostica, 
+        c.prueba_diagnostica,c.factura, 
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.contrato,
+        c.contrato,c.porcentaje_descuento,
         c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
         ib.nombreInstitucion as institucion_barras,
@@ -560,7 +538,9 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                        "factura"               => $validar[0]->factura
                     ];
                     $contador++;
                 }
@@ -578,8 +558,9 @@ class CodigoLibrosController extends Controller
         ];
      }
      public function getCodigos($codigo){
-        $consulta = DB::SELECT("SELECT c.prueba_diagnostica, 
+        $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica, 
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.porcentaje_descuento,
         c.libro as book,c.serie,c.created_at,
         (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
         FROM codigos_devolucion d
@@ -681,6 +662,8 @@ class CodigoLibrosController extends Controller
                         "status" => $validar[0]->status,
                         "contador" => $validar[0]->contador,
                         "contrato" => $validar[0]->contrato,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                        "factura"               => $validar[0]->factura
                     ];
                     $contador++;
                  }
@@ -820,7 +803,9 @@ class CodigoLibrosController extends Controller
                             "estado_liquidacion" => $validar[0]->estado_liquidacion,
                             "estado" => $validar[0]->estado,
                             "status" => $validar[0]->status,
-                            "contador" => $validar[0]->contador
+                            "contador" => $validar[0]->contador,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                            "factura"               => $validar[0]->factura
                         ];
                         $contador++;
                     }
@@ -898,7 +883,9 @@ class CodigoLibrosController extends Controller
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
                         "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "contador" => $validar[0]->contador,
+                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                        "factura"               => $validar[0]->factura
                     ];
                     $contador++;
                 }
@@ -1002,7 +989,9 @@ class CodigoLibrosController extends Controller
                             "estado" => $validar[0]->estado,
                             "status" => $validar[0]->status,
                             "contador" => $validar[0]->contador,
-                            "contrato" => $validar[0]->contrato
+                            "contrato" => $validar[0]->contrato,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                            "factura"               => $validar[0]->factura
                         ];
                         $contador++;
                     }   
@@ -1063,7 +1052,9 @@ class CodigoLibrosController extends Controller
                             "status" => $validar[0]->status,
                             "contador" => $validar[0]->contador,
                             "contrato" => $validar[0]->contrato,
-                            "mensaje" => $mensaje_personalizado
+                            "mensaje" => $mensaje_personalizado,
+                            "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
+                            "factura"               => $validar[0]->factura
                         ];
                         $contador++;
                     }  
@@ -1199,9 +1190,9 @@ class CodigoLibrosController extends Controller
         foreach($codigos as $key => $item){
         //validar si el codigo existe
             $validar = DB::SELECT("SELECT
-            c.prueba_diagnostica, 
+            c.prueba_diagnostica, c.factura,
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.porcentaje_descuento,
             c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
             CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
             i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
@@ -1264,7 +1255,9 @@ class CodigoLibrosController extends Controller
                         'verif8'                => null,
                         'verif9'                => null,
                         'verif10'               => null,
-                        'venta_lista_institucion'=> '0'
+                        'venta_lista_institucion'=> '0',
+                        'porcentaje_descuento'  => '0',
+                        'factura'               => null,
                     ]);
                     if($codigo){
                         $porcentaje++;
@@ -1276,7 +1269,6 @@ class CodigoLibrosController extends Controller
                         $historico->idInstitucion  = $request->id_usuario;
                         $historico->observacion    = $request->observacion;
                         $historico->save();
-                     
                     }else{
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
@@ -1284,25 +1276,27 @@ class CodigoLibrosController extends Controller
                     }  
                 }else{
                     $codigoSinDevolucion[$contador] = [
-                        "codigo" => $item->codigo,
-                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
-                        "tipoCodigo"         => $validar[0]->tipoCodigo,
-                        "barrasEstado" => $validar[0]->barrasEstado,
-                        "codigoEstado" => $validar[0]->codigoEstado,
-                        "liquidacion" => $validar[0]->liquidacion,
-                        "ventaEstado" => $validar[0]->ventaEstado,
-                        "idusuario" => $validar[0]->idusuario,
-                        "estudiante" => $validar[0]->estudiante,
-                        "nombreInstitucion" => $validar[0]->nombreInstitucion,
-                        "institucionBarra" => $validar[0]->institucionBarra,
-                        "periodo" => $validar[0]->periodo,
-                        "periodo_barras" => $validar[0]->periodo_barras,
-                        "cedula" => $validar[0]->cedula,
-                        "email" => $validar[0]->email,
-                        "estado_liquidacion" => $validar[0]->estado_liquidacion,
-                        "estado" => $validar[0]->estado,
-                        "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador
+                        "codigo"                => $item->codigo,
+                        "prueba_diagnostica"    => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"            => $validar[0]->tipoCodigo,
+                        "barrasEstado"          => $validar[0]->barrasEstado,
+                        "codigoEstado"          => $validar[0]->codigoEstado,
+                        "liquidacion"           => $validar[0]->liquidacion,
+                        "ventaEstado"           => $validar[0]->ventaEstado,
+                        "idusuario"             => $validar[0]->idusuario,
+                        "estudiante"            => $validar[0]->estudiante,
+                        "nombreInstitucion"     => $validar[0]->nombreInstitucion,
+                        "institucionBarra"      => $validar[0]->institucionBarra,
+                        "periodo"               => $validar[0]->periodo,
+                        "periodo_barras"        => $validar[0]->periodo_barras,
+                        "cedula"                => $validar[0]->cedula,
+                        "email"                 => $validar[0]->email,
+                        "estado_liquidacion"    => $validar[0]->estado_liquidacion,
+                        "estado"                => $validar[0]->estado,
+                        "status"                => $validar[0]->status,
+                        "contador"              => $validar[0]->contador,
+                        "porcentaje_descuento"  => $validar[0]->porcentaje_descuento,
+                        "factura"               => $validar[0]->factura
                     ];
                     $contador++;
                 }

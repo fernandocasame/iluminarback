@@ -48,18 +48,24 @@ class ObsequioController extends Controller
         return $query;
     }
     public function institucionPedido($institucion,$periodo){
-        // $test = [
-        //     "veN_CODIGO" => "C-C22-0000031-LJ",
-        //     "veN_VALOR"=> 3248.7,
-        //     "veN_ANTICIPO"=> 500,
-        //     "veN_DESCUENTO"=> 41,
-        //     "total_gastado"=> 40
-        // ];
-        // $preArreglo = [];
-        // $preArreglo[0] = $test;
-        // return $preArreglo;
+        // $data = '
+        //     [
+        //         {
+        //         "veN_CODIGO": "C-C22-0000013-CHL",
+        //         "veN_VALOR": 5046,
+        //         "veN_ANTICIPO": 0,
+        //         "veN_DESCUENTO": 44,
+        //         "total_gastado": 0,
+        //         "maximo_porcentaje_autorizado": 46
+        //         }
+        //     ]
+        // ';
+        // $setear  = json_decode($data,true);
+        // return $setear;
         //obtener contrato de la institucion y periodo 
-        $query = DB::SELECT("SELECT * FROM temporadas t
+        $query = DB::SELECT("SELECT t.*, i.maximo_porcentaje_autorizado
+        FROM temporadas t
+        LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
         WHERE t.idInstitucion = '$institucion'
         AND t.id_periodo = '$periodo'
         and t.estado = '1'
@@ -71,7 +77,14 @@ class ObsequioController extends Controller
             return ["status" => "0", "message" => "Existe mas de 1 un contrato con la misma institución"];
         }
         //variables 
-        $contrato = $query[0]->contrato;
+        $contrato                       = $query[0]->contrato;
+        $maximo_porcentaje_autorizado   = $query[0]->maximo_porcentaje_autorizado;
+        //validar que si tiene verificaciones en prolipa
+        $validate = DB::SELECT("SELECT * FROM verificaciones v
+        WHERE v.contrato = '$contrato'");
+        if(empty($validate)){
+            return ["status" => "0", "message" => "El contrato $contrato no tiene verificaciones"];
+        }
         try {
             $dataFinally    = [];
             $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
@@ -118,6 +131,7 @@ class ObsequioController extends Controller
                 $obj->veN_CODIGO    = $JsonContrato["veN_CODIGO"];
                 $obj->veN_DESCUENTO = $JsonContrato["veN_DESCUENTO"] + $DescuentoConvertido;
                 $obj->total_gastado = $total_gastado == null ? 0 : $total_gastado;
+                $obj->maximo_porcentaje_autorizado = $maximo_porcentaje_autorizado;
                 array_push($dataFinally,$obj);
                 return $dataFinally;
             }else{
@@ -182,6 +196,7 @@ class ObsequioController extends Controller
         $ob->institucion_id     = $request->institucion_id;
         $ob->periodo_id         = $request->periodo_id;
         $ob->asesor_id          = $request->asesor_id;
+        $ob->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
         $ob->save();
         //detalle obsequio
         //variables

@@ -123,7 +123,6 @@ class InstitucionController extends Controller
             if($request->enviarArchivo){
                 //eliminar el archivo anterior si existe
                 if($archivo == "" || $archivo == null || $archivo == 0){
-
                 }else{
                     if(file_exists('archivos/instituciones_logos/'.$archivo) ){
                         unlink('archivos/instituciones_logos/'.$archivo);
@@ -146,26 +145,25 @@ class InstitucionController extends Controller
                     $file = $request->file('imagenInstitucion');
                     $fileName = uniqid().$file->getClientOriginalName();
                     $file->move($ruta,$fileName);
-
                 }
-                $cambio->imgenInstitucion = $fileName;
+                $cambio->imgenInstitucion       = $fileName;
             }
-
         }
-        $cambio->idcreadorinstitucion   = $request->idcreadorinstitucion;
-        $cambio->nombreInstitucion      = $request->nombreInstitucion;
-        $cambio->direccionInstitucion   = $request->direccionInstitucion;
-        $cambio->telefonoInstitucion    = $request->telefonoInstitucion;
-        $cambio->solicitudInstitucion   = $request->solicitudInstitucion;
-        $cambio->codigo_institucion_milton   = $request->codigo_institucion_milton;
-        $cambio->vendedorInstitucion    = $request->vendedorInstitucion;
-        $cambio->tipo_institucion       = $request->tipo_institucion;
-        $cambio->region_idregion        = $request->region_idregion;
-        $cambio->ciudad_id              = $request->ciudad_id;
-        $cambio->estado_idEstado        = $request->estado;
-        $cambio->aplica_matricula       = $request->aplica_matricula;
-        $cambio->punto_venta            = $request->punto_venta;
-        $cambio->asesor_id              = $request->asesor_id;
+        $cambio->idcreadorinstitucion           = $request->idcreadorinstitucion;
+        $cambio->nombreInstitucion              = $request->nombreInstitucion;
+        $cambio->direccionInstitucion           = $request->direccionInstitucion;
+        $cambio->telefonoInstitucion            = $request->telefonoInstitucion;
+        $cambio->solicitudInstitucion           = $request->solicitudInstitucion;
+        $cambio->codigo_institucion_milton      = $request->codigo_institucion_milton;
+        $cambio->vendedorInstitucion            = $request->vendedorInstitucion;
+        $cambio->tipo_institucion               = $request->tipo_institucion;
+        $cambio->region_idregion                = $request->region_idregion;
+        $cambio->ciudad_id                      = $request->ciudad_id;
+        $cambio->estado_idEstado                = $request->estado;
+        $cambio->aplica_matricula               = $request->aplica_matricula;
+        $cambio->punto_venta                    = $request->punto_venta;
+        $cambio->asesor_id                      = $request->asesor_id;
+        $cambio->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
         $cambio->save();
         return $cambio;
     }
@@ -431,6 +429,7 @@ class InstitucionController extends Controller
                         "asesor_id" =>         $item->asesor_id,
                         "nombre_asesor" =>     $item->nombre_asesor,
                         "apellido_asesor" =>   $item->apellido_asesor,
+                        "asesor"           =>  $item->nombre_asesor." ".$item->apellido_asesor,
                         "fecha_registro" =>    $item->fecha_registro,
                         "nombreregion" =>      $item->nombreregion,
                         "periodo_id" =>        $periodoInstitucion[0]->periodo_id,
@@ -489,12 +488,15 @@ class InstitucionController extends Controller
         }
         //traer las instituciones temporales  creadas por el asesor
         if($request->temporales){
-            $instituciones = DB::SELECT("SELECT t.institucion_temporal_id,IF(t.region = 2,'Costa','Sierra') AS nombreregion, t.nombre_institucion AS nombreInstitucion,
-            t.periodo_id,t.asesor_id,t.ciudad
-
-             FROM seguimiento_institucion_temporal t
+            $instituciones = DB::SELECT("SELECT t.institucion_temporal_id,
+            IF(t.region = 2,'Costa','Sierra') AS nombreregion, 
+            t.nombre_institucion AS nombreInstitucion,
+            t.periodo_id,t.asesor_id,t.ciudad,pe.periodoescolar AS periodo
+            FROM seguimiento_institucion_temporal t
+         	LEFT JOIN periodoescolar pe ON t.periodo_id = pe.idperiodoescolar
             WHERE t.asesor_id = '$request->asesor_id'
             ORDER BY t.institucion_temporal_id DESC
+            
             ");
             return $instituciones;
         }

@@ -408,21 +408,23 @@ class EstudianteController extends Controller
         }
         //para buscar los cursos del estudiante
         if($request->busquedaCurso){
-            $cantidad = DB::SELECT("SELECT  COUNT(DISTINCT e.codigo) as cantidad_cursos   FROM
-            estudiante e ,curso c
-            WHERE  usuario_idusuario  = $request->idusuario
-            AND c.codigo = e.codigo
-            AND e.estado = '1'
-            AND c.estado = '1'
-            AND c.created_at BETWEEN '2021-03-29' AND '2022-09-12'
+            $cantidad = DB::SELECT("SELECT  COUNT(DISTINCT e.codigo) as cantidad_cursos  
+            FROM estudiante e 
+              LEFT JOIN curso c ON c.codigo = e.codigo
+              LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
+              WHERE  usuario_idusuario  = '$request->idusuario'
+              AND e.estado = '1'
+              AND c.estado = '1'
+              AND pe.estado = '1'
             ");
             $codigos = DB::SELECT("SELECT DISTINCT c.codigo, e.usuario_idusuario FROM
-                estudiante e ,curso c
-                WHERE  usuario_idusuario  =$request->idusuario
-                AND c.codigo = e.codigo
+                estudiante e 
+                LEFT JOIN curso c ON c.codigo = e.codigo
+                LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
+                WHERE  usuario_idusuario  = '$request->idusuario'
                 AND e.estado = '1'
                 AND c.estado = '1'
-                AND c.created_at BETWEEN '2021-03-29' AND '2022-09-12'
+                AND pe.estado = '1'
             ");
             return ["cantidad" => $cantidad , "codigos" => $codigos];
         }

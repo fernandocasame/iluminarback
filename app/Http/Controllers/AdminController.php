@@ -9,8 +9,12 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Models\CuotasPorCobrar;
 use App\Models\EstudianteMatriculado;
+use App\Models\PedidoAlcance;
+use App\Models\PedidoAlcanceHistorico;
 use App\Models\RepresentanteEconomico;
 use App\Models\RepresentanteLegal;
+use App\Models\SeminarioCapacitador;
+use App\Models\Temporada;
 use App\Models\Usuario;
 use DB;
 use GraphQL\Server\RequestError;
@@ -98,7 +102,7 @@ class AdminController extends Controller
                 //asesores
                 $teran = ["OT","OAT"];
                 $galo  = ["EZ","EZP"];
-                //buscar el codigo periodo 
+                //buscar el codigo periodo
                 $search = DB::SELECT("SELECT * FROM periodoescolar pe
                 WHERE pe.idperiodoescolar = '$periodo'
                 ");
@@ -122,7 +126,7 @@ class AdminController extends Controller
                 }else{
                     $menosUno = "C".substr(($anio-1),-2);
                 }
-               
+
                 //ASESORES QUE TIENE MAS DE UNA INICIAL
                 $valores     = [];
                 $arrayAsesor = [];
@@ -146,9 +150,9 @@ class AdminController extends Controller
                 $resultado = array_filter($JsonEnviar, function($p) {
                     return $p["estVenCodigo"] != 3 && !str_starts_with($p["venConvertido"] , 'C');
                     // print_r($p );
-                }); 
+                });
                 $renderSet = array_values($resultado);
-                //enviar valores 
+                //enviar valores
                 $dataFinally = array();
                 $contador = 0;
                 foreach($renderSet as $key => $item){
@@ -225,7 +229,7 @@ class AdminController extends Controller
                     "sin_contratos" => $arraySinContrato
                 ];
                 //====VENTA ANTERIOR======/
-                //VENTA BRUTA ANTERIOR 
+                //VENTA BRUTA ANTERIOR
                     $queryMenosUno = DB::SELECT("SELECT   t.VEN_VALOR,t.PERIODO,
                     ( t.VEN_VALOR - ((t.VEN_VALOR * t.VEN_DESCUENTO)/100)) AS ven_neta
                     FROM temp_reporte t
@@ -244,7 +248,7 @@ class AdminController extends Controller
                     "contratosEnviar"       => $contratosEnviar,
                     "MenosUno"              => $queryMenosUno,
                 ];
-              
+
             }//FIN FOR EACH ASESORES
             return $datos;
             } catch (\Exception  $ex) {
@@ -252,19 +256,89 @@ class AdminController extends Controller
         }
     }
     public function pruebaData(Request $request){
+        $dato = DB::SELECT("SELECT p.id_pedido as pedido_id,
+            p.ifagregado_anticipo_aprobado,phi.*,
+            u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
+            p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
+            p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
+            p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
+            p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
+            p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton
+            FROM pedidos p
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            WHERE (p.ifagregado_anticipo_aprobado = '0' OR p.ifagregado_anticipo_aprobado = '2' )
+            AND ifanticipo = '1'
+            AND pe.estado = '1'
+            AND p.anticipo > 0
+            AND p.estado = '1'
+            AND p.facturacion_vee = '1'
+            AND pe.pedido_gerencia = '1'
+            ORDER BY p.fecha_creacion_pedido DESC
+        ");
+        $datos = [];
         try {
-         
-            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=13930"); 
-            $JsonDocumentos = json_decode($dato, true);
-            return $JsonDocumentos;
-            
+            foreach($dato as $key => $item){
+                //traer valores anteriores
+                $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton); 
+                $JsonDocumentos = json_decode($dato, true);
+                $datos[$key] =[
+                    "pedido_id"                         => $item->pedido_id,
+                    "ifagregado_anticipo_aprobado"      => $item->ifagregado_anticipo_aprobado,
+                    "id"                                => $item->id,
+                    "periodo_id"                        => $item->periodo_id,
+                    "id_pedido"                         => $item->id_pedido,
+                    "estado"                            => $item->estado,
+                    "fecha_creacion_pedido"             => $item->fecha_creacion_pedido,
+                    "fecha_generar_contrato"            => $item->fecha_generar_contrato,
+                    "fecha_aprobacion_anticipo_gerencia" => $item->fecha_aprobacion_anticipo_gerencia,
+                    "fecha_rechazo_gerencia"            => $item->fecha_rechazo_gerencia,
+                    "fecha_contabilidad_recibe"         => $item->fecha_contabilidad_recibe,
+                    "fecha_contabilidad_sube_cheque_sin_firmar" => $item->fecha_contabilidad_sube_cheque_sin_firmar,
+                    "fecha_subir_cheque"                => $item->fecha_subir_cheque,
+                    "fecha_facturador_recibe_cheque"    => $item->fecha_facturador_recibe_cheque,
+                    "fecha_envio_cheque_for_asesor"     => $item->fecha_envio_cheque_for_asesor,
+                    "fecha_orden_firmada" =>            $item->fecha_orden_firmada,
+                    "fecha_que_recibe_orden_firmada"    => $item->fecha_que_recibe_orden_firmada,
+                    "fecha_que_recibe_orden_firmada_contabilidad" => $item->fecha_que_recibe_orden_firmada_contabilidad,
+                    "tipo_pago"                         => $item->tipo_pago,
+                    "evidencia_cheque_sin_firmar"       => $item->evidencia_cheque_sin_firmar,
+                    "evidencia_cheque"                  => $item->evidencia_cheque,
+                    "evidencia_pagare"                  => $item->evidencia_pagare,
+                    "contador_anticipo"                 => $item->contador_anticipo,
+                    "contador_liquidacion" =>           $item->contador_liquidacion,
+                    "created_at"                        =>  $item->created_at,
+                    "updated_at"                        =>  $item->updated_at,
+                    "idusuario"                         => $item->idusuario,
+                    "nombres"                           => $item->nombres,
+                    "apellidos"                         => $item->apellidos,
+                    "anticipo_aprobado"                 => $item->anticipo_aprobado,
+                    "pendiente_liquidar"                => $item->pendiente_liquidar,
+                    "anticipo_solicitud_for_gerencia"   => $item->anticipo_solicitud_for_gerencia,
+                    "anticipo_solicitud_observacion"    => $item->anticipo_solicitud_observacion,
+                    "anticipo_aprobado_gerencia"        => $item->anticipo_aprobado_gerencia,
+                    "nombreInstitucion"                 => $item->nombreInstitucion,
+                    "nombre_ciudad"                     => $item->nombre_ciudad,
+                    "fechaCreacionPedido"               => $item->fechaCreacionPedido,
+                    "anticipo_sugerido"                 => $item->anticipo_sugerido,
+                    "convenio_anios"                    => $item->convenio_anios,
+                    "observacion"                       => $item->observacion,
+                    "periodo"                           => $item->periodo,
+                    "total_venta"                       => $item->total_venta,
+                    "total_series_basicas"              => $item->total_series_basicas,
+                    "descuento"                         => $item->descuento,
+                    "codigo_institucion_milton"         => $item->codigo_institucion_milton,
+                    "valoresAnteriores"                 => $JsonDocumentos
+                ];
+            }
+            return $datos;
         } catch (\Exception  $ex) {
-        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor de facturación"];
         } 
-
-
-
-
+      
         // $json = '
         //     [
         //         {
@@ -302,11 +376,11 @@ class AdminController extends Controller
         // // Convertir la cadena JSON a un array de objetos
         // $arrayObjetos = json_decode($json);
         // return $arrayObjetos;
-        // //variables 
+        // //variables
         // $contrato = "C-C20-0000008-LJ";
         // try {
         //     $dataFinally    = [];
-        //     $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato); 
+        //     $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
         //     $JsonContrato = json_decode($dato, true);
         //     if($JsonContrato == "" || $JsonContrato == null){
         //         return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -322,10 +396,106 @@ class AdminController extends Controller
         //         // return $dataFinally;
         //         return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
         //     }
-            
+
         // } catch (\Exception  $ex) {
         // return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-        // } 
+        // }
+    }
+    public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
+        //vadidate that it's not exists
+        $query = DB::SELECT("SELECT * FROM pedidos_alcance_historico h
+        WHERE h.alcance_id = '$id_alcance'
+        AND h.id_pedido ='$id_pedido'");
+        if(empty($query)){
+            $historico                      = new PedidoAlcanceHistorico();
+            $historico->contrato            = $contrato;
+            $historico->id_pedido           = $id_pedido;
+            $historico->alcance_id          = $id_alcance;
+            $historico->cantidad_anterior   = $cantidad_anterior;
+            $historico->nueva_cantidad      = $nueva_cantidad;
+            $historico->user_created        = $user_created;
+            $historico->tipo                = $tipo;
+            $historico->save();
+        }
+    }
+    public function get_val_pedidoInfo_alcance($pedido,$alcance){
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
+        p.descuento, p.id_periodo,
+        p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
+        se.nombre_serie
+        FROM pedidos_val_area pv
+        left join area ar ON  pv.id_area = ar.idarea
+        left join series se ON pv.id_serie = se.id_serie
+        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        WHERE pv.id_pedido = '$pedido'
+        AND pv.alcance = '$alcance'
+        GROUP BY pv.id;
+        ");
+        $datos = [];
+        foreach($val_pedido as $key => $item){
+            $valores = [];
+            //plan lector
+            if($item->plan_lector > 0 ){
+                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,
+                (
+                    SELECT f.pvp AS precio
+                    FROM pedidos_formato f
+                    WHERE f.id_serie = '6'
+                    AND f.id_area = '69'
+                    AND f.id_libro = '$item->plan_lector'
+                    AND f.id_periodo = '$item->id_periodo'
+                )as precio, ls.codigo_liquidacion,ls.version,ls.year
+                FROM libro l
+                left join libros_series ls  on ls.idLibro = l.idlibro
+                WHERE l.idlibro = '$item->plan_lector'
+                ");
+                $valores = $getPlanlector;
+            }else{
+                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,
+                (
+                    SELECT f.pvp AS precio
+                    FROM pedidos_formato f
+                    WHERE f.id_serie = ls.id_serie
+                    AND f.id_area = a.area_idarea
+                    AND f.id_periodo = '$item->id_periodo'
+                )as precio
+                FROM libros_series ls
+                LEFT JOIN libro l ON ls.idLibro = l.idlibro
+                LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                WHERE ls.id_serie = '$item->id_serie'
+                AND a.area_idarea  = '$item->id_area'
+                AND l.Estado_idEstado = '1'
+                AND a.estado = '1'
+                AND ls.year = '$item->year'
+                LIMIT 1
+                ");
+                $valores = $getLibros;
+            }
+            $datos[$key] = [
+                "id"                => $item->id,
+                "id_pedido"         => $item->id_pedido,
+                "valor"             => $item->valor,
+                "id_area"           => $item->id_area,
+                "tipo_val"          => $item->tipo_val,
+                "id_serie"          => $item->id_serie,
+                "year"              => $item->year,
+                "anio"              => $valores[0]->year,
+                "version"           => $valores[0]->version,
+                "created_at"        => $item->created_at,
+                "updated_at"        => $item->updated_at,
+                "descuento"         => $item->descuento,
+                "anticipo"          => $item->anticipo,
+                "comision"          => $item->comision,
+                "plan_lector"       => $item->plan_lector,
+                "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$valores[0]->nombrelibro : $item->serieArea,
+                "idlibro"           => $valores[0]->idlibro,
+                "nombrelibro"       => $valores[0]->nombrelibro,
+                "precio"            => $valores[0]->precio,
+                "subtotal"          => $item->valor * $valores[0]->precio,
+                "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
+            ];
+        }
+        return $datos;
     }
     public function traerPeriodo($institucion_id){
         $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
@@ -343,7 +513,7 @@ class AdminController extends Controller
         }
     }
 
-    
+
     /**
      * Show the form for creating a new resource.
      *
@@ -358,195 +528,145 @@ class AdminController extends Controller
     public function guardarData(Request $request){
         set_time_limit(6000);
         ini_set('max_execution_time', 6000);
-        $data = $this->TraerData($request->institucion);
-
-
-        $cont =0;
-
-
-        while ($cont < count($data)) {
-
-
-
-                    //Parar registrar la reserva de matricula
-                    $fecha  = date('Y-m-d');
-                    $matricula = new EstudianteMatriculado();
-                    $matricula->id_estudiante = $data[$cont]->idusuario;
-                    $matricula->id_periodo = $data[$cont]->periodo;
-                    $matricula->fecha_matricula = $fecha;
-                    $matricula->estado_matricula = "2";
-                    $matricula->nivel  = $data[$cont]->orden;
-                    $matricula->save();
-
-                    //Para registrar las cuotas
-
-
-                    // $cont =0;
-                    // $couta = intval($data[$cont]->cuotas);
-
-                    $fecha_configuracion = "$request->fecha_inicio";
-                    // $fecha_configuracion = "2021-04-25";
-                    // if($couta == 2){
-                    $fecha1= $fecha_configuracion;
-                    $fecha0= date("Y-m-d",strtotime($fecha_configuracion."- 1  month"));
-                    $fecha2= date("Y-m-d",strtotime($fecha_configuracion."+ 1 month"));
-
-                    $fecha3= date("Y-m-d",strtotime($fecha_configuracion."+ 2 month"));
-                    $fecha4= date("Y-m-d",strtotime($fecha_configuracion."+ 3 month"));
-                    $fecha5= date("Y-m-d",strtotime($fecha_configuracion."+ 4 month"));
-                    $fecha6= date("Y-m-d",strtotime($fecha_configuracion."+ 5 month"));
-                    $fecha7= date("Y-m-d",strtotime($fecha_configuracion."+ 6 month"));
-                    $fecha8= date("Y-m-d",strtotime($fecha_configuracion."+ 7 month"));
-                    $fecha9= date("Y-m-d",strtotime($fecha_configuracion."+ 8 month"));
-                    $fecha10= date("Y-m-d",strtotime($fecha_configuracion."+ 9 month"));
-                    $fecha11= date("Y-m-d",strtotime($fecha_configuracion."+ 10 month"));
-
-
-                        // $dividirCuota = $request->valor * 10;
-                        $dividirCuota = $data[$cont]->valor;
-                        $decimalCuota = $dividirCuota;
-                        // $decimalCuota = number_format($dividirCuota,2);
-
-                              //COUTA 0 PARA VALORES PENDIENTES ANTERIORES
-                            $cuotas0=new CuotasPorCobrar;
-                            $cuotas0->id_matricula=$matricula->id_matricula;
-                            $cuotas0->valor_cuota=0;
-                            $cuotas0->valor_pendiente=0;
-                            $cuotas0->fecha_a_pagar = $fecha0;
-                            $cuotas0->num_cuota = 0;
-                            $cuotas0->save();
-
-
-                        //matricula
-                            $cuotas=new CuotasPorCobrar;
-                            $cuotas->id_matricula=$matricula->id_matricula;
-                            $cuotas->valor_cuota=$data[$cont]->matricula;
-                            $cuotas->valor_pendiente=$data[$cont]->matricula;
-                            $cuotas->fecha_a_pagar = $fecha1;
-                            $cuotas->num_cuota = 1;
-                            $cuotas->save();
-                        //pensiones
-                            $cuotas1=new CuotasPorCobrar;
-                            $cuotas1->id_matricula=$matricula->id_matricula;
-                            $cuotas1->valor_cuota=$decimalCuota;
-                            $cuotas1->valor_pendiente=$decimalCuota;
-                            $cuotas1->fecha_a_pagar = $fecha2;
-                            $cuotas1->num_cuota = 2;
-                            $cuotas1->save();
-
-                            $cuotas2=new CuotasPorCobrar;
-                            $cuotas2->id_matricula=$matricula->id_matricula;
-                            $cuotas2->valor_cuota=$decimalCuota;
-                            $cuotas2->valor_pendiente=$decimalCuota;
-                            $cuotas2->fecha_a_pagar = $fecha3;
-                            $cuotas2->num_cuota = 3;
-                            $cuotas2->save();
-
-                            $cuotas3=new CuotasPorCobrar;
-                            $cuotas3->id_matricula=$matricula->id_matricula;
-                            $cuotas3->valor_cuota=$decimalCuota;
-                            $cuotas3->valor_pendiente=$decimalCuota;
-                            $cuotas3->fecha_a_pagar = $fecha4;
-                            $cuotas3->num_cuota = 4;
-                            $cuotas3->save();
-
-                            $cuotas4=new CuotasPorCobrar;
-                            $cuotas4->id_matricula=$matricula->id_matricula;
-                            $cuotas4->valor_cuota=$decimalCuota;
-                            $cuotas4->valor_pendiente=$decimalCuota;
-                            $cuotas4->fecha_a_pagar = $fecha5;
-                            $cuotas4->num_cuota = 5;
-                            $cuotas4->save();
-
-                            $cuotas5=new CuotasPorCobrar;
-                            $cuotas5->id_matricula=$matricula->id_matricula;
-                            $cuotas5->valor_cuota=$decimalCuota;
-                            $cuotas5->valor_pendiente=$decimalCuota;
-                            $cuotas5->fecha_a_pagar = $fecha6;
-                            $cuotas5->num_cuota = 6;
-                            $cuotas5->save();
-
-                            $cuotas6=new CuotasPorCobrar;
-                            $cuotas6->id_matricula=$matricula->id_matricula;
-                            $cuotas6->valor_cuota=$decimalCuota;
-                            $cuotas6->valor_pendiente=$decimalCuota;
-                            $cuotas6->fecha_a_pagar = $fecha7;
-                            $cuotas6->num_cuota = 7;
-                            $cuotas6->save();
-
-                            $cuotas7=new CuotasPorCobrar;
-                            $cuotas7->id_matricula=$matricula->id_matricula;
-                            $cuotas7->valor_cuota=$decimalCuota;
-                            $cuotas7->valor_pendiente=$decimalCuota;
-                            $cuotas7->fecha_a_pagar = $fecha8;
-                            $cuotas7->num_cuota = 8;
-                            $cuotas7->save();
-
-                            $cuotas8=new CuotasPorCobrar;
-                            $cuotas8->id_matricula=$matricula->id_matricula;
-                            $cuotas8->valor_cuota=$decimalCuota;
-                            $cuotas8->valor_pendiente=$decimalCuota;
-                            $cuotas8->fecha_a_pagar = $fecha9;
-                            $cuotas8->num_cuota = 9;
-                            $cuotas8->save();
-
-                            $cuotas9=new CuotasPorCobrar;
-                            $cuotas9->id_matricula=$matricula->id_matricula;
-                            $cuotas9->valor_cuota=$decimalCuota;
-                            $cuotas9->valor_pendiente=$decimalCuota;
-                            $cuotas9->fecha_a_pagar = $fecha10;
-                            $cuotas9->num_cuota = 10;
-                            $cuotas9->save();
-
-                            $cuotas10=new CuotasPorCobrar;
-                            $cuotas10->id_matricula=$matricula->id_matricula;
-                            $cuotas10->valor_cuota=$decimalCuota;
-                            $cuotas10->valor_pendiente=$decimalCuota;
-                            $cuotas10->fecha_a_pagar = $fecha11;
-                            $cuotas10->num_cuota = 11;
-                            $cuotas10->save();
-
-
-                    $cont=$cont+1;
+        //pasar los capacitadores
+        $query = DB::SELECT("SELECT * FROM seminarios s
+        WHERE s.tipo_webinar = '2'
+        AND s.capacitador_id IS NOT NULL
+        and s.estado = '1'
+        ");
+        $contador = 0;
+        foreach($query as $key => $item){
+            //validar que el no este registrado
+            $validate = DB::SELECT("SELECT * FROM seminarios_capacitador
+            WHERE seminario_id = '$item->id_seminario'
+            AND idusuario = '$item->capacitador_id'");
+            if(empty($validate)){
+                $capacitador = new SeminarioCapacitador();
+                $capacitador->idusuario      = $item->capacitador_id;
+                $capacitador->seminario_id   = $item->id_seminario;
+                $capacitador->save();
+                $contador++;
+            }
         }
+        return "Se guardo $contador";
+        // $query = DB::SELECT("SELECT * FROM temporadas t
+        // WHERE t.temporal_institucion IS NULL
+        // AND t.year = '2023'
+        // AND t.id_periodo <> '20'
+        // and t.estado  = '1'
+        // ");
+        // $contador = 0;
+        // foreach($query as $key => $item){
+        //     $contrato = $item->contrato;
+        //     //validar que el contrato exista en pedidos
+        //     $validate = DB::SELECT("SELECT p.id_periodo, p.id_institucion,p.id_asesor,
+        //     pe.periodoescolar as periodo,
+        //         CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+        //         u.cedula AS cedulaAsesor,
+        //         CONCAT(ur.nombres, ' ', ur.apellidos) AS nombreDocente,
+        //         ur.cedula AS cedulaDocente,
+        //         i.nombreInstitucion, c.nombre AS ciudad,
+        //         SUBSTRING(pe.codigo_contrato, 1,1 ) AS temporada
+        //         FROM pedidos p
+        //         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        //         LEFT JOIN usuario ur ON p.id_responsable = ur.idusuario
+        //         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        //         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        //         LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        //         WHERE contrato_generado = '$contrato'
+        //         and p.estado = '1'
+        //         LIMIT 1
+        //     ");
+        //     if(sizeOf($validate) > 0){
 
-        return ["status" => "1" ,"message" => "Se actualizo correctamente"];
+        //         $id_institucion     = $validate[0]->id_institucion;
+        //         $asesor_id          = $validate[0]->id_asesor;
+        //         $temporada          = $validate[0]->temporada;
+        //         $periodo            = $validate[0]->id_periodo;
+        //         $ciudad             = $validate[0]->ciudad;
+        //         $asesor             = $validate[0]->asesor;
+        //         $cedulaAsesor       = $validate[0]->cedulaAsesor;
+        //         $nombreDocente      = $validate[0]->nombreDocente;
+        //         $cedulaDocente      = $validate[0]->cedulaDocente;
+        //         $nombreInstitucion  = $validate[0]->nombreInstitucion;
+        //         $this->guardarContratoTemporada($contrato,$id_institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
+        //         $contador ++;
+        //     }
 
+        // }
+        // return "se guardo $contador correctamente";
+    }
+    public function crearCapacitadores($request,$arreglo){
+        $datos = json_decode($request->capacitadores);
+        //eliminar si ya han quitado al capacitador
+        $getCapacitadores = $this->getCapacitadoresXCapacitacion($arreglo->id_seminario);
+        if(sizeOf($getCapacitadores) > 0){
+            foreach($getCapacitadores as $key => $item){
+                $capacitador        = "";
+                $capacitador        = $item->idusuario;
+                $searchCapacitador  = collect($datos)->filter(function ($objeto) use ($capacitador) {
+                    // Condición de filtro
+                    return $objeto->idusuario == $capacitador;
+                });
+                if(sizeOf($searchCapacitador) == 0){
+                    DB::DELETE("DELETE FROM seminarios_capacitador
+                      WHERE seminario_id = '$arreglo->id_seminario'
+                      AND idusuario = '$capacitador'
+                    ");
+                }
+            }
+        }
+        //guardar los capacitadores
+        foreach($datos as $key => $item){
+            $query = DB::SELECT("SELECT * FROM seminarios_capacitador c
+            WHERE c.idusuario = '$item->idusuario'
+            AND c.seminario_id = '$arreglo->id_seminario'");
+            if(empty($query)){
+                $capacitador = new SeminarioCapacitador();
+                $capacitador->idusuario      = $item->idusuario;
+                $capacitador->seminario_id   = $arreglo->id_seminario;
+                $capacitador->save();
+            }
+        }
     }
 
-    public function TraerData($institucion){
-        $data = DB::SELECT("SELECT DISTINCT  ni.valor, ni.matricula,
-        u.idusuario, u.nombres, u.apellidos, u.cedula, u.email,u.update_datos, u.curso ,u.institucion_idInstitucion,
-             i.reporte, n.nombrenivel, n.orden, per.fecha_inicio_pension,
-
-
-
-        (SELECT periodoescolar_idperiodoescolar AS periodo FROM periodoescolar_has_institucion
-        WHERE id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi, institucion i
-         WHERE phi.institucion_idInstitucion = i.idInstitucion
-        AND i.idInstitucion = '$institucion')) as periodo
-
-        FROM usuario u
-        LEFT JOIN institucion i ON  u.institucion_idInstitucion = i.idInstitucion
-        LEFT JOIN mat_representante_economico rc ON  u.cedula = rc.c_estudiante
-        LEFT JOIN mat_representante_legal rl ON  u.cedula = rl.c_estudiante
-        -- LEFT JOIN estado_cuenta_colegio ec ON  u.cedula = ec.cedula
-        LEFT JOIN nivel n ON u.curso = n.orden
-        LEFT JOIN periodoescolar_has_institucion per ON u.institucion_idInstitucion = per.institucion_idInstitucion
-        LEFT JOIN mat_niveles_institucion ni ON u.curso = ni.nivel_id
-
-
-       WHERE  ni.institucion_id = '$institucion'
-        AND u.institucion_idInstitucion = '$institucion'
-        AND u.id_group = '14'
-        AND ni.periodo_id = '12'
-        ORDER BY u.apellidos ASC
-
-        -- LIMIT 5
+    public function guardarContratoTemporada($contrato,$institucion,$asesor_id,$temporadas,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion){
+        //validar que el contrato no existe
+        $validate = DB::SELECT("SELECT * FROM temporadas t
+        WHERE t.contrato = '$contrato'
         ");
-
-
-        return $data;
+        if(empty($validate)){
+            $temporada = new Temporada();
+            $temporada->contrato                = $contrato;
+            $temporada->year                    = date("Y");
+            $temporada->ciudad                  = $ciudad;
+            $temporada->temporada               = $temporadas;
+            $temporada->id_asesor               = $asesor_id;
+            $temporada->cedula_asesor           = 0;
+            $temporada->id_periodo              = $periodo;
+            $temporada->id_profesor             = "0";
+            $temporada->idInstitucion           = $institucion;
+            $temporada->temporal_nombre_docente = $nombreDocente;
+            $temporada->temporal_cedula_docente = $cedulaDocente;
+            $temporada->temporal_institucion    = $nombreInstitucion;
+            $temporada->nombre_asesor           = $asesor;
+            $temporada->cedula_asesor           = $cedulaAsesor;
+            $temporada->save();
+            return $temporada;
+        }else{
+            $id_temporada                       = $validate[0]->id_temporada;
+            $temporada                          = Temporada::findOrFail($id_temporada);
+            $temporada->id_periodo              = $periodo;
+            $temporada->idInstitucion           = $institucion;
+            $temporada->id_asesor               = $asesor_id;
+            $temporada->temporal_nombre_docente = $nombreDocente;
+            $temporada->temporal_cedula_docente = $cedulaDocente;
+            $temporada->temporal_institucion    = $nombreInstitucion;
+            $temporada->nombre_asesor           = $asesor;
+            $temporada->cedula_asesor           = $cedulaAsesor;
+            $temporada->save();
+            return $temporada;
+        }
     }
 
     /**

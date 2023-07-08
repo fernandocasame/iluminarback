@@ -408,7 +408,7 @@ class CodigosLibrosGenerarController extends Controller
     }
     public function codigosBuscarCodigo($codigo){
             $codigos_libros = DB::SELECT("SELECT
-            c.prueba_diagnostica, 
+            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
              u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
             (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
@@ -460,7 +460,9 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarxCodigo($codigo){
-        $codigos_libros = DB::SELECT("SELECT u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
+        $codigos_libros = DB::SELECT("SELECT 
+            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,
+            u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
             (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
             FROM codigos_devolucion d
             WHERE d.codigo = c.codigo
@@ -530,7 +532,11 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function reportesCodigoAsesor($id,$periodo){
-        $codigos_libros = DB::SELECT("SELECT c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,
+        $codigos_libros = DB::SELECT("SELECT 
+        c.prueba_diagnostica, c.factura,
+        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.porcentaje_descuento,
+        c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,
         c.estado_liquidacion,bc_institucion,bc_periodo,
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
         (case when (c.estado_liquidacion = '0') then 'liquidado'

@@ -14,6 +14,10 @@ use App\Models\Institucion;
 use App\Models\PedidosClienteInstitucion;
 use App\Models\PedidosAnticiposSolicitados;
 use App\Models\PedidoAlcance;
+use App\Models\PedidoAlcanceHistorico;
+use App\Models\PedidoConvenio;
+use App\Models\PedidoConvenioDetalle;
+use App\Models\PedidoDocumentoAnterior;
 use App\Models\PedidoHistoricoActas;
 use App\Models\PedidosGuiasBodega;
 use App\Models\PedidoGuiaEntrega;
@@ -72,7 +76,20 @@ class PedidosController extends Controller
         }
         return $datos;
     }
-
+    public function getConvenioInstitucion($institucion){
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios c
+        WHERE c.institucion_id = '$institucion'
+        AND c.estado = '1'
+        ");
+        return $query;
+    }
+    public function contadorAniosConvenio($idConvenio){
+        $estadoConvenio = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
+        WHERE cd.pedido_convenio_institucion = '$idConvenio'
+        AND cd.estado = '1'
+        ");
+        return $estadoConvenio;
+    }
     public function store(Request $request)
     {
         //validar un pedido de institucion por periodo solo para cuando va a guardar no el editar
@@ -109,10 +126,27 @@ class PedidosController extends Controller
                 if($request->ifagregado_anticipo_aprobado == 1){
                     $this->aprobarAnticipo($request->id_pedido);
                 }
-                //Actualizar fecha creacion del pedido
-                //$this->UpdateFechaCreacionPedido($request->id_pedido);
             }else{
                 $pedido = new Pedidos();
+                //si existe convenio de la institucion
+                $getConvenio = $this->getConvenioInstitucion($request->institucion);
+                if(!empty($getConvenio)){
+                    $idConvenio     = $getConvenio[0]->id;
+                    $aniosConvenio  = $getConvenio[0]->convenio_anios;
+                    //valido que si el convenio ya tiene los anios cumplidos lo cierro
+                    $estadoConvenio = $this->contadorAniosConvenio($idConvenio);
+                    $contadorAnios = sizeOf($estadoConvenio);
+                    //si ya paso los años finalizo el convenio
+                    if($contadorAnios >= $aniosConvenio){
+                        $convenio = PedidoConvenio::findOrFail($idConvenio);
+                        $convenio->estado = 0;
+                        $convenio->save();
+                    }
+                    //si aun falta anios agrego convenio a este pedido 
+                    else{
+                        $pedido->convenio_origen = $getConvenio[0]->id_pedido;    
+                    }
+                }
             }
             $pedido->tipo_venta             = $request->tipo_venta;
             $pedido->tipo_venta_descr       = $request->tipo_venta_descr;
@@ -154,6 +188,14 @@ class PedidosController extends Controller
                 $pedido->convenio_anios     = $request->convenio_anios;
             }
             $pedido->save();
+            //ACTUALIZAR INSTITUCION
+            $uinstitucion = Institucion::findOrFail($request->institucion);
+            $uinstitucion->telefonoInstitucion         = $request->telefonoInstitucion;
+            $uinstitucion->direccionInstitucion        = $request->direccionInstitucion;
+            $uinstitucion->ruc                         = $request->ruc;
+            $uinstitucion->nivel                       = $request->nivel;
+            $uinstitucion->tipo_descripcion            = $request->tipo_descripcion;
+            $uinstitucion->save();
             if($request->generarNuevo == 'yes'){
                 //Si se genera un pedido apartir de un  pedido anulado
                 $this->changeBeneficiariosLibros($request->pedidoAnterior,$pedido->id_pedido);
@@ -179,7 +221,7 @@ class PedidosController extends Controller
             $contrato = $request->contrato;
             $aprobado = $request->anticipo_aprobado;
             $pedido = Pedidos::findOrFail($request->id_pedido);
-            $pedido->anticipo_aprobado = $aprobado;
+            $pedido->anticipo_aprobado              = $aprobado;
             $pedido->ifagregado_anticipo_aprobado   = 1;
             $pedido->save();
             //actualizar anticipo facturacion
@@ -508,6 +550,7 @@ class PedidosController extends Controller
     public function anular_pedido_asesor($id_pedido, $id_usuario,$contrato)
     {
         DB::SELECT("UPDATE `pedidos` SET `id_usuario_verif`=$id_usuario, `estado`=2 WHERE `id_pedido` = $id_pedido");
+        DB::SELECT("UPDATE `pedidos_convenios` SET estado=2 WHERE `id_pedido` = $id_pedido");
         if($contrato == "null" || $contrato == null || $contrato == "undefined" ||  $contrato == "" ){
         }else{
             DB::UPDATE("UPDATE temporadas SET estado = '0' WHERE contrato ='$contrato'");
@@ -847,16 +890,36 @@ class PedidosController extends Controller
     public function get_pedidos_periodo($periodo)
     {
         $pedidos = DB::SELECT("SELECT p.*,
+        SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
+        SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
         CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
         i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
         CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
         ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
+        IF(p.estado = 2,'Anulado','Activo') AS estadoPedido,
         (SELECT f.id_facturador from pedidos_asesores_facturador 
         f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
         (
             SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
             WHERE pa.id_pedido = p.id_pedido
-        ) AS contador_alcance
+        ) AS contador_alcance,
+        (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
+        (
+            SELECT COUNT(a.id) AS contadorAlcanceAbierto
+            FROM pedidos_alcance a
+            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+            WHERE  a.id_pedido = p.id_pedido
+            AND a.estado_alcance  = '0'
+            AND ped.estado = '1'
+        ) as contadorAlcanceAbierto,
+        (
+            SELECT COUNT(a.id) AS contadorAlcanceCerrado
+            FROM pedidos_alcance a
+            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+            WHERE  a.id_pedido = p.id_pedido
+            AND a.estado_alcance  = '1'
+            AND ped.estado = '1'
+        ) as contadorAlcanceCerrado
         FROM pedidos p
         INNER JOIN usuario u ON p.id_asesor = u.idusuario
         INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -865,7 +928,6 @@ class PedidosController extends Controller
         WHERE p.id_periodo = $periodo
         AND p.tipo = '0'
         AND p.estado <> '0'
-        -- AND p.facturacion_vee = '1'
         ORDER BY p.id_pedido DESC
         ");
         return $pedidos;
@@ -879,15 +941,35 @@ class PedidosController extends Controller
         foreach($query as $key => $item){
             $pedidos = DB::SELECT("SELECT p.*,
             CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
+            SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
+            SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
             i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
             CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
             ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
+            IF(p.estado = 2,'Desactivado','Activo') AS estadoPedido,
             (SELECT f.id_facturador from pedidos_asesores_facturador 
             f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
             (
                 SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
                 WHERE pa.id_pedido = p.id_pedido
-            ) AS contador_alcance
+            ) AS contador_alcance,
+            (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
+            (
+                SELECT COUNT(a.id) AS contadorAlcanceAbierto
+                FROM pedidos_alcance a
+                LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+                WHERE  a.id_pedido = p.id_pedido
+                AND a.estado_alcance  = '0'
+                AND ped.estado = '1'
+            ) as contadorAlcanceAbierto,
+            (
+                SELECT COUNT(a.id) AS contadorAlcanceCerrado
+                FROM pedidos_alcance a
+                LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+                WHERE  a.id_pedido = p.id_pedido
+                AND a.estado_alcance  = '1'
+                AND ped.estado = '1'
+            ) as contadorAlcanceCerrado
             FROM pedidos p
             INNER JOIN usuario u ON p.id_asesor = u.idusuario
             INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -1176,24 +1258,30 @@ class PedidosController extends Controller
 
     public function get_responsables_pedidos(Request $request)
     {
-        $responsables = DB::SELECT("SELECT *,
-         CONCAT(nombres,' ', apellidos, ' - ', cedula) AS 'nombres_responsable'
-          FROM `usuario` WHERE `estado_idEstado` = 1
-          AND (`id_group` = 6 OR `id_group` = 10)
-          AND cedula like '%$request->cedula%'
+        $responsables = DB::SELECT("SELECT u.idusuario,u.nombres, u.apellidos,
+         u.email,u.id_group,u.cedula,
+         CONCAT(u.nombres,' ', u.apellidos, ' - ', u.cedula) AS 'nombres_responsable',
+         g.deskripsi as rol
+          FROM usuario u
+          LEFT JOIN sys_group_users g ON g.id = id_group
+          WHERE u.estado_idEstado = 1
+          AND (u.id_group = 6 OR u.id_group = 10)
+          AND u.cedula like '%$request->cedula%'
           ");
         return $responsables;
     }
 
-    public function guardar_total_pedido($id_pedido, $total_usd, $total_unid,$total_guias)
+    public function guardar_total_pedido($id_pedido, $total_usd, $total_unid,$total_guias,$total_series_basicas)
     {
         //validar que el pedido que tenga contrato no se actualize
-        $query = DB::SELECT("SELECT * FROM pedidos WHERE id_pedido = '$id_pedido' AND contrato_generado IS NULL");
+        $query = DB::SELECT("SELECT * FROM pedidos WHERE id_pedido = '$id_pedido'");
+        // $query = DB::SELECT("SELECT * FROM pedidos WHERE id_pedido = '$id_pedido' AND contrato_generado IS NULL");
         if(count($query) > 0){
             DB::UPDATE("UPDATE `pedidos` SET
                 `total_venta` = $total_usd,
                 `total_unidades` = $total_unid,
-                `total_unidades_guias` = $total_guias
+                `total_unidades_guias` = $total_guias,
+                `total_series_basicas` = $total_series_basicas
                 WHERE `id_pedido` = $id_pedido
             ");     
         }
@@ -1509,6 +1597,7 @@ class PedidosController extends Controller
         $pedido->id_periodo             = $request->periodo;
         $pedido->id_asesor              = $request->id_asesor; //asesor/vendedor
         $pedido->id_responsable         = $request->id_asesor;
+        $pedido->observacion            = $request->observacion;
         $pedido->id_usuario_verif       = 0; //$request->id_usuario_verif; //facturador se guarda al generar el pedido
         $pedido->tipo                   = 1;
         $pedido->save();
@@ -1517,7 +1606,7 @@ class PedidosController extends Controller
     //api:post//guardarContratoBdMilton
     public function guardarContratoBdMilton(Request $request){
         //variables
-        $fecha_formato = date('Y-m-d');
+        $fecha_formato      = date('Y-m-d');
         $codigo_ven         = $request->contrato_generado;
         $verificador        = $request->cod_usuario_verif;
         $iniciales          = $request->iniciales;
@@ -1526,34 +1615,81 @@ class PedidosController extends Controller
         $region_idregion    = $request->region_idregion;
         $descuento          = $request->descuento;
         $cedulaAsesor       = $request->cedula;
+        $id_responsable     = $request->id_responsable;
+        $institucion        = $request->id_institucion;
+        $asesor_id          = $request->id_asesor;
+        $asesor             = $request->asesor;
+        $temporada          = substr($request->codigo_contrato,0,1);
+        $periodo            = $request->id_periodo;
+        $ciudad             = $request->nombre_ciudad;
+        $nombreInstitucion  = $request->nombreInstitucion;
         //fin variables
-        //condiciones
-        // $observacion = null;
-        // if($request->observacion == null || $request->observacion == "" || $request->observacion == "null"){
-        //     $observacion        = null;
-        // }else{
-        //     $observacion        = $request->observacion;
-        // }
-        // $setAnticipo = 0;
-        // if($request->anticipo == null || $request->anticipo == ""){
-        //     $setAnticipo = 0;
-        // }else{
-        //     $setAnticipo = $request->anticipo;
-        // }
-        // $setNumCuenta = 0;
-        // if($request->num_cuenta == null || $request->num_cuenta == "" || $request->num_cuenta == "null"){
-        //     $setNumCuenta = 0;
-        // }else{
-        //     $setNumCuenta = $request->num_cuenta;
-        // }
-        // //obtener el cli inst codigo
-        // $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
-        // WHERE `id_asesor` = ? AND `id_institucion` = ?
-        // AND `id_docente` = ?",
-        // [$iniciales, $request->codigo_institucion_milton, $cedulaAsesor]);
-        // if(empty($cli_ins_cod)){
-        //     return ["status" => "0","message" => "No existe el ins cliente codigo"];
-        // }
+        $observacion = null;
+        if($request->observacion == null || $request->observacion == "" || $request->observacion == "null"){
+            $observacion        = null;
+        }else{
+            $observacion        = $request->observacion;
+        }
+        $setAnticipo = 0;
+        if($request->anticipo_aprobado == null || $request->anticipo_aprobado == ""){
+            $setAnticipo = 0;
+        }else{
+            $setAnticipo = $request->anticipo_aprobado;
+        }
+        $setNumCuenta = 0;
+        if($request->num_cuenta == null || $request->num_cuenta == "" || $request->num_cuenta == "null"){
+            $setNumCuenta = 0;
+        }else{
+            $setNumCuenta = $request->num_cuenta;
+        }
+        //OBTENER EL DOCENTE
+        $docente = DB::SELECT("SELECT u.cedula,  CONCAT(u.nombres, ' ', u.apellidos) AS docente FROM  usuario u WHERE `idusuario` = ?", [$id_responsable]);
+        $nombreDocente      = $docente[0]->docente;
+        $cedulaDocente      = $docente[0]->cedula;
+        //cli ins codigo
+        $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
+        WHERE `id_asesor` = ? AND `id_institucion` = ?
+        AND `id_docente` = ?", [$iniciales,
+        $request->codigo_institucion_milton, $docente[0]->cedula]);
+        if(empty($cli_ins_cod)){
+            return ["status" => "0","message" => "No existe el ins cliente codigo"];
+        }
+        if (strlen($observacion) > 500) {
+            $cadenaRecortada = substr($observacion, 0, 500); // Recorta la cadena a 500 caracteres
+        } else {
+            $cadenaRecortada = $observacion; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
+        }
+        //GUARDAR VENTA
+        $form_data = [
+            'veN_CODIGO'            => $codigo_ven, //codigo formato milton
+            'usU_CODIGO'            => strval($verificador),
+            'veN_D_CODIGO'          => $iniciales, // codigo del asesor
+            'clI_INS_CODIGO'        => floatval($cli_ins_cod[0]->cli_ins_codigo),
+            'tiP_veN_CODIGO'        => intval($tipo_venta),
+            'esT_veN_CODIGO'        => 2, // por defecto
+            'veN_OBSERVACION'       => $cadenaRecortada,
+            'veN_VALOR'             => floatval($total_venta),
+            'veN_PAGADO'            => 0.00, // por defecto
+            'veN_ANTICIPO'          => floatval($setAnticipo),
+            'veN_DESCUENTO'         => floatval($descuento),
+            'veN_FECHA'             => $fecha_formato,
+            'veN_CONVERTIDO'        => '', // por defecto
+            'veN_TRANSPORTE'        => 0.00, // por defecto
+            'veN_ESTADO_TRANSPORTE' => false, // por defecto
+            'veN_FIRMADO'           => 'DS', // por defecto
+            'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
+            'cueN_NUMERO'           => strval($setNumCuenta)
+        ];
+        // return $form_data;
+        //guardar en la tabla de temporadas
+        $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
+        try {
+            $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $json_contrato = json_decode($contrato, true);
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+
         //DETALLE DE VENTA
         $detalleVenta = $this->get_val_pedidoInfo($request->id_pedido);
         //Si no hay nada en detalle de venta
@@ -1574,31 +1710,9 @@ class PedidosController extends Controller
                 "DET_VEN_CANTIDAD_REAL" => intval($detalleVenta[$i]["valor"]),
             ];
             $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleVenta);
-           $json_detalle = json_decode($detalle, true);
+        $json_detalle = json_decode($detalle, true);
         }
-        //fin condiciones
-        // $form_data = [
-        //     'veN_CODIGO'            => $codigo_ven, //codigo formato milton
-        //     'usU_CODIGO'            => strval($verificador),
-        //     'veN_D_CODIGO'          => $iniciales, // codigo del asesor
-        //     'clI_INS_CODIGO'        => floatval($cli_ins_cod[0]->cli_ins_codigo),
-        //     'tiP_veN_CODIGO'        => intval($tipo_venta),
-        //     'esT_veN_CODIGO'        => 2, // por defecto
-        //     'veN_OBSERVACION'       => $observacion,
-        //     'veN_VALOR'             => floatval($total_venta),
-        //     'veN_PAGADO'            => 0.00, // por defecto
-        //     'veN_ANTICIPO'          => floatval($setAnticipo),
-        //     'veN_DESCUENTO'         => floatval($descuento),
-        //     'veN_FECHA'             => $fecha_formato,
-        //     'veN_CONVERTIDO'        => '', // por defecto
-        //     'veN_TRANSPORTE'        => 0.00, // por defecto
-        //     'veN_ESTADO_TRANSPORTE' => false, // por defecto
-        //     'veN_FIRMADO'           => 'DS', // por defecto
-        //     'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
-        //     'cueN_NUMERO'           => strval($setNumCuenta)
-        // ];
-        // $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
-        // $json_contrato = json_decode($contrato, true);
+        return $json_contrato;
         // //actualizar en pedidos que envio a la bd de milton
         // DB::UPDATE("UPDATE pedidos SET enviarMilton = '1' WHERE id_pedido = '$request->id_pedido' ");
         // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
@@ -1712,7 +1826,6 @@ class PedidosController extends Controller
             'veN_ESTADO_TRANSPORTE' => false, // por defecto
             'veN_FIRMADO' => 'DS', // por defecto
             'veN_TEMPORADA' => $pedido[0]->region_idregion == 1 ? 0 :1 ,
-            //'veN_TEMPORADA' => $pedido[0]->id_pedido,
             'cueN_NUMERO' => strval($setNumCuenta)
         ];
         //guardar en la tabla de temporadas
@@ -1723,8 +1836,6 @@ class PedidosController extends Controller
          } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
-        // $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
-        // $json_contrato = json_decode($contrato, true);
          //GUARDAR DETALLE DE VENTA
         //DETALLE DE VENTA
         $detalleVenta = $this->get_val_pedidoInfo($id_pedido);
@@ -1770,7 +1881,27 @@ class PedidosController extends Controller
         //ACTUALIZAR EN EL HISTORICO
         $queryHistorico = "UPDATE `pedidos_historico` SET `fecha_generar_contrato` = '$fechaActual', `estado` = '2' WHERE `id_pedido` = $id_pedido;";
         DB::UPDATE($queryHistorico);
+        //ASIGNAR A TABLA CONVENIO HIJOS
+        $getConvenio = $this->asignarToConvenio($institucion,$id_pedido,$codigo_ven);
         return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
+    }
+    public function asignarToConvenio($institucion,$id_pedido,$contrato){
+        $getConvenio = $this->getConvenioInstitucion($institucion);
+        if(!empty($getConvenio)){
+            $idConvenio = $getConvenio[0]->id;
+            //validate que el contrato hijo convenio no este creado
+            $query = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
+            WHERE cd.id_pedido = '$id_pedido'");
+            if(empty($query)){
+                $hijoConvenio = new PedidoConvenioDetalle();
+                $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
+                $hijoConvenio->id_pedido                    = $id_pedido;
+                $hijoConvenio->contrato                     = $contrato;
+                $hijoConvenio->institucion_id               = $institucion;
+                $hijoConvenio->save();
+            }
+        }
+
     }
     public function guardarContratoTemporada($contrato,$institucion,$asesor_id,$temporadas,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion){
         //validar que el contrato no existe
@@ -1983,29 +2114,404 @@ class PedidosController extends Controller
     //pedidos gerencia
     public function listaPedidosGerencia()
     {
+        // $query = '
+        // [
+        //     {
+        //     "pedido_id": 381,
+        //     "ifagregado_anticipo_aprobado": 0,
+        //     "id": 100,
+        //     "periodo_id": 23,
+        //     "id_pedido": 381,
+        //     "estado": 0,
+        //     "fecha_creacion_pedido": "2023-07-04 20:57:59",
+        //     "fecha_generar_contrato": null,
+        //     "fecha_aprobacion_anticipo_gerencia": null,
+        //     "fecha_rechazo_gerencia": null,
+        //     "fecha_contabilidad_recibe": null,
+        //     "fecha_contabilidad_sube_cheque_sin_firmar": null,
+        //     "fecha_subir_cheque": null,
+        //     "fecha_facturador_recibe_cheque": null,
+        //     "fecha_envio_cheque_for_asesor": null,
+        //     "fecha_orden_firmada": null,
+        //     "fecha_que_recibe_orden_firmada": null,
+        //     "fecha_que_recibe_orden_firmada_contabilidad": null,
+        //     "tipo_pago": 0,
+        //     "evidencia_cheque_sin_firmar": null,
+        //     "evidencia_cheque": null,
+        //     "evidencia_pagare": null,
+        //     "contador_anticipo": 0,
+        //     "contador_liquidacion": 0,
+        //     "created_at": "2023-07-04 23:53:23",
+        //     "updated_at": "2023-07-04 23:53:23",
+        //     "idusuario": 4533,
+        //     "nombres": "DAVID MAURICIO",
+        //     "apellidos": "CALDERON ALBA",
+        //     "anticipo_aprobado": 0,
+        //     "pendiente_liquidar": 5917.29,
+        //     "anticipo_solicitud_for_gerencia": null,
+        //     "anticipo_solicitud_observacion": null,
+        //     "anticipo_aprobado_gerencia": null,
+        //     "nombreInstitucion": "UNIDAD EDUCATIVA CRISTIANO EMANUEL (AMBATO)",
+        //     "nombre_ciudad": "Ambato",
+        //     "fechaCreacionPedido": "2023-07-04 20:57:59",
+        //     "anticipo_sugerido": 2958.64,
+        //     "convenio_anios": null,
+        //     "observacion": "la isntitucion solicita 3000 dólares de anticipo \r\nRealizar combos de la 4 areas mas una novela que va de obsequio para cada grado \r\nColocar los combos en la librería Copymanias\r\n2= 4 areas + Amanecer aen la mitad del mundo \r\n3 =4 áreas + Donde nos lleve el mar \r\n4 =4  áreas + Un corte de pelo para un hombre lobo \r\n5 =4 áreas + Seres fantásticos del Ecuador \r\n6 = 4 áreas +Nuestras Raíces \r\n7 =4 áreas +Cuentos de l selva \r\n8 = 4 áreas +Donia Queja \r\n9 =4 áreas + La Iliada \r\n10 =4 aras +La Metamorfosis",
+        //     "periodo": "Sierra 2023",
+        //     "total_venta": 22758.8,
+        //     "total_series_basicas": null,
+        //     "descuento": 40,
+        //     "codigo_institucion_milton": "14081",
+        //     "valoresAnteriores": [
+        //     {
+        //     "cliInsCodigo": 37835,
+        //     "venDCodigo": "DC",
+        //     "insCodigo": 14081,
+        //     "insNombre": "EMANUEL (Ambato)",
+        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
+        //     "ciuCodigo": 68,
+        //     "venDCi": "1716118011",
+        //     "venDNombres": "DAVID CALDERON",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 1320.8,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-S20-0000028-DC",
+        //     "venConvertido": "",
+        //     "docCi": "LIQ",
+        //     "docNumero": "436707",
+        //     "docValor": 528.32,
+        //     "ciuNombre": "Ambato",
+        //     "periodo": "S20"
+        //     },
+        //     {
+        //     "cliInsCodigo": 37835,
+        //     "venDCodigo": "DC",
+        //     "insCodigo": 14081,
+        //     "insNombre": "EMANUEL (Ambato)",
+        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
+        //     "ciuCodigo": 68,
+        //     "venDCi": "1716118011",
+        //     "venDNombres": "DAVID CALDERON",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 5425.9,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-S21-0000013-DC",
+        //     "venConvertido": "",
+        //     "docCi": "LIQ",
+        //     "docNumero": "821437",
+        //     "docValor": 2170.36,
+        //     "ciuNombre": "Ambato",
+        //     "periodo": "S21"
+        //     },
+        //     {
+        //     "cliInsCodigo": 38168,
+        //     "venDCodigo": "DC",
+        //     "insCodigo": 14081,
+        //     "insNombre": "EMANUEL (Ambato)",
+        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
+        //     "ciuCodigo": 68,
+        //     "venDCi": "1716118011",
+        //     "venDNombres": "DAVID CALDERON",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 20291.2,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-S22-0000007-DC",
+        //     "venConvertido": "",
+        //     "docCi": "ANT",
+        //     "docNumero": "CH 7497; E 55432",
+        //     "docValor": 3000,
+        //     "ciuNombre": "Ambato",
+        //     "periodo": "S22"
+        //     },
+        //     {
+        //     "cliInsCodigo": 38168,
+        //     "venDCodigo": "DC",
+        //     "insCodigo": 14081,
+        //     "insNombre": "EMANUEL (Ambato)",
+        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
+        //     "ciuCodigo": 68,
+        //     "venDCi": "1716118011",
+        //     "venDNombres": "DAVID CALDERON",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 20291.2,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-S22-0000007-DC",
+        //     "venConvertido": "",
+        //     "docCi": "LIQ",
+        //     "docNumero": "textos hijos de los docentes",
+        //     "docValor": 105.16,
+        //     "ciuNombre": "Ambato",
+        //     "periodo": "S22"
+        //     },
+        //     {
+        //     "cliInsCodigo": 38168,
+        //     "venDCodigo": "DC",
+        //     "insCodigo": 14081,
+        //     "insNombre": "EMANUEL (Ambato)",
+        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
+        //     "ciuCodigo": 68,
+        //     "venDCi": "1716118011",
+        //     "venDNombres": "DAVID CALDERON",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 20291.2,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-S22-0000007-DC",
+        //     "venConvertido": "",
+        //     "docCi": "LIQ",
+        //     "docNumero": "CH 14070; EG 56772; FACT 3",
+        //     "docValor": 5011.32,
+        //     "ciuNombre": "Ambato",
+        //     "periodo": "S22"
+        //     }
+        //     ]
+        //     },
+        //     {
+        //     "pedido_id": 8,
+        //     "ifagregado_anticipo_aprobado": 2,
+        //     "id": 50,
+        //     "periodo_id": 22,
+        //     "id_pedido": 8,
+        //     "estado": 1,
+        //     "fecha_creacion_pedido": "2023-02-13 16:59:53",
+        //     "fecha_generar_contrato": null,
+        //     "fecha_aprobacion_anticipo_gerencia": "2023-04-03 16:55:48",
+        //     "fecha_rechazo_gerencia": null,
+        //     "fecha_contabilidad_recibe": null,
+        //     "fecha_contabilidad_sube_cheque_sin_firmar": null,
+        //     "fecha_subir_cheque": null,
+        //     "fecha_facturador_recibe_cheque": null,
+        //     "fecha_envio_cheque_for_asesor": null,
+        //     "fecha_orden_firmada": null,
+        //     "fecha_que_recibe_orden_firmada": null,
+        //     "fecha_que_recibe_orden_firmada_contabilidad": null,
+        //     "tipo_pago": 0,
+        //     "evidencia_cheque_sin_firmar": null,
+        //     "evidencia_cheque": null,
+        //     "evidencia_pagare": null,
+        //     "contador_anticipo": 0,
+        //     "contador_liquidacion": 0,
+        //     "created_at": "2023-04-03 16:54:57",
+        //     "updated_at": "2023-04-03 16:54:57",
+        //     "idusuario": 26087,
+        //     "nombres": "Luis",
+        //     "apellidos": "Jarrin",
+        //     "anticipo_aprobado": 0,
+        //     "pendiente_liquidar": 134.93,
+        //     "anticipo_solicitud_for_gerencia": 300,
+        //     "anticipo_solicitud_observacion": "pruebas",
+        //     "anticipo_aprobado_gerencia": null,
+        //     "nombreInstitucion": "PEQUEÑOS ADORADORES DE JESUS",
+        //     "nombre_ciudad": "Guayaquil",
+        //     "fechaCreacionPedido": "2023-02-13 16:59:53",
+        //     "anticipo_sugerido": 204.75,
+        //     "convenio_anios": null,
+        //     "observacion": null,
+        //     "periodo": "Costa 2023",
+        //     "total_venta": 3915,
+        //     "total_series_basicas": null,
+        //     "descuento": 40,
+        //     "codigo_institucion_milton": "14297",
+        //     "valoresAnteriores": [
+        //     {
+        //     "cliInsCodigo": 37563,
+        //     "venDCodigo": "LJ",
+        //     "insCodigo": 14297,
+        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
+        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
+        //     "ciuCodigo": 27,
+        //     "venDCi": "0915171920",
+        //     "venDNombres": "LUIS JARRIN",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 0,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-C20-0000016-LJ",
+        //     "venConvertido": "",
+        //     "docCi": "ANT",
+        //     "docNumero": "CH 12738",
+        //     "docValor": 500,
+        //     "ciuNombre": "Guayaquil",
+        //     "periodo": "C20"
+        //     },
+        //     {
+        //     "cliInsCodigo": 37563,
+        //     "venDCodigo": "LJ",
+        //     "insCodigo": 14297,
+        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
+        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
+        //     "ciuCodigo": 27,
+        //     "venDCi": "0915171920",
+        //     "venDNombres": "LUIS JARRIN",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 0,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-C20-0000016-LJ",
+        //     "venConvertido": "",
+        //     "docCi": "LIQ",
+        //     "docNumero": "deuda pasa TC21",
+        //     "docValor": -500,
+        //     "ciuNombre": "Guayaquil",
+        //     "periodo": "C20"
+        //     },
+        //     {
+        //     "cliInsCodigo": 37563,
+        //     "venDCodigo": "LJ",
+        //     "insCodigo": 14297,
+        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
+        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
+        //     "ciuCodigo": 27,
+        //     "venDCi": "0915171920",
+        //     "venDNombres": "LUIS JARRIN",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 0,
+        //     "venDescuento": 40,
+        //     "venCodigo": "C-C21-0000020-LJ",
+        //     "venConvertido": "",
+        //     "docCi": "ANT",
+        //     "docNumero": "deuda TC21; pasa a TC22 (BMC)",
+        //     "docValor": 500,
+        //     "ciuNombre": "Guayaquil",
+        //     "periodo": "C21"
+        //     },
+        //     {
+        //     "cliInsCodigo": 37563,
+        //     "venDCodigo": "LJ",
+        //     "insCodigo": 14297,
+        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
+        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
+        //     "ciuCodigo": 27,
+        //     "venDCi": "0915171920",
+        //     "venDNombres": "LUIS JARRIN",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 644.1,
+        //     "venDescuento": 35,
+        //     "venCodigo": "C-C22-0000021-BMC",
+        //     "venConvertido": "",
+        //     "docCi": "ANT",
+        //     "docNumero": "Deuda TC21",
+        //     "docValor": 500,
+        //     "ciuNombre": "Guayaquil",
+        //     "periodo": "C22"
+        //     },
+        //     {
+        //     "cliInsCodigo": 37563,
+        //     "venDCodigo": "LJ",
+        //     "insCodigo": 14297,
+        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
+        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
+        //     "ciuCodigo": 27,
+        //     "venDCi": "0915171920",
+        //     "venDNombres": "LUIS JARRIN",
+        //     "estVenCodigo": 4,
+        //     "venComPorcentaje": 0,
+        //     "venValor": 644.1,
+        //     "venDescuento": 35,
+        //     "venCodigo": "C-C22-0000021-BMC",
+        //     "venConvertido": "",
+        //     "docCi": "LIQ",
+        //     "docNumero": "DEUDA PASA TC23 (LUIS JARRIN) ",
+        //     "docValor": -274.66,
+        //     "ciuNombre": "Guayaquil",
+        //     "periodo": "C22"
+        //     }
+        //     ]
+        //     }
+        //     ]
+        // ';
+        //return json_decode($query,true);
         $dato = DB::SELECT("SELECT p.id_pedido as pedido_id,
-            p.ifagregado_anticipo_aprobado,phi.*,
-            u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
-            p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
-            p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
-            p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
-            p.convenio_anios,p.observacion,pe.periodoescolar as periodo
-            FROM pedidos p
-            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-            LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
-            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-            WHERE (p.ifagregado_anticipo_aprobado = '0' OR p.ifagregado_anticipo_aprobado = '2' )
-            AND ifanticipo = '1'
-            AND pe.estado = '1'
-            AND p.anticipo > 0
-            AND p.estado = '1'
-            AND p.facturacion_vee = '1'
-            AND pe.pedido_gerencia = '1'
-            ORDER BY p.fecha_creacion_pedido DESC
-        ");
-        return $dato;
+        p.ifagregado_anticipo_aprobado,phi.*,
+        u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
+        p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
+        p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
+        p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
+        p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
+        p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton,
+        p.contrato_generado
+        FROM pedidos p
+        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
+        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        WHERE (p.ifagregado_anticipo_aprobado = '0' OR p.ifagregado_anticipo_aprobado = '2' )
+        AND ifanticipo = '1'
+        AND pe.estado = '1'
+        AND p.anticipo > 0
+        AND p.estado = '1'
+        AND p.facturacion_vee = '1'
+        AND pe.pedido_gerencia = '1'
+        ORDER BY p.fecha_creacion_pedido DESC
+    ");
+    $datos = [];
+    try {
+        foreach($dato as $key => $item){
+            //traer valores anteriores
+            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton); 
+            $JsonDocumentos = json_decode($dato, true);
+            $datos[$key] =[
+                "pedido_id"                         => $item->pedido_id,
+                "ifagregado_anticipo_aprobado"      => $item->ifagregado_anticipo_aprobado,
+                "id"                                => $item->id,
+                "periodo_id"                        => $item->periodo_id,
+                "id_pedido"                         => $item->id_pedido,
+                "estado"                            => $item->estado,
+                "fecha_creacion_pedido"             => $item->fecha_creacion_pedido,
+                "fecha_generar_contrato"            => $item->fecha_generar_contrato,
+                "fecha_aprobacion_anticipo_gerencia" => $item->fecha_aprobacion_anticipo_gerencia,
+                "fecha_rechazo_gerencia"            => $item->fecha_rechazo_gerencia,
+                "fecha_contabilidad_recibe"         => $item->fecha_contabilidad_recibe,
+                "fecha_contabilidad_sube_cheque_sin_firmar" => $item->fecha_contabilidad_sube_cheque_sin_firmar,
+                "fecha_subir_cheque"                => $item->fecha_subir_cheque,
+                "fecha_facturador_recibe_cheque"    => $item->fecha_facturador_recibe_cheque,
+                "fecha_envio_cheque_for_asesor"     => $item->fecha_envio_cheque_for_asesor,
+                "fecha_orden_firmada" =>            $item->fecha_orden_firmada,
+                "fecha_que_recibe_orden_firmada"    => $item->fecha_que_recibe_orden_firmada,
+                "fecha_que_recibe_orden_firmada_contabilidad" => $item->fecha_que_recibe_orden_firmada_contabilidad,
+                "tipo_pago"                         => $item->tipo_pago,
+                "evidencia_cheque_sin_firmar"       => $item->evidencia_cheque_sin_firmar,
+                "evidencia_cheque"                  => $item->evidencia_cheque,
+                "evidencia_pagare"                  => $item->evidencia_pagare,
+                "contador_anticipo"                 => $item->contador_anticipo,
+                "contador_liquidacion" =>           $item->contador_liquidacion,
+                "created_at"                        =>  $item->created_at,
+                "updated_at"                        =>  $item->updated_at,
+                "idusuario"                         => $item->idusuario,
+                "nombres"                           => $item->nombres,
+                "apellidos"                         => $item->apellidos,
+                "anticipo_aprobado"                 => $item->anticipo_aprobado,
+                "pendiente_liquidar"                => $item->pendiente_liquidar,
+                "anticipo_solicitud_for_gerencia"   => $item->anticipo_solicitud_for_gerencia,
+                "anticipo_solicitud_observacion"    => $item->anticipo_solicitud_observacion,
+                "anticipo_aprobado_gerencia"        => $item->anticipo_aprobado_gerencia,
+                "nombreInstitucion"                 => $item->nombreInstitucion,
+                "nombre_ciudad"                     => $item->nombre_ciudad,
+                "fechaCreacionPedido"               => $item->fechaCreacionPedido,
+                "anticipo_sugerido"                 => $item->anticipo_sugerido,
+                "convenio_anios"                    => $item->convenio_anios,
+                "observacion"                       => $item->observacion,
+                "periodo"                           => $item->periodo,
+                "total_venta"                       => $item->total_venta,
+                "total_series_basicas"              => $item->total_series_basicas,
+                "descuento"                         => $item->descuento,
+                "codigo_institucion_milton"         => $item->codigo_institucion_milton,
+                "contrato_generado"                 => $item->contrato_generado,
+                "valoresAnteriores"                 => $JsonDocumentos
+            ];
+        }
+        return $datos;
+    } catch (\Exception  $ex) {
+    return ["status" => "0","message" => "Hubo problemas con la conexión al servidor de facturación"];
+    } 
+  
     }
     public function listaPedidosPeriodos($id)
     {
@@ -2059,6 +2565,17 @@ class PedidosController extends Controller
                 'anticipo_aprobado_gerencia'   => $datos->cantidadAprobar,
                 'anticipo_aprobado'            => $datos->cantidadAprobar
             ]);
+            //si tiene contrato guardo en facturacion
+            //actualizar anticipo facturacion 
+            $contrato = $datos->contrato_generado;
+            if($contrato == null || $contrato  == "null" || $contrato == ""){
+            }else{
+                $form_data = [ 
+                    'venAnticipo'   => floatval($datos->cantidadAprobar), 
+                ]; 
+                $dato = Http::post("http://186.46.24.108:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data); 
+                $prueba_get = json_decode($dato, true);
+            }
             //HISTORICO
            return $this->aprobarAnticipo($datos->pedido_id);
             return 'Pedido aprobado';
@@ -2143,10 +2660,10 @@ class PedidosController extends Controller
     //api:get/getContratosPedidos
     public function getContratosPedidos(Request $request){
         $query = DB::SELECT("SELECT p.*,
-        CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula, u.iniciales,
+        CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula, u.iniciales,
         CONCAT(uv.nombres,' ',uv.apellidos) as verificador, uv.cod_usuario,
         i.nombreInstitucion,i.codigo_institucion_milton,
-        pe.region_idregion, c.nombre AS nombre_ciudad
+        pe.region_idregion, c.nombre AS nombre_ciudad,pe.codigo_contrato
         FROM pedidos p
         LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
         LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
@@ -2518,6 +3035,7 @@ class PedidosController extends Controller
                 WHERE p.contrato_generado = '$item->contrato'
                 ");
                 if(empty($pedido)){
+                    $verificaciones =  $this->getVerificaciones($item->contrato);
                     $datosContratos[$contador] = [
                         "VEN_VALOR"         => $item->VEN_VALOR,
                         "ven_neta"          => $item->ven_neta,
@@ -2528,8 +3046,11 @@ class PedidosController extends Controller
                         "venFecha"          => $item->venFecha,
                         //prolipa
                         "id_pedido"         => null,
+                        "verificaciones"    => sizeOf($verificaciones),
+                        "estado_verificacion"=> 0,
                     ];
                 }else{
+                    $verificaciones = $this->getVerificaciones($pedido[0]->contrato_generado);
                     $datosContratos[$contador] = [
                         "VEN_VALOR"         => $item->VEN_VALOR,
                         "ven_neta"          => $item->ven_neta,
@@ -2543,7 +3064,9 @@ class PedidosController extends Controller
                         "contrato_generado" => $pedido[0]->contrato_generado,
                         "tipo_venta"        => $pedido[0]->tipo_venta,
                         "estado"            => $pedido[0]->estado,
+                        "estado_verificacion"=> $pedido[0]->estado_verificacion,
                         "historicoEstado"   => $pedido[0]->historicoEstado,
+                        "verificaciones"    => sizeOf($verificaciones)
                     ];
                 }
                 $contador++;
@@ -2555,6 +3078,14 @@ class PedidosController extends Controller
             } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
+    }
+    public function getVerificaciones($contrato){
+        $query = DB::SELECT("SELECT * FROM verificaciones 
+            WHERE contrato =  '$contrato'
+            and nuevo = '1'
+            and estado = '0'
+        ");
+        return $query;
     }
     //api:Get/detalleContratoFacturacion
     public function detalleContratoFacturacion(Request $request){
@@ -2626,7 +3157,9 @@ class PedidosController extends Controller
     //ver las notificaciones
     //api:get>>/verNotificacionPedidos
     public function verNotificacionPedidos(Request $request){
-        $datos=[];
+       $datos=[];
+       $fecha       = date("Y-m-d");
+       $Resta30dias = date("Y-m-d",strtotime($fecha."- 30 days")); 
        //obtener los ids de los pedidos
        $queryids = DB::SELECT("SELECT   pc.id_pedido,p.id_asesor,
        i.nombreInstitucion, c.nombre AS ciudad,
@@ -2638,6 +3171,7 @@ class PedidosController extends Controller
        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
        LEFT JOIN usuario ase ON p.id_asesor = ase.idusuario
        WHERE pe.estado = '1' 
+       AND pc.created_at > '$Resta30dias'
        ORDER BY pc.created_at DESC      
        ");
        $seTearArray = [];
@@ -2746,10 +3280,128 @@ class PedidosController extends Controller
         }
         
     }
+    //api:post/AceptarAlcance
+    public function AceptarAlcance(Request $request){
+        $contrato       = $request->contrato;
+        $id_pedido      = $request->id_pedido;
+        $id_alcance     = $request->id_alcance;
+        $ventaBruta     = $request->ventaBruta;
+        $user_created   = $request->user_created;
+        //validar que el pedido alcance este abierto
+        $validateAbierto     = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id = '$id_alcance' AND pa.estado_alcance = '0'");
+        if(empty($validateAbierto)){
+            return ["status" => "0", "message" => "El alcance no se encuentra activo"];
+        }
+        //validar que no haya verificaciones
+        $validateVerificacion = DB::SELECT("SELECT * FROM verificaciones v WHERE v.contrato = '$contrato'
+        ");
+        if(count($validateVerificacion) > 0){
+            return ["status" => "0", "message" => "Ya existe verificaciones no se puede aprobar el alcance"];
+        }
+        try {
+            //BUSCAR EL CONTRATO SI EXISTE
+            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato); 
+            $JsonContrato = json_decode($dato, true);
+            if($JsonContrato == "" || $JsonContrato == null){
+                return ["status" => "0", "message" => "No existe el contrato en facturación"];
+            }
+            $convertido             = "";
+            $convertido             = $JsonContrato["veN_CONVERTIDO"];
+            if($convertido == null || $convertido == ""){
+                $convertido          = "";
+            }
+            $estado                 = $JsonContrato["esT_VEN_CODIGO"];
+            if($estado != 3 && !str_starts_with($convertido , 'C')){
+                //===PROCESO======
+                //ACTUALIZAR DETALLE DE VENTA
+                $nuevoIngreso       = $this->get_val_pedidoInfo_alcance($id_pedido,$id_alcance);
+                if(!empty($nuevoIngreso)){
+                    foreach($nuevoIngreso as $key => $item){
+                        $proCodigo      = $item["codigo_liquidacion"];
+                        $cantidad       = $item["valor"];
+                        $precio         = $item["precio"];
+                        $form_data      = [];
+                        //consultar si hay codigo registrado en el contrato en el detalle de venta
+                        $responseBook   = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$contrato."&pro_codigo=".$proCodigo);
+                        $JsonLibro      = json_decode($responseBook, true);
+                        //si no  existe : creo
+                        if(sizeOf($JsonLibro["detalle_venta"]) == 0){
+                            $form_data = [
+                                "venCodigo"             => $contrato,
+                                "proCodigo"             => $proCodigo,
+                                "detVenCantidad"        => intval($cantidad),
+                                "detVenValorU"          => floatval($precio),
+                                "detVenIva"             => 0,
+                                "detVenDescontar"       => false,
+                                "detVenInicio"          => false,
+                                "detVenCantidadReal"    => intval($cantidad),
+                            ];
+                            $saveLibros     = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/CreateOrUpdateDetalleVenta',$form_data);
+                            $JsonLibroSave  = json_decode($saveLibros, true);
+                            //GUARDAR EN EL HISTORICO ALCANCE LIBROS
+                            $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,0,$cantidad,$user_created,1);
+                        }
+                        //no existe : actualizo
+                        else{
+                            $cantidadAnterior = $JsonLibro["detalle_venta"][0]["detVenCantidad"];
+                            //sumo la cantidad anterior + la nueva
+                            $resultadoLibro = intvaL($cantidadAnterior) + intval($cantidad);
+                            $form_data = [
+                                'detVenCantidad'        => intval($resultadoLibro),
+                                'detVenCantidadReal'    => intval($resultadoLibro),
+                            ];
+                            $updateLibros = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/UpdateDetallveVenta?venCodigo='.$contrato.'&proCodigo='.$proCodigo, $form_data);
+                            $json_saveLibros = json_decode($updateLibros, true);
+                            //GUARDAR EN EL HISTORICO ALCANCE LIBROS
+                            $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidadAnterior,$resultadoLibro,$user_created,1);
+                        }
+                    }  
+                    ////////=========
+                    ///============PROCESO  DE GUARDADO TABLA VENTA====
+                    //GUARDAR NUEVO VEN_VALOR VENTA
+                    $cantidad_anterior  = $JsonContrato["veN_VALOR"];
+                    $nueva_cantidad     = floatval($cantidad_anterior) + floatval($ventaBruta);
+                    $datos = [ 
+                        "venValor"        => floatval($nueva_cantidad)
+                    ];
+                    $saveValor          = Http::post('http://186.46.24.108:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
+                    //GUARDAR EN EL HISTORICO ALCANCE VEN_VALOR
+                    $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,0);
+                    //CERRAR ALCANCE
+                    $alcance = PedidoAlcance::findOrFail($id_alcance);
+                    $alcance->estado_alcance = 1;
+                    $alcance->save();
+                    return $alcance;
+                }else{
+                    return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
+                }
+             
+            }else{
+                return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
+            }
+            
+        } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        } 
+    }
+    public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
+        if(empty($query)){
+            $historico                      = new PedidoAlcanceHistorico();
+            $historico->contrato            = $contrato;
+            $historico->id_pedido           = $id_pedido;
+            $historico->alcance_id          = $id_alcance;
+            $historico->cantidad_anterior   = $cantidad_anterior;
+            $historico->nueva_cantidad      = $nueva_cantidad;
+            $historico->user_created        = $user_created;
+            $historico->tipo                = $tipo;
+            $historico->save();
+        }
+    }
     //listar alcaces pedido
     //api:get/>getAlcancePedido
     public function getAlcancePedido(Request $request){
-        $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad
+        $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad,
+        p.contrato_generado
         FROM pedidos_alcance pa
         LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -3410,10 +4062,16 @@ class PedidosController extends Controller
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
             WHERE contrato_generado = '$request->contrato'
         ");
-       
         if(count($validate) > 0){
             return ["status" => "0","message" => "El contrato ya existe en prolipa"];
         }
+        $validate2 = DB::SELECT("SELECT p.*, CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+            u.cedula,i.nombreInstitucion
+            FROM pedidos p 
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            WHERE id_pedido = '$request->id_pedido'
+        ");
         //obtener que tenga beneficiarios
         $query3 = DB::SELECT("SELECT  b.*,
           CONCAT(u.nombres, ' ', u.apellidos) AS docente,
@@ -3438,9 +4096,9 @@ class PedidosController extends Controller
         $usuario_fact       = 64394;
         $fechaContrato      = $request->fechaContrato;
         $fecha_Gerencia     = $request->fecha_Gerencia;
-        $asesor             = $validate[0]->asesor;
-        $nombreInstitucion  = $validate[0]->nombreInstitucion;
-        $cedulaAsesor       = $validate[0]->cedula;
+        $asesor             = $validate2[0]->asesor;
+        $nombreInstitucion  = $validate2[0]->nombreInstitucion;
+        $cedulaAsesor       = $validate2[0]->cedula;
         $nombreDocente      = $query3[0]->docente; 
         $cedulaDocente      = $query3[0]->cedula; 
         $query = "UPDATE `pedidos` SET `contrato_generado` = '$contrato', `id_usuario_verif` = $usuario_fact,`fecha_generacion_contrato` = '$fechaContrato', `facturacion_vee` = '1' WHERE `id_pedido` = $id_pedido;";
@@ -3584,6 +4242,137 @@ class PedidosController extends Controller
         $date = Carbon::now();   
         $temporada->ultima_fecha            = $date;
         $temporada->save();
+        //actualizar documentos
+        $this->updateDocumentoAnterior($request->id_pedido,1);
         return $pedido->id_responsable;
     }
+    //==APIS DOCUMENTOS ANTERIORES=========
+    //api get/getTraerDocumentoDocente
+    public function getTraerDocumentoDocente($id_pedido){
+        ///validar que el pedido exista y este activo
+        $query = DB::SELECT("SELECT p.*, u.cedula,
+        CONCAT(u.nombres, ' ', u.apellidos) AS docente 
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_responsable = u.idusuario
+        WHERE p.id_pedido = '$id_pedido'
+        AND (p.estado  = '0' OR  p.estado = '1')
+        AND p.contrato_generado IS NULL
+        AND p.imagen IS NULL
+        ");
+        $datos = [];
+        if(sizeOf($query) > 0){
+            //variables
+            $institucion                = $query[0]->id_institucion;
+            $cedulaDocente              = $query[0]->cedula;
+            $docente                    = $query[0]->docente;
+            $query2 = DB::SELECT("SELECT * FROM pedidos_documentos_anteriores pd
+            WHERE pd.institucion_id = '$institucion'
+            AND pd.cedula_docente = '$cedulaDocente'
+            LIMIT 1
+            ");  
+            foreach($query2 as $key => $item){
+                $datos[$key] = [
+                    "id"                => $item->id,
+                    "institucion_id"    => $item->institucion_id,
+                    "doc_cedula"        => $item->doc_cedula,   
+                    "doc_ruc"           => $item->doc_ruc,
+                    "docente"           => $docente,
+                    "cedulaDocente"     => $cedulaDocente
+                ];
+            }
+        }
+        return $datos;
+    }
+    //api:Get/updateDocumentoAnterior/{id_pedido}/{withContrato}
+    public function updateDocumentoAnterior($id_pedido,$withContrato){
+        ///validar que el pedido exista y este activo
+        $query = DB::SELECT("SELECT p.*, u.cedula,
+        CONCAT(u.nombres, ' ', u.apellidos) AS docente 
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_responsable = u.idusuario
+        WHERE p.id_pedido = '$id_pedido'
+        AND p.tipo = '0'
+        AND p.estado = '1'
+        AND p.ifanticipo  = '1'
+        AND p.imagen IS NOT NULL
+        ");
+        if(sizeOf($query) > 0){
+            //variables
+            $institucion                = $query[0]->id_institucion;
+            $cedulaDocente              = $query[0]->cedula;
+            $doc_cedula                 = $query[0]->imagen;     
+            $doc_ruc                    = $query[0]->doc_ruc; 
+            $contrato                   = $query[0]->contrato_generado;
+            //withContrato=> 0 =  guardar sin contrato;  1 = guardarcon contrato
+            //si quiero actualizar los documentos pero envio por parametro sin contrato Entonces valido que no tenga contrato
+            if($withContrato == 0){
+                if($contrato != null || $contrato != ""){
+                    return ["status" => "0", "message" => "El pedido ya tiene contrato"];
+                }
+            }  
+            //validar si existe edito si no guardo
+            $validate = DB::SELECT("SELECT * FROM pedidos_documentos_anteriores pd
+            WHERE pd.institucion_id = '$institucion'
+            -- AND pd.cedula_docente = '$cedulaDocente'
+            ");  
+            if(empty($validate)){
+                //Guardar        
+                $documento              = new PedidoDocumentoAnterior();
+            }
+            else{
+                $id                     = $validate[0]->id;
+                //Editar        
+                $documento              = PedidoDocumentoAnterior::findOrFail($id);
+            }
+            $documento->institucion_id  = $institucion;
+            $documento->cedula_docente  = $cedulaDocente;
+            $documento->doc_cedula      = $doc_cedula;
+            $documento->doc_ruc         = $doc_ruc;
+            $documento->save();
+            if($documento){
+                return ["status" => "1","message" => "Se guardo correctamente"];
+            }else{
+                return ["status" => "0","message" => "Se guardo correctamente"];
+            }
+        }
+        return ["status" => "0","message" => "-"];
+    }
+    //api:post/agregarDocumentosAnteriorPedido
+    public function agregarDocumentosAnteriorPedido(Request $request){
+        $pedido         = Pedidos::find($request->id_pedido);
+        $fileName       = $request->doc_cedula;
+        $fileNameRuc    = $request->doc_ruc;
+        if($pedido->contrato_generado != null || $pedido->contrato_generado != ""){
+            return ["status" => "0", "messsage" => "El pedido ya tiene contrato no se puede actualizar los documentos"];
+        }
+        //CEDULA
+        if($fileName == "null" || $fileName == null || $fileName == 'undefined'){
+            $pedido->imagen             = null;
+        }else{
+            $pedido->imagen             = $fileName;
+        }
+        //RUC
+        if($fileNameRuc == "null" || $fileNameRuc == null || $fileNameRuc == 'undefined'){
+            $pedido->doc_ruc            = null;
+        }else{
+            $pedido->doc_ruc            = $fileNameRuc;
+        }
+        $pedido->save();
+        if($pedido){
+            return ["status" => "1", "messsage" => "Se guardo correctamente"];
+        }else{
+            return ["status" => "0", "messsage" => "No se pudo guardar"];
+        }
+    }
+    //===FIN APIS DOCUMENTOS ANTERIORES====
+    //===CARGAR FORMATO ANTERIORES VALORES=====
+    public function cargarPeriodoFormatoPedidos(){
+        $query = DB::SELECT("SELECT DISTINCT pf.id_periodo, pe.periodoescolar
+        FROM pedidos_formato pf
+        LEFT JOIN periodoescolar pe ON pf.id_periodo = pe.idperiodoescolar
+        ORDER BY pe.periodoescolar
+        ");
+        return $query;
+    }
+    //===FIN CARGAR FORMATO ANTERIORES VALORES===
 }

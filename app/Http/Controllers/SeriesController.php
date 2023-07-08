@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Models\PedidoFormato;
 use Illuminate\Support\Facades\DB;
 use App\Models\Series;
 use App\Models\PedidoSeriesBasicas;
@@ -136,6 +137,61 @@ class SeriesController extends Controller
         }else{
             return ["status" => "1", "message" => "No se pudo guardar"];
         }
+    }
+    //api:post/traspasarFormatoPedidos
+    public function traspasarFormatoPedidos(Request $request){
+        //Transpaso de series basicas 
+        $periodoAnterior    = $request->periodoAnterior;
+        $periodoTranspaso   = $request->periodoTranspaso;
+        $query = DB::SELECT("SELECT * FROM pedidos_series_basicas sb
+        WHERE sb.periodo_id = '$periodoAnterior'
+        ");
+        foreach($query as $key => $item){
+            DB::table('pedidos_series_basicas')
+            ->where('periodo_id', $periodoTranspaso)
+            ->where('id_serie', $item->id_serie)
+            ->update(['serie_basica' => $item->serie_basica]);
+        }
+        //transpaso precios formato
+        $query2 = DB::SELECT("SELECT * FROM pedidos_formato pf
+        WHERE pf.id_periodo = '$periodoAnterior'
+        ");
+        foreach($query2 as $key => $item2){
+            //validate si esta creado lo edito si no creo
+            $validate = DB::SELECT("SELECT * FROM pedidos_formato pf
+                WHERE pf.id_periodo = '$periodoTranspaso'
+                AND pf.id_serie = '$item2->id_serie'
+                AND pf.id_area  = '$item2->id_area'
+                AND pf.id_libro = '$item2->id_libro'
+            ");
+            //CREAR
+            if(empty($validate)){
+                $formato = new PedidoFormato();
+            }
+            //editar
+            else{
+                $id = $validate[0]->id;
+                $formato = PedidoFormato::findOrFail($id);
+            }
+            $formato->orden         = $item2->orden;
+            $formato->id_periodo    = $periodoTranspaso;
+            $formato->id_serie      = $item2->id_serie;
+            $formato->id_area       = $item2->id_area;
+            $formato->pvp           = $item2->pvp;
+            $formato->id_libro      = $item2->id_libro;
+            $formato->n1            = $item2->n1;
+            $formato->n2            = $item2->n2;
+            $formato->n3            = $item2->n3;
+            $formato->n4            = $item2->n4;
+            $formato->n5            = $item2->n5;
+            $formato->n6            = $item2->n6;
+            $formato->n7            = $item2->n7;
+            $formato->n8            = $item2->n8;
+            $formato->n9            = $item2->n9;
+            $formato->n10           = $item2->n10;
+            $formato->save();
+        }
+        return ["status" => "1", "message" => "Se guardo correctamente"];
     }
     //api:get>>/generarSeriesBasicasPeriodo
     public function generarSeriesBasicasPeriodo(Request $request){

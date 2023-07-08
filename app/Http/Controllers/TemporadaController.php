@@ -178,11 +178,11 @@ class TemporadaController extends Controller
             ->where('estado_idEstado','1')
             ->get();
         
-            $profesores= DB::table('usuario')
-                ->select(DB::raw('CONCAT(usuario.nombres , " " , usuario.apellidos ) as  profesornombres'),'usuario.idusuario','usuario.nombres','usuario.cedula')
-                ->where('id_group', '6')
-                ->where('estado_idEstado','1')
-                ->get();
+            // $profesores= DB::table('usuario')
+            //     ->select(DB::raw('CONCAT(usuario.nombres , " " , usuario.apellidos ) as  profesornombres'),'usuario.idusuario','usuario.nombres','usuario.cedula')
+            //     ->where('id_group', '6')
+            //     ->where('estado_idEstado','1')
+            //     ->get();
             
         
             $ciudad = Ciudad::all();
@@ -194,7 +194,7 @@ class TemporadaController extends Controller
             
             "); 
         
-            return ['temporada' => $temporada, 'asesores'=> $asesores,'profesores' => $profesores, 'ciudad' => $ciudad, 'listainstitucion' => $institucion];
+            return ['temporada' => $temporada, 'asesores'=> $asesores, 'ciudad' => $ciudad, 'listainstitucion' => $institucion];
         }
   
 
@@ -422,15 +422,17 @@ class TemporadaController extends Controller
         ini_set('max_execution_time', 6000000);
         $buscarInstitucion= DB::table('temporadas')
         ->select('temporadas.idInstitucion')
-        ->where('contrato', $contrato)
+        ->where('contrato', '=',$contrato)
+        ->where('estado','=' ,'1')
         ->get();
         if(count($buscarInstitucion) <= 0){
-            return "no existe la institucion";        
+            return ["status" => "0", "message" => "No existe el contrato en temporadas"];
         }else{
             $institucion = $buscarInstitucion[0]->idInstitucion;
             //verificar que el periodo exista
             $verificarPeriodo = DB::select("SELECT t.contrato, t.id_periodo, p.idperiodoescolar
              FROM temporadas t, periodoescolar p
+             
              WHERE t.id_periodo = p.idperiodoescolar
              AND contrato = '$contrato'
              ");
@@ -441,19 +443,20 @@ class TemporadaController extends Controller
                 //almancenar el periodo
                  $periodo =  $verificarPeriodo[0]->idperiodoescolar;
                 //traer temporadas
-                $temporadas= DB::table('temporadas')
-                ->select('temporadas.*')
-                ->where('contrato', $contrato)
-                ->where('estado','1')
-                ->get(); 
-                
+                $temporadas = DB::SELECT("SELECT t.*, CONCAT(u.nombres,' ',u.apellidos) AS asesor,i.nombreInstitucion,
+                pe.periodoescolar AS periodo
+                FROM temporadas t
+                LEFT JOIN usuario u ON t.id_asesor = u.idusuario
+                LEFT JOIN institucion i ON i.idInstitucion = t.idInstitucion
+                LEFT JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
+                WHERE t.contrato = '$contrato'
+                AND t.estado = '1'
+                ");        
                 $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
-                c.libro_idlibro,ls.nombre as nombrelibro,i.nombreInstitucion,CONCAT(v.nombres, ' ', v.apellidos) as asesor
+                c.libro_idlibro,ls.nombre as nombrelibro
                     FROM codigoslibros c 
                     LEFT JOIN usuario u ON c.idusuario = u.idusuario
                     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-                    LEFT JOIN institucion i ON i.idInstitucion = u.institucion_idInstitucion
-                    LEFT JOIN usuario v ON i.vendedorInstitucion = v.cedula
                     WHERE c.bc_estado = '2'
                     AND c.estado <> 2
                     and c.estado_liquidacion = '1'
@@ -461,30 +464,12 @@ class TemporadaController extends Controller
                     AND c.bc_institucion = '$institucion'
                     AND ls.idLibro = c.libro_idlibro 
                    GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro");
-
-                // $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
-                // c.libro_idlibro,ls.nombre as nombrelibro,i.nombreInstitucion,CONCAT(v.nombres, ' ', v.apellidos) as asesor
-                //     FROM codigoslibros c 
-                //     LEFT JOIN usuario u ON c.idusuario = u.idusuario
-                //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-                //     LEFT JOIN institucion i ON i.idInstitucion = u.institucion_idInstitucion
-                //     LEFT JOIN usuario v ON i.vendedorInstitucion = v.cedula
-                //     WHERE c.estado <> 2
-                //     AND (c.estado_liquidacion = '1' OR c.estado_liquidacion = '0')
-                //     AND (c.bc_periodo  = '$periodo' OR c.id_periodo = '$periodo')
-                //     AND (c.bc_institucion = '$institucion' OR u.institucion_idInstitucion = '$institucion')
-                // AND ls.idLibro = c.libro_idlibro 
-                // GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro");
-                 
                 //SI TODO HA SALIDO BIEN TRAEMOS LA DATA 
                 if(count($data) >0){
                  return ['temporada'=>$temporadas,'codigos_libros' => $data];
-             
                 }else{
-                    return ["status"=>"0", "message" => "No se pudo cargar la informacion"];
+                    return ["status"=>"0", "message" => "No hay codigos para la liquidación"];
                 }
-                
-
             }
         }
 
