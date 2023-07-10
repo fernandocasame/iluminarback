@@ -1275,6 +1275,7 @@ Route::get('getEstudianteCodigos/{valores}','CodigosLibrosController@getEstudian
 Route::get('getAllBooks','LibroController@getAllBooks');
 Route::get('getxNombredemo/{nombrelike}','LibroController@getxNombredemo');
 Route::get('getxAreasdemo/{nombrearea}','LibroController@getxAreasdemo');
+Route::post('editarconteodemo','LibroController@editarconteodemo');
 //=====RUTAS PARA DESCUENTO DE CODIGOS==============================
 Route::post('guardarDescuentoCodigos','GestionCodigosController@guardarDescuentoCodigos');
 //=====FIN RUTAS PARA CODIGOS=======================================
