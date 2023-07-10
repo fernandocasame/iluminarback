@@ -2159,7 +2159,7 @@ class PedidosController extends Controller
         //     "observacion": "la isntitucion solicita 3000 dólares de anticipo \r\nRealizar combos de la 4 areas mas una novela que va de obsequio para cada grado \r\nColocar los combos en la librería Copymanias\r\n2= 4 areas + Amanecer aen la mitad del mundo \r\n3 =4 áreas + Donde nos lleve el mar \r\n4 =4  áreas + Un corte de pelo para un hombre lobo \r\n5 =4 áreas + Seres fantásticos del Ecuador \r\n6 = 4 áreas +Nuestras Raíces \r\n7 =4 áreas +Cuentos de l selva \r\n8 = 4 áreas +Donia Queja \r\n9 =4 áreas + La Iliada \r\n10 =4 aras +La Metamorfosis",
         //     "periodo": "Sierra 2023",
         //     "total_venta": 22758.8,
-        //     "total_series_basicas": null,
+        //     "total_series_basicas": 556,
         //     "descuento": 40,
         //     "codigo_institucion_milton": "14081",
         //     "valoresAnteriores": [
@@ -2313,7 +2313,7 @@ class PedidosController extends Controller
         //     "observacion": null,
         //     "periodo": "Costa 2023",
         //     "total_venta": 3915,
-        //     "total_series_basicas": null,
+        //     "total_series_basicas": 756,
         //     "descuento": 40,
         //     "codigo_institucion_milton": "14297",
         //     "valoresAnteriores": [
@@ -2426,7 +2426,7 @@ class PedidosController extends Controller
         //     }
         //     ]
         // ';
-        //return json_decode($query,true);
+        // return json_decode($query,true);
         $dato = DB::SELECT("SELECT p.id_pedido as pedido_id,
         p.ifagregado_anticipo_aprobado,phi.*,
         u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
