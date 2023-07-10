@@ -1261,7 +1261,7 @@ class PedidosController extends Controller
         $responsables = DB::SELECT("SELECT u.idusuario,u.nombres, u.apellidos,
          u.email,u.id_group,u.cedula,
          CONCAT(u.nombres,' ', u.apellidos, ' - ', u.cedula) AS 'nombres_responsable',
-         g.deskripsi as rol
+         g.deskripsi as rol,u.telefono
           FROM usuario u
           LEFT JOIN sys_group_users g ON g.id = id_group
           WHERE u.estado_idEstado = 1
@@ -1331,6 +1331,40 @@ class PedidosController extends Controller
 
     public function save_beneficiarios_pedido(Request $request) //docente
     {
+        //variables
+        $cedula     = $request->num_identificacion;
+        $nombres    = $request->nombres;
+        $apellidos  = $request->apellidos;
+        $email      = $request->correo;
+        if($request->telefono == null || $request->telefono == "null"){
+            $telefono   = null;
+        }else{
+            $telefono   = $request->telefono;
+        }
+        //====Crear cedula en facturacion si no existe=====
+        try {
+            $dato = Http::get("http://186.46.24.108:9095/api/f_Cliente/Busquedaxclici?cli_ci=".$cedula);
+            $JsonCedula = json_decode($dato, true);
+            // return $JsonCedula;
+            if(isset($JsonCedula["clientexclici"])){
+                //no hago nada
+            }else{
+                //no se encontro lo creo
+                $form_data = [
+                    'cli_ci'        => $cedula,
+                    'cli_apellidos' => $apellidos,
+                    'cli_nombres'   => $nombres,
+                    'cli_direccion' => null,
+                    'cli_telefono'  => $telefono,
+                    'cli_email'     => $email
+                ];
+                $client = Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
+                $JsonCliente = json_decode($client, true);
+            }
+        } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+        //====Fin Crear cedula en facturacion si no existe====
         //validar que el pedido no este con contrato 
         $validate = DB::SELECT("SELECT * FROM pedidos 
         WHERE id_pedido = '$request->id_pedido' 
@@ -1352,8 +1386,6 @@ class PedidosController extends Controller
         $docente = DB::SELECT("SELECT cedula FROM `usuario` WHERE `idusuario` = ?", [$request->idusuario]);
         // generar cli_ins_codigo
         $asesor = DB::SELECT("SELECT iniciales FROM `usuario` WHERE `idusuario` = ?", [$request->id_asesor]);
-        $asesorCedula = DB::SELECT("SELECT cedula FROM `usuario` WHERE `idusuario` = ?",
-        [$request->id_asesor]);
         $institucion = DB::SELECT("SELECT codigo_institucion_milton FROM `institucion` WHERE `idInstitucion` = ?", [$request->institucion]);
         // SE VERIFICA QUE NO ESTE YA CREADO EL CLI INS CODIGO
         $verif_cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
