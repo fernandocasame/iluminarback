@@ -52,8 +52,8 @@ class LibroController extends Controller
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
-         AND l.weblibro IS NOT NULL
-         AND TRIM(l.weblibro) <> ''
+         AND l.demo IS NOT NULL
+         AND TRIM(l.demo) <> ''
         ");
         return $query;
     }
@@ -69,8 +69,8 @@ class LibroController extends Controller
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
-         AND l.weblibro IS NOT NULL
-         AND TRIM(l.weblibro) <> ''
+         AND l.demo IS NOT NULL
+         AND TRIM(l.demo) <> ''
          AND l.nombrelibro like '%$nombrelike%'
         ");
         return $query;
@@ -87,8 +87,8 @@ class LibroController extends Controller
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
-         AND l.weblibro IS NOT NULL
-         AND TRIM(l.weblibro) <> ''
+         AND l.demo IS NOT NULL
+         AND TRIM(l.demo) <> ''
          AND ar.nombrearea = '$nombrearea'
         ");
         return $query;
