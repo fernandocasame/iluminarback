@@ -549,6 +549,13 @@ class PedidosController extends Controller
     }
     public function anular_pedido_asesor($id_pedido, $id_usuario,$contrato)
     {
+        //validar si tiene solicitudes  de verificaciones no se pueda anular
+        $query = DB::SELECT("SELECT * FROM temporadas_verificacion_historico h
+        WHERE h.contrato = '$contrato'
+        ");
+        if(count($query) > 0){
+            return ["status" => "0","message" => "Ya existe solicitudes de verificaciones para este contrato $contrato"];
+        }
         DB::SELECT("UPDATE `pedidos` SET `id_usuario_verif`=$id_usuario, `estado`=2 WHERE `id_pedido` = $id_pedido");
         DB::SELECT("UPDATE `pedidos_convenios` SET estado=2 WHERE `id_pedido` = $id_pedido");
         if($contrato == "null" || $contrato == null || $contrato == "undefined" ||  $contrato == "" ){
@@ -594,7 +601,7 @@ class PedidosController extends Controller
                 return $form_data;
                 // return response()->json(['save' => $json_anular, 'form_data' => $form_data]);
             } catch (\Exception  $ex) {
-                return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+                return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
             }
         }
     }

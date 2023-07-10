@@ -770,4 +770,19 @@ class VerificacionControllerAnterior extends Controller
         ");
         return $query;
     }
+    //api para traer todo el historico de las solicitudes de verificaciones
+    //api:get/getHistoricoVerificaciones
+    public function getHistoricoVerificaciones(Request $request){
+        $query = DB::SELECT("SELECT th.*,
+            CONCAT(u.nombres,' ', u.apellidos) AS asesor, i.nombreInstitucion,
+            c.nombre AS ciudad
+            FROM temporadas_verificacion_historico th
+            LEFT JOIN temporadas t ON th.contrato = t.contrato
+            LEFT JOIN usuario u ON t.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad 
+            ORDER BY th.id DESC
+        ");
+        return $query;
+    }
 }

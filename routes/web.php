@@ -188,6 +188,7 @@ Route::post('crearVerificacion','VerificacionControllerAnterior@crearVerificacio
 Route::post('solicitarVerificacion','VerificacionControllerAnterior@solicitarVerificacion');
 Route::get('notificacionesVerificaciones','VerificacionControllerAnterior@notificacionesVerificaciones');
 Route::get('getTrazabilidadVerificacion','VerificacionControllerAnterior@getTrazabilidadVerificacion');
+Route::get('getHistoricoVerificaciones','VerificacionControllerAnterior@getHistoricoVerificaciones');
 //=========================FIN DE API DE LIQUIDACIONES=======================
 
 //=========================API PARA LIQUIDACIONES CON CODIGOS DE BARRAS==========================
