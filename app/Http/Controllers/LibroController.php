@@ -92,7 +92,7 @@ class LibroController extends Controller
          AND ar.nombrearea = '$nombrearea'
         ");
         return $query;
-    }
+    } 
 
     public function librosEstudiante(Request $request)
     {
