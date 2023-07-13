@@ -19,4 +19,4 @@ jobs:
       - name: Scrip Permissions
         run: chmod 777 script.sh
       - name: Directory Permissions ug
-        run: sh script.sh
+        run: ./script.sh
