@@ -351,15 +351,61 @@ class VerificacionControllerAnterior extends Controller
          }
          //para traer los detalle de cada verificacion
          if($request->detalles){
-             $detalles = DB::SELECT("SELECT vl.* ,ls.idLibro AS libro_id
+             $detalles = DB::SELECT("SELECT vl.* ,ls.idLibro AS libro_id,
+             ls.id_serie,t.id_periodo,a.area_idarea
              FROM verificaciones_has_temporadas vl
              LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
+             LEFT JOIN libro l ON ls.idLibro = l.idlibro
+             LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+             LEFT JOIN temporadas t ON vl.contrato = t.contrato
              WHERE vl.verificacion_id = '$request->verificacion_id'
              AND vl.contrato = '$request->contrato'
              AND vl.estado = '1'
              AND nuevo  = '1'
              ");
-             return $detalles;
+            $datos = [];
+            $contador = 0;
+            foreach($detalles as $key => $item){
+                //plan lector 
+                $precio = 0;
+                $query = [];
+                if($item->id_serie == 6){
+                    $query = DB::SELECT("SELECT f.pvp AS precio
+                    FROM pedidos_formato f
+                    WHERE f.id_serie = '6'
+                    AND f.id_area = '69'
+                    AND f.id_libro = '$item->libro_id'
+                    AND f.id_periodo = '$item->id_periodo'");   
+                }else{
+                    $query = DB::SELECT("SELECT f.pvp AS precio
+                    FROM pedidos_formato f
+                    WHERE f.id_serie = '$item->id_serie'
+                    AND f.id_area = '$item->area_idarea'
+                    AND f.id_periodo = '$item->id_periodo'
+                    ");
+                }
+                if(count($query) > 0){
+                    $precio = $query[0]->precio;
+                }
+                $datos[$contador] = [
+                    "id_verificacion_inst"  => $item->id_verificacion_inst,
+                    "verificacion_id"       => $item->verificacion_id,
+                    "contrato"              => $item->contrato,
+                    "codigo"                => $item->codigo,
+                    "cantidad"              => $item->cantidad,
+                    "nombre_libro"          => $item->nombre_libro,
+                    "estado"                => $item->estado,
+                    "desface"               => $item->desface,
+                    "nuevo"                 => $item->nuevo,
+                    "libro_id"              => $item->libro_id,
+                    "id_serie"              => $item->id_serie,
+                    "id_periodo"            => $item->id_periodo,
+                    "precio"                => $precio,
+                    "valor"                 => $item->cantidad * $precio                 
+                ];
+                $contador++;
+            }
+             return $datos;
          }
          //para ver los codigos de cada libro
          if($request->verCodigos){
@@ -743,10 +789,10 @@ class VerificacionControllerAnterior extends Controller
             CONCAT(u.nombres,' ',u.apellidos) as asesor,
             i.nombreInstitucion,
             pe.region_idregion, c.nombre AS ciudad,
-            p.contrato_generado,p.fecha_solicita_verificacion
+            p.contrato_generado,p.fecha_solicita_verificacion,p.tipo_venta
             FROM pedidos p
             LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-            LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             WHERE p.estado = '1'

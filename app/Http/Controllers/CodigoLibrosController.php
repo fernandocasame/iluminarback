@@ -1415,4 +1415,108 @@ class CodigoLibrosController extends Controller
         ");
         return $query;
     }
+    //api:post/codigos/leidos/venta_directa
+    public function LeerVentaDirecta(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos = json_decode($request->data_codigos);  
+        $institucion        =  $request->institucion_id;
+        $traerPeriodo       =  $request->periodo_id;
+        $nombreInstitucion  =  $request->nombreInstitucion;
+        $nombrePeriodo      =  $request->nombrePeriodo;
+        $venta_estado       =  $request->venta_estado;
+        $comentario         =  "Codigo leido de ".$nombreInstitucion." - ".$nombrePeriodo;
+        $codigosNoCambiados=[];
+        $codigosLeidos =[];
+        $codigoNoExiste = [];
+        $porcentaje = 0;
+        $contador = 0;
+        $todate  = date('Y-m-d H:i:s');   
+        foreach($codigos as $key => $item){
+            //validar si el codigo existe
+            $validar = $this->getCodigos($item->codigo);
+            //valida que el codigo existe
+            if(count($validar)>0){
+                //validar si el codigo ya haya sido leido
+                $ifLeido            = $validar[0]->bc_estado;
+                //validar si el codigo ya esta liquidado
+                $ifLiquidado        = $validar[0]->estado_liquidacion;
+                //validar si el codigo no este liquidado
+                $ifBloqueado        = $validar[0]->estado;
+                //validar si tiene bc_institucion
+                $ifBc_Institucion   = $validar[0]->bc_institucion;
+                //validar que el periodo del estudiante sea 0 o sea igual al que se envia
+                $ifid_periodo       = $validar[0]->id_periodo;
+                //validar que el venta_estado sea cero o igual al enviado desde el front 
+                $ifventa_estado     = $validar[0]->venta_estado;
+                //validar el bc_periodo
+                $ifbc_periodo       = $validar[0]->bc_periodo;
+                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
+                    $codigo =  DB::table('codigoslibros')
+                    ->where('codigo', $item->codigo)
+                    ->where('bc_estado', '1')
+                    ->where('estado','<>', '2')
+                    ->where('estado_liquidacion','=', '1')
+                    ->update([
+                        'bc_institucion'        => $institucion,
+                        'bc_estado'             => 2,
+                        'bc_periodo'            => $traerPeriodo,
+                        'bc_fecha_ingreso'      => $todate,
+                        'venta_estado'          => $venta_estado
+                    ]);   
+                    if($codigo){
+                        $porcentaje++;
+                        //ingresar en el historico
+                        $historico                  = new HistoricoCodigos();
+                        $historico->codigo_libro    = $item->codigo;
+                        $historico->usuario_editor  = $institucion;
+                        $historico->idInstitucion   = $request->id_usuario;
+                        $historico->id_periodo      = $traerPeriodo;
+                        $historico->observacion     = $comentario;
+                        $historico->b_estado        = "1";
+                        $historico->save();
+                    }else{
+                        $codigosNoCambiados[$key] =[
+                            "codigo" => $item->codigo
+                        ];
+                    }  
+                }else{
+                    $codigosLeidos[$contador] = [
+                        "codigo"                => $item->codigo,
+                        "prueba_diagnostica"    => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"            => $validar[0]->tipoCodigo,
+                        "barrasEstado"          => $validar[0]->barrasEstado,
+                        "codigoEstado"          => $validar[0]->codigoEstado,
+                        "liquidacion"           => $validar[0]->liquidacion,
+                        "ventaEstado"           => $validar[0]->ventaEstado,
+                        "idusuario"             => $validar[0]->idusuario,
+                        "estudiante"            => $validar[0]->estudiante,
+                        "nombreInstitucion"     => $validar[0]->nombreInstitucion,
+                        "institucionBarra"      => $validar[0]->institucionBarra,
+                        "periodo"               => $validar[0]->periodo,
+                        "periodo_barras"        => $validar[0]->periodo_barras,
+                        "cedula"                => $validar[0]->cedula,
+                        "email"                 => $validar[0]->email,
+                        "estado_liquidacion"    => $validar[0]->estado_liquidacion,
+                        "estado"                => $validar[0]->estado,
+                        "status"                => $validar[0]->status,
+                        "contador"              => $validar[0]->contador,
+                        "porcentaje_descuento"  => $validar[0]->porcentaje_descuento,
+                        "factura"               => $validar[0]->factura
+                    ];
+                    $contador++;
+                }
+            }else{
+                $codigoNoExiste[$key] =[
+                    "codigo" => $item->codigo
+                ];
+            }
+        }
+        return [
+            "cambiados" => $porcentaje,
+            "codigosNoCambiados" => $codigosNoCambiados,
+            "codigosLeidos" => $codigosLeidos,
+            "codigoNoExiste" => $codigoNoExiste
+        ];
+    }
 }

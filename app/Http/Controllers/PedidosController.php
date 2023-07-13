@@ -631,7 +631,7 @@ class PedidosController extends Controller
         i.telefonoInstitucion, i.direccionInstitucion, i.ruc, i.nivel,i.tipo_descripcion,
         c.nombre AS nombre_ciudad, p.ifanticipo,pe.porcentaje_descuento,
         i.codigo_institucion_milton,i.codigo_mitlon_coincidencias,pe.region_idregion,
-        ph.estado as historicoEstado
+        ph.estado as historicoEstado,pe.codigo_contrato
         FROM pedidos p
 		LEFT JOIN usuario u ON p.id_asesor = u.idusuario
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -1847,6 +1847,11 @@ class PedidosController extends Controller
         WHERE `id_asesor` = ? AND `id_institucion` = ?
         AND `id_docente` = ?", [$pedido[0]->iniciales,
         $pedido[0]->codigo_institucion_milton, $docente[0]->cedula]);
+        if (strlen($comentario) > 500) {
+            $cadenaRecortada = substr($comentario, 0, 500); // Recorta la cadena a 500 caracteres
+        } else {
+            $cadenaRecortada = $comentario; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
+        }
         $form_data = [
             'veN_CODIGO' => $codigo_ven, //codigo formato milton
             'usU_CODIGO' => strval($usuario_verifica[0]->cod_usuario),
@@ -1854,7 +1859,7 @@ class PedidosController extends Controller
             'clI_INS_CODIGO' => floatval($cli_ins_cod[0]->cli_ins_codigo),
             'tiP_veN_CODIGO' => $pedido[0]->tipo_venta,
             'esT_veN_CODIGO' => 2, // por defecto
-            'veN_OBSERVACION' => $comentario,
+            'veN_OBSERVACION' => $cadenaRecortada,
             'veN_VALOR' => $pedido[0]->total_venta,
             'veN_PAGADO' => 0.00, // por defecto
             'veN_ANTICIPO' => $setAnticipo,
@@ -2153,404 +2158,117 @@ class PedidosController extends Controller
     //pedidos gerencia
     public function listaPedidosGerencia()
     {
-        // $query = '
-        // [
-        //     {
-        //     "pedido_id": 381,
-        //     "ifagregado_anticipo_aprobado": 0,
-        //     "id": 100,
-        //     "periodo_id": 23,
-        //     "id_pedido": 381,
-        //     "estado": 0,
-        //     "fecha_creacion_pedido": "2023-07-04 20:57:59",
-        //     "fecha_generar_contrato": null,
-        //     "fecha_aprobacion_anticipo_gerencia": null,
-        //     "fecha_rechazo_gerencia": null,
-        //     "fecha_contabilidad_recibe": null,
-        //     "fecha_contabilidad_sube_cheque_sin_firmar": null,
-        //     "fecha_subir_cheque": null,
-        //     "fecha_facturador_recibe_cheque": null,
-        //     "fecha_envio_cheque_for_asesor": null,
-        //     "fecha_orden_firmada": null,
-        //     "fecha_que_recibe_orden_firmada": null,
-        //     "fecha_que_recibe_orden_firmada_contabilidad": null,
-        //     "tipo_pago": 0,
-        //     "evidencia_cheque_sin_firmar": null,
-        //     "evidencia_cheque": null,
-        //     "evidencia_pagare": null,
-        //     "contador_anticipo": 0,
-        //     "contador_liquidacion": 0,
-        //     "created_at": "2023-07-04 23:53:23",
-        //     "updated_at": "2023-07-04 23:53:23",
-        //     "idusuario": 4533,
-        //     "nombres": "DAVID MAURICIO",
-        //     "apellidos": "CALDERON ALBA",
-        //     "anticipo_aprobado": 0,
-        //     "pendiente_liquidar": 5917.29,
-        //     "anticipo_solicitud_for_gerencia": null,
-        //     "anticipo_solicitud_observacion": null,
-        //     "anticipo_aprobado_gerencia": null,
-        //     "nombreInstitucion": "UNIDAD EDUCATIVA CRISTIANO EMANUEL (AMBATO)",
-        //     "nombre_ciudad": "Ambato",
-        //     "fechaCreacionPedido": "2023-07-04 20:57:59",
-        //     "anticipo_sugerido": 2958.64,
-        //     "convenio_anios": null,
-        //     "observacion": "la isntitucion solicita 3000 dólares de anticipo \r\nRealizar combos de la 4 areas mas una novela que va de obsequio para cada grado \r\nColocar los combos en la librería Copymanias\r\n2= 4 areas + Amanecer aen la mitad del mundo \r\n3 =4 áreas + Donde nos lleve el mar \r\n4 =4  áreas + Un corte de pelo para un hombre lobo \r\n5 =4 áreas + Seres fantásticos del Ecuador \r\n6 = 4 áreas +Nuestras Raíces \r\n7 =4 áreas +Cuentos de l selva \r\n8 = 4 áreas +Donia Queja \r\n9 =4 áreas + La Iliada \r\n10 =4 aras +La Metamorfosis",
-        //     "periodo": "Sierra 2023",
-        //     "total_venta": 22758.8,
-        //     "total_series_basicas": 556,
-        //     "descuento": 40,
-        //     "codigo_institucion_milton": "14081",
-        //     "valoresAnteriores": [
-        //     {
-        //     "cliInsCodigo": 37835,
-        //     "venDCodigo": "DC",
-        //     "insCodigo": 14081,
-        //     "insNombre": "EMANUEL (Ambato)",
-        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
-        //     "ciuCodigo": 68,
-        //     "venDCi": "1716118011",
-        //     "venDNombres": "DAVID CALDERON",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 1320.8,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-S20-0000028-DC",
-        //     "venConvertido": "",
-        //     "docCi": "LIQ",
-        //     "docNumero": "436707",
-        //     "docValor": 528.32,
-        //     "ciuNombre": "Ambato",
-        //     "periodo": "S20"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37835,
-        //     "venDCodigo": "DC",
-        //     "insCodigo": 14081,
-        //     "insNombre": "EMANUEL (Ambato)",
-        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
-        //     "ciuCodigo": 68,
-        //     "venDCi": "1716118011",
-        //     "venDNombres": "DAVID CALDERON",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 5425.9,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-S21-0000013-DC",
-        //     "venConvertido": "",
-        //     "docCi": "LIQ",
-        //     "docNumero": "821437",
-        //     "docValor": 2170.36,
-        //     "ciuNombre": "Ambato",
-        //     "periodo": "S21"
-        //     },
-        //     {
-        //     "cliInsCodigo": 38168,
-        //     "venDCodigo": "DC",
-        //     "insCodigo": 14081,
-        //     "insNombre": "EMANUEL (Ambato)",
-        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
-        //     "ciuCodigo": 68,
-        //     "venDCi": "1716118011",
-        //     "venDNombres": "DAVID CALDERON",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 20291.2,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-S22-0000007-DC",
-        //     "venConvertido": "",
-        //     "docCi": "ANT",
-        //     "docNumero": "CH 7497; E 55432",
-        //     "docValor": 3000,
-        //     "ciuNombre": "Ambato",
-        //     "periodo": "S22"
-        //     },
-        //     {
-        //     "cliInsCodigo": 38168,
-        //     "venDCodigo": "DC",
-        //     "insCodigo": 14081,
-        //     "insNombre": "EMANUEL (Ambato)",
-        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
-        //     "ciuCodigo": 68,
-        //     "venDCi": "1716118011",
-        //     "venDNombres": "DAVID CALDERON",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 20291.2,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-S22-0000007-DC",
-        //     "venConvertido": "",
-        //     "docCi": "LIQ",
-        //     "docNumero": "textos hijos de los docentes",
-        //     "docValor": 105.16,
-        //     "ciuNombre": "Ambato",
-        //     "periodo": "S22"
-        //     },
-        //     {
-        //     "cliInsCodigo": 38168,
-        //     "venDCodigo": "DC",
-        //     "insCodigo": 14081,
-        //     "insNombre": "EMANUEL (Ambato)",
-        //     "insDireccion": "HUACHI LORETO ENTRE AZUAY Y ORIENTE\t\t\t\t\t\t\r\n",
-        //     "ciuCodigo": 68,
-        //     "venDCi": "1716118011",
-        //     "venDNombres": "DAVID CALDERON",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 20291.2,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-S22-0000007-DC",
-        //     "venConvertido": "",
-        //     "docCi": "LIQ",
-        //     "docNumero": "CH 14070; EG 56772; FACT 3",
-        //     "docValor": 5011.32,
-        //     "ciuNombre": "Ambato",
-        //     "periodo": "S22"
-        //     }
-        //     ]
-        //     },
-        //     {
-        //     "pedido_id": 8,
-        //     "ifagregado_anticipo_aprobado": 2,
-        //     "id": 50,
-        //     "periodo_id": 22,
-        //     "id_pedido": 8,
-        //     "estado": 1,
-        //     "fecha_creacion_pedido": "2023-02-13 16:59:53",
-        //     "fecha_generar_contrato": null,
-        //     "fecha_aprobacion_anticipo_gerencia": "2023-04-03 16:55:48",
-        //     "fecha_rechazo_gerencia": null,
-        //     "fecha_contabilidad_recibe": null,
-        //     "fecha_contabilidad_sube_cheque_sin_firmar": null,
-        //     "fecha_subir_cheque": null,
-        //     "fecha_facturador_recibe_cheque": null,
-        //     "fecha_envio_cheque_for_asesor": null,
-        //     "fecha_orden_firmada": null,
-        //     "fecha_que_recibe_orden_firmada": null,
-        //     "fecha_que_recibe_orden_firmada_contabilidad": null,
-        //     "tipo_pago": 0,
-        //     "evidencia_cheque_sin_firmar": null,
-        //     "evidencia_cheque": null,
-        //     "evidencia_pagare": null,
-        //     "contador_anticipo": 0,
-        //     "contador_liquidacion": 0,
-        //     "created_at": "2023-04-03 16:54:57",
-        //     "updated_at": "2023-04-03 16:54:57",
-        //     "idusuario": 26087,
-        //     "nombres": "Luis",
-        //     "apellidos": "Jarrin",
-        //     "anticipo_aprobado": 0,
-        //     "pendiente_liquidar": 134.93,
-        //     "anticipo_solicitud_for_gerencia": 300,
-        //     "anticipo_solicitud_observacion": "pruebas",
-        //     "anticipo_aprobado_gerencia": null,
-        //     "nombreInstitucion": "PEQUEÑOS ADORADORES DE JESUS",
-        //     "nombre_ciudad": "Guayaquil",
-        //     "fechaCreacionPedido": "2023-02-13 16:59:53",
-        //     "anticipo_sugerido": 204.75,
-        //     "convenio_anios": null,
-        //     "observacion": null,
-        //     "periodo": "Costa 2023",
-        //     "total_venta": 3915,
-        //     "total_series_basicas": 756,
-        //     "descuento": 40,
-        //     "codigo_institucion_milton": "14297",
-        //     "valoresAnteriores": [
-        //     {
-        //     "cliInsCodigo": 37563,
-        //     "venDCodigo": "LJ",
-        //     "insCodigo": 14297,
-        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
-        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
-        //     "ciuCodigo": 27,
-        //     "venDCi": "0915171920",
-        //     "venDNombres": "LUIS JARRIN",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 0,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-C20-0000016-LJ",
-        //     "venConvertido": "",
-        //     "docCi": "ANT",
-        //     "docNumero": "CH 12738",
-        //     "docValor": 500,
-        //     "ciuNombre": "Guayaquil",
-        //     "periodo": "C20"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37563,
-        //     "venDCodigo": "LJ",
-        //     "insCodigo": 14297,
-        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
-        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
-        //     "ciuCodigo": 27,
-        //     "venDCi": "0915171920",
-        //     "venDNombres": "LUIS JARRIN",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 0,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-C20-0000016-LJ",
-        //     "venConvertido": "",
-        //     "docCi": "LIQ",
-        //     "docNumero": "deuda pasa TC21",
-        //     "docValor": -500,
-        //     "ciuNombre": "Guayaquil",
-        //     "periodo": "C20"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37563,
-        //     "venDCodigo": "LJ",
-        //     "insCodigo": 14297,
-        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
-        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
-        //     "ciuCodigo": 27,
-        //     "venDCi": "0915171920",
-        //     "venDNombres": "LUIS JARRIN",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 0,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-C21-0000020-LJ",
-        //     "venConvertido": "",
-        //     "docCi": "ANT",
-        //     "docNumero": "deuda TC21; pasa a TC22 (BMC)",
-        //     "docValor": 500,
-        //     "ciuNombre": "Guayaquil",
-        //     "periodo": "C21"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37563,
-        //     "venDCodigo": "LJ",
-        //     "insCodigo": 14297,
-        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
-        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
-        //     "ciuCodigo": 27,
-        //     "venDCi": "0915171920",
-        //     "venDNombres": "LUIS JARRIN",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 644.1,
-        //     "venDescuento": 35,
-        //     "venCodigo": "C-C22-0000021-BMC",
-        //     "venConvertido": "",
-        //     "docCi": "ANT",
-        //     "docNumero": "Deuda TC21",
-        //     "docValor": 500,
-        //     "ciuNombre": "Guayaquil",
-        //     "periodo": "C22"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37563,
-        //     "venDCodigo": "LJ",
-        //     "insCodigo": 14297,
-        //     "insNombre": "PEQUEÑOS ADORADORES DE JESUS",
-        //     "insDireccion": "CALLE PEDRO MENENDEZ #47",
-        //     "ciuCodigo": 27,
-        //     "venDCi": "0915171920",
-        //     "venDNombres": "LUIS JARRIN",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 644.1,
-        //     "venDescuento": 35,
-        //     "venCodigo": "C-C22-0000021-BMC",
-        //     "venConvertido": "",
-        //     "docCi": "LIQ",
-        //     "docNumero": "DEUDA PASA TC23 (LUIS JARRIN) ",
-        //     "docValor": -274.66,
-        //     "ciuNombre": "Guayaquil",
-        //     "periodo": "C22"
-        //     }
-        //     ]
-        //     }
-        //     ]
-        // ';
-        // return json_decode($query,true);
         $dato = DB::SELECT("SELECT p.id_pedido as pedido_id,
-        p.ifagregado_anticipo_aprobado,phi.*,
-        u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
-        p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
-        p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
-        p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
-        p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
-        p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton,
-        p.contrato_generado
-        FROM pedidos p
-        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
-        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-        WHERE (p.ifagregado_anticipo_aprobado = '0' OR p.ifagregado_anticipo_aprobado = '2' )
-        AND ifanticipo = '1'
-        AND pe.estado = '1'
-        AND p.anticipo > 0
-        AND p.estado = '1'
-        AND p.facturacion_vee = '1'
-        AND pe.pedido_gerencia = '1'
-        ORDER BY p.fecha_creacion_pedido DESC
-    ");
-    $datos = [];
-    try {
-        foreach($dato as $key => $item){
-            //traer valores anteriores
-            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton); 
-            $JsonDocumentos = json_decode($dato, true);
-            $datos[$key] =[
-                "pedido_id"                         => $item->pedido_id,
-                "ifagregado_anticipo_aprobado"      => $item->ifagregado_anticipo_aprobado,
-                "id"                                => $item->id,
-                "periodo_id"                        => $item->periodo_id,
-                "id_pedido"                         => $item->id_pedido,
-                "estado"                            => $item->estado,
-                "fecha_creacion_pedido"             => $item->fecha_creacion_pedido,
-                "fecha_generar_contrato"            => $item->fecha_generar_contrato,
-                "fecha_aprobacion_anticipo_gerencia" => $item->fecha_aprobacion_anticipo_gerencia,
-                "fecha_rechazo_gerencia"            => $item->fecha_rechazo_gerencia,
-                "fecha_contabilidad_recibe"         => $item->fecha_contabilidad_recibe,
-                "fecha_contabilidad_sube_cheque_sin_firmar" => $item->fecha_contabilidad_sube_cheque_sin_firmar,
-                "fecha_subir_cheque"                => $item->fecha_subir_cheque,
-                "fecha_facturador_recibe_cheque"    => $item->fecha_facturador_recibe_cheque,
-                "fecha_envio_cheque_for_asesor"     => $item->fecha_envio_cheque_for_asesor,
-                "fecha_orden_firmada" =>            $item->fecha_orden_firmada,
-                "fecha_que_recibe_orden_firmada"    => $item->fecha_que_recibe_orden_firmada,
-                "fecha_que_recibe_orden_firmada_contabilidad" => $item->fecha_que_recibe_orden_firmada_contabilidad,
-                "tipo_pago"                         => $item->tipo_pago,
-                "evidencia_cheque_sin_firmar"       => $item->evidencia_cheque_sin_firmar,
-                "evidencia_cheque"                  => $item->evidencia_cheque,
-                "evidencia_pagare"                  => $item->evidencia_pagare,
-                "contador_anticipo"                 => $item->contador_anticipo,
-                "contador_liquidacion" =>           $item->contador_liquidacion,
-                "created_at"                        =>  $item->created_at,
-                "updated_at"                        =>  $item->updated_at,
-                "idusuario"                         => $item->idusuario,
-                "nombres"                           => $item->nombres,
-                "apellidos"                         => $item->apellidos,
-                "anticipo_aprobado"                 => $item->anticipo_aprobado,
-                "pendiente_liquidar"                => $item->pendiente_liquidar,
-                "anticipo_solicitud_for_gerencia"   => $item->anticipo_solicitud_for_gerencia,
-                "anticipo_solicitud_observacion"    => $item->anticipo_solicitud_observacion,
-                "anticipo_aprobado_gerencia"        => $item->anticipo_aprobado_gerencia,
-                "nombreInstitucion"                 => $item->nombreInstitucion,
-                "nombre_ciudad"                     => $item->nombre_ciudad,
-                "fechaCreacionPedido"               => $item->fechaCreacionPedido,
-                "anticipo_sugerido"                 => $item->anticipo_sugerido,
-                "convenio_anios"                    => $item->convenio_anios,
-                "observacion"                       => $item->observacion,
-                "periodo"                           => $item->periodo,
-                "total_venta"                       => $item->total_venta,
-                "total_series_basicas"              => $item->total_series_basicas,
-                "descuento"                         => $item->descuento,
-                "codigo_institucion_milton"         => $item->codigo_institucion_milton,
-                "contrato_generado"                 => $item->contrato_generado,
-                "valoresAnteriores"                 => $JsonDocumentos
-            ];
-        }
-        return $datos;
-    } catch (\Exception  $ex) {
-    return ["status" => "0","message" => "Hubo problemas con la conexión al servidor de facturación"];
-    } 
-  
+            p.ifagregado_anticipo_aprobado,phi.*,
+            u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
+            p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
+            p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
+            p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
+            p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
+            p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton,
+            p.contrato_generado,pe.codigo_contrato
+            FROM pedidos p
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            WHERE p.ifagregado_anticipo_aprobado = '2' 
+            AND ifanticipo = '1'
+            AND pe.estado = '1'
+            AND p.anticipo > 0
+            AND p.estado = '1'
+            AND p.facturacion_vee = '1'
+            AND pe.pedido_gerencia = '1'
+            ORDER BY p.fecha_creacion_pedido DESC
+        ");
+        $datos = [];
+        try {
+            foreach($dato as $key => $item){
+                //traer valores anteriores
+                $cadena = $item->codigo_contrato;
+                $nuevoCadena = substr($cadena,1);
+                $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$item->codigo_institucion_milton."&venCodigo=".$nuevoCadena); 
+                // $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton); 
+                $JsonDocumentos = json_decode($dato, true);
+                $datos[$key] =[
+                    "pedido_id"                         => $item->pedido_id,
+                    "ifagregado_anticipo_aprobado"      => $item->ifagregado_anticipo_aprobado,
+                    "id"                                => $item->id,
+                    "periodo_id"                        => $item->periodo_id,
+                    "id_pedido"                         => $item->id_pedido,
+                    "estado"                            => $item->estado,
+                    "fecha_creacion_pedido"             => $item->fecha_creacion_pedido,
+                    "fecha_generar_contrato"            => $item->fecha_generar_contrato,
+                    "fecha_aprobacion_anticipo_gerencia" => $item->fecha_aprobacion_anticipo_gerencia,
+                    "fecha_rechazo_gerencia"            => $item->fecha_rechazo_gerencia,
+                    "fecha_contabilidad_recibe"         => $item->fecha_contabilidad_recibe,
+                    "fecha_contabilidad_sube_cheque_sin_firmar" => $item->fecha_contabilidad_sube_cheque_sin_firmar,
+                    "fecha_subir_cheque"                => $item->fecha_subir_cheque,
+                    "fecha_facturador_recibe_cheque"    => $item->fecha_facturador_recibe_cheque,
+                    "fecha_envio_cheque_for_asesor"     => $item->fecha_envio_cheque_for_asesor,
+                    "fecha_orden_firmada" =>            $item->fecha_orden_firmada,
+                    "fecha_que_recibe_orden_firmada"    => $item->fecha_que_recibe_orden_firmada,
+                    "fecha_que_recibe_orden_firmada_contabilidad" => $item->fecha_que_recibe_orden_firmada_contabilidad,
+                    "tipo_pago"                         => $item->tipo_pago,
+                    "evidencia_cheque_sin_firmar"       => $item->evidencia_cheque_sin_firmar,
+                    "evidencia_cheque"                  => $item->evidencia_cheque,
+                    "evidencia_pagare"                  => $item->evidencia_pagare,
+                    "contador_anticipo"                 => $item->contador_anticipo,
+                    "contador_liquidacion" =>           $item->contador_liquidacion,
+                    "created_at"                        =>  $item->created_at,
+                    "updated_at"                        =>  $item->updated_at,
+                    "idusuario"                         => $item->idusuario,
+                    "nombres"                           => $item->nombres,
+                    "apellidos"                         => $item->apellidos,
+                    "anticipo_aprobado"                 => $item->anticipo_aprobado,
+                    "pendiente_liquidar"                => $item->pendiente_liquidar,
+                    "anticipo_solicitud_for_gerencia"   => $item->anticipo_solicitud_for_gerencia,
+                    "anticipo_solicitud_observacion"    => $item->anticipo_solicitud_observacion,
+                    "anticipo_aprobado_gerencia"        => $item->anticipo_aprobado_gerencia,
+                    "nombreInstitucion"                 => $item->nombreInstitucion,
+                    "nombre_ciudad"                     => $item->nombre_ciudad,
+                    "fechaCreacionPedido"               => $item->fechaCreacionPedido,
+                    "anticipo_sugerido"                 => $item->anticipo_sugerido,
+                    "convenio_anios"                    => $item->convenio_anios,
+                    "observacion"                       => $item->observacion,
+                    "periodo"                           => $item->periodo,
+                    "total_venta"                       => $item->total_venta,
+                    "total_series_basicas"              => $item->total_series_basicas,
+                    "descuento"                         => $item->descuento,
+                    "codigo_institucion_milton"         => $item->codigo_institucion_milton,
+                    "contrato_generado"                 => $item->contrato_generado,
+                    "valoresAnteriores"                 => $JsonDocumentos,
+                    "codigo_contrato"                   => $item->codigo_contrato
+                ];
+            }
+            return $datos;
+        } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor de facturación"];
+        } 
+    }
+    public function getPedidosAprobadosGerencia(Request $request){
+        $dato = DB::SELECT("SELECT p.id_pedido as pedido_id,
+            p.ifagregado_anticipo_aprobado,phi.*,
+            u.idusuario,u.nombres,u.apellidos,p.anticipo_aprobado,p.pendiente_liquidar,
+            p.anticipo_solicitud_for_gerencia,p.anticipo_solicitud_observacion,
+            p.anticipo_aprobado_gerencia,i.nombreInstitucion, c.nombre AS nombre_ciudad,
+            p.fecha_creacion_pedido as fechaCreacionPedido,p.anticipo as anticipo_sugerido,
+            p.convenio_anios,p.observacion,pe.periodoescolar as periodo,
+            p.total_venta, p.total_series_basicas,p.descuento,i.codigo_institucion_milton,
+            p.contrato_generado,p.anticipo_aprobado_gerencia
+            FROM pedidos p
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN pedidos_historico phi ON p.id_pedido = phi.id_pedido
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            WHERE p.ifagregado_anticipo_aprobado = '3' 
+            AND p.estado = '1'
+            AND p.id_periodo = '$request->periodo_id'
+            ORDER BY p.fecha_creacion_pedido DESC
+        ");
+        return $dato;
     }
     public function listaPedidosPeriodos($id)
     {
@@ -2717,156 +2435,12 @@ class PedidosController extends Controller
     }
     //APIS ===MOSTRAR LO ANTICIPOS ANTERIORES
     public function mostrarAnticiposAnteriores(Request $request){
-        //valores de los anticipos
-        // $test = '[
-        //     {
-        //     "cliInsCodigo": 37368,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 0,
-        //     "venDescuento": 35,
-        //     "venCodigo": "C-C20-0000008-MCM",
-        //     "docCi": "ANT",
-        //     "docNumero": "3803320",
-        //     "docValor": 2000,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C20"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37368,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 0,
-        //     "venDescuento": 35,
-        //     "venCodigo": "C-C20-0000008-MCM",
-        //     "docCi": "LIQ",
-        //     "docNumero": "deuda pasa TC21",
-        //     "docValor": -2000,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C20"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37856,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 2760.6,
-        //     "venDescuento": 35,
-        //     "venCodigo": "C-C21-0000040-MCM",
-        //     "docCi": "ANT",
-        //     "docNumero": "Deuda TC20",
-        //     "docValor": 2000,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C21"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37856,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 4,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 2760.6,
-        //     "venDescuento": 35,
-        //     "venCodigo": "C-C21-0000040-MCM",
-        //     "docCi": "LIQ",
-        //     "docNumero": "Deuda pasa a TC22 ",
-        //     "docValor": -1033.79,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C21"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37856,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 2,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 4518.3,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-C22-0000006-XSC",
-        //     "docCi": "ANT",
-        //     "docNumero": "CH13413/EG54203",
-        //     "docValor": 1966.21,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C22"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37856,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 2,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 4518.3,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-C22-0000006-XSC",
-        //     "docCi": "ANT",
-        //     "docNumero": "Deuda TC21",
-        //     "docValor": 1033.79,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C22"
-        //     },
-        //     {
-        //     "cliInsCodigo": 37856,
-        //     "venDCodigo": "MCM",
-        //     "insCodigo": 13930,
-        //     "insNombre": "CELESTIN FREINET (SALINAS)",
-        //     "insDireccion": "LA FLORESTA AV BRAZIL CALLE CINCUENTA Y UNO",
-        //     "ciuCodigo": 31,
-        //     "venDCi": null,
-        //     "venDNombres": "MIGUEL CELORIO",
-        //     "estVenCodigo": 2,
-        //     "venComPorcentaje": 0,
-        //     "venValor": 4518.3,
-        //     "venDescuento": 40,
-        //     "venCodigo": "C-C22-0000006-XSC",
-        //     "docCi": "LIQ",
-        //     "docNumero": null,
-        //     "docValor": -1192.68,
-        //     "ciuNombre": "Salinas",
-        //     "periodo": "C22"
-        //     }
-        //     ]
-        // ';
-        // $array = json_decode($test);
-        // return  $array;
         try {
             $extractValues = explode(',',$request->codigosM);
+            $temporada     = $request->temporada;
             $escuela = $extractValues[0];
-            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$escuela); 
+            // $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$escuela); 
+            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$escuela.'&venCodigo='.$temporada); 
             $JsonDocumentos = json_decode($dato, true);
             return $JsonDocumentos; 
         } catch (\Exception  $ex) {
@@ -3068,9 +2642,11 @@ class PedidosController extends Controller
             $datosContratos = [];
             $contador = 0;
             foreach($dataFinally as $key => $item){
-                $pedido = DB::SELECT("SELECT p.*, ph.estado as historicoEstado
+                $pedido = DB::SELECT("SELECT p.*, 
+                ph.estado as historicoEstado,pe.periodoescolar as periodo
                 FROM pedidos p
                 LEFT JOIN pedidos_historico  ph ON p.id_pedido = ph.id_pedido
+                LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
                 WHERE p.contrato_generado = '$item->contrato'
                 ");
                 if(empty($pedido)){
@@ -3085,6 +2661,7 @@ class PedidosController extends Controller
                         "venFecha"          => $item->venFecha,
                         //prolipa
                         "id_pedido"         => null,
+                        "id_institucion"    => null,
                         "verificaciones"    => sizeOf($verificaciones),
                         "estado_verificacion"=> 0,
                     ];
@@ -3098,14 +2675,16 @@ class PedidosController extends Controller
                         "ciuNombre"         => $item->ciuNombre,
                         "anticipo_aprobado" => $item->anticipo_aprobado,
                         "venFecha"          => $item->venFecha,
+                        "id_institucion"    => $pedido[0]->id_institucion,
                         "id_pedido"         => $pedido[0]->id_pedido,
+                        "periodo"           => $pedido[0]->periodo,
                         "id_periodo"        => $pedido[0]->id_periodo,
                         "contrato_generado" => $pedido[0]->contrato_generado,
                         "tipo_venta"        => $pedido[0]->tipo_venta,
                         "estado"            => $pedido[0]->estado,
                         "estado_verificacion"=> $pedido[0]->estado_verificacion,
                         "historicoEstado"   => $pedido[0]->historicoEstado,
-                        "verificaciones"    => sizeOf($verificaciones)
+                        "verificaciones"    => sizeOf($verificaciones),
                     ];
                 }
                 $contador++;

@@ -41,6 +41,7 @@ Route::post('codigos/devolucion/activar','CodigoLibrosController@Activardevoluci
 Route::post('codigos/bloquear/activar','CodigoLibrosController@ActivardevolucionCodigos');
 Route::post('codigos/bloquear','CodigoLibrosController@bloquearCodigos');
 Route::get('getTipoVenta','CodigoLibrosController@getTipoVenta');
+Route::post('codigos/leidos/venta_directa','CodigoLibrosController@LeerVentaDirecta');
 //bodega
 Route::post('codigos/bodega/devolver','CodigoLibrosController@devolucionBodega');
 //api para ver las devoluciones de un codigos
@@ -1157,6 +1158,7 @@ Route::get('deletePedidoGuia/{id}','PedidosController@deletePedidoGuia');
 
 //pedidos gerencia aprobar subida 2  verificando git
 Route::get('listaPedidosGerencia','PedidosController@listaPedidosGerencia');
+Route::get('getPedidosAprobadosGerencia','PedidosController@getPedidosAprobadosGerencia');
 Route::post('aprobarPedidoGerencia','PedidosController@aprobarPedidoGerencia');
 Route::get('listaPedidosPeriodos/{id}','PedidosController@listaPedidosPeriodos');
 Route::get('getUsuariosPorRol/{id}','UsuarioController@getUsuariosPorRol');
