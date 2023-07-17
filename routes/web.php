@@ -1287,5 +1287,9 @@ Route::get('getTraerDocumentoDocente/{id_pedido}','PedidosController@getTraerDoc
 Route::get('updateDocumentoAnterior/{id_pedido}/{withContrato}','PedidosController@updateDocumentoAnterior');
 Route::post('agregarDocumentosAnteriorPedido','PedidosController@agregarDocumentosAnteriorPedido');
 //=====FIN RUTAS PARA DOCUMENTOS ANTERIORES=========================
+//=====APIS NEET DOCUMENTOS=========================================
+Route::resource('neetTema','NeetTemaController');
+Route::post('neetEliminar','NeetTemaController@neetEliminar');
+//=====FIN APIS NEET DOCUMENTOS=====================================
 
 

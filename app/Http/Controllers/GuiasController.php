@@ -618,8 +618,8 @@ class GuiasController extends Controller
     }
     public function corregirChequeContabilidad(Request $request){
         DB::UPDATE("UPDATE pedidos_historico
-        SET `fecha_subir_cheque` = null,
-        `evidencia_cheque` = null,
+        SET `$request->fecha` = null,
+        `$request->sendFile` = null,
          `estado` = '$request->estado'
          WHERE `id_pedido` = '$request->id_pedido'
          ");

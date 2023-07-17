@@ -15,6 +15,7 @@ use App\Models\PedidosClienteInstitucion;
 use App\Models\PedidosAnticiposSolicitados;
 use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
+use App\Models\PedidoAnticipoAprobadoHistorico;
 use App\Models\PedidoConvenio;
 use App\Models\PedidoConvenioDetalle;
 use App\Models\PedidoDocumentoAnterior;
@@ -23,15 +24,16 @@ use App\Models\PedidosGuiasBodega;
 use App\Models\PedidoGuiaEntrega;
 use App\Models\PedidoGuiaEntregaDetalle;
 use App\Models\Periodo;
+use App\Traits\Pedidos\TraitPedidosGeneral;
 use Carbon\Carbon;
 use DB;
 use DateTime;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use stdClass;
-
 class PedidosController extends Controller
 {
+    use TraitPedidosGeneral;
     public function index(Request $request)
     {
         if($request->homeAdmin){
@@ -196,6 +198,10 @@ class PedidosController extends Controller
             $uinstitucion->nivel                       = $request->nivel;
             $uinstitucion->tipo_descripcion            = $request->tipo_descripcion;
             $uinstitucion->save();
+            //SI FACTURADOR O ADMIN MODIFICAN EL ANTICIPO APROBADO LO GUARDO EN UN HISTORICO
+            if($request->modificarAnticipoAprobado == 1){
+                $this->saveHistoricoAnticipos($request);
+            }
             if($request->generarNuevo == 'yes'){
                 //Si se genera un pedido apartir de un  pedido anulado
                 $this->changeBeneficiariosLibros($request->pedidoAnterior,$pedido->id_pedido);
@@ -213,6 +219,15 @@ class PedidosController extends Controller
             return ["status" => "0", "message" => "Ya ha sido generado un pedido con esa institución en este período"];
         }
     }
+    //save historico anticipos aprobados;
+    public function saveHistoricoAnticipos($request){
+        $historico = new PedidoAnticipoAprobadoHistorico();
+        $historico->anticipo_aprobado   = $request->anticipo_aprobado;
+        $historico->id_pedido           = $request->id_pedido;
+        $historico->user_created        = $request->user_created;
+        $historico->id_group            = $request->id_group;
+        $historico->save();
+    }
     //Api para guardar el anticipo despues de generar el contrato
     //api:post/guardarAnticipoAprobadoContrato
     public function guardarAnticipoAprobadoContrato(Request $request){
@@ -228,6 +243,8 @@ class PedidosController extends Controller
             $form_data = [
                 'venAnticipo'   => floatval($aprobado),
             ];
+            //guardar en historico
+            $this->saveHistoricoAnticipos($request);
             $dato = Http::post("http://186.46.24.108:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
             $prueba_get = json_decode($dato, true);
             if($pedido){
@@ -1482,10 +1499,10 @@ class PedidosController extends Controller
     }
     public function eliminar_beneficiario_pedido(Request $request){
         //validate si tiene contrato
-        $query = DB::SELECT("SELECT * FROM pedidos where id_pedido = '$request->id_pedido' AND contrato_generado  IS NOT NULL");
-        if(count($query)){
-            return ["status" => "0", "message" => "No se puede eliminar un beneficiarios con contrato"];
-        }
+        // $query = DB::SELECT("SELECT * FROM pedidos where id_pedido = '$request->id_pedido' AND contrato_generado  IS NOT NULL");
+        // if(count($query)){
+        //     return ["status" => "0", "message" => "No se puede eliminar un beneficiarios con contrato"];
+        // }
         DB::SELECT("DELETE FROM `pedidos_beneficiarios` WHERE `id_beneficiario_pedido` = $request->id_beneficiario");
     }
     public function save_beneficiarios_db_milton(Request $request){
@@ -1757,9 +1774,7 @@ class PedidosController extends Controller
         // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
     }
     public function getBeneficiarios($id_pedido){
-        $query = DB::SELECT("SELECT * FROM pedidos_beneficiarios b
-        WHERE b.id_pedido = '$id_pedido'
-        ");
+        $query = $this->getAllBeneficiarios($id_pedido);
         return $query;
     }
     public function generar_contrato_pedido($id_pedido, $usuario_fact){
@@ -2088,7 +2103,8 @@ class PedidosController extends Controller
         $pedidos = DB::SELECT("SELECT p.id_pedido,p.imagen,p.doc_ruc,p.anticipo_aprobado,
         CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,
         i.nombreInstitucion, c.nombre AS nombre_ciudad,ph.fecha_aprobacion_anticipo_gerencia,
-        ph.fecha_generar_contrato,ph.evidencia_pagare,ph.evidencia_cheque,ph.evidencia_cheque_sin_firmar
+        ph.fecha_generar_contrato,ph.evidencia_pagare,ph.evidencia_cheque,
+        ph.evidencia_cheque_sin_firmar,ph.estado as estadoHistorico
         FROM pedidos  p
         LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -2125,6 +2141,7 @@ class PedidosController extends Controller
                 "evidencia_cheque"                      => $item->evidencia_cheque,
                 "evidencia_cheque_sin_firmar"           => $item->evidencia_cheque_sin_firmar,
                 "evidencia_pagare"                      => $item->evidencia_pagare,
+                "estadoHistorico"                       => $item->estadoHistorico,
                 "beneficiarios"                         => array_unique($query,SORT_REGULAR),
                 "files"                                 => $files
             ];
@@ -2333,8 +2350,10 @@ class PedidosController extends Controller
                 $dato = Http::post("http://186.46.24.108:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data); 
                 $prueba_get = json_decode($dato, true);
             }
-            //HISTORICO
-           return $this->aprobarAnticipo($datos->pedido_id);
+            //HISTORICO ANTICIPOS
+            $this->saveHistoricoAnticipos($datos);
+            //HISTORICO PEDIDOS
+            return $this->aprobarAnticipo($datos->pedido_id);
             return 'Pedido aprobado';
        }
        //rechazar
@@ -2356,7 +2375,13 @@ class PedidosController extends Controller
             //guardar
             $solicitud = Pedidos::findOrFail($request->id_pedido);
         }
-            $solicitud->anticipo_solicitud_observacion  = $request->observacion;
+            $observacion = null;
+            if($request->observacion == null || $request->observacion == "null" || $request->observacion == ""){
+                $observacion = null;
+            }else{
+                $observacion =  $request->observacion;
+            }
+            $solicitud->anticipo_solicitud_observacion  = $observacion;
             $solicitud->anticipo_solicitud_for_gerencia = $request->anticipo_solicitado;
             $solicitud->ifagregado_anticipo_aprobado    = $request->estado;
             $solicitud->save();
