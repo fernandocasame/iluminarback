@@ -274,21 +274,23 @@ class CodigosLibrosController extends Controller
     
     public function store(Request $request)
     {
-        $validacion = DB::SELECT("SELECT * FROM  codigoslibros WHERE  
+        $validacion = DB::SELECT("SELECT * 
+        FROM  codigoslibros WHERE  
         codigo = ?",["$request->codigo"]);
         $iduser = '';
         foreach ($validacion as $key => $value) {
-            $iduser = $value->idusuario;
-            $estadoCodigo = $value->estado;
+            $iduser             = $value->idusuario;
+            $estadoCodigo       = $value->estado;
             $estado_liquidacion = $value->estado_liquidacion;
+            $prueba_diagnostica = $value->prueba_diagnostica;
         }
         //para obtener los datos del estudiante para abrir el ticket
         $datosEstudiante = DB::SELECT("SELECT CONCAT(e.nombres,' ', e.apellidos) 
-        as estudiante ,e.name_usuario,e.cedula,e.idusuario, i.nombreInstitucion
-        FROM usuario e, institucion i 
-        WHERE e.id_group = '4'
-        AND e.idusuario = $request->idusuario
-        AND e.institucion_idInstitucion = i.idInstitucion
+            as estudiante ,e.name_usuario,e.cedula,e.idusuario, i.nombreInstitucion
+            FROM usuario e, institucion i 
+            WHERE e.id_group = '4'
+            AND e.idusuario = $request->idusuario
+            AND e.institucion_idInstitucion = i.idInstitucion
         ");
         //para ver cuantos tickets abiertos tiene el usuario
         $cantidadTicketOpen = DB::SELECT("SELECT t.* FROM tickets t
@@ -300,38 +302,43 @@ class CodigosLibrosController extends Controller
         if(empty($cantidadTicketOpen)){
             $realizarTicket = "ok";
         }
+        //EL CODIGO NO EXISTE
         if(empty($validacion)){
             $data = [
-                'status' => '2',
-                'codigo' => $request->codigo,
-                'institucion' => $request->id_institucion,
-                'usuario' => $request->idusuario,
-                'datosEstudiante' => $datosEstudiante,
-                'realizarTicket' => $realizarTicket,
+                'status'            => '2',
+                'codigo'            => $request->codigo,
+                'institucion'       => $request->id_institucion,
+                'usuario'           => $request->idusuario,
+                'datosEstudiante'   => $datosEstudiante,
+                'realizarTicket'    => $realizarTicket,
             ];
             return $data;
+        }
+        //validar que el codigo no sea de diagnostico
+        if($prueba_diagnostica == 1){
+            return ["status" => '5' ,"message" => "El código que esta ingresando, es una Prueba Diagnóstica, no tiene libro digital."];
         }
         //para mandar los codigos que esten bloqueados
         else if($estadoCodigo == '2'){
             $data = [
-                'status' => '3',
-                'codigo' => $request->codigo,
-                'institucion' => $request->id_institucion,
-                'usuario' => $request->idusuario,
-                'datosEstudiante' => $datosEstudiante,
-                'realizarTicket' => $realizarTicket,
+                'status'            => '3',
+                'codigo'            => $request->codigo,
+                'institucion'       => $request->id_institucion,
+                'usuario'           => $request->idusuario,
+                'datosEstudiante'   => $datosEstudiante,
+                'realizarTicket'    => $realizarTicket,
             ];
             return $data;    
         }
-          //para mandar los codigos que esten devueltos
-          else if($estado_liquidacion == '3'){
+        //para mandar los codigos que esten devueltos
+        else if($estado_liquidacion == '3'){
             $data = [
-                'status' => '4',
-                'codigo' => $request->codigo,
-                'institucion' => $request->id_institucion,
-                'usuario' => $request->idusuario,
-                'datosEstudiante' => $datosEstudiante,
-                'realizarTicket' => $realizarTicket,
+                'status'            => '4',
+                'codigo'            => $request->codigo,
+                'institucion'       => $request->id_institucion,
+                'usuario'           => $request->idusuario,
+                'datosEstudiante'   => $datosEstudiante,
+                'realizarTicket'    => $realizarTicket,
             ];
             return $data;    
         }
@@ -343,13 +350,13 @@ class CodigosLibrosController extends Controller
                 ->select('periodoescolar_has_institucion.periodoescolar_idperiodoescolar')
                 ->where('periodoescolar_has_institucion.institucion_idInstitucion','=',$request->id_institucion)
                 ->get();
-                    foreach($verificarperiodoinstitucion  as $clave=>$item){
+                foreach($verificarperiodoinstitucion  as $clave=>$item){
                     $verificarperiodos =DB::SELECT("SELECT p.idperiodoescolar
                     FROM periodoescolar p
                     WHERE p.estado = '1'
                     and p.idperiodoescolar = $item->periodoescolar_idperiodoescolar
                     ");
-                    }
+                }
                 if(count($verificarperiodoinstitucion) <=0){
                     return ["status"=>"0", "message" => "No existe el periodo lectivo por favor, asigne un periodo a esta institucion"];
                 }
@@ -365,7 +372,6 @@ class CodigosLibrosController extends Controller
                     [
                         'idusuario' => $request->idusuario,
                         'id_periodo' => $periodo
-                        
                     ]
                 );
                 $data = [

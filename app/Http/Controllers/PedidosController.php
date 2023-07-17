@@ -935,6 +935,7 @@ class PedidosController extends Controller
             WHERE  a.id_pedido = p.id_pedido
             AND a.estado_alcance  = '0'
             AND ped.estado = '1'
+            AND a.venta_bruta > 0
         ) as contadorAlcanceAbierto,
         (
             SELECT COUNT(a.id) AS contadorAlcanceCerrado
@@ -985,6 +986,7 @@ class PedidosController extends Controller
                 WHERE  a.id_pedido = p.id_pedido
                 AND a.estado_alcance  = '0'
                 AND ped.estado = '1'
+                AND a.venta_bruta > 0
             ) as contadorAlcanceAbierto,
             (
                 SELECT COUNT(a.id) AS contadorAlcanceCerrado
@@ -1775,7 +1777,44 @@ class PedidosController extends Controller
     }
     public function getBeneficiarios($id_pedido){
         $query = $this->getAllBeneficiarios($id_pedido);
-        return $query;
+        $datos = [];
+        if(empty($query)){
+            return $query;
+        }
+        foreach($query as $key => $item){
+            //total convenio
+            $query2 = DB::SELECT("SELECT SUM(a.venta_bruta) AS total_alcance
+            FROM pedidos_alcance a
+            WHERE a.id_pedido = '$id_pedido'
+            and a.estado_alcance = '1'
+            and a.venta_bruta > 0
+            ");
+            $datos[$key] = [
+                "id_beneficiario_pedido"    => $item->id_beneficiario_pedido,
+                "id_pedido"                 => $item->id_pedido,
+                "id_usuario"                => $item->id_usuario,
+                "cod_usuario"               => $item->cod_usuario,
+                "tipo_identificacion"       => $item->tipo_identificacion,
+                "direccion"                 => $item->direccion,
+                "correo"                    => $item->correo,
+                "comision"                  => $item->comision,
+                "valor"                     => $item->valor,
+                "banco"                     => $item->banco,
+                "tipo_cuenta"               => $item->tipo_cuenta,
+                "num_cuenta"                => $item->num_cuenta,
+                "observacion"               => $item->observacion,
+                "created_at"                => $item->created_at,
+                "updated_at"                => $item->updated_at,
+                "beneficiario"              => $item->beneficiario,
+                "cedula"                    => $item->cedula,
+                "nombres"                   => $item->nombres,
+                "apellidos"                 => $item->apellidos,
+                "descuento"                 => $item->descuento,
+                "total_venta"               => $item->total_venta,
+                "total_alcances"            => $query2[0]->total_alcance  == null ? 0: $query2[0]->total_alcance
+            ];
+        }
+        return $datos;
     }
     public function generar_contrato_pedido($id_pedido, $usuario_fact){
         $validateBeneficiarios = $this->getBeneficiarios($id_pedido);
