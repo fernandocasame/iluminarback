@@ -831,4 +831,28 @@ class VerificacionControllerAnterior extends Controller
         ");
         return $query;
     }
+    //api:get/getVerificacionXId/{id}
+    public function getVerificacionXId($id){
+        $query = DB::SELECT("SELECT * FROM verificaciones v 
+        WHERE v.id = '$id'
+        ");
+        return $query;
+    }
+    //api:post/saveDatosVerificacion
+    public function saveDatosVerificacion(Request $request){
+        $verificacion =  Verificacion::findOrFail($request->id);
+        $observacion = "";
+        if($request->observacion == null || $request->observacion == "null"){
+            $observacion  = null;
+        }else{
+            $observacion = $request->observacion;
+        }
+        $verificacion->observacion = $observacion;
+        $verificacion->save();
+        if($verificacion){
+            return ["status" => "1", "message" => "Se guardo correctamente"];
+        }else{
+            return ["status" => "0", "message" => "No se pudo guardar"];
+        }
+    }
 }

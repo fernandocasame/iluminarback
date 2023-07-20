@@ -8,7 +8,7 @@ trait TraitPedidosGeneral
     { 
         $query = DB::SELECT("SELECT  b.*,
         CONCAT(u.nombres, ' ',u.apellidos) AS beneficiario,
-        u.cedula,u.nombres,u.apellidos,p.descuento,p.total_venta
+        u.cedula,u.nombres,u.apellidos,p.descuento,p.total_venta,p.contrato_generado
          FROM pedidos_beneficiarios b
          LEFT JOIN pedidos p ON b.id_pedido = p.id_pedido
          LEFT JOIN usuario u ON  b.id_usuario = u.idusuario

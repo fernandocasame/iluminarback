@@ -990,6 +990,7 @@ Route::post('save_val_pedido_alcance','PedidosController@save_val_pedido_alcance
 Route::get('get_val_pedido/{pedido}','PedidosController@get_val_pedido');
 Route::get('get_val_pedido_alcance/{pedido}/{alcance}','PedidosController@get_val_pedido_alcance');
 Route::get('get_val_pedidoInfo/{pedido}','PedidosController@get_val_pedidoInfo');
+Route::get('get_val_pedidoInfoTodo/{pedido}','PedidosController@get_val_pedidoInfoTodo');
 Route::post('delete_pedido_asesor','PedidosController@delete_pedido_asesor');
 Route::post('save_pvp_area_formato','PedidosController@save_pvp_area_formato');
 Route::get('series_full','SeriesController@series_full');
@@ -999,6 +1000,7 @@ Route::get('get_pvp_planes_periodo/{periodo}','PedidosController@get_pvp_planes_
 Route::post('save_niveles_area_formato','PedidosController@save_niveles_area_formato');
 //api para traer los periodos que tienen cargado formato pedidos
 Route::get('cargarPeriodoFormatoPedidos','PedidosController@cargarPeriodoFormatoPedidos');
+Route::get('getAllPedidos','PedidosController@getAllPedidos');
 Route::get('get_pedidos_periodo/{periodo}','PedidosController@get_pedidos_periodo');
 Route::get('get_pedidos_periodo_facturador/{periodo}/{id_facturador}','PedidosController@get_pedidos_periodo_facturador');
 Route::get('get_pedidos_periodoxContrato/{contrato}','PedidosController@get_pedidos_periodo_contrato');
@@ -1155,7 +1157,7 @@ Route::get('getPedidoSecuencia/{id}','PedidosController@getPedidoSecuencia');
 Route::post('storePedidoSecuencia','PedidosController@storePedidoSecuencia');
 Route::get('deletePedidoSecuencia/{id}','PedidosController@deletePedidoSecuencia');
 Route::get('deletePedidoGuia/{id}','PedidosController@deletePedidoGuia');
-
+Route::post('actualizarPedido','PedidosController@actualizarPedido');
 //pedidos gerencia aprobar subida 2  verificando git
 Route::get('listaPedidosGerencia','PedidosController@listaPedidosGerencia');
 Route::get('getPedidosAprobadosGerencia','PedidosController@getPedidosAprobadosGerencia');
