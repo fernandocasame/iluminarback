@@ -558,7 +558,7 @@ class CodigoLibrosController extends Controller
         ];
      }
      public function getCodigos($codigo){
-        $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica, 
+        $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.porcentaje_descuento,
         c.libro as book,c.serie,c.created_at,
@@ -571,7 +571,7 @@ class CodigoLibrosController extends Controller
         (SELECT COUNT(d.id) FROM codigos_devolucion d
             WHERE d.codigo = c.codigo AND d.estado = '1'
         ) as devolucion,
-        c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.bc_fecha_ingreso,
+        c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro, c.venta_lista_institucion,
         CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
         i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
@@ -1518,5 +1518,57 @@ class CodigoLibrosController extends Controller
             "codigosLeidos" => $codigosLeidos,
             "codigoNoExiste" => $codigoNoExiste
         ];
+    }
+    //api:post/codigos/ingreso
+    public function importIngresoCodigos(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos           = json_decode($request->data_codigos);  
+        $pruebaDiagnostica = $request->pruebaDiagnostica;
+        $idlibro           = $request->idlibro;
+        $id_usuario        = $request->id_usuario;
+        $anio              = $request->anio;
+        $libro             = $request->libro;
+        $serie             = $request->serie;
+        $datos             = [];
+        $NoIngresados      = [];
+        $porcentaje        = 0;
+        $contador          = 0;
+        foreach($codigos as $key => $item){
+            $consulta = $this->getCodigos($item->codigo);
+            //si ya existe el codigo lo mando a un array
+            if(count($consulta) > 0){
+               $datos[] = $consulta[0];
+            }else{
+                //si no existen los agrego
+                $codigos_libros                             = new CodigosLibros();
+                $codigos_libros->serie                      = $serie;
+                $codigos_libros->libro                      = $libro;
+                $codigos_libros->anio                       = $anio;
+                $codigos_libros->libro_idlibro              = $idlibro;
+                $codigos_libros->estado                     = 0;
+                $codigos_libros->idusuario                  = 0;
+                $codigos_libros->bc_estado                  = 1;
+                $codigos_libros->idusuario_creador_codigo   = $id_usuario;
+                $codigos_libros->prueba_diagnostica         = $pruebaDiagnostica;
+                $codigos_libros->codigo                     = $item->codigo;
+                $codigos_libros->contador                   = 1;
+                $codigos_libros->save();
+                if($codigos_libros){
+                    $porcentaje++;
+                }else{
+                    $NoIngresados[$contador] =[
+                        "codigo" => $item->codigo
+                    ];
+                    $contador++;
+                }
+            }       
+        }
+        $data = [
+            "cambiados"             => $porcentaje,
+            "CodigosExisten"        => $datos,
+            "CodigosNoIngresados"   => $NoIngresados,
+        ];
+        return $data;
     }
 }

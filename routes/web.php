@@ -38,8 +38,8 @@ Route::post('codigos/import/periodo','CodigoLibrosController@changePeriodo');
 Route::post('codigos/import/periodo/varios','CodigoLibrosController@changePeriodoVarios');
 Route::post('bodega/codigos/eliminar','CodigoLibrosController@bodegaEliminar');
 Route::post('codigos/devolucion/activar','CodigoLibrosController@ActivardevolucionCodigos');
-Route::post('codigos/bloquear/activar','CodigoLibrosController@ActivardevolucionCodigos');
 Route::post('codigos/bloquear','CodigoLibrosController@bloquearCodigos');
+Route::post('codigos/ingreso','CodigoLibrosController@importIngresoCodigos');
 Route::get('getTipoVenta','CodigoLibrosController@getTipoVenta');
 Route::post('codigos/leidos/venta_directa','CodigoLibrosController@LeerVentaDirecta');
 //bodega

@@ -92,7 +92,7 @@ class LibroController extends Controller
          AND ar.nombrearea = '$nombrearea'
         ");
         return $query;
-    } 
+    }
 
     public function librosEstudiante(Request $request)
     {
@@ -562,7 +562,7 @@ class LibroController extends Controller
         //0 = libro; 1 = serie; 2 codigo
         if($request->tipo == '0'){
             $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
-                ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
+                ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie,ls.nombre
                 FROM libro l
                 LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
                 LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
@@ -573,7 +573,7 @@ class LibroController extends Controller
         }
         if($request->tipo == '1'){
             $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
-            ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
+            ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie,ls.nombre
                 FROM libro l
                 LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
                 LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
@@ -584,7 +584,7 @@ class LibroController extends Controller
         }
         if($request->tipo == '2'){
             $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
-            ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie
+            ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie,ls.nombre
                 FROM libro l
                 LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
                 LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
@@ -691,7 +691,7 @@ class LibroController extends Controller
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
     }
-    
+
     //para eliminar el libro
     public function eliminarLibro(Request $request){
        $res =DB::table('libro')
