@@ -10,6 +10,7 @@ class CodigosLibros extends Model implements Auditable
     use \OwenIt\Auditing\Auditable;
     protected $table = "codigoslibros";
     protected $primaryKey = 'codigo';
+    public $incrementing = false;
     protected $fillable=[
         'serie','libro','anio','contrato','idusuario','idusuario_creador_codigo','libro_idlibro','estado','fecha_create','id_periodo','created_at','updated_at',
         'estado_liquidacion',

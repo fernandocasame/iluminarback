@@ -413,8 +413,8 @@ class CodigoLibrosController extends Controller
         ];
         return $data;
      }
-     //API:POST/codigos/import/gestion/diagnostico
-     public function importGestionDiagnostico(Request $request){
+    //API:POST/codigos/import/gestion/diagnostico
+    public function importGestionDiagnostico(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $miArrayDeObjetos   = json_decode($request->data_codigos);  
@@ -427,6 +427,7 @@ class CodigoLibrosController extends Controller
         $getLongitud        = sizeof($miArrayDeObjetos);
         $longitud           = $getLongitud/2;
         $TipoVenta          = $request->venta_estado;
+        $tipoBodega         = $request->tipoBodega;
         // Supongamos que tienes una colección vacía
         $codigosNoExisten   = collect();
         $codigoConProblemas = collect();
@@ -440,8 +441,16 @@ class CodigoLibrosController extends Controller
             // Eliminamos los dos primeros objetos del array original y los agregamos al nuevo array
             $nuevoArray[]           = array_shift($miArrayDeObjetos);
             $nuevoArray[]           = array_shift($miArrayDeObjetos);
-            $codigoActivacion       = $nuevoArray[0]->codigo;
-            $codigoDiagnostico      = $nuevoArray[1]->codigo;
+            //ACTIVACION - DIAGNOSTICO
+            if($tipoBodega == 1){
+                $codigoActivacion       = $nuevoArray[0]->codigo;
+                $codigoDiagnostico      = $nuevoArray[1]->codigo;
+            }
+            //DIAGNOSTICO - ACTIVACION
+            if($tipoBodega == 2){
+                $codigoActivacion       = $nuevoArray[0]->codigo;
+                $codigoDiagnostico      = $nuevoArray[1]->codigo;
+            }
             //===CODIGO DE ACTIVACION====
             //validacion
             $validarA               = $this->getCodigos($codigoActivacion,0);
@@ -536,8 +545,8 @@ class CodigoLibrosController extends Controller
             "codigoConProblemas"                => array_merge(...$codigoConProblemas->all()),
             "ingresados"                        => $contador,
         ];
-     }
-     public function UpdateCodigo($codigo,$union,$request){
+    }
+    public function UpdateCodigo($codigo,$union,$request){
         if($request->venta_estado == 1){
             return $this->updateCodigoVentaDirecta($codigo,$union,$request);
         }
@@ -650,6 +659,9 @@ class CodigoLibrosController extends Controller
         $codigoNoExiste = [];
         $porcentaje = 0;
         $contador = 0; 
+        $usuario_editor = $request->id_usuario;
+        $comentario     = $request->comentario;
+        $periodo_id     = $request->periodo_id;
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validar = $this->getCodigos($item->codigo,0);
@@ -669,13 +681,8 @@ class CodigoLibrosController extends Controller
                     if($codigo){
                         $porcentaje++;
                         //ingresar en el historico
-                        $historico                  = new HistoricoCodigos();
-                        $historico->codigo_libro    = $item->codigo;
-                        $historico->usuario_editor  = $request->institucion_id;
-                        $historico->idInstitucion   = $request->id_usuario;
-                        $historico->id_periodo      = $request->periodo_id;
-                        $historico->observacion     = $request->comentario;
-                        $historico->save();
+                        $old_values = CodigosLibros::Where('codigo',$item->codigo)->get(); 
+                        $this->GuardarEnHistorico(0,$request->institucion_id,$periodo_id,$item->codigo,$usuario_editor,$comentario,$old_values);
                     }else{
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo

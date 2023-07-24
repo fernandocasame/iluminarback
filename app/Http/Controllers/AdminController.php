@@ -886,7 +886,7 @@ class AdminController extends Controller
         return $periodos;
     }
     public function get_periodos_pedidos(){
-        $periodos = DB::SELECT("SELECT * FROM periodoescolar p  ORDER BY p.idperiodoescolar DESC;");
+        $periodos = DB::SELECT("SELECT * FROM periodoescolar p  where p.idperiodoescolar > 9  ORDER BY p.idperiodoescolar DESC  ");
         return $periodos;
     }
 
