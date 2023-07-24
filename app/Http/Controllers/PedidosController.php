@@ -1121,9 +1121,19 @@ class PedidosController extends Controller
         (SELECT f.id_facturador from pedidos_asesores_facturador 
         f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
         (
-            SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
+            SELECT SUM(pa.venta_bruta) AS contador_alcance
+            FROM pedidos_alcance pa
             WHERE pa.id_pedido = p.id_pedido
+            AND pa.estado_alcance = '1'
+            AND pa.venta_bruta > 0
         ) AS contador_alcance,
+        (
+            SELECT SUM(pa.total_unidades)  AS alcanceUnidades
+            FROM pedidos_alcance pa
+            WHERE pa.id_pedido = p.id_pedido
+            AND pa.estado_alcance = '1'
+            AND pa.venta_bruta > 0
+        ) AS alcanceUnidades,
         (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
         (
             SELECT COUNT(a.id) AS contadorAlcanceAbierto
@@ -1173,9 +1183,19 @@ class PedidosController extends Controller
             (SELECT f.id_facturador from pedidos_asesores_facturador 
             f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
             (
-                SELECT COUNT(*) AS contador_alcance FROM pedidos_alcance pa
+                SELECT SUM(pa.venta_bruta) AS contador_alcance
+                FROM pedidos_alcance pa
                 WHERE pa.id_pedido = p.id_pedido
+                AND pa.estado_alcance = '1'
+                AND pa.venta_bruta > 0
             ) AS contador_alcance,
+            (
+                SELECT SUM(pa.total_unidades)  AS alcanceUnidades
+                FROM pedidos_alcance pa
+                WHERE pa.id_pedido = p.id_pedido
+                AND pa.estado_alcance = '1'
+                AND pa.venta_bruta > 0
+            ) AS alcanceUnidades,
             (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
             (
                 SELECT COUNT(a.id) AS contadorAlcanceAbierto
@@ -1976,7 +1996,7 @@ class PedidosController extends Controller
         //si no hay valores no hago nada
         if($contrato == null || $contrato == "null" || $contrato == "" ){
         }
-        //si hay contrato traigo la venta real
+        //si hay contrato traigo la venta real -
         else{
             try {
                 $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);

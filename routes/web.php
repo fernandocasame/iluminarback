@@ -32,6 +32,7 @@ Route::get('userInformacion','UsuarioController@userInformacion');
 
 Route::post('codigos/importar','CodigoLibrosController@importar');
 Route::post('codigos/import/gestion','CodigoLibrosController@importGestion');
+Route::post('codigos/import/gestion/diagnostico','CodigoLibrosController@importGestionDiagnostico');
 Route::post('codigos/revision','CodigoLibrosController@revision');
 Route::post('codigos/eliminar','CodigoLibrosController@eliminar');
 Route::post('codigos/import/periodo','CodigoLibrosController@changePeriodo');

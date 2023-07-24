@@ -36,7 +36,7 @@ class CodigoLibrosController extends Controller
         $todate  = date('Y-m-d H:i:s');   
         foreach($codigos as $key => $item){
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 //validar si el codigo ya haya sido leido
@@ -121,7 +121,7 @@ class CodigoLibrosController extends Controller
             "codigoNoExiste" => $codigoNoExiste
         ];
      }
-     public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario){
+     public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values){
         $historico = new HistoricoCodigos();
         $historico->id_usuario     =  $id_usuario;
         $historico->usuario_editor =  $institucion_id;
@@ -129,6 +129,7 @@ class CodigoLibrosController extends Controller
         $historico->codigo_libro   =  $codigo;
         $historico->idInstitucion  =  $usuario_editor;
         $historico->observacion    =  $comentario;
+        $historico->old_values     =  $old_values;
         $historico->save();
      }
 
@@ -167,7 +168,8 @@ class CodigoLibrosController extends Controller
             //SI ENVIAN POR INSTITUCION
             //USAN Y LIQUIDAN /VENTA DIRECTA
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
+            // return $validar;
             //valida que el codigo existe
             if(count($validar)>0){
                 //VENTA DIRECTA/VENTA POR LISTA
@@ -203,7 +205,7 @@ class CodigoLibrosController extends Controller
                             if($codigo){
                                 $porcentaje++;
                                 //Guardar en el historico
-                                $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario);
+                                $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario,null);
                             }else{
                                 $codigosNoCambiados[$key] =[
                                     "codigo" => $item->codigo
@@ -259,7 +261,7 @@ class CodigoLibrosController extends Controller
                             if($codigo){
                                 $porcentaje++;
                                 //Guardar en el historico
-                                $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario);
+                                $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario,null);
                             }else{
                                 $codigosNoCambiados[$key] =[
                                     "codigo" => $item->codigo
@@ -311,7 +313,7 @@ class CodigoLibrosController extends Controller
                         if($codigo){
                             $porcentaje++;
                             //Guardar en el historico
-                            $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario);
+                            $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario,null);
                         }else{
                             $codigosNoCambiados[$key] =[
                                 "codigo" => $item->codigo
@@ -363,7 +365,7 @@ class CodigoLibrosController extends Controller
                         if($codigo){
                             $porcentaje++;
                             //Guardar en el historico
-                            $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario);
+                            $this->GuardarEnHistorico($usuario_editor,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$request->comentario,null);
                         }else{
                             $codigosNoCambiados[$key] =[
                                 "codigo" => $item->codigo
@@ -399,19 +401,178 @@ class CodigoLibrosController extends Controller
                 }       
              }else{
                 $codigosNoExisten[$key] =[
-                     "codigo" => $item->codigo
+                    "codigo" => $item->codigo
                 ];
             }
         }
          $data = [
             "ingresados" => $porcentaje,
-            "codigosNoCambiados" => $codigosNoCambiados,
-            "codigosNoExisten" => $codigosNoExisten,
-            "codigosDemas" => $codigosDemas,
+            "codigosNoCambiados"    => array_values($codigosNoCambiados),
+            "codigosNoExisten"      => array_values($codigosNoExisten),
+            "codigoConProblemas"    => $codigosDemas,
         ];
         return $data;
      }
-     
+     //API:POST/codigos/import/gestion/diagnostico
+     public function importGestionDiagnostico(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $miArrayDeObjetos   = json_decode($request->data_codigos);  
+        //variables
+        $usuario_editor     = $request->id_usuario;
+        $institucion_id     = $request->institucion_id;
+        $comentario         = $request->comentario;
+        $periodo_id         = $request->periodo_id;
+        $contador           = 0;
+        $getLongitud        = sizeof($miArrayDeObjetos);
+        $longitud           = $getLongitud/2;
+        $TipoVenta          = $request->venta_estado;
+        // Supongamos que tienes una colección vacía
+        $codigosNoExisten   = collect();
+        $codigoConProblemas = collect();
+        for($i = 0; $i<$longitud; $i++){
+            // Creamos un nuevo array para almacenar los objetos quitados
+            $nuevoArray             = [];
+            $codigoActivacion       = "";
+            $codigoDiagnostico      = "";
+            $validarA               = [];
+            $validarD               = [];
+            // Eliminamos los dos primeros objetos del array original y los agregamos al nuevo array
+            $nuevoArray[]           = array_shift($miArrayDeObjetos);
+            $nuevoArray[]           = array_shift($miArrayDeObjetos);
+            $codigoActivacion       = $nuevoArray[0]->codigo;
+            $codigoDiagnostico      = $nuevoArray[1]->codigo;
+            //===CODIGO DE ACTIVACION====
+            //validacion
+            $validarA               = $this->getCodigos($codigoActivacion,0);
+            $validarD               = $this->getCodigos($codigoDiagnostico,0);
+            //======si ambos codigos existen========
+            if(count($validarA) > 0 && count($validarD) > 0){
+                //====VARIABLES DE CODIGOS===
+                //====Activacion=====
+                //validar si el codigo ya esta liquidado
+                $ifLiquidadoA                = $validarA[0]->estado_liquidacion;
+                //validar si el codigo no este liquidado
+                $ifBloqueadoA                = $validarA[0]->estado;
+                //validar si tiene bc_institucion
+                $ifBc_InstitucionA           = $validarA[0]->bc_institucion;
+                //validar que el periodo del estudiante sea 0 o sea igual al que se envia
+                $ifid_periodoA               = $validarA[0]->id_periodo;  
+                //validar si el codigo tiene venta_estado 
+                $venta_estadoA               = $validarA[0]->venta_estado;
+                //venta lista
+                $ifventa_lista_institucionA  = $validarA[0]->venta_lista_institucion;
+                //======Diagnostico=====
+                //validar si el codigo ya esta liquidado
+                $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
+                //validar si el codigo no este liquidado
+                $ifBloqueadoD                = $validarD[0]->estado;
+                //validar si tiene bc_institucion
+                $ifBc_InstitucionD           = $validarD[0]->bc_institucion;
+                //validar que el periodo del estudiante sea 0 o sea igual al que se envia
+                $ifid_periodoD               = $validarD[0]->id_periodo;  
+                //validar si el codigo tiene venta_estado 
+                $venta_estadoD               = $validarD[0]->venta_estado;
+                //venta lista
+                $ifventa_lista_institucionD  = $validarD[0]->venta_lista_institucion;
+                //===VENTA DIRECTA====
+                if($TipoVenta == 1){
+                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){ 
+                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){ 
+                            //Ingresar Union a codigo de activacion
+                           $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get(); 
+                           $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
+                           if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                           //Ingresar Union a codigo de prueba diagnostico
+                           $old_valuesD = CodigosLibros::findOrFail($codigoDiagnostico);
+                           $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
+                           if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                        }else{
+                            $codigoConProblemas->push($validarD);
+                        } 
+                    }else{
+                        $codigoConProblemas->push($validarA);
+                    } 
+                }
+                //==VENTA LISTA=====
+                if($TipoVenta == 2){
+                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){  
+                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){  
+                            //Ingresar Union a codigo de activacion
+                            $old_valuesA    = CodigosLibros::findOrFail($codigoActivacion);
+                            $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
+                            if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                            //Ingresar Union a codigo de prueba diagnostico
+                            $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
+                            $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
+                            if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                        }else{
+                            $codigoConProblemas->push($validarD);
+                        }
+                    }
+                    else{
+                        $codigoConProblemas->push($validarA);
+                    } 
+                }
+            }
+            //Si uno de los 2 codigos no existen
+            else{
+                //si no existe el codigo de activacion
+                if(count($validarA) == 0 && count($validarD) > 0){
+                    $codigosNoExisten->push(['codigoNoExiste' => "activacion", 'codigoActivacion' => $codigoActivacion, 'codigoDiagnostico' => $codigoDiagnostico]);
+                }
+                //si no existe el codigo de diagnostico
+                if(count($validarD) == 0 && count($validarA) > 0){
+                    $codigosNoExisten->push(['codigoNoExiste' => "diagnostico",'codigoActivacion' => $codigoActivacion, 'codigoDiagnostico' => $codigoDiagnostico]);
+                }
+                //si no existe ambos
+                if(count($validarA) == 0 && count($validarD) == 0){
+                    $codigosNoExisten->push(['codigoNoExiste' => "ambos",      'codigoActivacion' => $codigoActivacion, 'codigoDiagnostico' => $codigoDiagnostico]);
+                }
+            }
+        }
+        return [
+            "CodigosDiagnosticoNoexisten"       => $codigosNoExisten->all(),
+            "codigoConProblemas"                => array_merge(...$codigoConProblemas->all()),
+            "ingresados"                        => $contador,
+        ];
+     }
+     public function UpdateCodigo($codigo,$union,$request){
+        if($request->venta_estado == 1){
+            return $this->updateCodigoVentaDirecta($codigo,$union,$request);
+        }
+        if($request->venta_estado == 2){
+            return $this->updateCodigoVentaLista($codigo,$union,$request);
+        }
+    }
+    public function updateCodigoVentaDirecta($codigo,$union,$request){
+        $codigo = DB::table('codigoslibros')
+            ->where('codigo', '=', $codigo)
+            ->where('estado_liquidacion', '=', '1')
+            //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
+            ->update([
+                'factura'           => $request->factura,
+                'bc_institucion'    => $request->institucion_id,
+                'bc_periodo'        => $request->periodo_id,
+                'venta_estado'      => $request->venta_estado,
+                'codigo_union'      => $union
+            ]);
+        return $codigo;
+    }
+    public function updateCodigoVentaLista($codigo,$union,$request){
+        $codigo = DB::table('codigoslibros')
+            ->where('codigo', '=', $codigo)
+            ->where('estado_liquidacion', '=', '1')
+            //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
+            ->update([
+                'factura'                   => $request->factura,
+                'venta_lista_institucion'   => $request->institucion_id,
+                'bc_periodo'                => $request->periodo_id,
+                'venta_estado'              => $request->venta_estado,
+                'codigo_union'              => $union
+            ]);
+        return $codigo;
+    }
      //api:get>>/codigos/revision
      public function revision(Request $request){
         set_time_limit(6000000);
@@ -421,8 +582,10 @@ class CodigoLibrosController extends Controller
         $data=[];
         $codigosNoExisten=[];
         $contador = 0;
+        //conDevolucion => 1 = si; 0 = no;
+        $conDevolucion = $request->conDevolucion;
         foreach($codigos as $key => $item){
-            $consulta = $this->getCodigos($item->codigo);
+            $consulta = $this->getCodigos($item->codigo,$conDevolucion);
             if(count($consulta) > 0){
                $datos[] = $consulta[0];
             }else{
@@ -489,7 +652,7 @@ class CodigoLibrosController extends Controller
         $contador = 0; 
         foreach($codigos as $key => $item){
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 $ifLiquidado        = $validar[0]->estado_liquidacion;
@@ -557,22 +720,15 @@ class CodigoLibrosController extends Controller
             "codigoNoExiste" => $codigoNoExiste
         ];
      }
-     public function getCodigos($codigo){
-        $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,
+     //conDevolucion => 1 si; 0 no;
+     public function getCodigos($codigo,$conDevolucion){
+        $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.porcentaje_descuento,
         c.libro as book,c.serie,c.created_at,
-        (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
-        FROM codigos_devolucion d
-        WHERE d.codigo = c.codigo
-        AND d.estado = '1'
-        ORDER BY d.id DESC 
-        LIMIT 1) as devolucionInstitucion,
-        (SELECT COUNT(d.id) FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo AND d.estado = '1'
-        ) as devolucion,
         c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
-        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro, c.venta_lista_institucion,
+        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+        c.contrato,c.libro, c.venta_lista_institucion,
         CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
         i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
@@ -602,7 +758,66 @@ class CodigoLibrosController extends Controller
         LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
         WHERE codigo = '$codigo'
         ");
-        return $consulta;
+        if(empty($consulta)){
+            return $consulta;
+        }
+        $datos = [];
+        foreach($consulta as $key => $item){
+            $devolucionInstitucion = "";
+            //conDevolucion => 1 si; 0 no;
+            if($conDevolucion == 1){
+                //ULTIMA INSTITUCION
+                $query = DB::SELECT("SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+                FROM codigos_devolucion d
+                WHERE d.codigo = '$item->codigo'
+                AND d.estado = '1'
+                ORDER BY d.id DESC 
+                LIMIT 1");
+                if(count($query) > 0){
+                $devolucionInstitucion =  $query[0]->devolucion;
+                }    
+            }
+            $datos[$key] = (Object)[
+                "InstitucionLista"              => $item->InstitucionLista,
+                "barrasEstado"                  => $item->barrasEstado, 
+                "bc_estado"                     => $item->bc_estado,
+                "bc_fecha_ingreso"              => $item->bc_fecha_ingreso,
+                "bc_institucion"                => $item->bc_institucion,
+                "bc_periodo"                    => $item->bc_periodo,
+                "book"                          => $item->book,
+                "cedula"                        => $item->cedula,
+                "codigo"                        => $item->codigo,
+                "codigoEstado"                  => $item->codigoEstado,
+                "contador"                      => $item->contador,
+                "contrato"                      => $item->contrato,
+                "created_at"                    => $item->created_at,
+                "devolucionInstitucion"         => $devolucionInstitucion,
+                "email"                         => $item->email,
+                "estado"                        => $item->estado,
+                "estado_liquidacion"            => $item->estado_liquidacion,
+                "estudiante"                    => $item->estudiante,
+                "factura"                       => $item->factura,
+                "id_periodo"                    => $item->id_periodo,
+                "idusuario"                     => $item->idusuario,
+                "institucionBarra"              => $item->institucionBarra,
+                "institucion_barras"            => $item->institucion_barras,
+                "libro"                         => $item->libro,
+                "liquidacion"                   => $item->liquidacion,
+                "nombreInstitucion"             => $item->nombreInstitucion,
+                "periodo"                       => $item->periodo,
+                "periodo_barras"                => $item->periodo_barras,
+                "porcentaje_descuento"          => $item->porcentaje_descuento,
+                "prueba_diagnostica"            => $item->prueba_diagnostica,
+                "serie"                         => $item->serie,
+                "status"                        => $item->status,
+                "tipoCodigo"                    => $item->tipoCodigo,
+                "ventaEstado"                   => $item->ventaEstado,
+                "venta_estado"                  => $item->venta_estado,
+                "venta_lista_institucion"       => $item->venta_lista_institucion,
+                "codigo_union"                  => $item->codigo_union,
+            ];
+        }
+        return $datos;
      }
 
      public function eliminar(Request $request){
@@ -617,7 +832,7 @@ class CodigoLibrosController extends Controller
         $contador = 0;
         foreach($codigos as $key => $item){
              //validar si el codigo existe
-             $validar = $this->getCodigos($item->codigo);
+             $validar = $this->getCodigos($item->codigo,0);
              //valida que el codigo existe
              if(count($validar)>0){
                 //validar si el codigo tiene usuario y si ya esta liquidado
@@ -755,7 +970,7 @@ class CodigoLibrosController extends Controller
         $contador = 0;
         foreach($codigos as $key => $item){
                 //validar si el codigo existe
-                $validar = $this->getCodigos($item->codigo);
+                $validar = $this->getCodigos($item->codigo,0);
                 //valida que el codigo existe
                 if(count($validar)>0){
                     //validar si el codigo tiene usuario
@@ -835,7 +1050,7 @@ class CodigoLibrosController extends Controller
         $contador =0;
         foreach($codigos as $key => $item){
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 //validar si el codigo tiene usuario
@@ -934,7 +1149,7 @@ class CodigoLibrosController extends Controller
         }
         foreach($codigos as $key => $item){
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 //validar venta estado
@@ -960,7 +1175,7 @@ class CodigoLibrosController extends Controller
                         if($codigo){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,null);
                             //ingresar a la tabla de devolucion
                             $this->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                         }else{
@@ -1011,7 +1226,7 @@ class CodigoLibrosController extends Controller
                         if($codigo){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,null);
                             //ingresar a la tabla de devolucion
                             $this->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                         }else{
@@ -1095,7 +1310,7 @@ class CodigoLibrosController extends Controller
         $contador = 0;
         $fecha  = date('Y-m-d H:i:s');
             //validar si el codigo existe
-             $validar = $this->getCodigos($getCodigo);
+             $validar = $this->getCodigos($getCodigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 $ifventa_estado = $validar[0]->venta_estado;
@@ -1434,7 +1649,7 @@ class CodigoLibrosController extends Controller
         $todate  = date('Y-m-d H:i:s');   
         foreach($codigos as $key => $item){
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 //validar si el codigo ya haya sido leido
@@ -1451,10 +1666,10 @@ class CodigoLibrosController extends Controller
                 $ifventa_estado     = $validar[0]->venta_estado;
                 //validar el bc_periodo
                 $ifbc_periodo       = $validar[0]->bc_periodo;
-                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
+                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && ($ifLeido == '1' || $ifLeido == '2') && $ifLiquidado == '1' && $ifBloqueado !=2){
                     $codigo =  DB::table('codigoslibros')
                     ->where('codigo', $item->codigo)
-                    ->where('bc_estado', '1')
+                    // ->where('bc_estado', '1')
                     ->where('estado','<>', '2')
                     ->where('estado_liquidacion','=', '1')
                     ->update([
@@ -1535,7 +1750,7 @@ class CodigoLibrosController extends Controller
         $porcentaje        = 0;
         $contador          = 0;
         foreach($codigos as $key => $item){
-            $consulta = $this->getCodigos($item->codigo);
+            $consulta = $this->getCodigos($item->codigo,0);
             //si ya existe el codigo lo mando a un array
             if(count($consulta) > 0){
                $datos[] = $consulta[0];

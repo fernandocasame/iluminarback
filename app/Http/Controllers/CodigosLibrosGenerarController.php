@@ -417,8 +417,6 @@ class CodigosLibrosGenerarController extends Controller
             AND d.estado = '1'
             ORDER BY d.id DESC
             LIMIT 1) as devolucionInstitucion,
-            (SELECT COUNT(d.id) FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo AND d.estado = '1') as devolucion,
             (SELECT h.created_at FROM hist_codlibros h
             WHERE h.codigo_libro like '%$codigo%'
             AND h.observacion = 'registrado' ORDER BY h.created_at DESC limit 1) as fecha_registro,
@@ -890,12 +888,7 @@ class CodigosLibrosGenerarController extends Controller
             AND d.estado = '1'
             ORDER BY d.id DESC
             LIMIT 1
-        ) as devolucionInstitucion,
-        (
-            SELECT COUNT(d.id) FROM codigos_devolucion d
-            WHERE d.codigo = co.codigo AND d.estado = '1'
-        ) as devolucion
-
+        ) as devolucionInstitucion
         FROM hist_codlibros h
         LEFT JOIN institucion i ON h.usuario_editor = i.idInstitucion
         LEFT JOIN usuario u ON h.idInstitucion = u.idusuario
