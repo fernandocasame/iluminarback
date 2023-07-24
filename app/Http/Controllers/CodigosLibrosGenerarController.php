@@ -408,7 +408,7 @@ class CodigosLibrosGenerarController extends Controller
     }
     public function codigosBuscarCodigo($codigo){
             $codigos_libros = DB::SELECT("SELECT
-            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,
+            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
              u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
             (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
@@ -459,7 +459,7 @@ class CodigosLibrosGenerarController extends Controller
     }
     public function codigosBuscarxCodigo($codigo){
         $codigos_libros = DB::SELECT("SELECT 
-            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,
+            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
             u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
             (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
             FROM codigos_devolucion d
