@@ -12,10 +12,11 @@ class SalleAreasController extends Controller
 {
     public function index(Request $request)
     {   
-        $areas = DB::SELECT("SELECT * FROM salle_areas");
-
+        $areas = DB::SELECT("SELECT a.*,
+        IF(a.estado = '1','Activo','Desactivado') as estadoArea
+        FROM salle_areas a
+        ");
         return $areas;
-
     }
 
     /**

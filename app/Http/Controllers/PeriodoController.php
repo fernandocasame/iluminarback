@@ -229,6 +229,8 @@ class PeriodoController extends Controller
         $periodo->obsequios_facturador  = $request->obsequios_facturador;
         $periodo->obsequios_gerencia    = $request->obsequios_gerencia;
         $periodo->obsequio_asesor       = $request->obsequio_asesor;
+        //cambiar periodo
+        $periodo->cambiar_periodo       = $request->cambiar_periodo;
         $periodo->save();
         return $periodo;
     }

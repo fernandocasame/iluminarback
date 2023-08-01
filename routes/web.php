@@ -1196,6 +1196,7 @@ Route::post('eliminarAlcance','PedidosController@eliminarAlcance');
 Route::post('AceptarAlcance','PedidosController@AceptarAlcance');
 Route::get('get_val_pedidoInfo_alcance/{pedido}/{alcance}','PedidosController@get_val_pedidoInfo_alcance');
 Route::get('milton_test','AdminController@pruebaApi');
+Route::get('trazabilidadAlcance/{pedido}','PedidosController@trazabilidadAlcance');
 //APIS DE GUIAS
 Route::resource('guias','GuiasController');
 Route::post('guias/cambiar','GuiasController@changeGuiaSTOCK');
@@ -1296,5 +1297,8 @@ Route::post('agregarDocumentosAnteriorPedido','PedidosController@agregarDocument
 Route::resource('neetTema','NeetTemaController');
 Route::post('neetEliminar','NeetTemaController@neetEliminar');
 //=====FIN APIS NEET DOCUMENTOS=====================================
-
-
+//=====SALLE========================================================
+Route::group(['prefix' => 'salle'],function(){
+  Route::resource('periodos','SallePeriodoController');
+});
+//=====FIN SALLE====================================================

@@ -11,8 +11,11 @@ class SalleAsignaturasController extends Controller
 {
     public function index(Request $request)
     {   
-        $asignaturas = DB::SELECT("SELECT * FROM salle_asignaturas");
-
+        $asignaturas = DB::SELECT("SELECT asi.*, a.nombre_area,
+            IF(asi.estado = '1','Activo','Desactivado') as estadoAsignatura
+            FROM salle_asignaturas asi
+            LEFT JOIN salle_areas  a ON asi.id_area = a.id_area
+        ");
         return $asignaturas;
 
     }

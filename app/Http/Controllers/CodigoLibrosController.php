@@ -21,7 +21,7 @@ class CodigoLibrosController extends Controller
         ini_set('max_execution_time', 6000000);
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $institucion        =  $request->institucion_id;
         $traerPeriodo       =  $request->periodo_id;
         $nombreInstitucion  =  $request->nombreInstitucion;
@@ -33,7 +33,7 @@ class CodigoLibrosController extends Controller
         $codigoNoExiste = [];
         $porcentaje = 0;
         $contador = 0;
-        $todate  = date('Y-m-d H:i:s');   
+        $todate  = date('Y-m-d H:i:s');
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validar = $this->getCodigos($item->codigo,0);
@@ -49,7 +49,7 @@ class CodigoLibrosController extends Controller
                 $ifBc_Institucion   = $validar[0]->bc_institucion;
                 //validar que el periodo del estudiante sea 0 o sea igual al que se envia
                 $ifid_periodo       = $validar[0]->id_periodo;
-                //validar que el venta_estado sea cero o igual al enviado desde el front 
+                //validar que el venta_estado sea cero o igual al enviado desde el front
                 $ifventa_estado     = $validar[0]->venta_estado;
                 //validar el bc_periodo
                 $ifbc_periodo       = $validar[0]->bc_periodo;
@@ -65,7 +65,7 @@ class CodigoLibrosController extends Controller
                         'bc_periodo'            => $traerPeriodo,
                         'bc_fecha_ingreso'      => $todate,
                         'venta_estado'          => $venta_estado
-                    ]);   
+                    ]);
                     if($codigo){
                         $porcentaje++;
                         //ingresar en el historico
@@ -81,7 +81,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigosLeidos[$contador] = [
                         "codigo" => $item->codigo,
@@ -134,8 +134,8 @@ class CodigoLibrosController extends Controller
      }
 
       //api:post//codigos/import/gestion
-    public function importGestion(Request $request) 
-    {   
+    public function importGestion(Request $request)
+    {
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         //variables
@@ -143,7 +143,7 @@ class CodigoLibrosController extends Controller
         $institucion_id = $request->institucion_id;
         $periodo_id = $request->periodo_id;
         $codigosNoExisten =[];
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $codigosNoCambiados = [];
         $codigosDemas = [];
         $porcentaje = 0;
@@ -183,15 +183,15 @@ class CodigoLibrosController extends Controller
                     //validar si tiene bc_institucion
                     $ifBc_Institucion   = $validar[0]->bc_institucion;
                     //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-                    $ifid_periodo   = $validar[0]->id_periodo;  
-                    //validar si el codigo tiene venta_estado 
+                    $ifid_periodo   = $validar[0]->id_periodo;
+                    //validar si el codigo tiene venta_estado
                     $venta_estado = $validar[0]->venta_estado;
                     //venta lista
                     $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
                     //VENTA DIRECTA
                     if($request->venta_estado == '1'){
-                        //(SE QUITARA PARA AHORA EL ESTUDIANTE envia los codigos por formulario)if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ( $ifBc_Institucion == 0 || $ifBc_Institucion == $institucion_id )  && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2 && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null")){  
-                        if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ( $ifBc_Institucion == 0 || $ifBc_Institucion == $institucion_id )  && ($ifLeido == '1' || $ifLeido == '2') && $ifLiquidado == '1' && $ifBloqueado !=2 && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null")){  
+                        //(SE QUITARA PARA AHORA EL ESTUDIANTE envia los codigos por formulario)if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ( $ifBc_Institucion == 0 || $ifBc_Institucion == $institucion_id )  && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2 && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null")){
+                        if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ( $ifBc_Institucion == 0 || $ifBc_Institucion == $institucion_id )  && ($ifLeido == '1' || $ifLeido == '2') && $ifLiquidado == '1' && $ifBloqueado !=2 && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null")){
                             $codigo = DB::table('codigoslibros')
                             ->where('codigo', '=', $item->codigo)
                             ->where('estado_liquidacion', '=', '1')
@@ -210,7 +210,7 @@ class CodigoLibrosController extends Controller
                                 $codigosNoCambiados[$key] =[
                                     "codigo" => $item->codigo
                                 ];
-                            }  
+                            }
                         }else{
                             $codigosDemas[$contador] = [
                                 "codigo" => $item->codigo,
@@ -245,9 +245,9 @@ class CodigoLibrosController extends Controller
                         //validacion que el bc_estado sea 1 o 2  leido o no leido
                         //el venta estado puede ser 0 o nulo
                         //estado liquidacion = 1
-                        //que no este bloqueado 
-                        if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && ($ifLeido == '1' || $ifLeido == '2') && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null") && $ifLiquidado == '1' && $ifBloqueado !=2 && $ifventa_lista_institucion == '0'){  
-                        //(PARA EL VERIFICACION POR CODIGOS QUE EL ESTUDIANTE INGRESE)if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2 && $ifventa_lista_institucion == '0'){  
+                        //que no este bloqueado
+                        if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && ($ifLeido == '1' || $ifLeido == '2') && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null") && $ifLiquidado == '1' && $ifBloqueado !=2 && $ifventa_lista_institucion == '0'){
+                        //(PARA EL VERIFICACION POR CODIGOS QUE EL ESTUDIANTE INGRESE)if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2 && $ifventa_lista_institucion == '0'){
                             $codigo = DB::table('codigoslibros')
                             ->where('codigo', '=', $item->codigo)
                             ->where('estado_liquidacion', '=', '1')
@@ -257,7 +257,7 @@ class CodigoLibrosController extends Controller
                                 'venta_lista_institucion'   => $request->institucion_id,
                                 'bc_periodo'                => $request->periodo_id,
                                 'venta_estado'              => $request->venta_estado,
-                            ]);  
+                            ]);
                             if($codigo){
                                 $porcentaje++;
                                 //Guardar en el historico
@@ -266,7 +266,7 @@ class CodigoLibrosController extends Controller
                                 $codigosNoCambiados[$key] =[
                                     "codigo" => $item->codigo
                                 ];
-                            }  
+                            }
                         }else{
                             $codigosDemas[$contador] = [
                                 "codigo" => $item->codigo,
@@ -295,13 +295,13 @@ class CodigoLibrosController extends Controller
                             $contador++;
                         }
                     }
-                    
+
                 }
                 //REGALADO NO ENTRA A LA LIQUIDACION
                 if($request->regalado == '1'){
                     //validar si el codigo tiene estado liquidacion = 2 Y que no este liquidado
                     $estado_liquidacion = $validar[0]->estado_liquidacion;
-                    if($estado_liquidacion!=2 && $estado_liquidacion!= 0){  
+                    if($estado_liquidacion!=2 && $estado_liquidacion!= 0){
                         $codigo = DB::table('codigoslibros')
                         ->where('codigo', '=', $item->codigo)
                         ->update([
@@ -318,7 +318,7 @@ class CodigoLibrosController extends Controller
                             $codigosNoCambiados[$key] =[
                                 "codigo" => $item->codigo
                             ];
-                        }  
+                        }
                     }else{
                         $codigosDemas[$contador] = [
                             "codigo" => $item->codigo,
@@ -352,7 +352,7 @@ class CodigoLibrosController extends Controller
                     //validar si el codigo tiene estado bloqueado y liquidado
                     $estado_liquidacion = $validar[0]->estado_liquidacion;
                     $validarEstado = $validar[0]->estado;
-                    if($estado_liquidacion !='0' && $validarEstado !=2){  
+                    if($estado_liquidacion !='0' && $validarEstado !=2){
                         $codigo = DB::table('codigoslibros')
                         ->where('codigo', '=', $item->codigo)
                         ->update([
@@ -370,7 +370,7 @@ class CodigoLibrosController extends Controller
                             $codigosNoCambiados[$key] =[
                                 "codigo" => $item->codigo
                             ];
-                        }  
+                        }
                     }else{
                         $codigosDemas[$contador] = [
                             "codigo" => $item->codigo,
@@ -398,7 +398,7 @@ class CodigoLibrosController extends Controller
                         ];
                         $contador++;
                     }
-                }       
+                }
              }else{
                 $codigosNoExisten[$key] =[
                     "codigo" => $item->codigo
@@ -417,13 +417,14 @@ class CodigoLibrosController extends Controller
     public function importGestionDiagnostico(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $miArrayDeObjetos   = json_decode($request->data_codigos);  
+        $miArrayDeObjetos   = json_decode($request->data_codigos);
         //variables
         $usuario_editor     = $request->id_usuario;
         $institucion_id     = $request->institucion_id;
         $comentario         = $request->comentario;
         $periodo_id         = $request->periodo_id;
-        $contador           = 0;
+        $contadorA          = 0;
+        $contadorD          = 0;
         $getLongitud        = sizeof($miArrayDeObjetos);
         $longitud           = $getLongitud/2;
         $TipoVenta          = $request->venta_estado;
@@ -466,8 +467,8 @@ class CodigoLibrosController extends Controller
                 //validar si tiene bc_institucion
                 $ifBc_InstitucionA           = $validarA[0]->bc_institucion;
                 //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-                $ifid_periodoA               = $validarA[0]->id_periodo;  
-                //validar si el codigo tiene venta_estado 
+                $ifid_periodoA               = $validarA[0]->id_periodo;
+                //validar si el codigo tiene venta_estado
                 $venta_estadoA               = $validarA[0]->venta_estado;
                 //venta lista
                 $ifventa_lista_institucionA  = $validarA[0]->venta_lista_institucion;
@@ -479,49 +480,49 @@ class CodigoLibrosController extends Controller
                 //validar si tiene bc_institucion
                 $ifBc_InstitucionD           = $validarD[0]->bc_institucion;
                 //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-                $ifid_periodoD               = $validarD[0]->id_periodo;  
-                //validar si el codigo tiene venta_estado 
+                $ifid_periodoD               = $validarD[0]->id_periodo;
+                //validar si el codigo tiene venta_estado
                 $venta_estadoD               = $validarD[0]->venta_estado;
                 //venta lista
                 $ifventa_lista_institucionD  = $validarD[0]->venta_lista_institucion;
                 //===VENTA DIRECTA====
                 if($TipoVenta == 1){
-                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){ 
-                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){ 
+                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){
+                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){
                             //Ingresar Union a codigo de activacion
-                           $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get(); 
+                           $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get();
                            $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
-                           if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                           if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
                            //Ingresar Union a codigo de prueba diagnostico
                            $old_valuesD = CodigosLibros::findOrFail($codigoDiagnostico);
                            $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
-                           if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                           if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
                         }else{
                             $codigoConProblemas->push($validarD);
-                        } 
+                        }
                     }else{
                         $codigoConProblemas->push($validarA);
-                    } 
+                    }
                 }
                 //==VENTA LISTA=====
                 if($TipoVenta == 2){
-                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){  
-                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){  
+                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){
+                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){
                             //Ingresar Union a codigo de activacion
                             $old_valuesA    = CodigosLibros::findOrFail($codigoActivacion);
                             $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
-                            if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                            if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
                             //Ingresar Union a codigo de prueba diagnostico
                             $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
                             $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
-                            if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                            if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
                         }else{
                             $codigoConProblemas->push($validarD);
                         }
                     }
                     else{
                         $codigoConProblemas->push($validarA);
-                    } 
+                    }
                 }
             }
             //Si uno de los 2 codigos no existen
@@ -541,9 +542,10 @@ class CodigoLibrosController extends Controller
             }
         }
         return [
-            "CodigosDiagnosticoNoexisten"       => $codigosNoExisten->all(),
-            "codigoConProblemas"                => array_merge(...$codigoConProblemas->all()),
-            "ingresados"                        => $contador,
+            "CodigosDiagnosticoNoexisten"      => $codigosNoExisten->all(),
+            "codigoConProblemas"               => array_merge(...$codigoConProblemas->all()),
+            "contadorA"                        => $contadorA,
+            "contadorD"                        => $contadorD,
         ];
     }
     public function UpdateCodigo($codigo,$union,$request){
@@ -586,7 +588,7 @@ class CodigoLibrosController extends Controller
      public function revision(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $data=[];
         $codigosNoExisten=[];
@@ -602,7 +604,7 @@ class CodigoLibrosController extends Controller
                     "codigo" => $item->codigo
                 ];
                 $contador++;
-            }       
+            }
         }
         $data = [
             "codigosNoExisten" =>$codigosNoExisten,
@@ -614,8 +616,8 @@ class CodigoLibrosController extends Controller
      public function getTipoVenta(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $tipoVenta = DB::SELECT("SELECT 
-        c.prueba_diagnostica,c.factura, 
+        $tipoVenta = DB::SELECT("SELECT
+        c.prueba_diagnostica,c.factura,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.contrato,c.porcentaje_descuento,
         c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
@@ -644,7 +646,7 @@ class CodigoLibrosController extends Controller
         LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
         LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
         LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-        WHERE (c.bc_institucion = '$request->institucion_id' OR venta_lista_institucion = '$request->institucion_id') 
+        WHERE (c.bc_institucion = '$request->institucion_id' OR venta_lista_institucion = '$request->institucion_id')
         AND c.bc_periodo = '$request->periodo_id'
         ");
         return $tipoVenta;
@@ -653,12 +655,12 @@ class CodigoLibrosController extends Controller
      public function bloquearCodigos(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $codigosNoCambiados=[];
         $codigoLiquidados =[];
         $codigoNoExiste = [];
         $porcentaje = 0;
-        $contador = 0; 
+        $contador = 0;
         $usuario_editor = $request->id_usuario;
         $comentario     = $request->comentario;
         $periodo_id     = $request->periodo_id;
@@ -677,17 +679,17 @@ class CodigoLibrosController extends Controller
                     ->where('estado_liquidacion','<>', '0')
                     ->update([
                         'estado'             => 2,
-                    ]);   
+                    ]);
                     if($codigo){
                         $porcentaje++;
                         //ingresar en el historico
-                        $old_values = CodigosLibros::Where('codigo',$item->codigo)->get(); 
+                        $old_values = CodigosLibros::Where('codigo',$item->codigo)->get();
                         $this->GuardarEnHistorico(0,$request->institucion_id,$periodo_id,$item->codigo,$usuario_editor,$comentario,$old_values);
                     }else{
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigoLiquidados[$contador] = [
                         "codigo" => $item->codigo,
@@ -774,19 +776,19 @@ class CodigoLibrosController extends Controller
             //conDevolucion => 1 si; 0 no;
             if($conDevolucion == 1){
                 //ULTIMA INSTITUCION
-                $query = DB::SELECT("SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+                $query = DB::SELECT("SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
                 FROM codigos_devolucion d
                 WHERE d.codigo = '$item->codigo'
                 AND d.estado = '1'
-                ORDER BY d.id DESC 
+                ORDER BY d.id DESC
                 LIMIT 1");
                 if(count($query) > 0){
                 $devolucionInstitucion =  $query[0]->devolucion;
-                }    
+                }
             }
             $datos[$key] = (Object)[
                 "InstitucionLista"              => $item->InstitucionLista,
-                "barrasEstado"                  => $item->barrasEstado, 
+                "barrasEstado"                  => $item->barrasEstado,
                 "bc_estado"                     => $item->bc_estado,
                 "bc_fecha_ingreso"              => $item->bc_fecha_ingreso,
                 "bc_institucion"                => $item->bc_institucion,
@@ -830,7 +832,7 @@ class CodigoLibrosController extends Controller
      public function eliminar(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $codigosNoCambiados=[];
         $codigoNoExiste = [];
@@ -861,7 +863,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigosConUsuario[$contador] = [
                         "codigo" => $item->codigo,
@@ -906,7 +908,7 @@ class CodigoLibrosController extends Controller
      public function bodegaEliminar(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $codigosNoCambiados=[];
         $codigoNoExiste = [];
@@ -943,7 +945,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigosConLibro[$contador] = [
                     "codigo" => $item->codigo,
@@ -968,7 +970,7 @@ class CodigoLibrosController extends Controller
      public function changePeriodo(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $codigosNoCambiados=[];
         $codigosConUsuario =[];
@@ -1004,7 +1006,7 @@ class CodigoLibrosController extends Controller
                             $codigosNoCambiados[$key] = [
                                 "codigo" => $item->codigo
                             ];
-                        }  
+                        }
                     }else{
                         $codigosConUsuario[$contador] = [
                             "codigo" => $item->codigo,
@@ -1048,7 +1050,7 @@ class CodigoLibrosController extends Controller
     public function changePeriodoVarios(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $codigosNoCambiados=[];
         $codigosConUsuario =[];
@@ -1084,7 +1086,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigosConUsuario[$contador] = [
                         "codigo" => $item->codigo,
@@ -1126,7 +1128,7 @@ class CodigoLibrosController extends Controller
     }
     //api:GET/codigo/devoluciones/{codigo}
     public function verDevoluciones($codigo){
-        $getReturns = DB::SELECT("SELECT d.*, 
+        $getReturns = DB::SELECT("SELECT d.*,
         i.nombreInstitucion,p.periodoescolar,
         CONCAT(u.nombres, ' ', u.apellidos) AS editor
         FROM codigos_devolucion d
@@ -1142,7 +1144,7 @@ class CodigoLibrosController extends Controller
     public function devolucionBodega(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $codigosNoCambiados=[];
         $codigosConLiquidacion =[];
@@ -1189,7 +1191,7 @@ class CodigoLibrosController extends Controller
                             $codigosNoCambiados[$key] =[
                                 "codigo" => $item->codigo
                             ];
-                        }  
+                        }
                     }else{
                         $codigosConLiquidacion[$contador] = [
                             "codigo" => $item->codigo,
@@ -1216,7 +1218,7 @@ class CodigoLibrosController extends Controller
                             "factura"               => $validar[0]->factura
                         ];
                         $contador++;
-                    }   
+                    }
                 }
                 //BODEGA(NO PUEDE DEVOLVER SI ES DIFERNTE INSTITUCION O PUNTO DE DEVOLUCION)
                 else{
@@ -1240,7 +1242,7 @@ class CodigoLibrosController extends Controller
                             $codigosNoCambiados[$key] =[
                                 "codigo" => $item->codigo
                             ];
-                        }  
+                        }
                     }else{
                         $mensaje_personalizado = "";
                         //mensaje personalizado front
@@ -1279,9 +1281,9 @@ class CodigoLibrosController extends Controller
                             "factura"               => $validar[0]->factura
                         ];
                         $contador++;
-                    }  
+                    }
                 }
-                
+
             }else{
                 $codigoNoExiste[$key] =[
                     "codigo" => $item->codigo
@@ -1306,7 +1308,7 @@ class CodigoLibrosController extends Controller
         $devolucion->usuario_editor     = $id_usuario;
         $devolucion->save();
     }
-  
+
     public function devolucionIndividualBodega($getCodigo,$id_usuario,$cliente,$institucion_id,$periodo_id,$observacion){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
@@ -1323,7 +1325,7 @@ class CodigoLibrosController extends Controller
                 $ifventa_estado = $validar[0]->venta_estado;
                 //validar si el codigo no se encuentra liquidado
                 $ifLiquidado = $validar[0]->estado_liquidacion;
-                //validar que el bc_institucion sea el mismo desde el front 
+                //validar que el bc_institucion sea el mismo desde el front
                 $ifBc_Institucion = $validar[0]->bc_institucion;
                 //institucion del venta lista
                 $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
@@ -1362,7 +1364,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[0] =[
                             "codigo" => $getCodigo
                         ];
-                    }  
+                    }
                 }else{
                     $mensaje_personalizado = "";
                     //mensaje personalizado front
@@ -1388,7 +1390,7 @@ class CodigoLibrosController extends Controller
                     "codigo" => $getCodigo
                 ];
             }
-        
+
         return [
             "cambiados" => $porcentaje,
             "codigosNoCambiados" => $codigosNoCambiados,
@@ -1401,14 +1403,14 @@ class CodigoLibrosController extends Controller
         //api:post//codigos/import/periodo
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $datos=[];
         $codigosNoCambiados=[];
         $codigoSinDevolucion =[];
         $codigoNoExiste = [];
         $porcentaje = 0;
         $contador = 0;
-        $fecha  = date('Y-m-d H:i:s');   
+        $fecha  = date('Y-m-d H:i:s');
         foreach($codigos as $key => $item){
         //validar si el codigo existe
             $validar = DB::SELECT("SELECT
@@ -1495,7 +1497,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigoSinDevolucion[$contador] = [
                         "codigo"                => $item->codigo,
@@ -1537,9 +1539,9 @@ class CodigoLibrosController extends Controller
     }
 
     public function PeriodoInstitucion($institucion){
-        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = ( 
+        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
             SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
-            from institucion i,  periodoescolar_has_institucion pir         
+            from institucion i,  periodoescolar_has_institucion pir
             WHERE i.idInstitucion = pir.institucion_idInstitucion
             AND pir.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi
             WHERE phi.institucion_idInstitucion = i.idInstitucion
@@ -1641,7 +1643,7 @@ class CodigoLibrosController extends Controller
     public function LeerVentaDirecta(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);  
+        $codigos = json_decode($request->data_codigos);
         $institucion        =  $request->institucion_id;
         $traerPeriodo       =  $request->periodo_id;
         $nombreInstitucion  =  $request->nombreInstitucion;
@@ -1653,7 +1655,7 @@ class CodigoLibrosController extends Controller
         $codigoNoExiste = [];
         $porcentaje = 0;
         $contador = 0;
-        $todate  = date('Y-m-d H:i:s');   
+        $todate  = date('Y-m-d H:i:s');
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validar = $this->getCodigos($item->codigo,0);
@@ -1669,7 +1671,7 @@ class CodigoLibrosController extends Controller
                 $ifBc_Institucion   = $validar[0]->bc_institucion;
                 //validar que el periodo del estudiante sea 0 o sea igual al que se envia
                 $ifid_periodo       = $validar[0]->id_periodo;
-                //validar que el venta_estado sea cero o igual al enviado desde el front 
+                //validar que el venta_estado sea cero o igual al enviado desde el front
                 $ifventa_estado     = $validar[0]->venta_estado;
                 //validar el bc_periodo
                 $ifbc_periodo       = $validar[0]->bc_periodo;
@@ -1685,7 +1687,7 @@ class CodigoLibrosController extends Controller
                         'bc_periodo'            => $traerPeriodo,
                         'bc_fecha_ingreso'      => $todate,
                         'venta_estado'          => $venta_estado
-                    ]);   
+                    ]);
                     if($codigo){
                         $porcentaje++;
                         //ingresar en el historico
@@ -1701,7 +1703,7 @@ class CodigoLibrosController extends Controller
                         $codigosNoCambiados[$key] =[
                             "codigo" => $item->codigo
                         ];
-                    }  
+                    }
                 }else{
                     $codigosLeidos[$contador] = [
                         "codigo"                => $item->codigo,
@@ -1745,7 +1747,7 @@ class CodigoLibrosController extends Controller
     public function importIngresoCodigos(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos           = json_decode($request->data_codigos);  
+        $codigos           = json_decode($request->data_codigos);
         $pruebaDiagnostica = $request->pruebaDiagnostica;
         $idlibro           = $request->idlibro;
         $id_usuario        = $request->id_usuario;
@@ -1784,7 +1786,7 @@ class CodigoLibrosController extends Controller
                     ];
                     $contador++;
                 }
-            }       
+            }
         }
         $data = [
             "cambiados"             => $porcentaje,
