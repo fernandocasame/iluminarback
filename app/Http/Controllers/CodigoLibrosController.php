@@ -541,12 +541,21 @@ class CodigoLibrosController extends Controller
                 }
             }
         }
-        return [
-            "CodigosDiagnosticoNoexisten"      => $codigosNoExisten->all(),
-            "codigoConProblemas"               => array_merge(...$codigoConProblemas->all()),
-            "contadorA"                        => $contadorA,
-            "contadorD"                        => $contadorD,
-        ];
+        if(count($codigoConProblemas) == 0){
+            return [
+                "CodigosDiagnosticoNoexisten"      => $codigosNoExisten->all(),
+                "codigoConProblemas"               => [],
+                "contadorA"                        => $contadorA,
+                "contadorD"                        => $contadorD,
+            ];
+        }else{
+            return [
+                "CodigosDiagnosticoNoexisten"      => $codigosNoExisten->all(),
+                "codigoConProblemas"               => array_merge(...$codigoConProblemas->all()),
+                "contadorA"                        => $contadorA,
+                "contadorD"                        => $contadorD,
+            ];
+        }
     }
     public function UpdateCodigo($codigo,$union,$request){
         if($request->venta_estado == 1){
