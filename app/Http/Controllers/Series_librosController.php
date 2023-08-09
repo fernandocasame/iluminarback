@@ -21,12 +21,12 @@ class Series_librosController extends Controller
         s.nombre_serie,
         s.longitud_numeros,
         s.longitud_letras,
-        s.longitud_codigo 
+        s.longitud_codigo
         from libros_series ls
         LEFT JOIN libro l ON ls.idLibro = l.idlibro
         LEFT JOIN series s ON ls.id_serie = s.id_serie
         WHERE l.Estado_idEstado = '1'
-        ORDER BY ls.nombre ASC  
+        ORDER BY ls.nombre ASC
         ");
         return $libros_series;
     }
@@ -60,8 +60,10 @@ class Series_librosController extends Controller
      */
     public function show($id)
     {
-        $libros_series = DB::SELECT("SELECT * 
-        from libros_series 
+        $libros_series = DB::SELECT("SELECT ls.*, l.nombre_imprimir,
+        l.nombre_imprimir as  nombrelibro
+        from libros_series ls
+        LEFT JOIN libro l ON ls.idLibro = l.idlibro
         WHERE id_serie = $id
         ");
         return $libros_series;
@@ -101,9 +103,9 @@ class Series_librosController extends Controller
             ");
             return $libros_series;
         }
-      
+
     }
-    
+
 
     /**
      * Show the form for editing the specified resource.

@@ -616,6 +616,7 @@ class LibroController extends Controller
                 $libro = new Libro;
             }
                 $libro->nombrelibro                 = $request->nombrelibro;
+                $libro->nombre_imprimir             = $request->nombre_imprimir;
                 $libro->descripcionlibro            = $request->descripcionlibro;
                 $libro->serie                       = $request->serie;
                 $libro->weblibro                    = $request->weblibro;

@@ -48,20 +48,20 @@ class SallePeriodoController extends Controller
                 $periodo                    = new SallePeriodo();
             }
             $periodo->nombre            = $request->nombre;
-            //fecha inicio
-            $fecha_inicio               = $request->fecha_inicio;
-            if($fecha_inicio == null || $fecha_inicio == "" || $fecha_inicio == "null"){
-                $periodo->fecha_inicio  = null;
-            }else{
-                $periodo->fecha_inicio  = $request->fecha_inicio;
-            }
-            //fecha fin
-            $fecha_fin                  = $request->fecha_fin;
-            if($fecha_fin == null || $fecha_fin == "" || $fecha_fin == "null"){
-                $periodo->fecha_fin  = null;
-            }else{
-                $periodo->fecha_fin  = $request->fecha_fin;
-            }
+            // //fecha inicio
+            // $fecha_inicio               = $request->fecha_inicio;
+            // if($fecha_inicio == null || $fecha_inicio == "" || $fecha_inicio == "null"){
+            //     $periodo->fecha_inicio  = null;
+            // }else{
+            //     $periodo->fecha_inicio  = $request->fecha_inicio;
+            // }
+            // //fecha fin
+            // $fecha_fin                  = $request->fecha_fin;
+            // if($fecha_fin == null || $fecha_fin == "" || $fecha_fin == "null"){
+            //     $periodo->fecha_fin  = null;
+            // }else{
+            //     $periodo->fecha_fin  = $request->fecha_fin;
+            // }
             $periodo->save();
             return $this->saveStatus($periodo);
         }
@@ -72,7 +72,7 @@ class SallePeriodoController extends Controller
         $estado = $request->estado;
         if($estado == 1){
             $query = DB::SELECT("SELECT * FROM salle_periodos_evaluacion p
-            WHERE p.estado = '1' 
+            WHERE p.estado = '1'
             ");
             if(count($query) > 0){
                 return ["status" => "0", "message" => "Ya existe activo un período de evaluación"];

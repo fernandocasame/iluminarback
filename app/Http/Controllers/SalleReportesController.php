@@ -18,8 +18,8 @@ class SalleReportesController extends Controller
      */
     public function index()
     {
-        
-    
+
+
     }
 
     /**
@@ -39,8 +39,8 @@ class SalleReportesController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
-    {   
-        
+    {
+
     }
 
 
@@ -53,7 +53,7 @@ class SalleReportesController extends Controller
      */
     public function show($id)
     {
-        
+
     }
 
 
@@ -93,14 +93,34 @@ class SalleReportesController extends Controller
 
 
     // REPORTES
-    
-    public function reporte_evaluaciones_institucion($fecha)
-    {   
-        // set_time_limit(600000);
-        // ini_set('max_execution_time', 600000);
 
+    public function reporte_evaluaciones_institucion($n_evaluacion)
+    {
         // PROCEDIMIENTO OBTIENE EVALUACIONES AGRUPADAS POR INSTITUCION (una evaluacion solo puede pertenecer a un docente)
-        $evaluaciones = DB::SELECT("CALL `salle_reporte_evaluaciones_institucion` (?);", [$fecha]);
+        // $evaluaciones = DB::SELECT("CALL `salle_reporte_evaluaciones_institucion` (?);", [$fecha]);
+        // $evaluaciones = DB::SELECT("SELECT GROUP_CONCAT(CONCAT (se.id_evaluacion) ORDER BY se.id_evaluacion) AS evaluaciones,
+        //     se.created_at AS fecha_evaluacion, i.idInstitucion, i.nombreInstitucion, i.ciudad_id
+        //     FROM salle_evaluaciones se, usuario u, institucion i
+        //     WHERE se.estado = 2
+        //     AND i.idInstitucion != 1036
+        //     AND se.created_at LIKE CONCAT($fecha, '%')
+        //     AND se.id_usuario = u.idusuario
+        //     AND u.institucion_idInstitucion = i.idInstitucion
+        //     AND i.tipo_institucion = 2
+        //     GROUP BY i.idInstitucion
+        // ");
+        $evaluaciones = DB::SELECT("SELECT
+          GROUP_CONCAT(CONCAT (se.id_evaluacion) ORDER BY se.id_evaluacion) AS evaluaciones,
+          se.created_at AS fecha_evaluacion, i.idInstitucion, i.nombreInstitucion, i.ciudad_id
+          FROM salle_evaluaciones se
+          LEFT JOIN usuario u ON se.id_usuario = u.idusuario
+          LEFT JOIN institucion i ON  u.institucion_idInstitucion = i.idInstitucion
+          WHERE se.estado = 2
+          AND i.idInstitucion != 1036
+          AND se.n_evaluacion = '$n_evaluacion'
+          AND i.tipo_institucion = 2
+          GROUP BY i.idInstitucion
+        ");
         // dump($evaluaciones);
         if(!empty($evaluaciones)){
             foreach ($evaluaciones as $key => $value) {
@@ -109,11 +129,24 @@ class SalleReportesController extends Controller
                 $acum_eval = 0; $acum_doc = 0;
                 // dump('*********************************institucion: ' . $value->idInstitucion);
                 foreach ($vector_evaluaciones as $keyE => $valueE){
-
+                    // $respuestas = DB::SELECT("SELECT SUM(sp.puntaje_pregunta) AS puntaje
+                    // FROM salle_preguntas_evaluacion spe, salle_preguntas sp
+                    // WHERE spe.id_evaluacion = id_evaluacion
+                    // AND spe.id_pregunta = sp.id_pregunta");
                     $puntaje_respuestas = DB::SELECT("CALL salle_puntaje_respuestas (?);",[$valueE]);
                     // se acumula los puntajes de cada evaluacion por institucion
                     $acum_eval = $acum_eval + $puntaje_respuestas[0]->puntaje;
-                    // dump($puntaje_respuestas[0]->puntaje .' - ' .$valueE);
+                    // $pun_preguntas = DB::SELECT("SELECT sr.id_pregunta, sr.id_usuario,
+                    // IF(
+                    //     SUM(sr.puntaje)>=0
+                    //     AND SUM(sr.puntaje)<=sp.puntaje_pregunta ,SUM(sr.puntaje),
+                    //     (IF(sp.id_tipo_pregunta!=1, sp.puntaje_pregunta, 0))
+                    //  ) AS puntaje
+                    //  FROM salle_respuestas_preguntas sr, salle_preguntas sp
+                    //  WHERE sr.id_evaluacion = id_evaluacion
+                    //  AND sr.id_pregunta = sp.id_pregunta
+                    //  GROUP by sr.id_pregunta
+                    // ");
                     $puntaje_por_pregunta = DB::SELECT("CALL salle_puntaje_pregunta (?);",[$valueE]);
                     foreach ($puntaje_por_pregunta as $keyP => $valueP){
                         //puntaje obtenido por cada docente, cada evaluacion se califica por puntajes diferentes
@@ -124,17 +157,15 @@ class SalleReportesController extends Controller
                 }
                 // dump($calificaciones);
                 $promedio_eval_inst = ( $acum_doc * 100 ) / $acum_eval;
-
                 $promedio_eval_inst = floatval(number_format($promedio_eval_inst, 2));
-                
                 $data['items'][$key] = [
-                    'idInstitucion' => $value->idInstitucion,
+                    'idInstitucion'     => $value->idInstitucion,
                     'nombreInstitucion' => $value->nombreInstitucion,
-                    'fecha_evaluacion' => $value->fecha_evaluacion,
-                    'ciudad_id' => $value->ciudad_id,
-                    'puntaje' => $promedio_eval_inst,
+                    'fecha_evaluacion'  => $value->fecha_evaluacion,
+                    'ciudad_id'         => $value->ciudad_id,
+                    'puntaje'           => $promedio_eval_inst,
                     'cant_evaluaciones' => count($vector_evaluaciones)
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -146,9 +177,9 @@ class SalleReportesController extends Controller
     public function salle_promedio_areas($periodo, $institucion){
         //estado = 2; resuelta
         $evaluaciones = DB::SELECT("CALL salle_evaluaciones_institucion ($periodo, $institucion);");
-        
+
         $data_evaluaciones = array();
-        
+
         foreach ($evaluaciones as $key => $value) {
             // areas de cada evaluacion
             $areas = DB::SELECT("CALL salle_areas_evaluacion (?);",[$value->id_evaluacion]);
@@ -160,7 +191,7 @@ class SalleReportesController extends Controller
                 $puntaje_areas = DB::SELECT("CALL salle_puntaje_evaluacion_areas (?, ?)",[$value->id_evaluacion, $valueR->id_area]);
 
                 $calif_area_eval = $puntaje_areas[0]->puntaje;
-            
+
                 $puntaje_por_pregunta = DB::SELECT("CALL salle_puntaje_area (?, ?);",[$value->id_evaluacion, $valueR->id_area]);
 
                 foreach ($puntaje_por_pregunta as $keyP => $valueP){
@@ -172,7 +203,7 @@ class SalleReportesController extends Controller
                 else{ $promedio_eval_area = ( $calif_area_doc * 100 ) / $calif_area_eval; }
 
                 if( $promedio_eval_area > 100 ){ $promedio_eval_area = 100; }
-                
+
                 $data_areas[$keyR] = [
                     'id_area' => $puntaje_areas[0]->id_area,
                     'nombre_area' => $puntaje_areas[0]->nombre_area,
@@ -205,9 +236,9 @@ class SalleReportesController extends Controller
 
     public function salle_promedio_asignatura($periodo, $institucion, $id_area){
         $evaluaciones = DB::SELECT("CALL salle_evaluaciones_institucion_area ($periodo, $institucion, $id_area);");
-        
+
         $data_evaluaciones = array();
-        
+
         foreach ($evaluaciones as $key => $value) {
             // asignaturas de cada evaluacion
             $asignaturas = DB::SELECT("CALL salle_asignaturas_evaluacion (?, ?);",[$value->id_evaluacion, $id_area]);
@@ -219,7 +250,7 @@ class SalleReportesController extends Controller
                 $puntaje_asignaturas = DB::SELECT("CALL salle_puntaje_evaluacion_asignaturas (?, ?);",[$value->id_evaluacion, $valueA->id_asignatura]);
 
                 $calif_asig_eval = $puntaje_asignaturas[0]->puntaje;
-            
+
                 $puntaje_por_pregunta = DB::SELECT("CALL salle_puntaje_pregunta_asig (?, ?);",[$value->id_evaluacion, $valueA->id_asignatura]);
 
                 foreach ($puntaje_por_pregunta as $keyP => $valueP){
@@ -229,7 +260,7 @@ class SalleReportesController extends Controller
 
                 if( $calif_asig_doc <= 0 ){ $promedio_eval_asig = 0; }
                 else{ $promedio_eval_asig = ( $calif_asig_doc * 100 ) / $calif_asig_eval; }
-                
+
                 if( $promedio_eval_asig > 100 ){ $promedio_eval_asig = 100; }
 
                 $data_asignaturas[$keyA] = [
@@ -247,7 +278,7 @@ class SalleReportesController extends Controller
             }else{
                 $puntaje_evaluacion = 0;
             }
-            
+
 
             $data_evaluaciones['items'][$key] = [
                 'id_evaluacion' => $value->id_evaluacion,

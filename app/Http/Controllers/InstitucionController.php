@@ -287,12 +287,24 @@ class InstitucionController extends Controller
     }
 
     public function instituciones_salle(){
-        $instituciones = DB::SELECT("SELECT i.*, c.nombre as nombre_ciudad, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, sc.fecha_inicio, sc.fecha_fin, sc.ver_respuestas, sc.observaciones, sc.cant_evaluaciones FROM institucion i INNER JOIN ciudad c ON i.ciudad_id = c.idciudad LEFT JOIN salle_configuracion sc ON i.id_configuracion = sc.id_configuracion WHERE i.tipo_institucion = 2");
-
+        $instituciones = DB::SELECT("SELECT i.*, c.nombre as nombre_ciudad,
+        concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad,
+         sc.fecha_inicio, sc.fecha_fin, sc.ver_respuestas, sc.observaciones,
+         sc.cant_evaluaciones
+         FROM institucion i
+         INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
+         LEFT JOIN salle_configuracion sc ON i.id_configuracion = sc.id_configuracion
+         WHERE i.tipo_institucion = 2
+         ");
         if(!empty($instituciones)){
             foreach ($instituciones as $key => $value) {
-                $periodo = DB::SELECT("SELECT p.idperiodoescolar, p.fecha_inicial, p.fecha_final, p.periodoescolar, p.estado FROM periodoescolar_has_institucion pi, periodoescolar p WHERE pi.institucion_idInstitucion = ? AND pi.periodoescolar_idperiodoescolar = p.idperiodoescolar ORDER BY p.idperiodoescolar DESC LIMIT 1",[$value->idInstitucion]);
-
+                $periodo = DB::SELECT("SELECT p.idperiodoescolar, p.fecha_inicial, p.fecha_final,
+                p.periodoescolar, p.estado FROM periodoescolar_has_institucion pi,
+                periodoescolar p
+                WHERE pi.institucion_idInstitucion = ?
+                AND pi.periodoescolar_idperiodoescolar = p.idperiodoescolar
+                ORDER BY p.idperiodoescolar
+                DESC LIMIT 1",[$value->idInstitucion]);
                 $data['items'][$key] = [
                     'institucion' => $value,
                     'periodo' => $periodo,
@@ -303,32 +315,113 @@ class InstitucionController extends Controller
         }
         return $data;
     }
-
+    //API:GET/instituciones_salle/{n_evaluacion}
+    public function instituciones_salleXEvaluacion($n_evaluacion){
+        $instituciones = DB::SELECT("SELECT i.*, c.nombre as nombre_ciudad,
+        concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad,
+         sc.fecha_inicio, sc.fecha_fin, sc.ver_respuestas, sc.observaciones,
+         sc.cant_evaluaciones
+         FROM institucion i
+         INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
+         LEFT JOIN salle_configuracion sc ON i.id_configuracion = sc.id_configuracion
+         WHERE i.tipo_institucion = 2
+         ");
+         //get configuracion x institucion
+        $datos = [];
+        $contador = 0;
+        foreach($instituciones as $key => $item){
+            //traer configuracion x evaluacion
+            $query = $this->configuracionXInstitucion($item->idInstitucion,$n_evaluacion);
+            if(count($query) > 0){
+                $datos[$contador] = (Object) [
+                    "idInstitucion"     => $item->idInstitucion,
+                    "nombreInstitucion" => $item->nombreInstitucion,
+                    "region_idregion"   => $item->region_idregion,
+                    "tipo_institucion"  => $item->tipo_institucion,
+                    "nombre_ciudad"     => $item->nombre_ciudad,
+                    "institucion_ciudad"=> $item->institucion_ciudad,
+                    "id_configuracion"  => $query[0]->id_configuracion,
+                    "fecha_inicio"      => $query[0]->fecha_inicio,
+                    "fecha_fin"         => $query[0]->fecha_fin,
+                    "cant_evaluaciones" => $query[0]->cant_evaluaciones,
+                    "ver_respuestas"    => $query[0]->ver_respuestas,
+                    "observaciones"     => $query[0]->observaciones,
+                    "n_evaluacion"      => $query[0]->n_evaluacion
+                ];
+            }else{
+                $datos[$contador] = (Object) [
+                    "idInstitucion"     => $item->idInstitucion,
+                    "nombreInstitucion" => $item->nombreInstitucion,
+                    "region_idregion"   => $item->region_idregion,
+                    "tipo_institucion"  => $item->tipo_institucion,
+                    "nombre_ciudad"     => $item->nombre_ciudad,
+                    "institucion_ciudad"=> $item->institucion_ciudad,
+                    "id_configuracion"  => 0,
+                    "fecha_inicio"      => null,
+                    "fecha_fin"         => null,
+                    "cant_evaluaciones" => null,
+                    "ver_respuestas"    => null,
+                    "observaciones"     => null,
+                    "n_evaluacion"      => null
+                ];
+            }
+            $contador++;
+        }
+        if(!empty($datos)){
+            foreach ($datos as $key => $value) {
+                $periodo = DB::SELECT("SELECT p.idperiodoescolar, p.fecha_inicial, p.fecha_final,
+                p.periodoescolar, p.estado FROM periodoescolar_has_institucion pi,
+                periodoescolar p
+                WHERE pi.institucion_idInstitucion = ?
+                AND pi.periodoescolar_idperiodoescolar = p.idperiodoescolar
+                ORDER BY p.idperiodoescolar
+                DESC LIMIT 1",[$value->idInstitucion]);
+                $data['items'][$key] = [
+                    'institucion' => $value,
+                    'periodo' => $periodo,
+                ];
+            }
+        }else{
+            $data = [];
+        }
+        return $data;
+    }
     public function instituciones_salle_select(){
         $instituciones = DB::SELECT("SELECT i.*, c.nombre as nombre_ciudad, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, sc.fecha_inicio, sc.fecha_fin, sc.ver_respuestas, sc.observaciones, sc.cant_evaluaciones FROM institucion i INNER JOIN ciudad c ON i.ciudad_id = c.idciudad LEFT JOIN salle_configuracion sc ON i.id_configuracion = sc.id_configuracion WHERE i.tipo_institucion = 2");
 
         return $instituciones;
     }
-
+    public function configuracionXInstitucion($institucion_id,$n_evaluacion){
+        $query = DB::SELECT("SELECT * FROM salle_configuracion c
+        WHERE c.institucion_id = '$institucion_id'
+        AND c.n_evaluacion  = '$n_evaluacion'
+        ");
+        return $query;
+    }
     public function save_instituciones_salle(Request $request){
         if( $request->id_configuracion == 0 ){
-            $configuracion = new Configuracion_salle();
+            //validate que no exista para crear la configuracion
+            $validate = $this->configuracionXInstitucion($request->id_institucion,$request->n_evaluacion);
+            if(count($validate) > 0){
+                return "Se guardo";
+            }
+            $configuracion                  = new Configuracion_salle();
+            $configuracion->institucion_id  = $request->id_institucion;
+            $configuracion->n_evaluacion    = $request->n_evaluacion;
         }else{
-            $configuracion = Configuracion_salle::find($request->id_configuracion);
+            $configuracion                  = Configuracion_salle::find($request->id_configuracion);
         }
-
-        $configuracion->fecha_inicio = $request->fecha_inicio;
-        $configuracion->fecha_fin = $request->fecha_fin;
-        $configuracion->ver_respuestas = $request->ver_respuestas;
-        $configuracion->observaciones = $request->observaciones;
-        $configuracion->cant_evaluaciones = $request->cant_evaluaciones;
-
+        $configuracion->fecha_inicio        = $request->fecha_inicio;
+        $configuracion->fecha_fin           = $request->fecha_fin;
+        $configuracion->ver_respuestas      = $request->ver_respuestas;
+        $configuracion->observaciones       = $request->observaciones;
+        $configuracion->cant_evaluaciones   = $request->cant_evaluaciones;
         $configuracion->save();
-
         if( $request->id_configuracion == 0 ){
-            DB::UPDATE("UPDATE `institucion` SET `id_configuracion` = $configuracion->id_configuracion WHERE `idInstitucion` = $request->id_institucion");
+            DB::UPDATE("UPDATE `institucion` SET `id_configuracion` = $configuracion->id_configuracion
+            WHERE `idInstitucion` = $request->id_institucion
+            ");
         }
-
         return $configuracion;
     }
     public function listaInstitucionesActiva(){
@@ -349,12 +442,14 @@ class InstitucionController extends Controller
         AND inst.estado_idEstado = 1");
                 return $institucion;
     }
-    public function institucionConfiguracionSalle($id)
+    public function institucionConfiguracionSalle($id_institucion,$n_evaluacion)
     {
-        $configuracion = DB::SELECT("SELECT inst.id_configuracion, sc.*
-        FROM institucion inst, salle_configuracion sc
-        WHERE inst.id_configuracion = sc.id_configuracion
-        AND inst.idInstitucion  = $id");
+        $configuracion = $this->configuracionXInstitucion($id_institucion,$n_evaluacion);
+        // $configuracion = DB::SELECT("SELECT inst.id_configuracion, sc.*
+        // FROM institucion inst, salle_configuracion sc
+        // WHERE inst.id_configuracion = sc.id_configuracion
+        // AND inst.idInstitucion  = $id");
+        // return $configuracion;
         return $configuracion;
     }
     public function listaInsitucion(Request $request)
@@ -489,14 +584,14 @@ class InstitucionController extends Controller
         //traer las instituciones temporales  creadas por el asesor
         if($request->temporales){
             $instituciones = DB::SELECT("SELECT t.institucion_temporal_id,
-            IF(t.region = 2,'Costa','Sierra') AS nombreregion, 
+            IF(t.region = 2,'Costa','Sierra') AS nombreregion,
             t.nombre_institucion AS nombreInstitucion,
             t.periodo_id,t.asesor_id,t.ciudad,pe.periodoescolar AS periodo
             FROM seguimiento_institucion_temporal t
          	LEFT JOIN periodoescolar pe ON t.periodo_id = pe.idperiodoescolar
             WHERE t.asesor_id = '$request->asesor_id'
             ORDER BY t.institucion_temporal_id DESC
-            
+
             ");
             return $instituciones;
         }

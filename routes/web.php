@@ -574,6 +574,7 @@ Route::get('codigosLibrosFecha/{id}', 'CodigosLibrosGenerarController@codigosLib
 Route::get('codigosLibrosExportados/{id}', 'CodigosLibrosGenerarController@codigosLibrosExportados');
 Route::get('librosBuscar', 'CodigosLibrosGenerarController@librosBuscar');
 Route::get('codigosLibrosCodigo/{id}','CodigosLibrosGenerarController@codigosLibrosCodigo');
+Route::get('codigosBuscarCodigoXContador/{idlibro}/{contador}','CodigosLibrosGenerarController@codigosBuscarCodigoXContador');
 Route::get('codigosBuscarCodigo/{id}','CodigosLibrosGenerarController@codigosBuscarCodigo');
 Route::get('codigosBuscarxCodigo/{id}','CodigosLibrosGenerarController@codigosBuscarxCodigo');
 Route::get('editarCodigoBuscado/{id}','CodigosLibrosGenerarController@editarCodigoBuscado');
@@ -747,14 +748,16 @@ Route::get('asignaturas_area_salle/{id}','SalleAsignaturasController@asignaturas
 Route::post('crea_area_salle','SalleAreasController@crea_area_salle');
 Route::post('crea_asignatura_salle','SalleAsignaturasController@crea_asignatura_salle');
 Route::get('instituciones_salle','InstitucionController@instituciones_salle');
+Route::get('instituciones_salle/{n_evaluacion}','InstitucionController@instituciones_salleXEvaluacion');
 Route::get('instituciones_salle_select','InstitucionController@instituciones_salle_select');
 Route::post('save_instituciones_salle','InstitucionController@save_instituciones_salle');
 // salle asignaturas docente
-Route::get('asignaturas_docente_salle/{id}','SalleAsignaturasController@asignaturas_docente_salle');
+Route::get('asignaturas_docente_salle/{id}/{n_evaluacion}','SalleAsignaturasController@asignaturas_docente_salle');
 Route::post('save_asignaturas_docente_salle','SalleAsignaturasController@save_asignaturas_docente_salle');
 Route::get('delete_asignaturas_docente_salle/{id}','SalleAsignaturasController@delete_asignaturas_docente_salle');
 Route::get('asignaturas_por_area_salle/{id}','SalleAsignaturasController@asignaturas_por_area_salle');
 // preguntas salle
+Route::get('salle_sincronizar_preguntas/{asignatura1}/{asignatura2}/{usuario}/{n_evaluacion}','SallePreguntasController@salle_sincronizar_preguntas');
 Route::apiResource('preguntas_salle','SallePreguntasController');
 Route::get('opciones_pregunta_salle/{id}','SallePreguntasController@opciones_pregunta_salle');
 Route::post('cargar_opcion_salle','SallePreguntasController@cargar_opcion_salle');
@@ -765,14 +768,15 @@ Route::post('cargar_opcion_vf_salle','SallePreguntasController@cargar_opcion_vf_
 Route::post('transformar_preguntas_salle','SallePreguntasController@transformar_preguntas_salle');
 Route::get('validar_puntajes','SallePreguntasController@validar_puntajes');
 // evaluaciones salle
-Route::get('generar_evaluacion_salle/{id_docente}/{id_institucion}','SallePreguntasController@generar_evaluacion_salle');
-Route::get('salle_getConfiguracion/{id_institucion}','SallePreguntasController@salle_getConfiguracion');
-Route::get('obtener_evaluacion_salle/{id_docente}/{id_evaluacion}','SallePreguntasController@obtener_evaluacion_salle');
+Route::get('generar_evaluacion_salle/{id_docente}/{id_institucion}/{n_evaluacion}','SallePreguntasController@generar_evaluacion_salle');
+Route::get('salle_getConfiguracion/{id_institucion}/{n_evaluacion}','SallePreguntasController@salle_getConfiguracion');
+Route::get('obtener_evaluacion_salle/{id_docente}/{id_evaluacion}/{n_evaluacion}','SallePreguntasController@obtener_evaluacion_salle');
 Route::post('salle_finalizarEvaluacion','SallePreguntasController@salle_finalizarEvaluacion');
-Route::get('evaluaciones_resueltas_salle/{id_docente}','SallePreguntasController@evaluaciones_resueltas_salle');
+Route::get('evaluaciones_resueltas_salle/{id_docente}/{n_evaluacion}','SallePreguntasController@evaluaciones_resueltas_salle');
 Route::get('reporte_evaluaciones_institucion/{fecha}','SallePreguntasController@reporte_evaluaciones_institucion');
 Route::post('salle_guardarSeleccion','SallePreguntasController@salle_guardarSeleccion');
 Route::post('salle_intento_eval','SallePreguntasController@salle_intento_eval');
+Route::post('save_finalizar_evalIntentos','SallePreguntasController@save_finalizar_evalIntentos');
 //salle reportes
 Route::get('reporte_evaluaciones_institucion/{fecha}','SalleReportesController@reporte_evaluaciones_institucion');
 Route::get('salle_promedio_areas/{periodo}/{institucion}','SalleReportesController@salle_promedio_areas');
@@ -793,6 +797,7 @@ Route::get('eliminarMenu/{id}','MenuController@eliminarMenu');
 Route::get('traerCantidadUsuarios','UsuarioController@traerCantidadUsuarios');
 //usuarios salle
 Route::get('usuarioSalle','UsuarioController@usuarioSalle');
+Route::get('usuarioSalle/{evaluacion}','UsuarioController@usuarioSallexEvaluacion');
 Route::get('salleadministrador','UsuarioController@salleadministrador');
 Route::post('add_edit_user_salle','UsuarioController@add_edit_user_salle');
 Route::post('activa_desactiva_user','UsuarioController@activa_desactiva_user');
@@ -872,7 +877,8 @@ Route::post('asesor-institucion','TemporadaController@asesorInstitucion');
 Route::get('listaInstitucionesActiva','InstitucionController@listaInstitucionesActiva');
 //areas SIN basicas SALLE
 Route::get('areasSinBasica','SalleAreasController@areasSinBasica');
-Route::get('institucionConfiguracionSalle/{id}','InstitucionController@institucionConfiguracionSalle');
+Route::post('AsignarComoAreaBasica','SalleAreasController@AsignarComoAreaBasica');
+Route::get('institucionConfiguracionSalle/{institucion}/{n_evaluacion}','InstitucionController@institucionConfiguracionSalle');
 //Juego seleccionSimple
 Route::get('pregunta_opciones/{id}', 'J_contenidoController@preguntas_y_opciones');
 Route::post('saveSeleccion', 'J_contenidoController@guardaSeleccionSimple');
@@ -1299,6 +1305,9 @@ Route::post('neetEliminar','NeetTemaController@neetEliminar');
 //=====FIN APIS NEET DOCUMENTOS=====================================
 //=====SALLE========================================================
 Route::group(['prefix' => 'salle'],function(){
-  Route::resource('periodos','SallePeriodoController');
+Route::resource('periodos','SallePeriodoController');
+Route::post('MoverPreguntas','SallePreguntasController@MoverPreguntas');
+Route::get('exportAllPreguntasXAsignatura','SallePreguntasController@exportAllPreguntasXAsignatura');
 });
+
 //=====FIN SALLE====================================================

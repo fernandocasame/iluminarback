@@ -52,10 +52,10 @@ class CodigosLibrosGenerarController extends Controller
     public function generarCodigosUnicos(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos); 
+        $codigos = json_decode($request->data_codigos);
         $codigosIngresados = [];
         $contador = 0;
-        foreach($codigos as $key => $item){ 
+        foreach($codigos as $key => $item){
             for($i = 0; $i<$item->cantidad;$i++){
                 $ingresar = false;
                 while ($ingresar == false) {
@@ -345,7 +345,7 @@ class CodigosLibrosGenerarController extends Controller
                 //se obtiene el periodo actual del codigo
                 $periodo = $has_periodo[0]->id_periodo ;
                 DB::INSERT("INSERT INTO hist_codlibros(id_usuario, codigo_libro,usuario_editor, idInstitucion,  observacion,id_periodo) VALUES ($idusuario, '$codigo', $id_institucion, $idusuario_creador_codigo, 'modificado', $periodo)");
-                 
+
             }else{
                 $codigos_libros = DB::UPDATE("UPDATE `codigoslibros` SET `codigo`='$codigo',`serie`='$serie',`libro`='$libro',`anio`='$anio',`idusuario_creador_codigo`=$idusuario_creador_codigo,`idusuario`='$idusuario', `libro_idlibro`=$idLibro ,`id_periodo` = $id_periodo WHERE `codigo`= '$codigo'");
                 //guardar en el historico
@@ -353,7 +353,7 @@ class CodigosLibrosGenerarController extends Controller
             }
 
 
-          
+
 
             return $codigos_libros;
 
@@ -382,7 +382,18 @@ class CodigosLibrosGenerarController extends Controller
             $fecha = $data[1];
             $libro = $datalibro[1];
             $serie = $datalibro[0];
-            $codigos_libros = DB::SELECT("SELECT c.idusuario, c.codigo, l.nombrelibro as libro, c.serie, c.anio, c.fecha_create, s.id_serie, s.nombre_serie, c.libro_idlibro, u.nombres, u.apellidos, u.cedula, i.nombreInstitucion FROM codigoslibros c INNER JOIN series s ON c.serie = s.nombre_serie INNER JOIN libro l ON c.libro_idlibro = l.idlibro LEFT JOIN usuario u ON c.idusuario = u.idusuario LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion WHERE c.libro = '$libro' AND c.serie = '$serie' AND c.created_at like '$fecha%'");
+            $codigos_libros = DB::SELECT("SELECT c.idusuario, c.codigo,
+            l.nombrelibro as libro, c.serie, c.anio, c.fecha_create,
+            s.id_serie, s.nombre_serie, c.libro_idlibro, u.nombres, u.apellidos, u.cedula,
+            i.nombreInstitucion
+            FROM codigoslibros c
+            INNER JOIN series s ON c.serie = s.nombre_serie
+            INNER JOIN libro l ON c.libro_idlibro = l.idlibro
+            LEFT JOIN usuario u ON c.idusuario = u.idusuario
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+            WHERE c.libro = '$libro'
+            AND c.serie = '$serie'
+             AND c.created_at like '$fecha%'");
             return $codigos_libros;
         }else{
             return 0;
@@ -390,7 +401,7 @@ class CodigosLibrosGenerarController extends Controller
     }
     public function codigosLibrosCodigo($codigo)
     {
-       
+
         $codigos_libros = DB::SELECT("SELECT c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
          c.contrato,c.codigo, c.serie, l.nombrelibro as libro, c.anio, c.idusuario, c.idusuario_creador_codigo, c.libro_idlibro,
          c.contador,c.bc_estado,c.estado_liquidacion,c.venta_estado,
@@ -406,20 +417,66 @@ class CodigosLibrosGenerarController extends Controller
         WHERE c.codigo like '%$codigo%'");
         return $codigos_libros;
     }
-    public function codigosBuscarCodigo($codigo){
-            $codigos_libros = DB::SELECT("SELECT
+    public function codigosBuscarCodigoXContador($idlibro,$contador){
+        $codigos_libros = DB::SELECT("SELECT
             c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
              u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
-            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
             FROM codigos_devolucion d
             WHERE d.codigo = c.codigo
             AND d.estado = '1'
             ORDER BY d.id DESC
             LIMIT 1) as devolucionInstitucion,
-            (SELECT h.created_at FROM hist_codlibros h
-            WHERE h.codigo_libro like '%$codigo%'
-            AND h.observacion = 'registrado' ORDER BY h.created_at DESC limit 1) as fecha_registro,
+            c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
+            c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
+            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+            (case when (c.estado_liquidacion = '0') then 'liquidado'
+                when (c.estado_liquidacion = '1') then 'sin liquidar'
+                when (c.estado_liquidacion = '2') then 'codigo regalado'
+                when (c.estado_liquidacion = '3') then 'codigo devuelto'
+            end) as liquidacion,
+            (case when (c.bc_estado = '2') then 'codigo leido'
+                when (c.bc_estado = '1') then 'codigo sin leer'
+            end) as barrasEstado,
+            (case when (c.codigos_barras = '1') then 'con código de barras'
+                when (c.codigos_barras = '0')  then 'sin código de barras'
+            end) as status,
+            (case when (c.venta_estado = '0') then ''
+                when (c.venta_estado = '1') then 'Venta directa'
+                when (c.venta_estado = '2') then 'Venta por lista'
+            end) as ventaEstado,
+            c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
+            c.updated_at as registrado, CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.cedula as cedula,  u.email,
+            p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
+            c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
+            ivl.nombreInstitucion as InstitucionLista
+            from codigoslibros c
+            LEFT JOIN usuario u on u.idusuario = c.idusuario
+            LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
+            LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
+            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN ciudad ci ON ci.idciudad = ib.ciudad_id
+            WHERE c.libro_idlibro = '$idlibro'
+            AND c.contador = '$contador'
+        ");
+        return $codigos_libros;
+    }
+    public function codigosBuscarCodigo($codigo){
+        $codigos_libros = DB::SELECT("SELECT
+            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+             u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
+            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
+            FROM codigos_devolucion d
+            WHERE d.codigo = c.codigo
+            AND d.estado = '1'
+            ORDER BY d.id DESC
+            LIMIT 1) as devolucionInstitucion,
             c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
             c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
@@ -458,10 +515,10 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarxCodigo($codigo){
-        $codigos_libros = DB::SELECT("SELECT 
+        $codigos_libros = DB::SELECT("SELECT
             c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
             u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
-            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
             FROM codigos_devolucion d
             WHERE d.codigo = c.codigo
             AND d.estado = '1'
@@ -469,9 +526,6 @@ class CodigosLibrosGenerarController extends Controller
             LIMIT 1) as devolucionInstitucion,
             (SELECT COUNT(d.id) FROM codigos_devolucion d
             WHERE d.codigo = c.codigo AND d.estado = '1') as devolucion,
-            (SELECT h.created_at FROM hist_codlibros h
-            WHERE h.codigo_libro like '%$codigo%'
-            AND h.observacion = 'registrado' ORDER BY h.created_at DESC limit 1) as fecha_registro,
             c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
             c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
@@ -511,15 +565,19 @@ class CodigosLibrosGenerarController extends Controller
     }
     public function librosBuscar(){//select buscar
         //SELECT l.id_libro_serie as id, concat_ws('-', s.nombre_serie, l.nombre) as label from libros_series l, series s WHERE l.id_serie = s.id_serie
-        $codigos_libros = DB::SELECT("SELECT l.id_libro_serie as id, concat_ws('-', s.nombre_serie, l.nombre) as label from libros_series l, series s WHERE l.id_serie = s.id_serie");
+        $codigos_libros = DB::SELECT("SELECT l.id_libro_serie as id,idLibro,
+        concat_ws('-', s.nombre_serie, l.nombre) as label
+        from libros_series l, series s
+        WHERE l.id_serie = s.id_serie
+        ");
         return $codigos_libros;
     }
     public function codigosLibrosExportados($data){
         $datos = explode("*", $data);
         $usuario = $datos[0];
         $cantidad = $datos[1];
-        $codigos_libros = DB::SELECT("SELECT * 
-        from codigoslibros 
+        $codigos_libros = DB::SELECT("SELECT *
+        from codigoslibros
         WHERE idusuario_creador_codigo = '$usuario'
         ORDER BY fecha_create
         DESC LIMIT $cantidad");
@@ -530,7 +588,7 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function reportesCodigoAsesor($id,$periodo){
-        $codigos_libros = DB::SELECT("SELECT 
+        $codigos_libros = DB::SELECT("SELECT
         c.prueba_diagnostica, c.factura,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.porcentaje_descuento,
@@ -882,7 +940,7 @@ class CodigosLibrosGenerarController extends Controller
         h.old_values,h.new_values,
 
         (
-            SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+            SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
             FROM codigos_devolucion d
             WHERE d.codigo = co.codigo
             AND d.estado = '1'
@@ -894,7 +952,7 @@ class CodigosLibrosGenerarController extends Controller
         LEFT JOIN usuario u ON h.idInstitucion = u.idusuario
         LEFT JOIN usuario us ON h.id_usuario = us.idusuario
         LEFT JOIN institucion ins ON us.institucion_idInstitucion = ins.idInstitucion
-        LEFT JOIN periodoescolar p ON p.idperiodoescolar = h.id_periodo 
+        LEFT JOIN periodoescolar p ON p.idperiodoescolar = h.id_periodo
         LEFT JOIN ciudad c ON ins.ciudad_id = c.idciudad
         LEFT JOIN estado e on us.estado_idEstado = e.idEstado
         LEFT JOIN codigoslibros co ON h.codigo_libro = co.codigo

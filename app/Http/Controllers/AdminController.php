@@ -11,6 +11,7 @@ use App\Models\CodigosLibros;
 use App\Models\CuotasPorCobrar;
 use App\Models\EstudianteMatriculado;
 use App\Models\HistoricoCodigos;
+use App\Models\Libro;
 use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
 use App\Models\RepresentanteEconomico;
@@ -296,92 +297,36 @@ class AdminController extends Controller
             ]);
         return $codigo;
     }
+    public function quitarTildes($texto) {
+        $tildes = array(
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' => 'u',
+            'Á' => 'A',
+            'É' => 'E',
+            'Í' => 'I',
+            'Ó' => 'O',
+            'Ú' => 'U'
+        );
+        return strtr($texto, $tildes);
+    }
     public function pruebaData(Request $request){
-        $pedido = "486";
-        try{
-            $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
-            p.descuento, p.id_periodo,
-            p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
-            se.nombre_serie
-            FROM pedidos_val_area pv
-            left join area ar ON  pv.id_area = ar.idarea
-            left join series se ON pv.id_serie = se.id_serie
-            INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
-            WHERE pv.id_pedido = '$pedido'
-            AND pv.alcance = '0'
-            GROUP BY pv.id;
-            ");
-            $datos = [];
-            foreach($val_pedido as $key => $item){
-                $valores = [];
-                //plan lector
-                if($item->plan_lector > 0 ){
-                    $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,l.asignatura_idasignatura,
-                    (
-                        SELECT f.pvp AS precio
-                        FROM pedidos_formato f
-                        WHERE f.id_serie = '6'
-                        AND f.id_area = '69'
-                        AND f.id_libro = '$item->plan_lector'
-                        AND f.id_periodo = '$item->id_periodo'
-                    )as precio, ls.codigo_liquidacion,ls.version,ls.year
-                    FROM libro l
-                    left join libros_series ls  on ls.idLibro = l.idlibro
-                    WHERE l.idlibro = '$item->plan_lector'
-                    ");
-                    $valores = $getPlanlector;
-                }else{
-                    $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,l.asignatura_idasignatura,
-                    (
-                        SELECT f.pvp AS precio
-                        FROM pedidos_formato f
-                        WHERE f.id_serie = ls.id_serie
-                        AND f.id_area = a.area_idarea
-                        AND f.id_periodo = '$item->id_periodo'
-                    )as precio
-                    FROM libros_series ls
-                    LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                    LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-                    WHERE ls.id_serie = '$item->id_serie'
-                    AND a.area_idarea  = '$item->id_area'
-                    AND l.Estado_idEstado = '1'
-                    AND a.estado = '1'
-                    AND ls.year = '$item->year'
-                    LIMIT 1
-                    ");
-                    $valores = $getLibros;
-                }
-                $datos[$key] = [
-                    "id"                => $item->id,
-                    "id_pedido"         => $item->id_pedido,
-                    "valor"             => $item->valor,
-                    "id_area"           => $item->id_area,
-                    "tipo_val"          => $item->tipo_val,
-                    "id_serie"          => $item->id_serie,
-                    "year"              => $item->year,
-                    // "anio"              => $valores[0]->year,
-                    // "version"           => $valores[0]->version,
-                    "created_at"        => $item->created_at,
-                    "updated_at"        => $item->updated_at,
-                    "descuento"         => $item->descuento,
-                    "anticipo"          => $item->anticipo,
-                    "comision"          => $item->comision,
-                    "plan_lector"       => $item->plan_lector,
-                    "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$valores[0]->nombrelibro : $item->serieArea,
-                    // "idlibro"           => $valores[0]->idlibro,
-                    // "nombrelibro"       => $valores[0]->nombrelibro,
-                    // "precio"            => $valores[0]->precio,
-                    // "idasignatura"      => $valores[0]->asignatura_idasignatura,
-                    // "subtotal"          => $item->valor * $valores[0]->precio,
-                    // "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
-                    "values"            => $valores
-                ];
+        $libros = DB::SELECT("SELECT * FROM libro l
+        ");
+        $contador = 0;
+        foreach($libros as $key => $item){
+            $nombreImprimir = "";
+            $nombreImprimir = $this->quitarTildes($item->nombrelibro);
+            $libro = Libro::findOrFail($item->idlibro);
+            $libro->nombre_imprimir = $nombreImprimir;
+            $libro->save();
+            if($libro){
+                $contador++;
             }
-            return $datos;
         }
-        catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        }
+        return "se guardo ".$contador;
         // $miArrayDeObjetos = [
         //     (object) ["codigo" => "SMLL3-Y84W9MP666"],
         //     (object) ["codigo" => "PSMLL3-HFRTCYT"],
@@ -426,8 +371,8 @@ class AdminController extends Controller
         //         //validar si tiene bc_institucion
         //         $ifBc_InstitucionA           = $validarA[0]->bc_institucion;
         //         //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-        //         $ifid_periodoA               = $validarA[0]->id_periodo;  
-        //         //validar si el codigo tiene venta_estado 
+        //         $ifid_periodoA               = $validarA[0]->id_periodo;
+        //         //validar si el codigo tiene venta_estado
         //         $venta_estadoA               = $validarA[0]->venta_estado;
         //         //venta lista
         //         $ifventa_lista_institucionA  = $validarA[0]->venta_lista_institucion;
@@ -439,17 +384,17 @@ class AdminController extends Controller
         //         //validar si tiene bc_institucion
         //         $ifBc_InstitucionD           = $validarD[0]->bc_institucion;
         //         //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-        //         $ifid_periodoD               = $validarD[0]->id_periodo;  
-        //         //validar si el codigo tiene venta_estado 
+        //         $ifid_periodoD               = $validarD[0]->id_periodo;
+        //         //validar si el codigo tiene venta_estado
         //         $venta_estadoD               = $validarD[0]->venta_estado;
         //         //venta lista
         //         $ifventa_lista_institucionD  = $validarD[0]->venta_lista_institucion;
         //         //===VENTA DIRECTA====
         //         if($TipoVenta == 1){
-        //             if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){ 
-        //                 if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){ 
+        //             if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){
+        //                 if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){
         //                     //Ingresar Union a codigo de activacion
-        //                    $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get(); 
+        //                    $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get();
         //                    $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$TipoVenta);
         //                    if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
         //                    //Ingresar Union a codigo de prueba diagnostico
@@ -458,14 +403,14 @@ class AdminController extends Controller
         //                    if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
         //                 }else{
         //                     $codigoConProblemas->push($validarD);
-        //                 } 
+        //                 }
         //             }else{
         //                 $codigoConProblemas->push($validarA);
-        //             } 
+        //             }
         //         }
         //         if($TipoVenta == 2){
-        //             if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){  
-        //                 if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){  
+        //             if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){
+        //                 if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){
         //                     //Ingresar Union a codigo de activacion
         //                     $old_valuesA    = CodigosLibros::findOrFail($codigoActivacion);
         //                     $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$TipoVenta);
@@ -480,7 +425,7 @@ class AdminController extends Controller
         //             }
         //             else{
         //                 $codigoConProblemas->push($validarA);
-        //             } 
+        //             }
         //         }
         //     }
         //     //Si uno de los 2 codigos no existen

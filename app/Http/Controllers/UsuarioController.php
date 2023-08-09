@@ -754,20 +754,48 @@ class UsuarioController extends Controller
     ///CONSULTAS SALLE
     public function usuarioSalle()
     {
-        $docentes = DB::select("SELECT u.*, i.nombreInstitucion, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion
+        $docentes = DB::select("SELECT u.*, i.idInstitucion, i.nombreInstitucion, i.tipo_institucion,
+         concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion
          FROM usuario u
          INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
          INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
          lEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
-         WHERE u.id_group = 13 GROUP BY u.idusuario
+         WHERE u.id_group = 13
+         AND i.tipo_institucion = '2'
+         GROUP BY u.idusuario
          ");
         $admins = DB::select("SELECT u.*, i.nombreInstitucion, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad FROM usuario u, institucion i INNER JOIN ciudad c ON i.ciudad_id = c.idciudad WHERE u.id_group = 12 and u.institucion_idInstitucion = i.idInstitucion ");
-
-
-
         return array('docentes'=>$docentes , 'admins'=>$admins,);
-
-
+    }
+    //API:GET/usuarioSalle/{n_evaluacion}
+    public function usuarioSallexEvaluacion($n_evaluacion){
+        // $docentes = DB::select("SELECT u.*, i.nombreInstitucion,
+        // concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion
+        // FROM usuario u
+        // INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+        // INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
+        // LEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
+        // WHERE u.id_group = 13
+        // GROUP BY u.idusuario
+        // ");
+        $docentes = DB::select("SELECT u.idusuario, u.nombres,u.apellidos,u.cedula,u.email,u.estado_idEstado,
+        i.idInstitucion, i.nombreInstitucion,
+        concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad,
+        (SELECT   MAX(se.id_evaluacion)
+        FROM salle_evaluaciones se
+            WHERE se.id_usuario = u.idusuario
+            AND se.n_evaluacion = '$n_evaluacion'
+        ) AS id_evaluacion
+        FROM usuario u
+        INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+        INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
+        LEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
+        WHERE u.id_group = 13
+        AND i.tipo_institucion = '2'
+        GROUP BY u.idusuario
+        ");
+       $admins = DB::select("SELECT u.*, i.nombreInstitucion, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad FROM usuario u, institucion i INNER JOIN ciudad c ON i.ciudad_id = c.idciudad WHERE u.id_group = 12 and u.institucion_idInstitucion = i.idInstitucion ");
+       return array('docentes'=>$docentes , 'admins'=>$admins,);
     }
     public function add_edit_user_salle(Request $request)
     {
