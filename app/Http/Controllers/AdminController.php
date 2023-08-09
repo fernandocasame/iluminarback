@@ -313,6 +313,7 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
+        return "hola mundo";
         $libros = DB::SELECT("SELECT * FROM libro l
         ");
         $contador = 0;
