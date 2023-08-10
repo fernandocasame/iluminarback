@@ -313,20 +313,89 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-        $libros = DB::SELECT("SELECT * FROM libro l
-        ");
-        $contador = 0;
-        foreach($libros as $key => $item){
-            $nombreImprimir = "";
-            $nombreImprimir = $this->quitarTildes($item->nombrelibro);
-            $libro = Libro::findOrFail($item->idlibro);
-            $libro->nombre_imprimir = $nombreImprimir;
-            $libro->save();
-            if($libro){
-                $contador++;
-            }
+
+        // $form_data = [
+        //     'cli_ci'        => "15156151",
+        //     'cli_apellidos' => "jaun",
+        //     'cli_nombres'   => "perez",
+        //     'cli_direccion' => null,
+        //     'cli_telefono'  => "123",
+        //     'cli_email'     => "testing66@gmail.com"
+        // ];
+        // $client = Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
+        // $JsonCliente = json_decode($client, true);
+
+        //variables
+        $cedula         = "15156151";
+        $apellidos      = "perez";
+        $nombres        = "luis";
+        $telefono       = "123";
+        $email          = "testing66@gmail.com";
+        //====Crear cedula en facturacion si no existe=====
+        try {
+        $dato = Http::get("http://186.46.24.108:9095/api/f_Cliente/Busquedaxclici?cli_ci=".$cedula);
+        $JsonCedula = json_decode($dato, true);
+        // return $JsonCedula;
+        if(isset($JsonCedula["clientexclici"])){
+            //edito
+        }else{
+            //no se encontro lo creo
+            $form_data = [
+                'cli_ci'        => $cedula,
+                'cli_apellidos' => $apellidos,
+                'cli_nombres'   => $nombres,
+                'cli_direccion' => null,
+                'cli_telefono'  => $telefono,
+                'cli_email'     => $email
+            ];
+            $client = Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
+            $JsonCliente = json_decode($client, true);
         }
-        return "se guardo ".$contador;
+        } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+        // 'cli_ci'        => $cedula,
+        // 'cli_apellidos' => $apellidos,
+        // 'cli_nombres'   => $nombres,
+        // 'cli_direccion' => null,
+        // 'cli_telefono'  => $telefono,
+        // 'cli_email'     => $email
+        // $form_data = [
+        //     'cliCi'        => '15156151',
+        //     'cliApellidos' => $request->cliApellidos,
+        //     'cliNombres'   => $request->cliNombres,
+        //     'cliDireccion'   => $request->cliDireccion,
+        //     'cliTelefono'   => $request->cliTelefono,
+        //     'cliEmail'   => $request->cliEmail,
+        //     'cliCredito'   => $request->cliCredito,
+        //     'cliPlazo'   => $request->cliPlazo,
+        //     'cliAlias'   => $request->cliAlias,
+        //     'cliCelular'   => $request->cliCelular,
+        //     'cliFechaNacimiento'   => $request->cliFechaNacimiento,
+        //     'venDCodigo'   => $request->venDCodigo,
+        //     'cliTitulo'   => $request->cliTitulo
+        // ];
+        //return $form_data;
+        $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
+        $prueba_post = json_decode($dato, true);
+        return $prueba_post;
+
+
+
+        // $libros = DB::SELECT("SELECT * FROM libro l
+        // ");
+        // $contador = 0;
+        // foreach($libros as $key => $item){
+        //     $nombreImprimir = "";
+        //     $nombreImprimir = $this->quitarTildes($item->nombrelibro);
+        //     $libro = Libro::findOrFail($item->idlibro);
+        //     $libro->nombre_imprimir = $nombreImprimir;
+        //     $libro->save();
+        //     if($libro){
+        //         $contador++;
+        //     }
+        // }
+        // return "se guardo ".$contador;
         // $miArrayDeObjetos = [
         //     (object) ["codigo" => "SMLL3-Y84W9MP666"],
         //     (object) ["codigo" => "PSMLL3-HFRTCYT"],

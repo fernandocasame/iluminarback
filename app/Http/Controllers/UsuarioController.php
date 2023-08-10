@@ -760,7 +760,10 @@ class UsuarioController extends Controller
          INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
          INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
          lEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
-         WHERE u.id_group = 13
+         WHERE (
+            u.id_group = '13'
+            OR u.id_group = '6'
+        )
          AND i.tipo_institucion = '2'
          GROUP BY u.idusuario
          ");
@@ -790,7 +793,10 @@ class UsuarioController extends Controller
         INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
         INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
         LEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
-        WHERE u.id_group = 13
+        WHERE (
+            u.id_group = '13'
+            OR u.id_group = '6'
+        )
         AND i.tipo_institucion = '2'
         GROUP BY u.idusuario
         ");
