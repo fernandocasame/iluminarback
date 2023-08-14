@@ -26,10 +26,10 @@ class VerificacionControllerAnterior extends Controller
         and t.estado = '0'
         ");
         if(count($validarContrato) > 0){
-            return ["status"=>"0", "message" => "El contrato esta inactivo"]; 
+            return ["status"=>"0", "message" => "El contrato esta inactivo"];
         }
             $traerInformacion = DB::select(" SELECT   vt.verificacion_id as numero_verificacion,vt.contrato,vt.codigo,vt.cantidad,
-            vt.nombre_libro, v.fecha_inicio, v.fecha_fin, vt.contrato 
+            vt.nombre_libro, v.fecha_inicio, v.fecha_fin, vt.contrato
             FROM verificaciones v
             LEFT JOIN verificaciones_has_temporadas vt ON v.num_verificacion = vt.verificacion_id
             WHERE v.num_verificacion ='$numero'
@@ -41,7 +41,7 @@ class VerificacionControllerAnterior extends Controller
             and vt.nuevo = '1'
             ORDER BY vt.verificacion_id desc
             ");
-    
+
             if(empty($traerInformacion)){
                 return ["status"=>"0","message"=>"No se encontro datos para este  contrato"];
             }else{
@@ -52,12 +52,12 @@ class VerificacionControllerAnterior extends Controller
     public function CodigosRegalos($contrato){
         $regalados = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
         c.libro_idlibro,ls.nombre as nombrelibro
-            FROM codigoslibros c 
+            FROM codigoslibros c
             LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
             WHERE c.estado_liquidacion = '2'
                AND c.contrato = '$contrato'
-           AND ls.idLibro = c.libro_idlibro 
+           AND ls.idLibro = c.libro_idlibro
            GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
         ");
         if(empty($regalados)){
@@ -65,7 +65,7 @@ class VerificacionControllerAnterior extends Controller
         }else{
             return $regalados;
         }
-        
+
     }
      //PARA GUARDAR LA LIQUIDACION
 
@@ -77,21 +77,21 @@ class VerificacionControllerAnterior extends Controller
         WHERE t.contrato = '$contrato'
         ");
         if(empty($validarContrato)){
-            return ["status" => "0", "message" => "No existe el contrato"]; 
+            return ["status" => "0", "message" => "No existe el contrato"];
         }
         $estado = $validarContrato[0]->estado;
         $year   = $validarContrato[0]->year;
         if($estado == '0'){
-            return ["status" => "0", "message" => "El contrato esta inactivo"]; 
+            return ["status" => "0", "message" => "El contrato esta inactivo"];
         }
         if($year > 2022){
-            //validar que el contrato este en pedidos 
+            //validar que el contrato este en pedidos
             $query = DB::SELECT("SELECT * FROM pedidos p
             WHERE p.contrato_generado = '$contrato'
             AND p.estado = '1'
             ");
             if(empty($query)){
-                return ["status" => "0", "message" => "El contrato no se encuentra en pedidos"]; 
+                return ["status" => "0", "message" => "El contrato no se encuentra en pedidos"];
             }
             $id_pedido = $query[0]->id_pedido;
             //validar que el pedido no tenga alcaces abiertos o activos
@@ -100,7 +100,7 @@ class VerificacionControllerAnterior extends Controller
             AND pa.estado_alcance = '0'
             ");
             if(count($query2) > 0){
-                return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; 
+                return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"];
             }
         }
         $buscarContrato= DB::select("SELECT t.*, p.idperiodoescolar
@@ -109,7 +109,7 @@ class VerificacionControllerAnterior extends Controller
         AND contrato = '$contrato'
         ");
         if(count($buscarContrato) <= 0){
-            return ["status"=>"0", "message" => "No existe el contrato o no tiene asignado a un período"]; 
+            return ["status"=>"0", "message" => "No existe el contrato o no tiene asignado a un período"];
         }else{
             //almacenar el id de la institucion
             $institucion = $buscarContrato[0]->idInstitucion;
@@ -120,7 +120,7 @@ class VerificacionControllerAnterior extends Controller
             //traigo la liquidacion actual por cantidad
             $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
             c.libro_idlibro,ls.nombre as nombrelibro
-                FROM codigoslibros c 
+                FROM codigoslibros c
                 LEFT JOIN usuario u ON c.idusuario = u.idusuario
                 LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
                 WHERE c.bc_estado = '2'
@@ -128,14 +128,14 @@ class VerificacionControllerAnterior extends Controller
                    and c.estado_liquidacion = '1'
                    AND c.bc_periodo  = '$periodo'
                    AND c.bc_institucion = '$institucion'
-               AND ls.idLibro = c.libro_idlibro 
+               AND ls.idLibro = c.libro_idlibro
                GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
             ");
             //AGRUPADO VERSION 1
             // $data = DB::SELECT("SELECT cl.codigo, COUNT(cl.libro_idlibro) as cantidad, IF(cl.codigo LIKE '%plus', (SELECT lsv.codigo_liquidacion   FROM libros_series lsv WHERE lsv.idLibro = cl.libro_idlibro AND lsv.version = 'PLUS'), ls.codigo_liquidacion) AS codigo, cl.serie, cl.libro as nombrelibro, cl.libro_idlibro, i.nombreInstitucion,  CONCAT(ac.nombres, ' ', ac.apellidos) as asesor  from codigoslibros cl, usuario u,  usuario as ac,institucion i,libros_series ls
-            // WHERE cl.idusuario = u.idusuario 
+            // WHERE cl.idusuario = u.idusuario
             // and u.institucion_idInstitucion = i.idInstitucion
-            // and ls.idLibro = cl.libro_idlibro 
+            // and ls.idLibro = cl.libro_idlibro
             // AND i.idInstitucion = '$institucion'
             // and ac.cedula = i.vendedorInstitucion
             // and cl.id_periodo ='$periodo'
@@ -150,7 +150,7 @@ class VerificacionControllerAnterior extends Controller
             //traigo la liquidacion  con los codigos invidivuales
             $traerCodigosIndividual = DB::SELECT("SELECT c.codigo, ls.codigo_liquidacion,   c.serie,
                 c.libro_idlibro,c.libro as nombrelibro
-               FROM codigoslibros c 
+               FROM codigoslibros c
                LEFT JOIN usuario u ON c.idusuario = u.idusuario
                LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
                WHERE c.bc_estado = '2'
@@ -158,29 +158,29 @@ class VerificacionControllerAnterior extends Controller
                and c.estado_liquidacion = '1'
                AND c.bc_periodo  = '$periodo'
                AND c.bc_institucion = '$institucion'
-               AND ls.idLibro = c.libro_idlibro 
+               AND ls.idLibro = c.libro_idlibro
             ");
             // $traerCodigosIndividual = DB::SELECT("SELECT cl.codigo, ls.codigo_liquidacion, cl.serie, cl.libro as nombrelibro, cl.libro_idlibro
             // from codigoslibros cl, usuario u,  usuario as ac,institucion i,libros_series ls
-            // WHERE cl.idusuario = u.idusuario 
+            // WHERE cl.idusuario = u.idusuario
             // and u.institucion_idInstitucion = i.idInstitucion
-            // and ls.idLibro = cl.libro_idlibro 
+            // and ls.idLibro = cl.libro_idlibro
             // AND i.idInstitucion = '$institucion'
             // and ac.cedula = i.vendedorInstitucion
             // and cl.id_periodo ='$periodo'
             // and cl.estado <> '2'
             // and cl.estado_liquidacion = '1'
             // AND cl.bc_estado = '0'
-            // AND ls.idLibro = cl.libro_idlibro 
-            
+            // AND ls.idLibro = cl.libro_idlibro
 
-            // ");   
-            //SI TODO HA SALIDO BIEN TRAEMOS LA DATA 
+
+            // ");
+            //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
             if(count($data) >0){
                 //obtener la fecha actual
-                $fechaActual  = date('Y-m-d'); 
+                $fechaActual  = date('Y-m-d');
                 //verificar si es el primer contrato
-                $vericacionContrato = DB::select("SELECT  
+                $vericacionContrato = DB::select("SELECT
                 * FROM verificaciones
                 WHERE contrato = '$contrato'
                 AND nuevo = '1'
@@ -191,14 +191,14 @@ class VerificacionControllerAnterior extends Controller
                     //obtener el numero de verificacion en el que se quedo el contrato
                     $traerNumeroVerificacion =  $vericacionContrato[0]->num_verificacion;
                     $traeridVerificacion     =  $vericacionContrato[0]->id;
-                    //Para guardar la verificacion si  existe el contrato 
+                    //Para guardar la verificacion si  existe el contrato
                     //SI EXCEDE LAS 10 VERIFICACIONES
                     $finVerificacion="no";
                     if($traerNumeroVerificacion >10){
                         $finVerificacion = "yes";
                     }
-                    else{        
-                        //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL 
+                    else{
+                        //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
                         $this->updateCodigoIndividualInicial($traeridVerificacion,$traerCodigosIndividual,$contrato,$traerNumeroVerificacion,$periodo,$institucion);
                         //Ingresar la liquidacion en la base
                         $this->guardarLiquidacion($data,$traerNumeroVerificacion,$contrato);
@@ -218,7 +218,7 @@ class VerificacionControllerAnterior extends Controller
                         $verificacion->save();
                     }
                 }else{
-                    
+
                     //=====PARA GUARDAR LA VERIFICACION SI EL CONTRATO AUN NO TIENE VERIFICACIONES======
                     //para indicar que aun no existe el fin de la verificacion
                      $finVerificacion = "0";
@@ -232,8 +232,8 @@ class VerificacionControllerAnterior extends Controller
                     $verificacion->nuevo = '1';
                     $verificacion->save();
                         //Obtener Verificacion actual
-                        $encontrarVerificacionContratoInicial = DB::select("SELECT  
-                            * FROM verificaciones 
+                        $encontrarVerificacionContratoInicial = DB::select("SELECT
+                            * FROM verificaciones
                             WHERE contrato = '$contrato'
                             AND nuevo = '1'
                             ORDER BY id DESC
@@ -253,7 +253,7 @@ class VerificacionControllerAnterior extends Controller
                         $verificacion->contrato = $contrato;
                         $verificacion->nuevo = "1";
                         $verificacion->save();
-                }                               
+                }
                 if($finVerificacion =="yes"){
                     return [
                         "verificaciones"=>"Ha alzancado el limite de verificaciones permitidas",
@@ -268,7 +268,7 @@ class VerificacionControllerAnterior extends Controller
                 }
             }else{
                 return ["status"=>"0", "message" => "No existe NUEVOS VALORES para guardar la verificación"];
-            }      
+            }
         }
     }
 
@@ -284,11 +284,11 @@ class VerificacionControllerAnterior extends Controller
                 'estado' => '1',
                 'nuevo' => '1'
             ]);
-           
+
         }
      }
 
-     public function updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$traerCodigosIndividual,$contrato,$num_verificacion,$periodo,$institucion){       
+     public function updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$traerCodigosIndividual,$contrato,$num_verificacion,$periodo,$institucion){
         $columnaVerificacion = "verif".$num_verificacion;
         //PARA RECORRER Y IR ACTUALIZANDO A CADA CODIGO LA VERIFICACION
         foreach($traerCodigosIndividual as $item){
@@ -309,7 +309,7 @@ class VerificacionControllerAnterior extends Controller
                 $historico->contrato_actual = $contrato;
                 $historico->save();
             }
-          
+
         }
      }
 
@@ -317,11 +317,11 @@ class VerificacionControllerAnterior extends Controller
      {
          set_time_limit(60000);
          ini_set('max_execution_time', 60000);
- 
+
          //PARA VER EL CONTRATO POR CODIGO
- 
+
          if($request->id){
-             $buscarContrato = DB::select("SELECT 
+             $buscarContrato = DB::select("SELECT
              v.* from verificaciones v
              WHERE v.id = '$request->id'
              ");
@@ -331,9 +331,9 @@ class VerificacionControllerAnterior extends Controller
                  return $buscarContrato;
              }
          }
-     
+
          //PARA VER LA INFORMACION DE LAS VERIFICACIONES DEL CONTRATO
-         if($request->informacion){     
+         if($request->informacion){
             $verificaciones = DB::SELECT("SELECT * FROM verificaciones
             WHERE contrato = '$request->contrato'
             AND  nuevo = '1'
@@ -344,7 +344,7 @@ class VerificacionControllerAnterior extends Controller
             WHERE t.contrato = '$request->contrato'
             ");
             return ["verificaciones" => $verificaciones, "institucion" => $institucion];
-         }   
+         }
          //para ver el historico de contrato liquidacion
          if($request->historico){
             return $this->historicoContrato($request->contrato);
@@ -366,7 +366,7 @@ class VerificacionControllerAnterior extends Controller
             $datos = [];
             $contador = 0;
             foreach($detalles as $key => $item){
-                //plan lector 
+                //plan lector
                 $precio = 0;
                 $query = [];
                 if($item->id_serie == 6){
@@ -375,7 +375,7 @@ class VerificacionControllerAnterior extends Controller
                     WHERE f.id_serie = '6'
                     AND f.id_area = '69'
                     AND f.id_libro = '$item->libro_id'
-                    AND f.id_periodo = '$item->id_periodo'");   
+                    AND f.id_periodo = '$item->id_periodo'");
                 }else{
                     $query = DB::SELECT("SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -401,7 +401,7 @@ class VerificacionControllerAnterior extends Controller
                     "id_serie"              => $item->id_serie,
                     "id_periodo"            => $item->id_periodo,
                     "precio"                => $precio,
-                    "valor"                 => $item->cantidad * $precio                 
+                    "valor"                 => $item->cantidad * $precio
                 ];
                 $contador++;
             }
@@ -429,9 +429,9 @@ class VerificacionControllerAnterior extends Controller
              ->where('libro_idlibro', $request->libro_id)
              ->get();
              return $codigos;
- 
+
              }
-        
+
      }
 
      //para cambiar la data de la liquidacion a la nueva
@@ -448,18 +448,26 @@ class VerificacionControllerAnterior extends Controller
         else{
             $change = DB::SELECT("SELECT * FROM verificaciones
             WHERE contrato = '$request->contrato'
-          
+
             ");
             return $change;
         }
-       
-      
+
+
      }
     public function historicoContrato($contrato){
        //codigos
-       $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,vl.nombre_libro,ls.idLibro AS libro_id
+    //    $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,vl.nombre_libro,ls.idLibro AS libro_id
+    //    FROM verificaciones_has_temporadas vl
+    //    LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
+    //    WHERE vl.contrato = '$contrato'
+    //    AND vl.nuevo = '1'
+    //    AND vl.estado = '1'
+    //    ");
+       $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,l.nombrelibro as nombre_libro,ls.idLibro AS libro_id
        FROM verificaciones_has_temporadas vl
        LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
+       LEFT JOIN libro l ON l.idlibro = ls.idLibro
        WHERE vl.contrato = '$contrato'
        AND vl.nuevo = '1'
        AND vl.estado = '1'
@@ -469,7 +477,8 @@ class VerificacionControllerAnterior extends Controller
        }else{
             $data = [];
             foreach($codigos as $key => $item){
-                $codigo = DB::SELECT("SELECT id_verificacion_inst,verificacion_id,codigo,cantidad FROM verificaciones_has_temporadas
+                $codigo = DB::SELECT("SELECT id_verificacion_inst,verificacion_id,codigo,cantidad
+                FROM verificaciones_has_temporadas
                 WHERE contrato = '$contrato'
                 AND nuevo = '1'
                 AND codigo = '$item->codigo'
@@ -625,13 +634,13 @@ class VerificacionControllerAnterior extends Controller
                 }
             }
             return $data2;
-        }   
+        }
     }
     //para crear una verificacion
     public function crearVerificacion(Request $request){
         //obtener la fecha actual
-         $fechaActual  = date('Y-m-d'); 
-        $vericacionContrato = DB::select("SELECT  
+         $fechaActual  = date('Y-m-d');
+        $vericacionContrato = DB::select("SELECT
         * FROM verificaciones
         WHERE contrato = '$request->contrato'
         AND nuevo = '1'
@@ -666,7 +675,7 @@ class VerificacionControllerAnterior extends Controller
             $verificacion->estado = "0";
             $verificacion->nuevo = '1';
             $verificacion->save();
-        
+
             $traerNumeroVerificacionInicial =  $verificacion->num_verificacion;
             //Para generar la siguiente verificacion y quede abierta
             $verificacion =  new Verificacion;
@@ -676,7 +685,7 @@ class VerificacionControllerAnterior extends Controller
             $verificacion->nuevo = "1";
             $verificacion->save();
         }
-      
+
            if($verificacion){
                return ["status"=>"1","message"=>"Se agrego correctamente una nueva verificacion"];
            }else{
@@ -705,10 +714,10 @@ class VerificacionControllerAnterior extends Controller
             $institucion = $buscarInstitucion[0]->idInstitucion;
             $num_verificacion = 'verif'.$request->num_verificacion_anterior;
             $num_verificacionNueva = 'verif'.$request->num_verificacion_nueva;
-            
-        //guardar en el historico 
+
+        //guardar en el historico
             $this->guardarHistoricoLiquidacion($periodo,$request->contrato,$num_verificacion,$request->id_verificacion_anterior,$request->id_verificacion_nuevo,$request->usuario_editor,$institucion);
-        
+
               //actualizar cada codigo a la nueva liquidacion
             DB::table('codigoslibros')
             ->where('id_periodo', $periodo)
@@ -716,8 +725,8 @@ class VerificacionControllerAnterior extends Controller
             ->where($num_verificacion, $request->id_verificacion_anterior)
             ->update([
                 $num_verificacionNueva => $request->id_verificacion_nuevo,
-            ]);   
-            
+            ]);
+
             if($num_verificacion == $num_verificacionNueva){
 
             }
@@ -729,7 +738,7 @@ class VerificacionControllerAnterior extends Controller
                 ->where($num_verificacion, $request->id_verificacion_anterior)
                 ->update([
                     $num_verificacion => '',
-                ]);   
+                ]);
             }
     }
 
@@ -771,7 +780,7 @@ class VerificacionControllerAnterior extends Controller
         $fechaActual = date('Y-m-d H:i:s');
         DB::UPDATE("UPDATE pedidos SET estado_verificacion = '1' , fecha_solicita_verificacion = '$fechaActual' WHERE contrato_generado = '$request->contrato'");
         //registrar trazabilidad
-        //validar que no este registrado 
+        //validar que no este registrado
         $query = DB::SELECT("SELECT * FROM temporadas_verificacion_historico th
         WHERE th.contrato = '$request->contrato'
         AND th.estado = '1'");
@@ -785,7 +794,7 @@ class VerificacionControllerAnterior extends Controller
     }
     //api:get/notificacionesVerificaciones
     public function notificacionesVerificaciones(){
-        $query = DB::SELECT("SELECT 
+        $query = DB::SELECT("SELECT
             CONCAT(u.nombres,' ',u.apellidos) as asesor,
             i.nombreInstitucion,
             pe.region_idregion, c.nombre AS ciudad,
@@ -810,7 +819,7 @@ class VerificacionControllerAnterior extends Controller
             LEFT JOIN temporadas t ON th.contrato = t.contrato
             LEFT JOIN usuario u ON t.id_asesor = u.idusuario
             LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad 
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             WHERE th.contrato = '$request->contrato'
             AND t.estado = '1'
         ");
@@ -826,14 +835,14 @@ class VerificacionControllerAnterior extends Controller
             LEFT JOIN temporadas t ON th.contrato = t.contrato
             LEFT JOIN usuario u ON t.id_asesor = u.idusuario
             LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad 
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             ORDER BY th.id DESC
         ");
         return $query;
     }
     //api:get/getVerificacionXId/{id}
     public function getVerificacionXId($id){
-        $query = DB::SELECT("SELECT * FROM verificaciones v 
+        $query = DB::SELECT("SELECT * FROM verificaciones v
         WHERE v.id = '$id'
         ");
         return $query;

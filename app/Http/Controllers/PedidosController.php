@@ -1583,7 +1583,35 @@ class PedidosController extends Controller
             $JsonCedula = json_decode($dato, true);
             // return $JsonCedula;
             if(isset($JsonCedula["clientexclici"])){
-                //no hago nada
+                $arrayUser = $JsonCedula["clientexclici"][0];
+                //variables
+                $cliDireccion         = $arrayUser["cliDireccion"];
+                $cliCredito           = $arrayUser["cliCredito"];
+                $cliPlazo             = $arrayUser["cliPlazo"];
+                $cliAlias             = $arrayUser["cliAlias"];
+                $cliCelular           = $arrayUser["cliCelular"];
+                $cliFechaNacimiento   = $arrayUser["cliFechaNacimiento"];
+                $venDCodigo           = $arrayUser["venDCodigo"];
+                $cliTitulo            = $arrayUser["cliTitulo"];
+                //edito
+                $form_data = [
+                    'cliCi'                 => $cedula,
+                    'cliApellidos'          => $apellidos,
+                    'cliNombres'            => $nombres,
+                    'cliDireccion'          => $cliDireccion,
+                    'cliTelefono'           => $telefono,
+                    'cliEmail'              => $email,
+                    'cliCredito'            => $cliCredito,
+                    'cliPlazo'              => $cliPlazo,
+                    'cliAlias'              => $cliAlias,
+                    'cliCelular'            => $cliCelular,
+                    'cliFechaNacimiento'    => $cliFechaNacimiento,
+                    'venDCodigo'            => $venDCodigo,
+                    'cliTitulo'             => $cliTitulo
+                ];
+                //return $form_data;
+                $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
+                $prueba_post = json_decode($dato, true);
             }else{
                 //no se encontro lo creo
                 $form_data = [
@@ -1645,10 +1673,10 @@ class PedidosController extends Controller
         }
         if( $request->id_beneficiario > 0){
             //usuario
-            // $usuario = Usuario::findOrFail($request->idusuario);
-            // $usuario->nombres   = $request->nombres;
-            // $usuario->apellidos = $request->apellidos;
-            // $usuario->save();
+            $usuario = Usuario::findOrFail($request->idusuario);
+            $usuario->nombres   = $request->nombres;
+            $usuario->apellidos = $request->apellidos;
+            $usuario->save();
             if($concontrato == 0){
                 //usuario
                 $usuario = Usuario::findOrFail($request->idusuario);
@@ -4380,14 +4408,31 @@ class PedidosController extends Controller
         if($request->changeRevisonNotificacion){
             return $this->changeRevisonNotificacion($request->id_pedido,$request->notificados);
         }
-        $pedido                 = Pedidos::findOrFail($request->id_pedido);
-        $pedido->observacion    = $request->observacion;
-        $pedido->save();
-        if($pedido){
-            return ["status" => "1", "message" => "Se guardo correctamente"];
-        }else{
-            return ["status" => "0", "message" => "No se pudo guardar"];
+        $pedido =  DB::UPDATE("UPDATE pedidos
+        SET `$request->campo` = '$request->valor',
+        `user_created`        = '$request->user_created',
+        `editor_motivo`       = '$request->campo'
+        WHERE `id_pedido`     = '$request->id_pedido'
+        ");
+        //ingresar al historico
+        $this->pedidosConAnticipo();
+        if($request->campo == 'ifanticipo' && $request->valor == 1){
+            $this->ingresarHistoricoAnticipo($request);
         }
+        if($pedido){
+            return ["status" => "1", "message" =>"Se guardo correctamente"];
+        }else{
+            return ["status" => "0","message" => "No se pudo guardar"];
+        }
+    }
+    public function ingresarHistoricoAnticipo($request){
+        $pedido                     = Pedidos::findOrFail($request->id_pedido);
+        $fecha_generacion_contrato  = $pedido->fecha_generacion_contrato;
+        DB::UPDATE("UPDATE pedidos_historico
+        SET `fecha_generar_contrato` = '$fecha_generacion_contrato',
+         `estado` = '2'
+         WHERE `id_pedido` = '$request->id_pedido'
+        ");
     }
     //===FIN METODOS ROOT==
     //api:post/changeRevisonNotificacion

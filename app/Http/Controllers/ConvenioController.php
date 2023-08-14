@@ -44,14 +44,14 @@ class ConvenioController extends Controller
         $idConvenio     = $query[0]->id;
         //traer los hijos del convenio global
         $query2 = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
-            WHERE cd.pedido_convenio_institucion = '$idConvenio' 
+            WHERE cd.pedido_convenio_institucion = '$idConvenio'
             AND cd.estado = '1'
         ");
         $datos = [];
         $contador =0;
         foreach($query2 as $key => $item){
             try {
-                $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$item->contrato); 
+                $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$item->contrato);
                 $JsonContrato = json_decode($dato, true);
                 if($JsonContrato == "" || $JsonContrato == null){
                     $datos[$contador] = [
@@ -97,7 +97,7 @@ class ConvenioController extends Controller
                 $contador++;
             } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-            } 
+            }
         }
         return ["convenio" => $query, "hijos_convenio" => $datos];
     }
@@ -132,8 +132,15 @@ class ConvenioController extends Controller
             $global = PedidoConvenio::findOrFail($id);
         }else{
             $global = new PedidoConvenio;
-            //Colocar id_pedido_origen el id_pedido para futuras consultas
-            DB::UPDATE("UPDATE pedidos SET convenio_origen = '$request->id_pedido', convenio_hijo_receptor_fuera = '$request->convenio_hijo_receptor_fuera' WHERE id_pedido = '$request->tempid_pedido'");
+            //convenio Fuera plataforma
+            if($request->convenioFuera == 1){
+                //Colocar id_pedido_origen el id_pedido para futuras consultas
+                DB::UPDATE("UPDATE pedidos SET convenio_origen = '$request->id_pedido', convenio_hijo_receptor_fuera = '$request->convenio_hijo_receptor_fuera' WHERE id_pedido = '$request->tempid_pedido'");
+            }
+            //Convenio en la plataforma
+            else{
+                DB::UPDATE("UPDATE pedidos SET convenio_anios = '$request->convenio_anios', convenio_origen = '$request->id_pedido', convenio_hijo_receptor_fuera = '$request->convenio_hijo_receptor_fuera' WHERE id_pedido = '$request->tempid_pedido'");
+            }
         }
             $global->anticipo_global = $request->anticipo_global;
             $global->convenio_anios  = $request->convenio_anios;
@@ -184,7 +191,7 @@ class ConvenioController extends Controller
                         $pedido = Pedidos::findOrFail($request->tempid_pedido);
                         $contrato = $pedido->contrato_generado;
                         if($contrato == null || $contrato == ""){
-                        }else{  
+                        }else{
                             $hijoConvenio = new PedidoConvenioDetalle();
                             $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
                             $hijoConvenio->id_pedido                    = $request->tempid_pedido;
@@ -200,7 +207,7 @@ class ConvenioController extends Controller
                     $pedido = Pedidos::findOrFail($request->id_pedido);
                     $contrato = $pedido->contrato_generado;
                     if($contrato == null || $contrato == ""){
-                    }else{  
+                    }else{
                         $hijoConvenio = new PedidoConvenioDetalle();
                         $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
                         $hijoConvenio->id_pedido                    = $request->id_pedido;
@@ -209,7 +216,7 @@ class ConvenioController extends Controller
                         $hijoConvenio->save();
                     }
                 }
-              
+
             }
         }
     }

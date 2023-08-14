@@ -313,46 +313,177 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-
-        // $form_data = [
-        //     'cli_ci'        => "15156151",
-        //     'cli_apellidos' => "jaun",
-        //     'cli_nombres'   => "perez",
-        //     'cli_direccion' => null,
-        //     'cli_telefono'  => "123",
-        //     'cli_email'     => "testing66@gmail.com"
-        // ];
-        // $client = Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
-        // $JsonCliente = json_decode($client, true);
-
-        //variables
-        $cedula         = "15156151";
-        $apellidos      = "perez";
-        $nombres        = "luis";
-        $telefono       = "123";
-        $email          = "testing66@gmail.com";
-        //====Crear cedula en facturacion si no existe=====
-        try {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Cliente/Busquedaxclici?cli_ci=".$cedula);
-        $JsonCedula = json_decode($dato, true);
-        // return $JsonCedula;
-        if(isset($JsonCedula["clientexclici"])){
-            //edito
-        }else{
-            //no se encontro lo creo
-            $form_data = [
-                'cli_ci'        => $cedula,
-                'cli_apellidos' => $apellidos,
-                'cli_nombres'   => $nombres,
-                'cli_direccion' => null,
-                'cli_telefono'  => $telefono,
-                'cli_email'     => $email
-            ];
-            $client = Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
-            $JsonCliente = json_decode($client, true);
-        }
-        } catch (\Exception  $ex) {
-        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        $contrato = "C-C23-0000031-LJ";
+        //codigos
+       $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,l.nombrelibro as nombre_libro,ls.idLibro AS libro_id
+       FROM verificaciones_has_temporadas vl
+       LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
+       LEFT JOIN libro l ON l.idlibro = ls.idLibro
+       WHERE vl.contrato = '$contrato'
+       AND vl.nuevo = '1'
+       AND vl.estado = '1'
+       ");
+       if(empty($codigos)){
+        return 0;
+       }else{
+            $data = [];
+            foreach($codigos as $key => $item){
+                $codigo = DB::SELECT("SELECT id_verificacion_inst,verificacion_id,codigo,cantidad FROM verificaciones_has_temporadas
+                WHERE contrato = '$contrato'
+                AND nuevo = '1'
+                AND codigo = '$item->codigo'
+                ORDER BY verificacion_id ASC
+                ");
+                $data = $codigo;
+                $cantidad = count($codigo);
+                foreach($codigo as $k => $tr){
+                    if($cantidad == 1){
+                        $data2[$key] =[
+                            "codigo"                            => $data[0]->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "total"                             => $data[0]->cantidad
+                        ];
+                    }
+                    if($cantidad == 2){
+                        $suma2 = $data[0]->cantidad+$data[1]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "total"                             => $suma2
+                        ];
+                    }
+                    if($cantidad == 3){
+                        $suma3 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "total"                             => $suma3
+                        ];
+                    }
+                    if($cantidad == 4){
+                        $suma4 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "total"                             => $suma4
+                        ];
+                    }
+                    if($cantidad == 5){
+                        $suma5 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
+                            "total"                             => $suma5
+                        ];
+                    }
+                    if($cantidad == 6){
+                        $suma6 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
+                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
+                            "total"                             => $suma6
+                        ];
+                    }
+                    if($cantidad == 7){
+                        $suma7 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
+                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
+                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
+                            "total"                             => $suma7
+                        ];
+                    }
+                    if($cantidad == 8){
+                        $suma8 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad+$data[7]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
+                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
+                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
+                            "verif".$data[7]->verificacion_id   => $data[7]->cantidad,
+                            "total"                             => $suma8
+                        ];
+                    }
+                    if($cantidad == 9){
+                        $suma9 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad+$data[7]->cantidad+$data[8]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
+                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
+                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
+                            "verif".$data[7]->verificacion_id   => $data[7]->cantidad,
+                            "verif".$data[8]->verificacion_id   => $data[8]->cantidad,
+                            "total"                             => $suma9
+                        ];
+                    }
+                    if($cantidad == 10){
+                        $suma10 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad+$data[7]->cantidad+$data[8]->cantidad+$data[9]->cantidad;
+                        $data2[$key] =[
+                            "codigo" => $item->codigo,
+                            "libro_id"                          => $item->libro_id,
+                            "nombre_libro"                      => $item->nombre_libro,
+                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
+                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
+                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
+                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
+                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
+                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
+                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
+                            "verif".$data[7]->verificacion_id   => $data[7]->cantidad,
+                            "verif".$data[8]->verificacion_id   => $data[8]->cantidad,
+                            "verif".$data[9]->verificacion_id   => $data[9]->cantidad,
+                            "total"                             => $suma10
+                        ];
+                    }
+                }
+            }
+            return $data2;
         }
         // 'cli_ci'        => $cedula,
         // 'cli_apellidos' => $apellidos,
@@ -376,9 +507,7 @@ class AdminController extends Controller
         //     'cliTitulo'   => $request->cliTitulo
         // ];
         //return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
-        $prueba_post = json_decode($dato, true);
-        return $prueba_post;
+
 
 
 

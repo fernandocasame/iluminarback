@@ -403,8 +403,27 @@ class UsuarioController extends Controller
         if(!empty($request->idusuario)){
 
             $usuario = Usuario::findOrFail($request->idusuario);
-            $user = $request->all();
-            $usuario->fill($user)->save();
+            $change_password = $usuario->change_password;
+            // $user = $request->all();
+            // $usuario->fill($user)->save();
+            $usuario->cedula = $request->cedula;
+            $usuario->nombres = $request->nombres;
+            $usuario->apellidos = $request->apellidos;
+            $usuario->name_usuario = $request->email;
+            $usuario->email = $request->email;
+            $usuario->id_group = $request->id_group;
+            if($change_password == 1){
+                $usuario->password=sha1(md5($request->cedula));
+            }
+            $usuario->p_ingreso=0;
+            $usuario->institucion_idInstitucion = $request->institucion_idInstitucion;
+            $usuario->estado_idEstado = 1;
+            $usuario->paralelo = $request->paralelo;
+            $usuario->curso = $request->curso;
+            $usuario->iniciales = $request->iniciales;
+            $usuario->capacitador = $request->capacitador;
+            $email = $request->email;
+            $usuario->save();
         }else{
             $datosValidados=$request->validate([
                 'cedula' => 'required|max:11|unique:usuario',
