@@ -1757,7 +1757,6 @@ class CodigoLibrosController extends Controller
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $codigos           = json_decode($request->data_codigos);
-        $pruebaDiagnostica = $request->pruebaDiagnostica;
         $idlibro           = $request->idlibro;
         $id_usuario        = $request->id_usuario;
         $anio              = $request->anio;
@@ -1783,7 +1782,7 @@ class CodigoLibrosController extends Controller
                 $codigos_libros->idusuario                  = 0;
                 $codigos_libros->bc_estado                  = 1;
                 $codigos_libros->idusuario_creador_codigo   = $id_usuario;
-                $codigos_libros->prueba_diagnostica         = $pruebaDiagnostica;
+                $codigos_libros->prueba_diagnostica         = $item->diagnostica;
                 $codigos_libros->codigo                     = $item->codigo;
                 $codigos_libros->contador                   = 1;
                 $codigos_libros->save();
