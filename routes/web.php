@@ -907,6 +907,8 @@ Route::get('eliminaAsignatura/{id}','SalleAsignaturasController@eliminaAsignatur
 //asignaturas por docente
 Route::post('asignaturasDocent','AsignaturaDocenteController@asignaturas_x_docente');
 //asignaturas por docente X PERIDOO
+Route::get('moverAsignaturasPeriodo/{usuario}/{periodo}','AsignaturaDocenteController@moverAsignaturasPeriodo');
+//asignaturas por docente X PERIDOO
 Route::post('asignaturas_x_docente_xPeriodo','AsignaturaDocenteController@asignaturas_x_docente_xPeriodo');
 Route::get('eliminaAsignacion/{id}','AsignaturaDocenteController@eliminaAsignacion');
 Route::post('asignar_asignatura_docentes', 'AsignaturaDocenteController@asignar_asignatura_docentes');

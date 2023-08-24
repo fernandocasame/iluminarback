@@ -48,43 +48,32 @@ class LoginController extends Controller
         if (Auth::attempt(['name_usuario' => $request->name_usuario, 'password' => $request->password, 'estado_idEstado' => 1])) {
             // Authentication passed...
             // return redirect()->intended('dashboard');
-            
-        }
-        
-       
 
-        
+        }
         else{
             $buscarUser =DB::select("SELECT * FROM usuario where name_usuario = '$request->name_usuario'");
-
             if(count($buscarUser) > 0){
                 $encontrarEstado = $buscarUser[0]->estado_idEstado;
                 if($encontrarEstado == 2){
                     return response()->json(['errors' => 'Su usuario se encuentra bloqueado, por favor envíe un correo a soporte@prolipa.com.ec, para reestablecer su acceso.'], 412);
-
                 }
-
                 if($encontrarEstado == 3){
                     return response()->json(['errors' => 'Su usuario se encuentra bloqueado, por favor envíe un correo a soporte@prolipa.com.ec, para reestablecer su acceso.'], 412);
-
                 }
-
                 if($encontrarEstado == 4){
                     return response()->json(['errors' => 'Su usuario se encuentra bloqueado, por favor envíe un correo a soporte@prolipa.com.ec, para reestablecer su acceso.'], 412);
-
                 }
-
                 if($encontrarEstado == null){
                     return response()->json(['errors' => 'Su usuario se encuentra bloqueado, por favor envíe un correo a soporte@prolipa.com.ec, para reestablecer su acceso.'], 412);
-
+                }else{
+                    return response()->json(['errors' => 'Su contraseña es incorrecta'], 412);
                 }
-
-                
             }
             else{
-                return response()->json(['errors' => 'Estas credenciales no coinciden con nuestros registros.'], 412);
+                return response()->json(['errors' => 'Su usuario no coinciden con nuestros registros'], 412);
+                // return response()->json(['errors' => 'Estas credenciales no coinciden con nuestros registros.'], 412);
             }
-            
+
         }
     }
 

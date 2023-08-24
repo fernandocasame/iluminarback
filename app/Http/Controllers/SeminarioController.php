@@ -221,7 +221,7 @@ class SeminarioController extends Controller
     public function obtenerWebinars(Request $request){
         //listado de capacitaciones del docente que pertenezca a una institucion registrada por prolipa
         if($request->capacitacionInstitucion){
-            $capacitacion = DB::SELECT("SELECT s.*, CONCAT(s.descripcion, ' - ' ,s.nombre,' - ',i.nombreInstitucion) as webinar, 
+            $capacitacion = DB::SELECT("SELECT s.*, CONCAT(s.descripcion, ' - ' ,s.nombre,' - ',i.nombreInstitucion) as webinar,
             i.nombreInstitucion AS nombre_institucion,
              c.nombre AS nombre_ciudad, COUNT(sr.id_seminario) AS cant_respuestas
                 FROM seminarios s
@@ -239,9 +239,9 @@ class SeminarioController extends Controller
         }
         if($request->capacitaciones){
             $capacitacion = DB::SELECT("SELECT s.*,
-            (case when (s.estado_institucion_temporal = 0) then  CONCAT(s.descripcion, ' - ' ,s.nombre,' - ',i.nombreInstitucion) 
+            (case when (s.estado_institucion_temporal = 0) then  CONCAT(s.descripcion, ' - ' ,s.nombre,' - ',i.nombreInstitucion)
             when (s.estado_institucion_temporal = 1) then  CONCAT(s.descripcion, ' - ' ,s.nombre,' - ',s.nombre_institucion_temporal)
-            end) as webinar, 
+            end) as webinar,
             i.nombreInstitucion AS nombre_institucion,
              c.nombre AS nombre_ciudad, COUNT(sr.id_seminario) AS cant_respuestas
                 FROM seminarios s
@@ -271,8 +271,8 @@ class SeminarioController extends Controller
              ");
              return  $webinars;
         }
-     
-         
+
+
     }
 
     public function sumarEncuestasDescargadas(Request $request){
@@ -535,19 +535,19 @@ class SeminarioController extends Controller
                 AND (s.tipo_webinar = '1' OR s.tipo_webinar = '2')
             ");
 
-            //verificar si hay encuestas 
+            //verificar si hay encuestas
             $encuestas = DB::SELECT("SELECT * FROM seminario_respuestas r
             WHERE r.id_usuario = '$request->idusuario'
             ");
         }
         //si hay encuestas pero no estan registrados
         if(count($encuestas) < 0){
-            $webinars = DB::SELECT("SELECT DISTINCT sm.seminario_has_usuario_id,sm.asistencia, sm.usuario_id, s.* , sr.respuestas 
+            $webinars = DB::SELECT("SELECT DISTINCT sm.seminario_has_usuario_id,sm.asistencia, sm.usuario_id, s.* , sr.respuestas
                 FROM seminario_has_usuario sm
                 LEFT JOIN seminarios s ON sm.seminario_id = s.id_seminario
-                LEFT JOIN seminario_respuestas sr ON s.id_seminario = sr.id_seminario 
-                AND sr.id_usuario = '$request->idusuario' WHERE sm.usuario_id = '$request->idusuario' 
-                AND s.estado = 1 
+                LEFT JOIN seminario_respuestas sr ON s.id_seminario = sr.id_seminario
+                AND sr.id_usuario = '$request->idusuario' WHERE sm.usuario_id = '$request->idusuario'
+                AND s.estado = 1
                 AND s.tipo_webinar = 1
                 ORDER BY sm.seminario_has_usuario_id DESC
                 ");
@@ -638,13 +638,16 @@ class SeminarioController extends Controller
 
     public function guardar_seminario(Request $request){
         //CAPACITACIONES
+        $getCantidadCapacitaciones = DB::SELECT("SELECT * FROM seminarios_configuracion");
+        $pre_Capacitadores        = $getCantidadCapacitaciones[0]->cantidad_capacitadores;
+        $cant_Capacitadores       = $pre_Capacitadores - 1;
         if($request->capacitacion == "yes"){
             $datos = json_decode($request->capacitadores);
             foreach($datos as $key => $item){
                 //validar que el capacitador solo pueda 2 capacitaciones por dia
                 $validate  = $this->buscarCapacitacionesXCapacitador($item->idusuario,substr($request->fecha_inicio, 0, 10),$request->id_seminario); // Extraer la subcadena
-                if(sizeof($validate) > 1){
-                    return ["status" => "0", "message" => "El capacitador $item->capacitador ya tiene 2 capacitaciones en el mismo día"];
+                if(sizeof($validate) > $cant_Capacitadores){
+                    return ["status" => "0", "message" => "El capacitador $item->capacitador ya tiene $pre_Capacitadores capacitaciones en el mismo día"];
                 }
             }
             //editar
@@ -669,7 +672,7 @@ class SeminarioController extends Controller
                 $capacitacion->institucion_id_temporal = $request->institucion_id_temporal;
                 $capacitacion->nombre_institucion_temporal = $request->nombreInstitucion;
                 $capacitacion->id_institucion = "";
-            } 
+            }
             if($request->estado_institucion_temporal == 0){
                 $capacitacion->id_institucion = $request->institucion_id;
                 $capacitacion->institucion_id_temporal = "";
@@ -680,7 +683,7 @@ class SeminarioController extends Controller
                 //     $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
                 // }
             }
-           $capacitacion->periodo_id                    = $request->periodo_id; 
+           $capacitacion->periodo_id                    = $request->periodo_id;
            $capacitacion->descripcion                   = $request->fecha_inicio;
            $capacitacion->tipo_webinar                  = "2";
            $capacitacion->estado_institucion_temporal   = $request->estado_institucion_temporal;
@@ -697,9 +700,9 @@ class SeminarioController extends Controller
            if($capacitacion){
             return ["status" => "1","message" => "Se actualizo correctamente"];
            }else{
-            return ["status" => "0","message" => "No se pudo actualizar"]; 
+            return ["status" => "0","message" => "No se pudo actualizar"];
            }
-              
+
         }
         //SEMINARIOS
         if( $request->id_seminario ){
@@ -721,7 +724,7 @@ class SeminarioController extends Controller
         return $query;
     }
     public function getCapacitadoresXCapacitacion($id_seminario){
-        $getCapacitadores = DB::SELECT("SELECT c.*, 
+        $getCapacitadores = DB::SELECT("SELECT c.*,
         CONCAT(u.nombres,' ',u.apellidos) AS capacitador
         FROM seminarios_capacitador c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
@@ -763,9 +766,9 @@ class SeminarioController extends Controller
         }
     }
     public function traerPeriodo($institucion_id){
-        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = ( 
+        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
             SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
-            from institucion i,  periodoescolar_has_institucion pir         
+            from institucion i,  periodoescolar_has_institucion pir
             WHERE i.idInstitucion = pir.institucion_idInstitucion
             AND pir.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi
             WHERE phi.institucion_idInstitucion = i.idInstitucion
@@ -841,7 +844,7 @@ class SeminarioController extends Controller
         $periodos = DB::SELECT("SELECT *,
         IF(p.estado = '1',CONCAT(p.periodoescolar,' ','activo'),CONCAT(p.periodoescolar,' ','desactivado')) AS periodo
          FROM periodoescolar p
-        ORDER BY  p.idperiodoescolar 
+        ORDER BY  p.idperiodoescolar
         desc");
         return $periodos;
     }

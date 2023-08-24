@@ -26,7 +26,7 @@ class AsignaturaDocenteController extends Controller
         return $asignaturas;
     }
 
-    
+
     public function deshabilitarasignatura($id)
     {
         $asignatura = DB::UPDATE("UPDATE asignatura SET estado = '0' WHERE idasignatura = $id");
@@ -62,7 +62,7 @@ class AsignaturaDocenteController extends Controller
     }
 
 
-    
+
      public function guardar_asignatura_usuario(Request $request)
     {
         $asignatura = new AsignaturaDocente();
@@ -117,12 +117,25 @@ class AsignaturaDocenteController extends Controller
         $respuesta=DB::delete('DELETE FROM `asignaturausuario` WHERE  idasiguser = ?',[$request->asignatura_idasignatura]);
         return $respuesta;
     }
+    //API:GET/moverAsignaturasPeriodo/{usuario}/{periodo}
+    public function moverAsignaturasPeriodo($usuario,$periodo){
+        $query = DB::SELECT("SELECT * FROM asignaturausuario a
+        WHERE a.usuario_idusuario = '$usuario'
+        ");
+        foreach($query as $key => $item){
+            DB::table('asignaturausuario')
+            ->where('idasiguser', $item->idasiguser)
+            ->update(['periodo_id' => $periodo]);
+        }
+        return "se guardo correctamente";
+    }
     public function asignaturas_x_docente(Request $request)
     {
         $dato = DB::table('asignaturausuario as ausu')
         ->where('ausu.usuario_idusuario','=',$request->idusuario)
         ->leftjoin('asignatura as asig','ausu.asignatura_idasignatura','=','asig.idasignatura')
-        ->select('asig.nombreasignatura','asig.idasignatura','asig.area_idarea', 'ausu.usuario_idusuario as user','ausu.asignatura_idasignatura','ausu.idasiguser as idasignado')
+        ->leftjoin('periodoescolar as pe','pe.idperiodoescolar','=','ausu.periodo_id')
+        ->select('asig.nombreasignatura','asig.idasignatura','asig.area_idarea', 'ausu.usuario_idusuario as user','ausu.asignatura_idasignatura','ausu.idasiguser as idasignado','pe.periodoescolar','ausu.periodo_id')
         ->get();
         return $dato;
     }
@@ -151,8 +164,8 @@ class AsignaturaDocenteController extends Controller
             $periodo = $buscarPeriodo["periodo"][0]->periodo;
             $asignatura = new AsignaturaDocente();
             $asignatura->usuario_idusuario       = $request->usuario_idusuario;
-            $asignatura->asignatura_idasignatura = $request->asignatura_idasignatura;   
-            $asignatura->periodo_id              = $periodo;            
+            $asignatura->asignatura_idasignatura = $request->asignatura_idasignatura;
+            $asignatura->periodo_id              = $periodo;
             $asignatura->save();
             //$this->addCurso($request->asignatura_idasignatura,$request->usuario_idusuario);
             return $asignatura;
@@ -212,6 +225,6 @@ class AsignaturaDocenteController extends Controller
         $ids = explode(",",$request->idasiguser);
         $data = AsignaturaDocente::destroy($ids);
         return $data;
-     
+
     }
 }
