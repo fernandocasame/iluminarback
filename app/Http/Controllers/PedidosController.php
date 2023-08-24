@@ -23,6 +23,7 @@ use App\Models\PedidoHistoricoActas;
 use App\Models\PedidosGuiasBodega;
 use App\Models\PedidoGuiaEntrega;
 use App\Models\PedidoGuiaEntregaDetalle;
+use App\Models\PedidoHistoricoCambios;
 use App\Models\Periodo;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use Carbon\Carbon;
@@ -2504,7 +2505,6 @@ class PedidosController extends Controller
             WHERE p.ifagregado_anticipo_aprobado = '2'
             AND ifanticipo = '1'
             AND pe.estado = '1'
-            AND p.anticipo > 0
             AND p.estado = '1'
             AND p.facturacion_vee = '1'
             AND pe.pedido_gerencia = '1'
@@ -4408,22 +4408,35 @@ class PedidosController extends Controller
         if($request->changeRevisonNotificacion){
             return $this->changeRevisonNotificacion($request->id_pedido,$request->notificados);
         }
-        $pedido =  DB::UPDATE("UPDATE pedidos
-        SET `$request->campo` = '$request->valor',
-        `user_created`        = '$request->user_created',
-        `editor_motivo`       = '$request->campo'
-        WHERE `id_pedido`     = '$request->id_pedido'
-        ");
+        $getPedido =  Pedidos::findOrFail($request->id_pedido);
+        $contrato  =  $getPedido->contrato_generado;
+        if($request->noCambios == "yes"){
+        }else{
+            $pedido =  DB::UPDATE("UPDATE pedidos
+            SET `$request->campo` = '$request->valor'
+            WHERE `id_pedido`     = '$request->id_pedido'
+            ");
+        }
         //ingresar al historico
         $this->pedidosConAnticipo();
-        if($request->campo == 'ifanticipo' && $request->valor == 1){
+        if($request->campo == 'ifanticipo' && $request->valor == 1 && $contrato != null){
             $this->ingresarHistoricoAnticipo($request);
         }
+        //guardar en historico
+        $this->saveHistoricoCambios($request,$getPedido);
         if($pedido){
             return ["status" => "1", "message" =>"Se guardo correctamente"];
         }else{
             return ["status" => "0","message" => "No se pudo guardar"];
         }
+    }
+    public function saveHistoricoCambios($request,$old_values){
+        $historico = new PedidoHistoricoCambios();
+        $historico->id_pedido       = $request->id_pedido;
+        $historico->user_created    = $request->user_created;
+        $historico->old_values      = $old_values;
+        $historico->tipo            = $request->campo;
+        $historico->save();
     }
     public function ingresarHistoricoAnticipo($request){
         $pedido                     = Pedidos::findOrFail($request->id_pedido);

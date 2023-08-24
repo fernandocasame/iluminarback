@@ -409,6 +409,7 @@ class UsuarioController extends Controller
             $usuario->cedula = $request->cedula;
             $usuario->nombres = $request->nombres;
             $usuario->apellidos = $request->apellidos;
+            $usuario->telefono = $request->telefono;
             $usuario->name_usuario = $request->email;
             $usuario->email = $request->email;
             $usuario->id_group = $request->id_group;
@@ -980,7 +981,9 @@ class UsuarioController extends Controller
    }
     //para ver la institucion del director api::/verInstitucionDirector
     public function verInstitucionDirector(Request $request) {
-        $consulta = DB::SELECT("SELECT di.*,i.idInstitucion, i.nombreInstitucion, c.nombre AS ciudad,i.imgenInstitucion
+        $consulta = DB::SELECT("SELECT di.*,i.idInstitucion,
+        i.nombreInstitucion, c.nombre AS ciudad,i.imgenInstitucion,i.direccionInstitucion,
+        i.region_idregion,i.telefonoInstitucion,i.ciudad_id
         FROM director_has_institucion di
         LEFT JOIN institucion i ON di.institucion_id = i.idInstitucion
         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad

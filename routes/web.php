@@ -1311,3 +1311,14 @@ Route::get('exportAllPreguntasXAsignatura','SallePreguntasController@exportAllPr
 });
 
 //=====FIN SALLE====================================================
+//=======APIS CODIGOS PAQUETES======================================
+Route::group(['prefix' => 'paquetes'],function(){
+  Route::resource('paquetes','PaqueteController');
+  Route::post('generarCodigosPaquete','PaqueteController@generarCodigosPaquete');
+});
+//=======FIN CODIGOS PAQUTES========================================
+// ====== BIBLIOTECA ====== //
+Route::get('biblioteca/categorias/{area}', 'BibliotecaController@getCategorias');
+Route::post('biblioteca/categorias', 'BibliotecaController@crearCategoria');
+Route::get('biblioteca/libros', 'BibliotecaController@getLibros');
+Route::get('biblioteca/libros/{libro}/unidades', 'BibliotecaController@getUnidades');

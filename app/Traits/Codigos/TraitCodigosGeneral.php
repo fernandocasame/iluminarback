@@ -1,7 +1,18 @@
 <?php
-namespace App\Traits\Codigos; 
+namespace App\Traits\Codigos;
 use DB;
 trait TraitCodigosGeneral{
+    public function makeid($longitud){
+        $characters = ['A','B','C','D','E','F','G','H','K','M','N','P','R','S','T','U','V','W','X','Y','Z','2','3','4','5','6','7','8','9'];
+        shuffle($characters);
+        $charactersLength = count($characters);
+        $randomString = '';
+        for ($i = 0; $i < $longitud; $i++) {
+            $pos_rand = rand(0, ($charactersLength-1));
+            $randomString .= $characters[$pos_rand];
+        }
+        return $randomString;
+    }
     //conDevolucion => 1 si; 0 no;
     public function getCodigos($codigo,$conDevolucion){
         $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
@@ -49,20 +60,20 @@ trait TraitCodigosGeneral{
             //conDevolucion => 1 si; 0 no;
             if($conDevolucion == 1){
                 //ULTIMA INSTITUCION
-                $query = DB::SELECT("SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+                $query = DB::SELECT("SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
                 FROM codigos_devolucion d
                 WHERE d.codigo = '$item->codigo'
                 AND d.estado = '1'
-                ORDER BY d.id DESC 
+                ORDER BY d.id DESC
                 LIMIT 1");
                 if(count($query) > 0){
                 $devolucionInstitucion =  $query[0]->devolucion;
-                }    
+                }
             }
             $datos[$key] = (Object)[
                 "codigo"                        => $item->codigo,
                 "InstitucionLista"              => $item->InstitucionLista,
-                "barrasEstado"                  => $item->barrasEstado, 
+                "barrasEstado"                  => $item->barrasEstado,
                 "bc_estado"                     => $item->bc_estado,
                 "bc_fecha_ingreso"              => $item->bc_fecha_ingreso,
                 "bc_institucion"                => $item->bc_institucion,
@@ -101,5 +112,5 @@ trait TraitCodigosGeneral{
         }
         return $datos;
     }
-} 
+}
 ?>

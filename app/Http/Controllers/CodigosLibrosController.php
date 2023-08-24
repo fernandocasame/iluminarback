@@ -27,7 +27,7 @@ class CodigosLibrosController extends Controller
         foreach ($usuario as $key => $value) {
             $idinstitucion = $value->institucion_idInstitucion;
         }
-        
+
         if(!empty($codigos_libros)){
             foreach ($codigos_libros as $key => $value) {
                 $free = DB::SELECT("SELECT libro.*,asignatura.* FROM institucion_libro join libro on libro.idlibro = institucion_libro.idlibro join asignatura on asignatura.idasignatura = libro.asignatura_idasignatura  WHERE institucion_libro.idinstitucion = ? AND asignatura.nivel_idnivel = ? AND institucion_libro.estado = '1'",[$idinstitucion,$value->nivel_idnivel]);
@@ -38,7 +38,7 @@ class CodigosLibrosController extends Controller
         }
         $auxlibrosf = array_unique($auxlibros, SORT_REGULAR);
 
-     
+
         return $auxlibrosf;
     }
 
@@ -52,7 +52,7 @@ class CodigosLibrosController extends Controller
         foreach ($usuario as $key => $value) {
             $idinstitucion = $value->institucion_idInstitucion;
         }
-        
+
         if(!empty($codigos_libros)){
             foreach ($codigos_libros as $key => $value) {
                 $free = DB::SELECT("SELECT libro.*,asignatura.* FROM institucion_libro join libro on libro.idlibro = institucion_libro.idlibro join asignatura on asignatura.idasignatura = libro.asignatura_idasignatura  WHERE institucion_libro.idinstitucion = ? AND asignatura.nivel_idnivel = ? AND institucion_libro.estado = '1'",[$idinstitucion,$value->nivel_idnivel]);
@@ -66,13 +66,13 @@ class CodigosLibrosController extends Controller
             $data[] = DB::SELECT("SELECT j.*, a.nombreasignatura FROM juegos j
              LEFT JOIN asignatura a ON a.idasignatura = j.asignatura_idasignatura
              WHERE j.asignatura_idasignatura = $item->idasignatura
-           
+
             ");
         }
 
         $contador1 =0;
         while ($contador1 < count($data)) {
-         
+
             if(count($data) == 1){
                 $array_resultante= $data[0];
             }
@@ -80,7 +80,7 @@ class CodigosLibrosController extends Controller
             if(count($data) == 2){
                 $array_resultante= array_merge($data[0],$data[1]);
             }
-            
+
             if(count($data) == 3){
                 $array_resultante= array_merge($data[0],$data[1],$data[2]);
             }
@@ -117,7 +117,7 @@ class CodigosLibrosController extends Controller
                 $array_resultante= array_merge($data[0],$data[1],$data[2],$data[3],$data[4],$data[5],$data[6],$data[7],$data[8],$data[9],$data[10]);
             }
 
-            
+
             if(count($data) == 12){
                 $array_resultante= array_merge($data[0],$data[1],$data[2],$data[3],$data[4],$data[5],$data[6],$data[7],$data[8],$data[9],$data[10],$data[11]);
             }
@@ -137,13 +137,13 @@ class CodigosLibrosController extends Controller
             if(count($data) == 16){
                 $array_resultante= array_merge($data[0],$data[1],$data[2],$data[3],$data[4],$data[5],$data[6],$data[7],$data[8],$data[9],$data[10],$data[11],$data[12],$data[13],$data[14],$data[15]);
             }
-           
+
             $contador1=$contador1+1;
         }
         return $array_resultante;
-       
+
     }
-    
+
     public function codigosCuaderno(Request $request){
         $codigos_libros = DB::SELECT("SELECT cuaderno.* from codigoslibros join libro on libro.idlibro = codigoslibros.libro_idlibro join cuaderno on cuaderno.asignatura_idasignatura = libro.asignatura_idasignatura  WHERE idusuario = ? AND codigoslibros.codigo LIKE '%PLUS%'",[$request->idusuario]);
         return $codigos_libros;
@@ -159,12 +159,12 @@ class CodigosLibrosController extends Controller
         //
     }
 
-    //CODIGO COMENTADO, SOLICITADO POR FERNANDO, 
+    //CODIGO COMENTADO, SOLICITADO POR FERNANDO,
     // public function codigos_libros_estudiante($id){
     //     $libros = DB::SELECT("SELECT l. *, c.codigo FROM libro l, codigoslibros c WHERE l.idlibro = c.libro_idlibro AND c.idusuario = $id");
     //     return $libros;
     // }
-    
+
     public function codigos_libros_estudiante($id,$institucion,$periodo,$region){
         $auxlibros = [];
         $nivel = 0;
@@ -204,8 +204,8 @@ class CodigosLibrosController extends Controller
         $portada        = $item->portada;
         $pdfsinguia     = $item->pdfsinguia;
         $pdfconguia     = $item->pdfconguia;
-        $guiadidactica  = $item->guiadidactica; 
-        //sierra 
+        $guiadidactica  = $item->guiadidactica;
+        //sierra
         if($region == 1){
             //si no hay libro de costa asignado tomamos el por defecto
             if($item->s_weblibro != null || $item->s_weblibro != ""){
@@ -213,10 +213,10 @@ class CodigosLibrosController extends Controller
                 $portada        = $item->s_portada;
                 $pdfsinguia     = $item->s_pdfsinguia;
                 $pdfconguia     = $item->s_pdfconguia;
-                $guiadidactica  = $item->s_guiadidactica;            
+                $guiadidactica  = $item->s_guiadidactica;
             }
         }
-        //costa 
+        //costa
         if($region == 2){
             //si no hay libro de costa asignado tomamos el por defecto
             if($item->c_weblibro != null || $item->c_weblibro != ""){
@@ -261,7 +261,7 @@ class CodigosLibrosController extends Controller
             "estado"                    => $item->estado,
             "created_at"                => $item->created_at,
             "updated_at"                => $item->updated_at,
-        ];  
+        ];
         }
         $data=[
             'libros'=>$auxlibrosf = array_unique($datos, SORT_REGULAR),
@@ -271,11 +271,11 @@ class CodigosLibrosController extends Controller
          ];
         return $data;
     }
-    
+
     public function store(Request $request)
     {
-        $validacion = DB::SELECT("SELECT * 
-        FROM  codigoslibros WHERE  
+        $validacion = DB::SELECT("SELECT *
+        FROM  codigoslibros WHERE
         codigo = ?",["$request->codigo"]);
         $iduser = '';
         foreach ($validacion as $key => $value) {
@@ -285,9 +285,9 @@ class CodigosLibrosController extends Controller
             $prueba_diagnostica = $value->prueba_diagnostica;
         }
         //para obtener los datos del estudiante para abrir el ticket
-        $datosEstudiante = DB::SELECT("SELECT CONCAT(e.nombres,' ', e.apellidos) 
+        $datosEstudiante = DB::SELECT("SELECT CONCAT(e.nombres,' ', e.apellidos)
             as estudiante ,e.name_usuario,e.cedula,e.idusuario, i.nombreInstitucion
-            FROM usuario e, institucion i 
+            FROM usuario e, institucion i
             WHERE e.id_group = '4'
             AND e.idusuario = $request->idusuario
             AND e.institucion_idInstitucion = i.idInstitucion
@@ -328,7 +328,7 @@ class CodigosLibrosController extends Controller
                 'datosEstudiante'   => $datosEstudiante,
                 'realizarTicket'    => $realizarTicket,
             ];
-            return $data;    
+            return $data;
         }
         //para mandar los codigos que esten devueltos
         else if($estado_liquidacion == '3'){
@@ -340,7 +340,7 @@ class CodigosLibrosController extends Controller
                 'datosEstudiante'   => $datosEstudiante,
                 'realizarTicket'    => $realizarTicket,
             ];
-            return $data;    
+            return $data;
         }
         else{
             $institucion = $request->id_institucion;
@@ -361,7 +361,7 @@ class CodigosLibrosController extends Controller
                     return ["status"=>"0", "message" => "No existe el periodo lectivo por favor, asigne un periodo a esta institucion"];
                 }
                     //verificar que el periodo exista
-                if(count($verificarperiodos) <= 0){        
+                if(count($verificarperiodos) <= 0){
                     return ["status"=>"0", "message" => "No existe el periodo lectivo por favor, asigne un periodo a esta institucion"];
                 }
                 //fin de busqueda del periodo
@@ -405,23 +405,23 @@ class CodigosLibrosController extends Controller
     }
 
 
-    
+
     public function codigosLibrosFecha($datos)
-    {   
+    {
         $data = explode("*", $datos);
 
         if( $data[0] != "" ){
             $libro = $data[0];
             $fecha = $data[1];
-                
+
             $codigos_libros = DB::SELECT("SELECT * from codigoslibros WHERE libro = '$libro' AND created_at like '$fecha%' ORDER BY `codigoslibros`.`fecha_create` ASC");
-            
+
             return $codigos_libros;
-            
+
         }else{
             return 0;
         }
-        
+
     }
 
 

@@ -408,8 +408,8 @@ class EstudianteController extends Controller
         }
         //para buscar los cursos del estudiante
         if($request->busquedaCurso){
-            $cantidad = DB::SELECT("SELECT  COUNT(DISTINCT e.codigo) as cantidad_cursos  
-            FROM estudiante e 
+            $cantidad = DB::SELECT("SELECT  COUNT(DISTINCT e.codigo) as cantidad_cursos
+            FROM estudiante e
               LEFT JOIN curso c ON c.codigo = e.codigo
               LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
               WHERE  usuario_idusuario  = '$request->idusuario'
@@ -418,7 +418,7 @@ class EstudianteController extends Controller
               AND pe.estado = '1'
             ");
             $codigos = DB::SELECT("SELECT DISTINCT c.codigo, e.usuario_idusuario FROM
-                estudiante e 
+                estudiante e
                 LEFT JOIN curso c ON c.codigo = e.codigo
                 LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
                 WHERE  usuario_idusuario  = '$request->idusuario'
@@ -439,7 +439,7 @@ class EstudianteController extends Controller
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
                 LEFT JOIN institucion_cargos  c ON u.cargo_id = c.id
-                WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '4' OR u.id_group = '9')
+                WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '13' OR u.id_group = '4' OR u.id_group = '9')
                 AND email LIKE '%$request->razonBusqueda%'
                 ");
             }else{
@@ -471,7 +471,6 @@ class EstudianteController extends Controller
         if($request->busqueda == 'cedula'){
 
             if($request->asesor){
-
                 $estudiantes =  DB::SELECT("SELECT DISTINCT  u.idusuario, u.nombres,
                 u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
                 u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion,
@@ -481,7 +480,7 @@ class EstudianteController extends Controller
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
                 LEFT JOIN institucion_cargos  c ON u.cargo_id = c.id
-                WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '4' OR u.id_group = '9')
+                WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '13' OR u.id_group = '4' OR u.id_group = '9')
                 AND cedula LIKE '%$request->razonBusqueda%'
 
                 ");
@@ -517,7 +516,7 @@ class EstudianteController extends Controller
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
                 LEFT JOIN institucion_cargos  c ON u.cargo_id = c.id
-                WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '4' OR u.id_group = '9')
+                WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '13' OR u.id_group = '4' OR u.id_group = '9')
                 AND name_usuario LIKE '%$request->razonBusqueda%'
                 ");
             }
