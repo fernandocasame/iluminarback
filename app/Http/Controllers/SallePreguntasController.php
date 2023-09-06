@@ -22,11 +22,9 @@ class SallePreguntasController extends Controller
     public function index()
     {
         $preguntas = DB::SELECT("SELECT p . *, t.nombre_tipo, t.indicaciones, t.descripcion_tipo, a.nombre_asignatura, a.cant_preguntas, a.estado as estado_asignatura, ar.nombre_area, ar.id_area, ar.estado as estado_area FROM salle_preguntas p, tipos_preguntas t, salle_asignaturas a, salle_areas ar WHERE p.id_tipo_pregunta = t.id_tipo_pregunta AND p.id_asignatura = a.id_asignatura AND a.id_area = ar.id_area AND a.estado = 1 AND ar.estado = 1 AND p.estado = 1");
-
         if(!empty($preguntas)){
             foreach ($preguntas as $key => $value) {
                 $opciones = DB::SELECT("SELECT * FROM `salle_opciones_preguntas` WHERE `id_pregunta` = ?",[$value->id_pregunta]);
-
                 $data['items'][$key] = [
                     'pregunta' => $value,
                     'opciones' => $opciones,
@@ -36,7 +34,6 @@ class SallePreguntasController extends Controller
             $data = [];
         }
         return $data;
-
     }
 
     /**
@@ -55,6 +52,12 @@ class SallePreguntasController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+    //api:post/CambiarEstadoPreguntaSalle
+    public function CambiarEstadoPreguntaSalle(Request $request){
+        $pregunta = SallePreguntas::find($request->id_pregunta);
+        $pregunta->estado = $request->estado;
+        $pregunta->save();
+    }
     public function store(Request $request)
     {
         $ruta = public_path('img/salle/img_preguntas');
@@ -164,21 +167,7 @@ class SallePreguntasController extends Controller
     {
         $info       = explode("*", $datos);
         $id         = $info[0];
-        $periodo    = $info[1];
-        // $preguntas = DB::SELECT("SELECT p . *, t.nombre_tipo, t.indicaciones, t.descripcion_tipo,
-        //  a.nombre_asignatura, a.cant_preguntas, a.estado as estado_asignatura,
-        //  ar.nombre_area, ar.id_area, ar.estado as estado_area
-        //  FROM salle_preguntas p,
-        //  tipos_preguntas t, salle_asignaturas a, salle_areas ar
-        //  WHERE p.id_tipo_pregunta = t.id_tipo_pregunta
-        //   AND p.id_asignatura = a.id_asignatura
-        //    AND a.id_area = ar.id_area
-        //     AND a.estado = 1
-        //     AND ar.estado = 1
-        //     AND p.estado = 1
-        //     AND p.id_asignatura = $id"
-        // );
-
+        $tipoFiltro = $info[2];
         $preguntas = DB::SELECT("SELECT a.nombre_asignatura, p . *, t.nombre_tipo, t.indicaciones,
         t.descripcion_tipo, a.nombre_asignatura, a.cant_preguntas,
         a.estado as estado_asignatura, ar.nombre_area, ar.id_area,
@@ -190,7 +179,7 @@ class SallePreguntasController extends Controller
         LEFT JOIN salle_periodos_evaluacion pe ON ar.n_evaluacion = pe.id
         WHERE a.estado = 1
         AND ar.estado = 1
-        AND p.estado = 1
+        AND p.estado = '$tipoFiltro'
         AND p.id_asignatura = '$id'
         ");
         if(!empty($preguntas)){
@@ -330,7 +319,7 @@ class SallePreguntasController extends Controller
         ");
         return $query;
     }
-    public function generar_evaluacion_salle($id_docente, $id_institucion,$n_evaluacion)
+    public function generar_evaluacion_salle($id_docente, $id_institucion,$n_evaluacion,$admin)
     {
         set_time_limit(60000);
         ini_set('max_execution_time', 60000);
@@ -344,6 +333,21 @@ class SallePreguntasController extends Controller
         // AND i.estado_idEstado = 1");
         if( !empty($configuracion) ){
             if( $fecha_actual < $configuracion[0]->fecha_fin && $fecha_actual > $configuracion[0]->fecha_inicio ){
+                //si el admin previsualiza
+                if($admin == 1){
+                    $eval_doc = DB::SELECT("SELECT * FROM `salle_evaluaciones`
+                    WHERE `id_usuario` = $id_docente
+                    AND `estado` != 3
+                    AND intentos = '0'
+                    AND n_evaluacion = '$n_evaluacion'
+                    ");
+                    ///elimino la evaluacion que se genera para previsualizar
+                    if(count($eval_doc) > 0){
+                        $preIdEvaluacion = $eval_doc[0]->id_evaluacion;
+                        DB::DELETE("DELETE FROM salle_evaluaciones WHERE id_evaluacion = '$preIdEvaluacion'");
+                        DB::DELETE("DELETE FROM salle_preguntas_evaluacion WHERE id_evaluacion = '$preIdEvaluacion'");
+                    }
+                }
                 // evaluaciones del docente que no esten eliminadas !=3, y que corresponda al periodo actual
                 $eval_doc = DB::SELECT("SELECT * FROM `salle_evaluaciones`
                 WHERE `id_usuario` = $id_docente
@@ -411,6 +415,10 @@ class SallePreguntasController extends Controller
                     if( $eval_doc[0]->estado === 1 ){
                         return $this->obtener_evaluacion_salle($eval_doc[0]->id_evaluacion, $id_docente,$n_evaluacion);
                     }else{
+                        //para previsulizar
+                        if($admin == 1){
+                            return $this->obtener_evaluacion_salle($eval_doc[0]->id_evaluacion, $id_docente,$n_evaluacion);
+                        }
                         return 2; // esta evaluacion ya fue completada
                     }
                 }
@@ -604,6 +612,42 @@ class SallePreguntasController extends Controller
             return $cant_modificados;
     }
     //=====METODOS PARA MOVER LAS PREGUNTAS====
+    //API POST/salle/ActivarPreguntas
+    public function ActivarPreguntas(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $miArrayDeObjetos   = json_decode($request->data_preguntas);
+        $contador           = 0;
+        $arregloPreguntasActivas   = collect();
+        foreach($miArrayDeObjetos as $key => $item){
+            $preg_sync          = SallePreguntas::findOrFail($item->id_pregunta);
+            $preg_sync->estado  = '1';
+            $preg_sync->editor  = $request->user_created;
+            $preg_sync->save();
+            if($preg_sync){
+                $pregunta = $this->getPreguntaXId($item->id_pregunta);
+                $arregloPreguntasActivas->push($pregunta);
+                $contador++;
+            }
+        }
+        if(count($arregloPreguntasActivas) == 0){
+            return[
+                "ingresadas"              => $contador,
+                "arregloPreguntasActivas"   => [],
+            ];
+        }else{
+            return[
+                "ingresadas"              => $contador,
+                "arregloPreguntasActivas"   => array_merge(...$arregloPreguntasActivas->all()),
+            ];
+        }
+    }
+    public function getPreguntaXId($id_pregunta){
+        $query = DB::SELECT("SELECT * FROM salle_preguntas p
+        WHERE p.id_pregunta   = '$id_pregunta'
+        ");
+        return $query;
+    }
     //API:POST/salle/MoverPreguntas
     public function MoverPreguntas(Request $request){
         try{

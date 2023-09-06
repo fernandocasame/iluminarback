@@ -141,14 +141,14 @@ class AdminController extends Controller
                     if($iniciales == 'OT') $arrayAsesor = $teran;
                     if($iniciales == 'EZ') $arrayAsesor = $galo;
                     foreach($arrayAsesor as $key => $item){
-                        $test = Http::get('http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$item.'&periodo=C-'.$codPeriodo);
+                        $test = Http::get('http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$item.'&periodo=C-'.$codPeriodo);
                         $json = json_decode($test, true);
                     $valores[$key] = $json;
                     }
                     $setearArray =  array_merge(...$valores);
                     $JsonEnviar = array_unique($setearArray,SORT_REGULAR);
                 }else{
-                    $test = Http::get('http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$iniciales.'&periodo=C-'.$codPeriodo);
+                    $test = Http::get('http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$iniciales.'&periodo=C-'.$codPeriodo);
                     $json = json_decode($test, true);
                     $JsonEnviar = $json;
                 }
@@ -700,7 +700,7 @@ class AdminController extends Controller
         // $contrato = "C-C20-0000008-LJ";
         // try {
         //     $dataFinally    = [];
-        //     $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
+        //     $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
         //     $JsonContrato = json_decode($dato, true);
         //     if($JsonContrato == "" || $JsonContrato == null){
         //         return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -709,7 +709,7 @@ class AdminController extends Controller
         //     $estado         = $JsonContrato["esT_VEN_CODIGO"];
         //     if($estado != 3 && !str_starts_with($covertido , 'C')){
         //         //===PROCESO======
-        //         $dato2 = Http::get("http://186.46.24.108:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$contrato);
+        //         $dato2 = Http::get("http://186.4.218.168:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$contrato);
         //         $JsonDocumentos = json_decode($dato2, true);
         //         return $JsonDocumentos;
         //     }else{

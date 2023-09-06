@@ -1077,19 +1077,18 @@ class CodigoLibrosController extends Controller
                     $codigo = DB::table('codigoslibros')
                     ->where('codigo', '=', $item->codigo)
                     ->update([
-                        'idusuario' =>  $item->idusuario,
-                        'id_periodo' => $item->id_periodo
+                        'bc_periodo' => $item->id_periodo
                     ]);
                     if($codigo){
                         $porcentaje++;
                         //ingresar en el historico
-                        $historico = new HistoricoCodigos();
-                        $historico->id_usuario   =  $item->idusuario;
-                        $historico->codigo_libro   =  $item->codigo;
-                        $historico->usuario_editor = '';
-                        $historico->idInstitucion = $request->id_usuario;
-                        $historico->id_periodo = $item->id_periodo;
-                        $historico->observacion = $item->comentario;
+                        $historico                  = new HistoricoCodigos();
+                        $historico->id_usuario      =  0;
+                        $historico->codigo_libro    =  $item->codigo;
+                        $historico->usuario_editor  = '';
+                        $historico->idInstitucion   = $request->id_usuario;
+                        $historico->id_periodo      = $item->id_periodo;
+                        $historico->observacion     = $item->comentario;
                         $historico->save();
                     }else{
                         $codigosNoCambiados[$key] =[
@@ -1098,27 +1097,27 @@ class CodigoLibrosController extends Controller
                     }
                 }else{
                     $codigosConUsuario[$contador] = [
-                        "codigo" => $item->codigo,
+                        "codigo"             => $item->codigo,
                         "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
                         "tipoCodigo"         => $validar[0]->tipoCodigo,
-                        "barrasEstado" => $validar[0]->barrasEstado,
-                        "codigoEstado" => $validar[0]->codigoEstado,
-                        "liquidacion" => $validar[0]->liquidacion,
-                        "ventaEstado" => $validar[0]->ventaEstado,
-                        "idusuario" => $validar[0]->idusuario,
-                        "estudiante" => $validar[0]->estudiante,
-                        "nombreInstitucion" => $validar[0]->nombreInstitucion,
-                        "institucionBarra" => $validar[0]->institucionBarra,
-                        "periodo" => $validar[0]->periodo,
-                        "periodo_barras" => $validar[0]->periodo_barras,
-                        "cedula" => $validar[0]->cedula,
-                        "email" => $validar[0]->email,
+                        "barrasEstado"       => $validar[0]->barrasEstado,
+                        "codigoEstado"       => $validar[0]->codigoEstado,
+                        "liquidacion"        => $validar[0]->liquidacion,
+                        "ventaEstado"        => $validar[0]->ventaEstado,
+                        "idusuario"          => $validar[0]->idusuario,
+                        "estudiante"         => $validar[0]->estudiante,
+                        "nombreInstitucion"  => $validar[0]->nombreInstitucion,
+                        "institucionBarra"   => $validar[0]->institucionBarra,
+                        "periodo"            => $validar[0]->periodo,
+                        "periodo_barras"     => $validar[0]->periodo_barras,
+                        "cedula"             => $validar[0]->cedula,
+                        "email"              => $validar[0]->email,
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
-                        "estado" => $validar[0]->estado,
-                        "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador,
+                        "estado"             => $validar[0]->estado,
+                        "status"             => $validar[0]->status,
+                        "contador"           => $validar[0]->contador,
                         "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
-                        "factura"               => $validar[0]->factura
+                        "factura"            => $validar[0]->factura
                     ];
                     $contador++;
                 }

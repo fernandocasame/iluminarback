@@ -62,7 +62,7 @@ class ObsequioController extends Controller
         // ';
         // $setear  = json_decode($data,true);
         // return $setear;
-        //obtener contrato de la institucion y periodo 
+        //obtener contrato de la institucion y periodo
         $query = DB::SELECT("SELECT t.*, i.maximo_porcentaje_autorizado
         FROM temporadas t
         LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
@@ -76,7 +76,7 @@ class ObsequioController extends Controller
         if(count($query) > 1){
             return ["status" => "0", "message" => "Existe mas de 1 un contrato con la misma institución"];
         }
-        //variables 
+        //variables
         $contrato                       = $query[0]->contrato;
         $maximo_porcentaje_autorizado   = $query[0]->maximo_porcentaje_autorizado;
         //validar que si tiene verificaciones en prolipa
@@ -87,7 +87,7 @@ class ObsequioController extends Controller
         }
         try {
             $dataFinally    = [];
-            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
+            $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
             $JsonContrato = json_decode($dato, true);
             if($JsonContrato == "" || $JsonContrato == null){
                 return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -97,7 +97,7 @@ class ObsequioController extends Controller
             if($estado != 3 && !str_starts_with($convertido , 'C')){
                 //=====PROCESO VEN CONVERTIDO==========
                 //si el contrato tiene ven convertidos -> para sumar el ven_descuento
-                $dato = Http::get("http://186.46.24.108:9095/api/f_Venta/GetxVenconvertido?venConvertido=".$contrato);
+                $dato = Http::get("http://186.4.218.168:9095/api/f_Venta/GetxVenconvertido?venConvertido=".$contrato);
                 $JsonConvertido = json_decode($dato, true);
                 $DescuentoConvertido = 0;
                 //Si NO existe contratos con ven_convertido
@@ -112,7 +112,7 @@ class ObsequioController extends Controller
                 }
                 //=====FIN PROCESO VEN CONVERTIDO========
                 //get total gastado
-                $query2 = DB::SELECT("SELECT 
+                $query2 = DB::SELECT("SELECT
                     SUM(o.valor_total) AS total_gastado
                     FROM obsequios o
                     WHERE o.institucion_id = '$institucion'
@@ -138,10 +138,10 @@ class ObsequioController extends Controller
                 //return $dataFinally;
                 return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
             }
-            
+
         } catch (\Exception  $ex) {
         return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-        } 
+        }
         return $query;
     }
     public function listadoObsequioGerencia(){
@@ -192,7 +192,7 @@ class ObsequioController extends Controller
             }
         }else{
             $ob = new Obsequio();
-        }   
+        }
         $ob->institucion_id     = $request->institucion_id;
         $ob->periodo_id         = $request->periodo_id;
         $ob->asesor_id          = $request->asesor_id;
@@ -200,14 +200,14 @@ class ObsequioController extends Controller
         $ob->save();
         //detalle obsequio
         //variables
-        $obsequios = json_decode($request->data_obsequios); 
+        $obsequios = json_decode($request->data_obsequios);
         foreach($obsequios as $key => $item){
             if($item->id > 0){
                 $obd = ObsequioDetalle::findOrFail($item->id);
             }else{
                 $obd = new ObsequioDetalle();
                 $obd->obsequios_id   = $ob->id;
-            }   
+            }
             $obd->cantidad       = $item->cantidad;
             $obd->descripcion    = $item->descripcion;
             $obd->especificacion = $item->especificacion;

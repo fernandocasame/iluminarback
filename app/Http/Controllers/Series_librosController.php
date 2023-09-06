@@ -6,9 +6,11 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use App\Models\Libros_series;
+use App\Traits\Codigos\TraitCodigosGeneral;
 
 class Series_librosController extends Controller
 {
+    use TraitCodigosGeneral;
     /**
      * Display a listing of the resource.
      *

@@ -38,7 +38,7 @@ class GuiasController extends Controller
         if($request->verStock){
             return $this->verStock($request->id_pedido);
         }
-        //stock de las 
+        //stock de las
         if($request->verStockGuiasProlipa){
             return $this->verStockGuiasProlipa($request->id_pedido,$request->acta);
         }
@@ -121,7 +121,7 @@ class GuiasController extends Controller
             ];
         }
         return $datos;
-       
+
     }
     public function verStock($id_pedido){
         try {
@@ -134,8 +134,8 @@ class GuiasController extends Controller
                 $codigoFact     = "G".$codigo;
                 $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
                 //get stock
-                $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-                $json_stock     = json_decode($getStock, true); 
+                $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+                $json_stock     = json_decode($getStock, true);
                 $stockAnterior  = $json_stock["producto"][0]["proStock"];
                 //post stock
                 $valorNew       = $arregloCodigos[$contador]["valor"];
@@ -201,8 +201,8 @@ class GuiasController extends Controller
             //     $codigoFact     = "G".$codigo;
             //     $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
             //     //get stock
-            //     $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-            //     $json_stock     = json_decode($getStock, true); 
+            //     $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+            //     $json_stock     = json_decode($getStock, true);
             //     $stockAnterior  = $json_stock["producto"][0]["proStock"];
             //     //post stock
             //     $valorNew       = $arregloCodigos[$contador]["valor"];
@@ -226,7 +226,7 @@ class GuiasController extends Controller
         $query = DB::SELECT("SELECT pd.*,
         CONCAT(u.nombres,' ',u.apellidos) as asesor,
         (
-            SELECT SUM(pg.cantidad_devuelta) AS cantidad 
+            SELECT SUM(pg.cantidad_devuelta) AS cantidad
             FROM pedidos_guias_devolucion_detalle  pg
             WHERE pg.pedidos_guias_devolucion_id = pd.id
 
@@ -235,13 +235,13 @@ class GuiasController extends Controller
         FROM pedidos_guias_devolucion pd
         LEFT JOIN usuario u ON pd.asesor_id = u.idusuario
         LEFT JOIN periodoescolar pe ON pd.periodo_id = pe.idperiodoescolar
-       
+
         ORDER BY pd.id DESC
         ");
         return $query;
     }
     public function validarGenerar($asesor_id){
-        $query = DB::SELECT("SELECT * FROM pedidos_guias_devolucion p 
+        $query = DB::SELECT("SELECT * FROM pedidos_guias_devolucion p
         WHERE p.asesor_id = '$asesor_id'
         AND p.estado = '0'
         ");
@@ -253,14 +253,14 @@ class GuiasController extends Controller
         $query = DB::SELECT("SELECT pd.*,
         CONCAT(u.nombres,' ',u.apellidos) as asesor,
         (
-            SELECT SUM(pg.cantidad_devuelta) AS cantidad 
+            SELECT SUM(pg.cantidad_devuelta) AS cantidad
             FROM pedidos_guias_devolucion_detalle  pg
             WHERE pg.pedidos_guias_devolucion_id = pd.id
 
         ) as cantidad_devolver
         FROM pedidos_guias_devolucion pd
-        LEFT JOIN usuario u ON pd.asesor_id = u.idusuario 
-        WHERE pd.asesor_id = '$asesor_id' 
+        LEFT JOIN usuario u ON pd.asesor_id = u.idusuario
+        WHERE pd.asesor_id = '$asesor_id'
         AND periodo_id = '$periodo_id'
         ORDER BY pd.id DESC
         ");
@@ -313,7 +313,7 @@ class GuiasController extends Controller
                 return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
             }
             //get secuencia
-            $secuencia = Http::get('http://186.46.24.108:9095/api/f_Configuracion');
+            $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
             $json_secuencia_guia = json_decode($secuencia, true);
             $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
             //VARIABLES
@@ -354,7 +354,7 @@ class GuiasController extends Controller
                 'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
                 'cueN_NUMERO'           => strval($cuenta)
             ];
-            $guias = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_guias = json_decode($guias, true);
             // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
             $query = "UPDATE `pedidos_guias_devolucion` SET `ven_codigo` = '$codigo_ven', `fecha_aprobacion` = '$fechaActual', `estado` = '1' WHERE `id` = $id_pedido;";
@@ -382,7 +382,7 @@ class GuiasController extends Controller
                     "DET_VEN_INICIO"        => false,
                     "DET_VEN_CANTIDAD_REAL" => intval($item->cantidad_devuelta),
                 ];
-                $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleGuias);
+                $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleGuias);
                 $json_detalle = json_decode($detalle, true);
             }
             //ACTUALIZAR EL ACTA DE LAS GUIAS
@@ -393,7 +393,7 @@ class GuiasController extends Controller
                 "conValorNum"   => $getSecuencia + 1 ,
                 "conValorStr"   => null,
             ];
-            $post_Secuencia = Http::post('http://186.46.24.108:9095/api/f_Configuracion', $form_data_Secuencia);
+            $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
             $json_secuencia = json_decode($post_Secuencia, true);
             //===ACTUALIZAR STOCK========
            return $this->actualizarStockFacturacion($detalleGuias,$codigo_ven);
@@ -401,7 +401,7 @@ class GuiasController extends Controller
          } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
-           
+
     }
     //actualizar stock
     public function actualizarStockFacturacion($arregloCodigos,$codigo_ven){
@@ -410,8 +410,8 @@ class GuiasController extends Controller
             $codigo         = $item->pro_codigo;
             $codigoFact     = "G".$codigo;
             //get stock
-            $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-            $json_stock     = json_decode($getStock, true); 
+            $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+            $json_stock     = json_decode($getStock, true);
             $stockAnterior  = $json_stock["producto"][0]["proStock"];
             //post stock
             $valorNew       = $item->cantidad_devuelta;
@@ -420,9 +420,9 @@ class GuiasController extends Controller
                 "proStock"     => $nuevoStock,
             ];
             //test
-            //$postStock = Http::post('http://186.46.24.108:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
+            //$postStock = Http::post('http://186.4.218.168:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
             //prod
-            $postStock = Http::post('http://186.46.24.108:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
+            $postStock = Http::post('http://186.4.218.168:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
             $json_StockPost = json_decode($postStock, true);
             //save Historico
             $historico = new PedidoHistoricoActas();
@@ -462,7 +462,7 @@ class GuiasController extends Controller
     public function saveDevolucionGuiasBodega(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $detalles  = json_decode($request->data_detalle);  
+        $detalles  = json_decode($request->data_detalle);
         $asesor_id = $request->asesor_id;
         if($request->id == 0){
             //save devolucion
@@ -564,16 +564,16 @@ class GuiasController extends Controller
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $guias = json_decode($request->data_guias);
-        $contador = 0;  
+        $contador = 0;
         try {
             foreach($guias as $key => $item){
                 $form_data_stock = [];
                 $codigo         = $item->pro_codigo;
                 $codigoFact     = $item->codigoFact;
                 //get stock
-               // $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigo);
-                $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-                $json_stock     = json_decode($getStock, true); 
+               // $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigo);
+                $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+                $json_stock     = json_decode($getStock, true);
                 $stockAnterior  = $json_stock["producto"][0]["proStock"];
                 //post stock
                 $valorNew       = $item->cantidad;
@@ -582,11 +582,11 @@ class GuiasController extends Controller
                     "proStock"     => $nuevoStock,
                 ];
                 //test
-                //$postStock = Http::post('http://186.46.24.108:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
-                //$postStock = Http::post('http://186.46.24.108:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
+                //$postStock = Http::post('http://186.4.218.168:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
+                //$postStock = Http::post('http://186.4.218.168:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
                 //prod
-                //$postStock = Http::post('http://186.46.24.108:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
-                $postStock = Http::post('http://186.46.24.108:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
+                //$postStock = Http::post('http://186.4.218.168:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
+                $postStock = Http::post('http://186.4.218.168:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
                 $json_StockPost = json_decode($postStock, true);
 
                 $historico = new PedidoHistoricoActas();

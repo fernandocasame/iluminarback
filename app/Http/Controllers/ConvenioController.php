@@ -51,7 +51,7 @@ class ConvenioController extends Controller
         $contador =0;
         foreach($query2 as $key => $item){
             try {
-                $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$item->contrato);
+                $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$item->contrato);
                 $JsonContrato = json_decode($dato, true);
                 if($JsonContrato == "" || $JsonContrato == null){
                     $datos[$contador] = [
@@ -70,7 +70,7 @@ class ConvenioController extends Controller
                     //verificar que no sea anulado ni convertido
                     if($estado != 3 && !str_starts_with($covertido , 'C')){
                         //===PROCESO======
-                        $dato2 = Http::get("http://186.46.24.108:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$item->contrato);
+                        $dato2 = Http::get("http://186.4.218.168:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$item->contrato);
                         $JsonDocumentos = json_decode($dato2, true);
                         $datos[$contador] = [
                             "id"                            => $item->id,

@@ -808,6 +808,7 @@ class UsuarioController extends Controller
         FROM salle_evaluaciones se
             WHERE se.id_usuario = u.idusuario
             AND se.n_evaluacion = '$n_evaluacion'
+            AND intentos <> '0'
         ) AS id_evaluacion
         FROM usuario u
         INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion

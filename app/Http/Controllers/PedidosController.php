@@ -246,7 +246,7 @@ class PedidosController extends Controller
             ];
             //guardar en historico
             $this->saveHistoricoAnticipos($request);
-            $dato = Http::post("http://186.46.24.108:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
+            $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
             $prueba_get = json_decode($dato, true);
             if($pedido){
                 return ["status" => "1", "message" => "Se guardo correctamente"];
@@ -356,7 +356,7 @@ class PedidosController extends Controller
                        $cantidad       = $request->valor;
                        $codigoFact     = "G".$codigoCodigo;
                        //get stock
-                       $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+                       $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
                        $json_stock     = json_decode($getStock, true);
                        $stockAnterior  = $json_stock["producto"][0]["proStock"];
                        //post stock
@@ -395,7 +395,7 @@ class PedidosController extends Controller
                        $cantidad       = $request->valor;
                        $codigoFact     = "G".$codigoCodigo;
                        //get stock
-                       $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+                       $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
                        $json_stock     = json_decode($getStock, true);
                        $stockAnterior  = $json_stock["producto"][0]["proStock"];
                        //post stock
@@ -583,7 +583,7 @@ class PedidosController extends Controller
             DB::UPDATE("UPDATE temporadas SET estado = '0' WHERE contrato ='$contrato'");
             //anular en la base facturacion
             try {
-                $test = Http::get('http://186.46.24.108:9095/api/f_Venta/'.$contrato);
+                $test = Http::get('http://186.4.218.168:9095/api/f_Venta/'.$contrato);
                 $json = json_decode($test, true);
                 $valor =3;
                 $form_data = [
@@ -616,7 +616,7 @@ class PedidosController extends Controller
                     "venFechRemision"       => $json["venFechRemision"],
                     "sucursal"              => $json["sucursal"]
                 ];
-                $saveContrato = Http::post('http://186.46.24.108:9095/api/f_Venta', $form_data);
+                $saveContrato = Http::post('http://186.4.218.168:9095/api/f_Venta', $form_data);
                 $json_anular = json_decode($saveContrato, true);
                 return $form_data;
                 // return response()->json(['save' => $json_anular, 'form_data' => $form_data]);
@@ -1544,7 +1544,7 @@ class PedidosController extends Controller
                 'cli_telefono'  => $request->telefono,
                 'cli_email'     => $request->email
             ];
-            Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
+            Http::post('http://186.4.218.168:9095/api/Cliente', $form_data);
          } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
@@ -1580,7 +1580,7 @@ class PedidosController extends Controller
         }
         //====Crear cedula en facturacion si no existe=====
         try {
-            $dato = Http::get("http://186.46.24.108:9095/api/f_Cliente/Busquedaxclici?cli_ci=".$cedula);
+            $dato = Http::get("http://186.4.218.168:9095/api/f_Cliente/Busquedaxclici?cli_ci=".$cedula);
             $JsonCedula = json_decode($dato, true);
             // return $JsonCedula;
             if(isset($JsonCedula["clientexclici"])){
@@ -1611,7 +1611,7 @@ class PedidosController extends Controller
                     'cliTitulo'             => $cliTitulo
                 ];
                 //return $form_data;
-                $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
+                $dato = Http::post("http://186.4.218.168:9095/api/f_Cliente", $form_data);
                 $prueba_post = json_decode($dato, true);
             }else{
                 //no se encontro lo creo
@@ -1623,7 +1623,7 @@ class PedidosController extends Controller
                     'cli_telefono'  => $telefono,
                     'cli_email'     => $email
                 ];
-                $client = Http::post('http://186.46.24.108:9095/api/Cliente', $form_data);
+                $client = Http::post('http://186.4.218.168:9095/api/Cliente', $form_data);
                 $JsonCliente = json_decode($client, true);
             }
         } catch (\Exception  $ex) {
@@ -1663,7 +1663,7 @@ class PedidosController extends Controller
                 'ins_codigo'   => intval($institucion[0]->codigo_institucion_milton),
                 'ven_d_codigo' => $asesor[0]->iniciales,
             ];
-            $cliente_escuela = Http::post('http://186.46.24.108:9095/api/ClienteEscuela', $form_data);
+            $cliente_escuela = Http::post('http://186.4.218.168:9095/api/ClienteEscuela', $form_data);
             $json_cliente_escuela = json_decode($cliente_escuela, true);
             if( $json_cliente_escuela ){
             // SE GUARDA EN BASE PROLIPA EL CLI INS CODIGO GENERADO
@@ -1762,7 +1762,7 @@ class PedidosController extends Controller
                 "ben_valor"       => $value->valor
             ];
             try {
-                $benef = Http::post('http://186.46.24.108:9095/api/beneficiario', $form_data);
+                $benef = Http::post('http://186.4.218.168:9095/api/beneficiario', $form_data);
                 return $benef;
             } catch (\Throwable $th) {
                 dump($th);
@@ -1770,7 +1770,7 @@ class PedidosController extends Controller
         }
     }
     public function cargar_codigos_vendedores(){
-        $vendedores = Http::get('http://186.46.24.108:9095/api/vendedor');
+        $vendedores = Http::get('http://186.4.218.168:9095/api/vendedor');
         $json_vendedores = json_decode($vendedores, true);
         // return count($json_vendedores);
         foreach ($json_vendedores as $key => $value) {
@@ -1785,7 +1785,7 @@ class PedidosController extends Controller
         }
     }
     public function cargar_codigos_usuarios(){
-        $usuarios = Http::get('http://186.46.24.108:9095/api/usuario');
+        $usuarios = Http::get('http://186.4.218.168:9095/api/usuario');
         $json_usuarios = json_decode($usuarios, true);
         // return count($json_usuarios);
         foreach ($json_usuarios as $key => $value) {
@@ -1801,14 +1801,14 @@ class PedidosController extends Controller
     public function cargar_codigo_institucion1(){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $escuelas = Http::get('http://186.46.24.108:9095/api/Escuela');
+        $escuelas = Http::get('http://186.4.218.168:9095/api/Escuela');
         $json_escuelas = json_decode($escuelas, true);
         return  $json_escuelas;
     }
     public function cargar_codigo_institucion(){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $escuelas = Http::get('http://186.46.24.108:9095/api/Escuela');
+        $escuelas = Http::get('http://186.4.218.168:9095/api/Escuela');
         $json_escuelas = json_decode($escuelas, true);
         // return count($json_escuelas);
         foreach ($json_escuelas as $key => $value) {
@@ -1824,7 +1824,7 @@ class PedidosController extends Controller
     public function cargar_codigo_ciudad(){ /// base de milton
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $ciudades = Http::get('http://186.46.24.108:9095/api/Ciudad');
+        $ciudades = Http::get('http://186.4.218.168:9095/api/Ciudad');
         $json_ciudades = json_decode($ciudades, true);
         // return count($json_ciudades);
         foreach ($json_ciudades as $key => $value) {
@@ -1853,7 +1853,7 @@ class PedidosController extends Controller
                     'ins_ruc'        => '', // no tienen
                     'ins_sector'     => '', // no tienen
                 ];
-                $institucion = Http::post('http://186.46.24.108:9095/api/Escuela', $form_data);
+                $institucion = Http::post('http://186.4.218.168:9095/api/Escuela', $form_data);
                 $json_institucion = json_decode($institucion, true);
                 // guardar en base de prolipa tabla institucion
                 if( count($json_institucion) > 0 ){
@@ -1986,7 +1986,7 @@ class PedidosController extends Controller
         //guardar en la tabla de temporadas
         $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
         try {
-            $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $contrato = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_contrato = json_decode($contrato, true);
         } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
@@ -2011,7 +2011,7 @@ class PedidosController extends Controller
                 "DET_VEN_INICIO"        => false,
                 "DET_VEN_CANTIDAD_REAL" => intval($detalleVenta[$i]["valor"]),
             ];
-            $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleVenta);
+            $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleVenta);
         $json_detalle = json_decode($detalle, true);
         }
         return $json_contrato;
@@ -2034,7 +2034,7 @@ class PedidosController extends Controller
         //si hay contrato traigo la venta real -
         else{
             try {
-                $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
+                $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
                 $JsonContrato = json_decode($dato, true);
                 if($JsonContrato == "" || $JsonContrato == null){
                     return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -2196,7 +2196,7 @@ class PedidosController extends Controller
         //guardar en la tabla de temporadas
         $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
         try {
-            $contrato = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $contrato = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_contrato = json_decode($contrato, true);
          } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
@@ -2222,7 +2222,7 @@ class PedidosController extends Controller
                 "DET_VEN_INICIO"        => false,
                 "DET_VEN_CANTIDAD_REAL" => intval($detalleVenta[$i]["valor"]),
             ];
-            $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleVenta);
+            $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleVenta);
             $json_detalle = json_decode($detalle, true);
         }
         } catch (\Exception  $ex) {
@@ -2323,14 +2323,14 @@ class PedidosController extends Controller
     public function cargarClientesMilton(){ /// base de milton
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $consulta = Http::get('http://186.46.24.108:9095/api/Cliente');
+        $consulta = Http::get('http://186.4.218.168:9095/api/Cliente');
         $jsonconsulta = json_decode($consulta, true);
         return $jsonconsulta;
     }
     public function cargarVendedoresMilton(){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $consulta = Http::get('http://186.46.24.108:9095/api/Vendedor');
+        $consulta = Http::get('http://186.4.218.168:9095/api/Vendedor');
         $jsonconsulta = json_decode($consulta, true);
         return $jsonconsulta;
     }
@@ -2516,8 +2516,8 @@ class PedidosController extends Controller
                 //traer valores anteriores
                 $cadena = $item->codigo_contrato;
                 $nuevoCadena = substr($cadena,1);
-                $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$item->codigo_institucion_milton."&venCodigo=".$nuevoCadena);
-                // $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton);
+                $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$item->codigo_institucion_milton."&venCodigo=".$nuevoCadena);
+                // $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$item->codigo_institucion_milton);
                 $JsonDocumentos = json_decode($dato, true);
                 $datos[$key] =[
                     "pedido_id"                         => $item->pedido_id,
@@ -2658,7 +2658,7 @@ class PedidosController extends Controller
                 $form_data = [
                     'venAnticipo'   => floatval($datos->cantidadAprobar),
                 ];
-                $dato = Http::post("http://186.46.24.108:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
+                $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
                 $prueba_get = json_decode($dato, true);
             }
             //HISTORICO ANTICIPOS
@@ -2775,8 +2775,8 @@ class PedidosController extends Controller
             $extractValues = explode(',',$request->codigosM);
             $temporada     = $request->temporada;
             $escuela = $extractValues[0];
-            // $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$escuela);
-            $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$escuela.'&venCodigo='.$temporada);
+            // $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$escuela);
+            $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$escuela.'&venCodigo='.$temporada);
             $JsonDocumentos = json_decode($dato, true);
             return $JsonDocumentos;
         } catch (\Exception  $ex) {
@@ -2922,14 +2922,14 @@ class PedidosController extends Controller
                 if($iniciales == 'OT') $arrayAsesor = $teran;
                 if($iniciales == 'EZ') $arrayAsesor = $galo;
                 foreach($arrayAsesor as $key => $item){
-                    $test = Http::get('http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$item.'&periodo=C-'.$codPeriodo);
+                    $test = Http::get('http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$item.'&periodo=C-'.$codPeriodo);
                     $json = json_decode($test, true);
                    $valores[$key] = $json;
                 }
                 $setearArray =  array_merge(...$valores);
                 $JsonEnviar = array_unique($setearArray,SORT_REGULAR);
             }else{
-                $test = Http::get('http://186.46.24.108:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$iniciales.'&periodo=C-'.$codPeriodo);
+                $test = Http::get('http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$iniciales.'&periodo=C-'.$codPeriodo);
                 $json = json_decode($test, true);
                 $JsonEnviar = $json;
             }
@@ -3044,7 +3044,7 @@ class PedidosController extends Controller
     //api:Get/detalleContratoFacturacion
     public function detalleContratoFacturacion(Request $request){
         try {
-            $test = Http::get('http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodigo?ven_codigo='.$request->ven_codigo);
+            $test = Http::get('http://186.4.218.168:9095/api/f_DetalleVenta/Busquedaxvencodigo?ven_codigo='.$request->ven_codigo);
             $json = json_decode($test, true);
             return $json;
         } catch (\Exception  $ex) {
@@ -3258,7 +3258,7 @@ class PedidosController extends Controller
         }
         try {
             //BUSCAR EL CONTRATO SI EXISTE
-            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
+            $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
             $JsonContrato = json_decode($dato, true);
             if($JsonContrato == "" || $JsonContrato == null){
                 return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -3280,7 +3280,7 @@ class PedidosController extends Controller
                         $precio         = $item["precio"];
                         $form_data      = [];
                         //consultar si hay codigo registrado en el contrato en el detalle de venta
-                        $responseBook   = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$contrato."&pro_codigo=".$proCodigo);
+                        $responseBook   = Http::get("http://186.4.218.168:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$contrato."&pro_codigo=".$proCodigo);
                         $JsonLibro      = json_decode($responseBook, true);
                         //si no  existe : creo
                         if(sizeOf($JsonLibro["detalle_venta"]) == 0){
@@ -3294,7 +3294,7 @@ class PedidosController extends Controller
                                 "detVenInicio"          => false,
                                 "detVenCantidadReal"    => intval($cantidad),
                             ];
-                            $saveLibros     = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/CreateOrUpdateDetalleVenta',$form_data);
+                            $saveLibros     = Http::post('http://186.4.218.168:9095/api/f_DetalleVenta/CreateOrUpdateDetalleVenta',$form_data);
                             $JsonLibroSave  = json_decode($saveLibros, true);
                             //GUARDAR EN EL HISTORICO ALCANCE LIBROS
                             $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,0,$cantidad,$user_created,1,$proCodigo);
@@ -3308,7 +3308,7 @@ class PedidosController extends Controller
                                 'detVenCantidad'        => intval($resultadoLibro),
                                 'detVenCantidadReal'    => intval($resultadoLibro),
                             ];
-                            $updateLibros = Http::post('http://186.46.24.108:9095/api/f_DetalleVenta/UpdateDetallveVenta?venCodigo='.$contrato.'&proCodigo='.$proCodigo, $form_data);
+                            $updateLibros = Http::post('http://186.4.218.168:9095/api/f_DetalleVenta/UpdateDetallveVenta?venCodigo='.$contrato.'&proCodigo='.$proCodigo, $form_data);
                             $json_saveLibros = json_decode($updateLibros, true);
                             //GUARDAR EN EL HISTORICO ALCANCE LIBROS
                             $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidadAnterior,$resultadoLibro,$user_created,1,$proCodigo);
@@ -3322,7 +3322,7 @@ class PedidosController extends Controller
                     $datos = [
                         "venValor"        => floatval($nueva_cantidad)
                     ];
-                    $saveValor          = Http::post('http://186.46.24.108:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
+                    $saveValor          = Http::post('http://186.4.218.168:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
                     //GUARDAR EN EL HISTORICO ALCANCE VEN_VALOR
                     $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,0,null);
                     //CERRAR ALCANCE
@@ -3621,7 +3621,7 @@ class PedidosController extends Controller
                 return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
             }
             //get secuencia
-            $secuencia = Http::get('http://186.46.24.108:9095/api/f_Configuracion');
+            $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
             $json_secuencia_guia = json_decode($secuencia, true);
             $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
             // //VARIABLES
@@ -3658,7 +3658,7 @@ class PedidosController extends Controller
                 'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
                 'cueN_NUMERO'           => strval($cuenta)
             ];
-            $guias = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_guias = json_decode($guias, true);
             // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
             $query = "UPDATE `pedidos` SET `ven_codigo` = '$codigo_ven', `id_usuario_verif` = $usuario_fact ,`fecha_aprobado_facturacion` = '$fechaActual', `estado_entrega` = '1' WHERE `id_pedido` = $id_pedido;";
@@ -3686,7 +3686,7 @@ class PedidosController extends Controller
                     "DET_VEN_INICIO"        => false,
                     "DET_VEN_CANTIDAD_REAL" => intval($detalleGuias[$i]["valor"]),
                 ];
-                $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleGuias);
+                $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleGuias);
                 $json_detalle = json_decode($detalle, true);
             }
             //ACTUALIZAR EL ACTA DE LAS GUIAS
@@ -3697,7 +3697,7 @@ class PedidosController extends Controller
                 "conValorNum"   => $getSecuencia + 1 ,
                 "conValorStr"   => null,
             ];
-            $post_Secuencia = Http::post('http://186.46.24.108:9095/api/f_Configuracion', $form_data_Secuencia);
+            $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
             $json_secuencia = json_decode($post_Secuencia, true);
             //===ACTUALIZAR STOCK========
            return $this->actualizarStockFacturacion($detalleGuias,$codigo_ven);
@@ -3715,7 +3715,7 @@ class PedidosController extends Controller
             $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
             $codigoFact     = "G".$codigo;
             //get stock
-            $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+            $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
             $json_stock     = json_decode($getStock, true);
             $stockAnterior  = $json_stock["producto"][0]["proStock"];
             //post stock
@@ -3725,9 +3725,9 @@ class PedidosController extends Controller
                 "proStock"     => $nuevoStock,
             ];
             //test
-           // $postStock = Http::post('http://186.46.24.108:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
+           // $postStock = Http::post('http://186.4.218.168:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
             //prod
-            $postStock = Http::post('http://186.46.24.108:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
+            $postStock = Http::post('http://186.4.218.168:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigoFact,$form_data_stock);
             $json_StockPost = json_decode($postStock, true);
             //save Historico
             $historico = new PedidoHistoricoActas();
@@ -3836,7 +3836,7 @@ class PedidosController extends Controller
             'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
             'cueN_NUMERO'           => strval($cuenta)
             ];
-            $guias = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+            $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_guias = json_decode($guias, true);
             return $form_data;
          //$arregloCodigos = $this->get_val_pedidoInfo(157);
@@ -3851,7 +3851,7 @@ class PedidosController extends Controller
         //         $codigoFact     = "G".$codigo;
         //         $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
         //         //get stock
-        //         $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+        //         $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
         //         $json_stock     = json_decode($getStock, true);
         //         $stockAnterior  = $json_stock["producto"][0]["proStock"];
         //         //post stock
@@ -3900,7 +3900,7 @@ class PedidosController extends Controller
         //       return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
         //   }
         //     //get secuencia
-        //     //   $secuencia = Http::get('http://186.46.24.108:9095/api/f_Configuracion');
+        //     //   $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
         //     //   $json_secuencia_guia = json_decode($secuencia, true);
         //     //   $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
         //     //   //VARIABLES
@@ -3939,7 +3939,7 @@ class PedidosController extends Controller
         //     'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
         //     'cueN_NUMERO'           => strval($cuenta)
         //     ];
-        //     $guias = Http::post('http://186.46.24.108:9095/api/Contrato', $form_data);
+        //     $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
         //     $json_guias = json_decode($guias, true);
         //     //================SAVE DETALLE DE LAS GUIAS======================
         //     //obtener las guias por libros
@@ -3965,7 +3965,7 @@ class PedidosController extends Controller
         //             "DET_VEN_INICIO"        => false,
         //             "DET_VEN_CANTIDAD_REAL" => intval($detalleGuias[$i]["valor"]),
         //         ];
-        //         $detalle = Http::post('http://186.46.24.108:9095/api/DetalleVenta', $form_data_detalleGuias);
+        //         $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleGuias);
         //         $json_detalle = json_decode($detalle, true);
 
         //     }
@@ -3981,7 +3981,7 @@ class PedidosController extends Controller
         //     "conValorNum"   => $getSecuencia + 1 ,
         //     "conValorStr"   => null,
         // ];
-        // $post_Secuencia = Http::post('http://186.46.24.108:9095/api/f_Configuracion', $form_data_Secuencia);
+        // $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
         // $json_secuencia = json_decode($post_Secuencia, true);
         //===ACTUALIZAR STOCK========
        // return $this->actualizarStockFacturacionTest($detalleGuias,$ven_codigo);
@@ -3992,7 +3992,7 @@ class PedidosController extends Controller
             $form_data_stock = [];
             $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
             //get stock
-            $getStock       = Http::get('http://186.46.24.108:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigo);
+            $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigo);
             $json_stock     = json_decode($getStock, true);
             $stockAnterior  = $json_stock["producto"][0]["proStock"];
             //post stock
@@ -4002,9 +4002,9 @@ class PedidosController extends Controller
                 "proStock"     => $nuevoStock,
             ];
             //test
-            $postStock = Http::post('http://186.46.24.108:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
+            $postStock = Http::post('http://186.4.218.168:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
             //prod
-            //$postStock = Http::post('http://186.46.24.108:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
+            //$postStock = Http::post('http://186.4.218.168:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
             $json_StockPost = json_decode($postStock, true);
             //save Historico
             $historico = new PedidoHistoricoActas();
@@ -4068,7 +4068,7 @@ class PedidosController extends Controller
         // $sendQuery = json_decode($data,true);
         // return $sendQuery;
         try {
-            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
+            $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
             $JsonContrato = json_decode($dato, true);
             if($JsonContrato == "" || $JsonContrato == null){
                 return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -4186,7 +4186,7 @@ class PedidosController extends Controller
         return $arrayObjetos;
         // $contrato = "C-C20-0000008-LJ";
         try {
-            $dato = Http::get("http://186.46.24.108:9095/api/Contrato/".$contrato);
+            $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
             $JsonContrato = json_decode($dato, true);
             if($JsonContrato == "" || $JsonContrato == null){
                 return ["status" => "0", "message" => "No existe el contrato en facturación"];
@@ -4195,7 +4195,7 @@ class PedidosController extends Controller
             $estado         = $JsonContrato["esT_VEN_CODIGO"];
             if($estado != 3 && !str_starts_with($covertido , 'C')){
                 //===PROCESO======
-                $dato2 = Http::get("http://186.46.24.108:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$contrato);
+                $dato2 = Http::get("http://186.4.218.168:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$contrato);
                 $JsonDocumentos = json_decode($dato2, true);
                 return $JsonDocumentos;
             }else{

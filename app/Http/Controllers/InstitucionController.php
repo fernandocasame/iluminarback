@@ -660,8 +660,26 @@ class InstitucionController extends Controller
         WHERE i.ciudad_id = '$request->ciudad_id'
         ORDER BY i.fecha_registro DESC
         ");
-
-        return $lista;
+        // return $lista;
+        $datos = [];
+        foreach($lista as $key => $item){
+            $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo_id , periodoescolar AS periodo,
+            IF(estado = '1' ,'Activo','Desactivado') as estadoPeriodo,estado
+             FROM periodoescolar
+              WHERE idperiodoescolar = (
+                SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
+                from institucion i,  periodoescolar_has_institucion pir
+                WHERE i.idInstitucion = pir.institucion_idInstitucion
+                AND pir.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi
+                WHERE phi.institucion_idInstitucion = i.idInstitucion
+                AND i.idInstitucion = '$item->idInstitucion'))
+            ");
+            $datos[$key] = [
+                "institucion" => $item,
+                "periodo"     => $periodoInstitucion
+            ];
+        }
+        return $datos;
     }
     public function getInstitucionConfiguracion (){
         $dato = DB::table('institucion_configuracion_periodo as ic')

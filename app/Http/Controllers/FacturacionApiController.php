@@ -14,7 +14,7 @@ class FacturacionApiController extends Controller
     //PRUEBA API
     public function Pruebaapi()
     {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Pruebaapi");
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Pruebaapi");
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -27,7 +27,7 @@ class FacturacionApiController extends Controller
             'correoElectronico' => $request->correoElectronico
         ];
         // return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Pruebaapi", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Pruebaapi", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
     }
@@ -42,7 +42,7 @@ class FacturacionApiController extends Controller
         ];
         // return $form_data;
         //$json_data = json_encode($form_data);
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Pruebaapi/", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Pruebaapi/", $form_data);
         $prueba_put = json_decode($dato, true);
         return $prueba_put;
     }
@@ -50,7 +50,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->id;
         //return $valor;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Pruebaapi/DeletePruebaapi?id=".$valor);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Pruebaapi/DeletePruebaapi?id=".$valor);
         $prueba_delete = json_decode($dato, true);
         return $prueba_delete;
     }
@@ -58,7 +58,7 @@ class FacturacionApiController extends Controller
     //VENDEDOR
     public function Get_Vendedor()
     {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Vendedor/GetVen_Ciudades");
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Vendedor/GetVen_Ciudades");
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -66,7 +66,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->busqueda;
         $valor2 = $request->razonbusqueda;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Vendedor/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Vendedor/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -83,7 +83,7 @@ class FacturacionApiController extends Controller
             'venDCi' => $request->venDCi,
             'venDSecuencial' => $request->venDSecuencial
         ];
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Vendedor", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Vendedor", $form_data);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -100,20 +100,20 @@ class FacturacionApiController extends Controller
             'venDCi' => $request->venDCi,
             'venDSecuencial' => $request->venDSecuencial
         ];
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Vendedor", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Vendedor", $form_data);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
     //PRODUCTO
     public function Get_Producto()
     {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Producto/GetPro_Grupos");
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Producto/GetPro_Grupos");
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
     public function Get_Productocompleto()
     {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Producto");
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Producto");
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -123,7 +123,7 @@ class FacturacionApiController extends Controller
         $valor2 = $request->razonbusqueda;
         //return $valor;
         //return $request;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Producto/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Producto/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -142,14 +142,14 @@ class FacturacionApiController extends Controller
             'proPeso' => $request->proPeso
         ];
         //return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Producto/AggOrUpdateProducto", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Producto/AggOrUpdateProducto", $form_data);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
     //INSTITUCION
     public function Get_Institucion()
     {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Institucion");
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Institucion");
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -158,7 +158,7 @@ class FacturacionApiController extends Controller
         $valor = $request->nameInstitucion;
         //return $valor;
         //return $request;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Institucion?nameInstitucion=".$valor);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Institucion?nameInstitucion=".$valor);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -181,7 +181,7 @@ class FacturacionApiController extends Controller
             'insSector' => $request->insSector
         ];
         // return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Institucion", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Institucion", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
     }
@@ -206,14 +206,14 @@ class FacturacionApiController extends Controller
         ];
         // return $form_data;
         // return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Institucion/", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Institucion/", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
     }
     //CLIENTE_INSTITUCION
     /*public function Get_Cliente_Institucion()
     {
-        $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion");
+        $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion");
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -222,7 +222,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->busqueda;
         $valor2 = $request->razonbusqueda;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_ClienteInstitucion/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/GetxParametros?busqueda=".$valor."&razonbusqueda=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -230,7 +230,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->id;
         // return $valor;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_ClienteInstitucion/DeleteClienteInstitucion?id=".$valor);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_ClienteInstitucion/DeleteClienteInstitucion?id=".$valor);
         $prueba_delete = json_decode($dato, true);
         return $prueba_delete;
     }
@@ -241,7 +241,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->codcontrato;
         //return $valor
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Venta?codcontrato=".$valor);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Venta?codcontrato=".$valor);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -251,7 +251,7 @@ class FacturacionApiController extends Controller
         $valor = $request->codcontrato;
         $valor2 = $request->periodo;
         //return $valor
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Venta?codcontrato=".$valor."&periodo=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Venta?codcontrato=".$valor."&periodo=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -288,7 +288,7 @@ class FacturacionApiController extends Controller
             'sucursal'   => $request->sucursal
         ];
         //return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Venta", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Venta", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
     }
@@ -297,7 +297,7 @@ class FacturacionApiController extends Controller
     {
         $valor = $request->busqueda;
         $valor2 = $request->razonbusqueda;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_Cliente?busqueda=".$valor."&razonbusqueda=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Cliente?busqueda=".$valor."&razonbusqueda=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -319,7 +319,7 @@ class FacturacionApiController extends Controller
             'cliTitulo'   => $request->cliTitulo
         ];
         //return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Cliente", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
     }
@@ -341,7 +341,7 @@ class FacturacionApiController extends Controller
             'cliTitulo'   => $request->cliTitulo
         ];
         //return $form_data;
-        $dato = Http::post("http://186.46.24.108:9095/api/f_Cliente", $form_data);
+        $dato = Http::post("http://186.4.218.168:9095/api/f_Cliente", $form_data);
         $prueba_post = json_decode($dato, true);
         return $prueba_post;
     }
@@ -352,7 +352,7 @@ class FacturacionApiController extends Controller
         $valor2 = $request->pro_codigo;
         //return $valor;
         //return $request;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_DetalleVerificacion/Getxvencodigoyprocodigo?ven_codigo=".$valor."&pro_codigo=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_DetalleVerificacion/Getxvencodigoyprocodigo?ven_codigo=".$valor."&pro_codigo=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -365,7 +365,7 @@ class FacturacionApiController extends Controller
         ];
         try {
             // return $valor;
-            $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Updatedvcantidadxdetverid?det_ver_id=".$valor, $form_data);
+            $dato = Http::post("http://186.4.218.168:9095/api/f_DetalleVerificacion/Updatedvcantidadxdetverid?det_ver_id=".$valor, $form_data);
             $prueba_update = json_decode($dato, true);
             $historico = new VerificacionHistorico();
             $historico->vencodigo = $request->venCodigo;
@@ -392,7 +392,7 @@ class FacturacionApiController extends Controller
         $valor = $request->detVerId;
         // return $valor;
         try {
-            $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVerificacion/Deletexdetverid?det_ver_id=".$valor);
+            $dato = Http::post("http://186.4.218.168:9095/api/f_DetalleVerificacion/Deletexdetverid?det_ver_id=".$valor);
             $prueba_delete = json_decode($dato, true);
             $historico = new VerificacionHistorico();
             $historico->vencodigo = $request->venCodigo;
@@ -420,7 +420,7 @@ class FacturacionApiController extends Controller
         $valor2 = $request->pro_codigo;
         //return $valor;
         //return $request;
-        $dato = Http::get("http://186.46.24.108:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$valor."&pro_codigo=".$valor2);
+        $dato = Http::get("http://186.4.218.168:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$valor."&pro_codigo=".$valor2);
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
@@ -433,7 +433,7 @@ class FacturacionApiController extends Controller
         ];
         try {
             //return $formdata;
-            $dato = Http::post("http://186.46.24.108:9095/api/f_DetalleVenta/Updatexdetvencodigo?det_ven_codigo=".$valor, $form_data);
+            $dato = Http::post("http://186.4.218.168:9095/api/f_DetalleVenta/Updatexdetvencodigo?det_ven_codigo=".$valor, $form_data);
             $prueba_update = json_decode($dato, true);
             $historico = new VerificacionHistorico();
             $historico->vencodigo = $request->venCodigo;

@@ -757,6 +757,7 @@ Route::post('save_asignaturas_docente_salle','SalleAsignaturasController@save_as
 Route::get('delete_asignaturas_docente_salle/{id}','SalleAsignaturasController@delete_asignaturas_docente_salle');
 Route::get('asignaturas_por_area_salle/{id}','SalleAsignaturasController@asignaturas_por_area_salle');
 // preguntas salle
+Route::post('CambiarEstadoPreguntaSalle','SallePreguntasController@CambiarEstadoPreguntaSalle');
 Route::get('salle_sincronizar_preguntas/{asignatura1}/{asignatura2}/{usuario}/{n_evaluacion}','SallePreguntasController@salle_sincronizar_preguntas');
 Route::apiResource('preguntas_salle','SallePreguntasController');
 Route::get('opciones_pregunta_salle/{id}','SallePreguntasController@opciones_pregunta_salle');
@@ -768,7 +769,7 @@ Route::post('cargar_opcion_vf_salle','SallePreguntasController@cargar_opcion_vf_
 Route::post('transformar_preguntas_salle','SallePreguntasController@transformar_preguntas_salle');
 Route::get('validar_puntajes','SallePreguntasController@validar_puntajes');
 // evaluaciones salle
-Route::get('generar_evaluacion_salle/{id_docente}/{id_institucion}/{n_evaluacion}','SallePreguntasController@generar_evaluacion_salle');
+Route::get('generar_evaluacion_salle/{id_docente}/{id_institucion}/{n_evaluacion}/{admin}', 'SallePreguntasController@generar_evaluacion_salle');
 Route::get('salle_getConfiguracion/{id_institucion}/{n_evaluacion}','SallePreguntasController@salle_getConfiguracion');
 Route::get('obtener_evaluacion_salle/{id_docente}/{id_evaluacion}/{n_evaluacion}','SallePreguntasController@obtener_evaluacion_salle');
 Route::post('salle_finalizarEvaluacion','SallePreguntasController@salle_finalizarEvaluacion');
@@ -1187,7 +1188,7 @@ Route::get('getLiquidacion/{id_pedido}','PedidosController@getLiquidacion');
 Route::get('llenarInformacionContrato','PedidosController@llenarInformacionContrato');
 //api para asignar como principal el beneficiario
 Route::post('asignarBeneficiarioPrincipal','PedidosController@asignarBeneficiarioPrincipal');
-Route::post('institucionesX_Ciudad','InstitucionController@instituciones_ciudad');
+Route::get('institucionesX_Ciudad','InstitucionController@instituciones_ciudad');
 Route::get('reportePedidosLibrosGuias/{id}','PedidosController@reportePedidosLibrosGuias');
 Route::get('reportePedidosGuiasBodega/{id}','PedidosController@reportePedidosGuiasBodega');
 Route::get('getProvincias','CiudadController@getProvincias');
@@ -1309,6 +1310,7 @@ Route::post('neetEliminar','NeetTemaController@neetEliminar');
 Route::group(['prefix' => 'salle'],function(){
 Route::resource('periodos','SallePeriodoController');
 Route::post('MoverPreguntas','SallePreguntasController@MoverPreguntas');
+Route::post('ActivarPreguntas', 'SallePreguntasController@ActivarPreguntas');
 Route::get('exportAllPreguntasXAsignatura','SallePreguntasController@exportAllPreguntasXAsignatura');
 });
 
@@ -1324,3 +1326,9 @@ Route::get('biblioteca/categorias/{area}', 'BibliotecaController@getCategorias')
 Route::post('biblioteca/categorias', 'BibliotecaController@crearCategoria');
 Route::get('biblioteca/libros', 'BibliotecaController@getLibros');
 Route::get('biblioteca/libros/{libro}/unidades', 'BibliotecaController@getUnidades');
+//=======APIS CODIGOS PAQUETES======================================
+Route::group(['prefix' => 'grafitex'], function () {
+    Route::resource('codigos', 'CodigosGrafitexController');
+    Route::post('generarCodigosGrafitex', 'CodigosGrafitexController@generarCodigosGrafitex');
+});
+//=======FIN CODIGOS PAQUTES========================================
