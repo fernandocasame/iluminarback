@@ -885,11 +885,19 @@ class UsuarioController extends Controller
     public function add_user_admin(Request $request)
     {
         $usuario = new Usuario();
-        $datosValidados=$request->validate([
+        if($request->validarEmail == 1){
+            $datosValidados=$request->validate([
             'cedula' => 'required|max:13|unique:usuario',
             'email' => 'required|email|unique:usuario',
             'name_usuario' => 'required|unique:usuario',
             ]);
+        }else{
+            $datosValidados=$request->validate([
+            'cedula' => 'required|max:13|unique:usuario',
+            'email' => 'required|unique:usuario',
+            'name_usuario' => 'required|unique:usuario',
+            ]);
+        }
         $usuario->password=sha1(md5($request->cedula));
         $usuario->cedula = $request->cedula;
         $str1 = strtolower($request->nombre);
