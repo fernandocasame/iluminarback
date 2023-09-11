@@ -14,11 +14,11 @@ class AreaController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function index()
-    {   
+    {
         // return csrf_token();
         $area = DB::SELECT("SELECT a.*, t.nombretipoarea
-         FROM area a 
-         LEFT JOIN tipoareas t ON a.tipoareas_idtipoarea  = t.idtipoarea 
+         FROM area a
+         LEFT JOIN tipoareas t ON a.tipoareas_idtipoarea  = t.idtipoarea
         ORDER  BY idarea ASC
         ");
 
@@ -30,10 +30,10 @@ class AreaController extends Controller
     {
         $area = DB::SELECT("SELECT * FROM area WHERE estado = '1'");
         foreach ($area as $key => $post) {
-            // $respuesta = DB::SELECT("SELECT asignatura.idasignatura as id, asignatura.nombreasignatura as name 
-            // FROM asignatura 
+            // $respuesta = DB::SELECT("SELECT asignatura.idasignatura as id, asignatura.nombreasignatura as name
+            // FROM asignatura
             // join area on area.idarea = asignatura.area_idarea
-            // WHERE asignatura.area_idarea = ? 
+            // WHERE asignatura.area_idarea = ?
             // AND asignatura.estado = '1'
             // ",[$post->idarea]);
             $respuesta = DB::SELECT("SELECT DISTINCT a.idasignatura as id, a.nombreasignatura as name
@@ -71,9 +71,9 @@ class AreaController extends Controller
      */
     public function store(Request $request)
     {
-        
+
        if($request->idarea){
-       
+
         $area = Area::findOrFail($request->idarea);
         $area->nombrearea = $request->nombrearea;
         $area->tipoareas_idtipoarea = $request->idtipoarea;
