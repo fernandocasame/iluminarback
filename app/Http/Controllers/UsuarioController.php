@@ -9,8 +9,10 @@ use App\Models\Institucion;
 use App\Models\Perfil;
 use App\Models\Periodo;
 use App\Models\DirectorHasInstitucion;
+use App\Models\HistoricoCodigos;
 use Illuminate\Http\Request;
 use App\Quotation;
+use App\Traits\Codigos\TraitCodigosGeneral;
 use DB;
 use Mail;
 use Cookie;
@@ -20,6 +22,7 @@ use GuzzleHttp\Client;
 
 class UsuarioController extends Controller
 {
+    use TraitCodigosGeneral;
     public function infoRegistro(Request $request){
         $paralelos = DB::SELECT("SELECT * FROM mat_paralelos");
 
@@ -410,7 +413,7 @@ class UsuarioController extends Controller
             $usuario->nombres = $request->nombres;
             $usuario->apellidos = $request->apellidos;
             $usuario->telefono = $request->telefono;
-            $usuario->name_usuario = $request->email;
+            $usuario->name_usuario = $request->name_usuario;
             $usuario->email = $request->email;
             $usuario->id_group = $request->id_group;
             if($change_password == 1){
@@ -418,7 +421,7 @@ class UsuarioController extends Controller
             }
             $usuario->p_ingreso=0;
             $usuario->institucion_idInstitucion = $request->institucion_idInstitucion;
-            $usuario->estado_idEstado = 1;
+            $usuario->estado_idEstado = $request->estado_idEstado;
             $usuario->paralelo = $request->paralelo;
             $usuario->curso = $request->curso;
             $usuario->iniciales = $request->iniciales;
@@ -438,7 +441,7 @@ class UsuarioController extends Controller
             $usuario->cedula = $request->cedula;
             $usuario->nombres = $request->nombres;
             $usuario->apellidos = $request->apellidos;
-            $usuario->name_usuario = $request->email;
+            $usuario->name_usuario = $request->name_usuario;
             $usuario->email = $request->email;
             $usuario->id_group = $request->id_group;
             $usuario->password=sha1(md5($request->cedula));
@@ -1346,11 +1349,9 @@ class UsuarioController extends Controller
         u.nombres,u.apellidos, u.cargo_id,u.fecha_nacimiento,u.id_group, u.email,u.estado_idEstado,
         u.institucion_idInstitucion,u.telefono,u.iniciales,u.idusuario,u.foto_user,
         (
-            SELECT COUNT(i.idInstitucion) FROM institucion i
-            LEFT JOIN periodoescolar_has_institucion pir ON i.idInstitucion = pir.institucion_idInstitucion
+            SELECT COUNT(i.idInstitucion)
+            FROM institucion i
             WHERE i.vendedorInstitucion = u.cedula
-            AND i.estado_idEstado = '1'
-            AND (pir.periodoescolar_idperiodoescolar = '$request->sierra'  OR pir.periodoescolar_idperiodoescolar = '$request->costa')
         )   AS cantidad_instituciones
         FROM usuario u
         WHERE u.id_group = '11'
@@ -1359,17 +1360,39 @@ class UsuarioController extends Controller
         return $asesoresInstituciones;
     }
     public function getInstitucionesxAsesor(Request $request){
-        $institucionesAsesor = DB::SELECT("SELECT i.nombreInstitucion,i.idInstitucion, c.nombre AS ciudad ,
-         p.periodoescolar AS periodo,p.estado ,p.region_idregion AS region
-        FROM institucion i
-           LEFT JOIN periodoescolar_has_institucion pir ON i.idInstitucion = pir.institucion_idInstitucion
-           LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-           LEFT JOIN periodoescolar p ON p.idperiodoescolar = pir.periodoescolar_idperiodoescolar
+        $institucionesAsesor = DB::SELECT("SELECT i.nombreInstitucion,
+         i.idInstitucion, c.nombre AS ciudad,i.estado_idEstado
+         FROM institucion i
+         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
          WHERE i.vendedorInstitucion = '$request->cedula'
-         AND i.estado_idEstado = '1'
-         AND (pir.periodoescolar_idperiodoescolar = '$request->sierra' OR pir.periodoescolar_idperiodoescolar = '$request->costa')
-         ");
-        return $institucionesAsesor;
+        ");
+        $datos = [];
+        foreach($institucionesAsesor as $key => $item){
+            $getPeriodo = $this->PeriodoInstitucion($item->idInstitucion);
+            if(empty($getPeriodo)){
+                $datos[$key] = [
+                    "nombreInstitucion" => $item->nombreInstitucion,
+                    "idInstitucion"     => $item->idInstitucion,
+                    "estado_idEstado"   => $item->estado_idEstado,
+                    "ciudad"            => $item->ciudad,
+                    "periodo"           => "",
+                    "estado"            => "",
+                    "region"            => ""
+                ];
+            }else{
+                $datos[$key] = [
+                    "nombreInstitucion" => $item->nombreInstitucion,
+                    "idInstitucion"     => $item->idInstitucion,
+                    "estado_idEstado"   => $item->estado_idEstado,
+                    "ciudad"            => $item->ciudad,
+                    "periodo"           => $getPeriodo[0]->descripcion,
+                    "estado"            => $getPeriodo[0]->estado,
+                    "region"            => $getPeriodo[0]->region,
+                ];
+            }
+
+        }
+        return $datos;
     }
     public function getPeriodoInvidivual(Request $request){
         $periodo = DB::SELECT("SELECT DISTINCT  p.* FROM periodoescolar p
@@ -1466,7 +1489,7 @@ class UsuarioController extends Controller
         $contador = 0;
         foreach($codigos as $key => $item){
             //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo);
+            $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
                 $ifLiquidado        = $validar[0]->estado_liquidacion;
