@@ -1,5 +1,7 @@
 <?php
 namespace App\Traits\Codigos;
+
+use App\Models\HistoricoCodigos;
 use DB;
 trait TraitCodigosGeneral{
     public function makeid($longitud){
@@ -41,7 +43,9 @@ trait TraitCodigosGeneral{
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
             ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-            p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             FROM codigoslibros c
             LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
@@ -108,9 +112,36 @@ trait TraitCodigosGeneral{
                 "venta_estado"                  => $item->venta_estado,
                 "venta_lista_institucion"       => $item->venta_lista_institucion,
                 "codigo_union"                  => $item->codigo_union,
+                "codigo_paquete"                => $item->codigo_paquete,
+                "fecha_registro_paquete"        => $item->fecha_registro_paquete
             ];
         }
         return $datos;
+    }
+    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values){
+        $historico = new HistoricoCodigos();
+        $historico->id_usuario     =  $id_usuario;
+        $historico->usuario_editor =  $institucion_id;
+        $historico->id_periodo     =  $periodo_id;
+        $historico->codigo_libro   =  $codigo;
+        $historico->idInstitucion  =  $usuario_editor;
+        $historico->observacion    =  $comentario;
+        $historico->old_values     =  $old_values;
+        $historico->save();
+    }
+    public function PeriodoInstitucion($institucion){
+        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo ,
+            periodoescolar AS descripcion,region_idregion as region,estado
+            FROM periodoescolar
+            WHERE idperiodoescolar = (
+            SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
+            from institucion i,  periodoescolar_has_institucion pir
+            WHERE i.idInstitucion = pir.institucion_idInstitucion
+            AND pir.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi
+            WHERE phi.institucion_idInstitucion = i.idInstitucion
+            AND i.idInstitucion = '$institucion'))
+        ");
+        return $periodoInstitucion;
     }
 }
 ?>
