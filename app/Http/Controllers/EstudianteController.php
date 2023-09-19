@@ -33,10 +33,13 @@ class EstudianteController extends Controller
     }
 
     public function estudianteCurso(Request $request){
+        $data = [];
         $cursos = DB::SELECT("CALL `cursoAlumno` (?);",[$request->idusuario]);
         foreach ($cursos as $key => $post) {
+            $docente = $this->getUser($post->idusuario);
             $data['items'][$key] = [
                 'cursos' => $post,
+                "docente" => $docente,
                 'tareas' => $this->tareasEstudiante($post->idcurso),
                 'tareas_pendientes' => $this->tareaEstudiantePendienteD($post->idcurso,$request->idusuario),
                 'tareas_realizadas' => $this->tareaEstudianteRealizadaD($post->idcurso,$request->idusuario),
@@ -44,7 +47,13 @@ class EstudianteController extends Controller
         }
         return $data;
     }
-
+    public function getUser($usuario){
+        $query = DB::SELECT("SELECT CONCAT(u.nombres,' ',u.apellidos) as docente
+        FROM usuario u
+        WHERE u.idusuario = '$usuario'
+        ");
+        return $query;
+    }
     public function tareaEstudiantePendienteD($idcurso,$idusuario){
         $data=array();
         $tarea = DB::SELECT("SELECT * FROM tarea left join contenido on contenido.idcontenido = tarea.contenido_idcontenido WHERE tarea.curso_idcurso = ? AND tarea.estado = '1' AND tarea.usuario_idusuario IS NULL OR tarea.usuario_idusuario = ?",[$idcurso,$idusuario]);
@@ -153,7 +162,15 @@ class EstudianteController extends Controller
 
 
     public function institucionEstCod($id){
-        $institucion = DB::SELECT("SELECT idInstitucion, nombreInstitucion, ciudad.nombre as nombre_ciudad, pi.periodoescolar_idperiodoescolar as id_periodo FROM institucion, usuario, ciudad, periodoescolar_has_institucion pi WHERE usuario.institucion_idInstitucion = institucion.idInstitucion AND ciudad.idciudad = institucion.ciudad_id AND usuario.idUsuario = $id AND usuario.institucion_idInstitucion = pi.institucion_idInstitucion AND pi.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi WHERE phi.institucion_idInstitucion = institucion.idInstitucion)");
+        $institucion = DB::SELECT("SELECT idInstitucion,
+         nombreInstitucion, ciudad.nombre as nombre_ciudad,
+         pi.periodoescolar_idperiodoescolar as id_periodo,institucion.region_idregion as region
+         FROM institucion, usuario, ciudad, periodoescolar_has_institucion pi
+         WHERE usuario.institucion_idInstitucion = institucion.idInstitucion
+         AND ciudad.idciudad = institucion.ciudad_id
+         AND usuario.idUsuario = $id
+         AND usuario.institucion_idInstitucion = pi.institucion_idInstitucion
+         AND pi.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi WHERE phi.institucion_idInstitucion = institucion.idInstitucion)");
 
         return $institucion;
 

@@ -13,10 +13,12 @@ use App\Models\Periodo;
 use DataTables;
 Use Exception;
 use App\Models\CodigosObservacion;
+use App\Traits\Codigos\TraitCodigosGeneral;
 use GraphQL\Server\RequestError;
 
 class CodigosLibrosGenerarController extends Controller
 {
+    use TraitCodigosGeneral;
     /**
      * Display a listing of the resource.
      *
@@ -328,41 +330,23 @@ class CodigosLibrosGenerarController extends Controller
         $idLibro = $data[6];
         $id_periodo = $data[7];
         $id_institucion = $data[8];
-
         if( $codigo != "" ){
-
             $has_periodo = DB::SELECT("SELECT `id_periodo` FROM `codigoslibros` WHERE `codigo` = '$codigo'");
-            // if( $has_periodo[0]->id_periodo == null ){
-            //     $codigos_libros = DB::UPDATE("UPDATE `codigoslibros` SET `codigo`='$codigo',`serie`='$serie',`libro`='$libro',`anio`='$anio',`idusuario_creador_codigo`=$idusuario_creador_codigo,`idusuario`='$idusuario', `libro_idlibro`=$idLibro WHERE `codigo`= '$codigo'");
-            // }else{
-            //     $codigos_libros = DB::UPDATE("UPDATE `codigoslibros` SET `codigo`='$codigo',`serie`='$serie',`libro`='$libro',`anio`='$anio',`idusuario_creador_codigo`=$idusuario_creador_codigo,`idusuario`='$idusuario', `libro_idlibro`=$idLibro ,`id_periodo` = $id_periodo WHERE `codigo`= '$codigo'");
-            // }
-                //SI NO SELECCIONA EL PERIODO
             if($id_periodo == "undefined") {
-
                 $codigos_libros = DB::UPDATE("UPDATE `codigoslibros` SET `codigo`='$codigo',`serie`='$serie',`libro`='$libro',`anio`='$anio',`idusuario_creador_codigo`=$idusuario_creador_codigo,`idusuario`='$idusuario', `libro_idlibro`=$idLibro WHERE `codigo`= '$codigo'");
                 //guardar en el historico
                 //se obtiene el periodo actual del codigo
                 $periodo = $has_periodo[0]->id_periodo ;
                 DB::INSERT("INSERT INTO hist_codlibros(id_usuario, codigo_libro,usuario_editor, idInstitucion,  observacion,id_periodo) VALUES ($idusuario, '$codigo', $id_institucion, $idusuario_creador_codigo, 'modificado', $periodo)");
-
             }else{
                 $codigos_libros = DB::UPDATE("UPDATE `codigoslibros` SET `codigo`='$codigo',`serie`='$serie',`libro`='$libro',`anio`='$anio',`idusuario_creador_codigo`=$idusuario_creador_codigo,`idusuario`='$idusuario', `libro_idlibro`=$idLibro ,`id_periodo` = $id_periodo WHERE `codigo`= '$codigo'");
                 //guardar en el historico
                 DB::INSERT("INSERT INTO hist_codlibros(id_usuario, codigo_libro,usuario_editor, idInstitucion,  observacion,id_periodo) VALUES ($idusuario, '$codigo', $id_institucion, $idusuario_creador_codigo, 'modificado', $id_periodo)");
             }
-
-
-
-
             return $codigos_libros;
-
         }else{
-
             return 'Codigo no encontrado';
-
         }
-
     }
 
 
@@ -451,7 +435,8 @@ class CodigosLibrosGenerarController extends Controller
             c.updated_at as registrado, CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.cedula as cedula,  u.email,
             p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
             c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
-            ivl.nombreInstitucion as InstitucionLista
+            ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             from codigoslibros c
             LEFT JOIN usuario u on u.idusuario = c.idusuario
             LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
@@ -467,7 +452,7 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarCodigo($codigo){
-        $codigos_libros = DB::SELECT("SELECT
+        $codigos_libros = DB::SELECT("SELECT c.id_periodo,
             c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
              u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
@@ -500,7 +485,8 @@ class CodigosLibrosGenerarController extends Controller
             c.updated_at as registrado, CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.cedula as cedula,  u.email,
             p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
             c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
-            ivl.nombreInstitucion as InstitucionLista
+            ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             from codigoslibros c
             LEFT JOIN usuario u on u.idusuario = c.idusuario
             LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
@@ -515,52 +501,7 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarxCodigo($codigo){
-        $codigos_libros = DB::SELECT("SELECT
-            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
-            u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
-            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
-            FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo
-            AND d.estado = '1'
-            ORDER BY d.id DESC
-            LIMIT 1) as devolucionInstitucion,
-            (SELECT COUNT(d.id) FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo AND d.estado = '1') as devolucion,
-            c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
-            c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
-            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-            (case when (c.estado_liquidacion = '0') then 'liquidado'
-                when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2') then 'codigo regalado'
-                when (c.estado_liquidacion = '3') then 'codigo devuelto'
-            end) as liquidacion,
-            (case when (c.bc_estado = '2') then 'codigo leido'
-                when (c.bc_estado = '1') then 'codigo sin leer'
-            end) as barrasEstado,
-            (case when (c.codigos_barras = '1') then 'con código de barras'
-                when (c.codigos_barras = '0')  then 'sin código de barras'
-            end) as status,
-            (case when (c.venta_estado = '0') then ''
-                        when (c.venta_estado = '1') then 'Venta directa'
-                        when (c.venta_estado = '2') then 'Venta por lista'
-            end) as ventaEstado,
-            c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-            (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
-            c.updated_at as registrado, CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.cedula as cedula,  u.email,
-            p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
-            c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
-            ivl.nombreInstitucion as InstitucionLista
-            from codigoslibros c
-            LEFT JOIN usuario u on u.idusuario = c.idusuario
-            LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
-            LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
-            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-            LEFT JOIN ciudad ci ON ci.idciudad = ib.ciudad_id
-            WHERE c.codigo = '$codigo'
-         ");
+        $codigos_libros = $this->getCodigos($codigo,0);
         return $codigos_libros;
     }
     public function librosBuscar(){//select buscar

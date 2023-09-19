@@ -17,8 +17,8 @@ class GestionCodigosController extends Controller
      */
     public function index(Request $request)
     {
-        $consulta = DB::SELECT("SELECT 
-        (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion 
+        $consulta = DB::SELECT("SELECT
+        (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
             FROM codigos_devolucion d
             WHERE d.codigo = c.codigo
             AND d.estado = '1'
@@ -48,7 +48,8 @@ class GestionCodigosController extends Controller
             when (c.venta_estado = '1') then 'Venta directa'
             when (c.venta_estado = '2') then 'Venta por lista'
         end) as ventaEstado,ib.nombreInstitucion as institucionBarra,
-        p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+        p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+        c.codigo_paquete,c.fecha_registro_paquete,c.prueba_diagnostica,c.codigo_union
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -144,8 +145,8 @@ class GestionCodigosController extends Controller
         ini_set('max_execution_time', 6000000);
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos    = json_decode($request->data_codigos); 
-        $todate     = date('Y-m-d H:i:s');  
+        $codigos    = json_decode($request->data_codigos);
+        $todate     = date('Y-m-d H:i:s');
         $contador   = 0;
         //editar
         foreach($codigos as $key => $item){
@@ -180,7 +181,7 @@ class GestionCodigosController extends Controller
                 $contador++;
                 //Guardar en el historico
                 $this->GuardarEnHistorico($request->user_created,$request->institucion_id,$request->periodo_id,$item->codigo,$request->user_created,$comentario,$old_values,$codigo);
-            }    
+            }
         }
         return [
             "contador" => $contador
@@ -219,13 +220,13 @@ class GestionCodigosController extends Controller
            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-           WHERE  
+           WHERE
                 (
-                c.bc_institucion = '$request->institucion_id' 
+                c.bc_institucion = '$request->institucion_id'
                 OR venta_lista_institucion = '$request->institucion_id'
-                ) 
+                )
             AND c.bc_periodo = '$request->periodo_id'
-            AND 
+            AND
                 (
                 c.estado = '1' OR c.estado = '0' OR c.estado = '' OR c.estado IS NULL
                 )
@@ -263,13 +264,13 @@ class GestionCodigosController extends Controller
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            WHERE  
+            WHERE
                 (
-                c.bc_institucion = '$request->institucion_id' 
+                c.bc_institucion = '$request->institucion_id'
                 OR venta_lista_institucion = '$request->institucion_id'
-                ) 
+                )
              AND c.bc_periodo = '$request->periodo_id'
-             AND 
+             AND
                 (
                 c.estado = '1' OR c.estado = '0' OR c.estado = '' OR c.estado IS NULL
                 )
@@ -341,13 +342,13 @@ class GestionCodigosController extends Controller
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            WHERE  
+            WHERE
                 (
-                c.bc_institucion = '$request->institucion_id' 
+                c.bc_institucion = '$request->institucion_id'
                 OR venta_lista_institucion = '$request->institucion_id'
-                ) 
+                )
                 AND c.bc_periodo = '$request->periodo_id'
-                AND 
+                AND
                 (
                 c.estado = '1' OR c.estado = '0' OR c.estado = '' OR c.estado IS NULL
                 )
@@ -386,13 +387,13 @@ class GestionCodigosController extends Controller
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            WHERE  
+            WHERE
                 (
-                c.bc_institucion = '$request->institucion_id' 
+                c.bc_institucion = '$request->institucion_id'
                 OR venta_lista_institucion = '$request->institucion_id'
-                ) 
+                )
                 AND c.bc_periodo = '$request->periodo_id'
-                AND 
+                AND
                 (
                 c.estado = '1' OR c.estado = '0' OR c.estado = '' OR c.estado IS NULL
                 )
@@ -431,11 +432,11 @@ class GestionCodigosController extends Controller
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            WHERE  
+            WHERE
                 (
-                c.bc_institucion = '$request->institucion_id' 
+                c.bc_institucion = '$request->institucion_id'
                 OR venta_lista_institucion = '$request->institucion_id'
-                ) 
+                )
                 AND c.bc_periodo = '$request->periodo_id'
                 LIMIT 2000
             ");
@@ -450,7 +451,7 @@ class GestionCodigosController extends Controller
      */
     public function show($id)
     {
-     
+
     }
 
     /**
@@ -490,7 +491,7 @@ class GestionCodigosController extends Controller
         }else{
             return ["status" => "0" ,"message" => "No se pudo eliminar el codigo puede que este liquidado"];
         }
-      
+
     }
     public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values){
         $historico = new HistoricoCodigos();
@@ -506,14 +507,14 @@ class GestionCodigosController extends Controller
      }
     public function destroy($id)
     {
-        
+
     }
     public function guardarDescuentoCodigos(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        //variables 
+        //variables
         $valor = $request->valor;
-        $codigos = json_decode($request->codigos);  
+        $codigos = json_decode($request->codigos);
         foreach($codigos as $key => $item){
             $codigo = CodigosLibros::findOrFail($item->codigo);
             $codigo->porcentaje_descuento   = $valor;

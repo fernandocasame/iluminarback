@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\CodigosLibros;
 use App\Models\CodigosPaquete;
 use Illuminate\Http\Request;
 use DB;
@@ -43,6 +44,142 @@ class PaqueteController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+    public function getPaquete($paquete){
+        $query = DB::SELECT("SELECT * FROM codigos_paquetes p
+        WHERE p.codigo = '$paquete'
+        ");
+        return $query;
+    }
+    //paquetes/guadarPaquete
+    public function guardarPaquete(Request $request){
+        set_time_limit(600000);
+        ini_set('max_execution_time', 600000);
+        $miArrayDeObjetos           = json_decode($request->data_codigos);
+        //variables
+        $usuario_editor             = $request->id_usuario;
+        $institucion_id             = 0;
+        $periodo_id                 = $request->periodo_id;
+        $arregloResumen             = [];
+        $contadorResumen            = 0;
+        $codigoConProblemas         = collect();
+        //====PROCESO===================================
+        foreach($miArrayDeObjetos as $key => $item){
+            $problemasconCodigo         = [];
+            $contadorProblemasCodigos   = 0;
+            $ExistsPaquete              = [];
+            $contadorA                  = 0;
+            $contadorD                  = 0;
+            $noExisteA                  = 0;
+            $noExisteD                  = 0;
+            //VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
+            $ExistsPaquete = $this->getPaquete($item->codigoPaquete);
+            if(!empty($ExistsPaquete)){
+                foreach($item->codigosHijos as $key2 => $tr){
+                    $codigoActivacion       = $tr->codigoActivacion;
+                    $codigoDiagnostico      = $tr->codigoDiagnostico;
+                    $errorA                 = 1;
+                    $errorD                 = 1;
+                    $mensajeError           = "";
+                    //validacion
+                    $validarA               = $this->getCodigos($codigoActivacion,0);
+                    $validarD               = $this->getCodigos($codigoDiagnostico,0);
+                    $comentario             = "Se agrego al paquete ".$item->codigoPaquete;
+                    //======si ambos codigos existen========
+                    if(count($validarA) > 0 && count($validarD) > 0){
+                        //====Activacion=====
+                        //validar si el codigo ya esta liquidado
+                        $ifLiquidadoA                = $validarA[0]->estado_liquidacion;
+                        //validar si el codigo no este bloqueado
+                        $ifBloqueadoA                = $validarA[0]->estado;
+                        //validar que el codigo de paquete sea nulo
+                        $ifcodigo_paqueteA           = $validarA[0]->codigo_paquete;
+                        //======Diagnostico=====
+                        //validar si el codigo ya esta liquidado
+                        $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
+                        //validar si el codigo no este bloqueado
+                        $ifBloqueadoD                = $validarD[0]->estado;
+                        //validar que el codigo de paquete sea nulo
+                        $ifcodigo_paqueteD           = $validarD[0]->codigo_paquete;
+                        //===VALIDACION====
+                        //error 0 => no hay error; 1 hay error
+                        if($ifLiquidadoA == 1 && $ifBloqueadoA != '2' && $ifcodigo_paqueteA == null) $errorA = 0;
+                        if($ifLiquidadoD == 1 && $ifBloqueadoD != '2' && $ifcodigo_paqueteD == null) $errorD = 0;
+                        //===MENSAJE VALIDACION====
+                        if($errorA == 1 && $errorD == 0) { $mensajeError = "Problema con el código de activación";  $codigoConProblemas->push($validarA); }
+                        if($errorA == 0 && $errorD == 1) { $mensajeError = "Problema con el código de diagnóstico"; $codigoConProblemas->push($validarD); }
+                        if($errorA == 1 && $errorD == 1) { $mensajeError = "Ambos códigos tienen problemas";        $codigoConProblemas->push($validarA); $codigoConProblemas->push($validarD);}
+                        //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
+                        if($errorA == 0 && $errorD == 0){
+                            $old_valuesA    = CodigosLibros::Where('codigo',$codigoActivacion)->get();
+                            $ingresoA       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoActivacion);
+                            $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
+                            $ingresoD       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoDiagnostico);
+                            //si se guarda codigo de activacion
+                            if($ingresoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                            //si se guarda codigo de diagnostico
+                            if($ingresoD){ $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                        }else{
+                            //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
+                            $problemasconCodigo[$contadorProblemasCodigos] = [
+                                "codigoActivacion"  => $codigoActivacion,
+                                "codigoDiagnostico" => $codigoDiagnostico,
+                                "problema"          => $mensajeError
+                            ];
+                            $contadorProblemasCodigos++;
+                        }
+                    }
+                    //====SI NO EXISTEN LOS CODIGOS==============
+                    else{
+                        if(empty($validarA)  && !empty($validarD)) { $noExisteA++;               $mensajeError = "Código de activación no existe";  }
+                        if(!empty($validarA) && empty($validarD))  { $noExisteD++;               $mensajeError = "Código de diagnóstico no existe"; }
+                        if(empty($validarA)  && empty($validarD))  { $noExisteA++; $noExisteD++; $mensajeError = "Ambos códigos no existen"; }
+                        $problemasconCodigo[$contadorProblemasCodigos] = [
+                            "codigoActivacion"  => $codigoActivacion,
+                            "codigoDiagnostico" => $codigoDiagnostico,
+                            "problema"          => $mensajeError
+                        ];
+                        $contadorProblemasCodigos++;
+                    }
+                }
+                //codigos resumen
+                $arregloResumen[$contadorResumen] = [
+                    "codigoPaquete"     => $item->codigoPaquete,
+                    "codigosHijos"      => $problemasconCodigo,
+                    "mensaje"           => empty($ExistsPaquete) ? 1 : '0',
+                    "ingresoA"          => $contadorA,
+                    "ingresoD"          => $contadorD,
+                    "noExisteA"         => $noExisteA,
+                    "noExisteD"         => $noExisteD
+                ];
+                $contadorResumen++;
+            }
+        }
+        if(count($codigoConProblemas) == 0){
+            return [
+                "arregloResumen"                   => $arregloResumen,
+                "codigoConProblemas"               => [],
+            ];
+        }else{
+            return [
+                "arregloResumen"                   => $arregloResumen,
+                "codigoConProblemas"               => array_merge(...$codigoConProblemas->all()),
+            ];
+        }
+    }
+    public function updatecodigosPaquete($codigoPaquete,$codigo){
+        $fecha = date("Y-m-d H:i:s");
+        $codigo = DB::table('codigoslibros')
+            ->where('codigo', '=', $codigo)
+            ->where('estado_liquidacion', '=', '1')
+            ->where('estado', '<>', '2')
+            ->whereNull('codigo_paquete')
+            //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
+            ->update([
+                'codigo_paquete'            => $codigoPaquete,
+                'fecha_registro_paquete'    => $fecha,
+            ]);
+        return $codigo;
+    }
     public function store(Request $request)
     {
         set_time_limit(600000);

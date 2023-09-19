@@ -462,7 +462,7 @@ class InstitucionController extends Controller
             }else{
                 $cedula = $request->cedula;
             }
-            $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.aplica_matricula,
+            $lista = DB::SELECT("SELECT i.idInstitucion,i.region_idregion, i.nombreInstitucion,i.aplica_matricula,
             IF(i.estado_idEstado = '1','activado','desactivado') AS estado,i.estado_idEstado as estadoInstitucion,
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
@@ -479,7 +479,7 @@ class InstitucionController extends Controller
             ORDER BY i.fecha_registro DESC
             ");
         }else{
-            $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.aplica_matricula,
+            $lista = DB::SELECT("SELECT i.idInstitucion,i.region_idregion, i.nombreInstitucion,i.aplica_matricula,
             IF(i.estado_idEstado = '1','activado','desactivado') AS estado,i.estado_idEstado as estadoInstitucion,
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
@@ -538,6 +538,7 @@ class InstitucionController extends Controller
                         "codigo_mitlon_coincidencias" => $item->codigo_mitlon_coincidencias,
                         "vendedorInstitucion"   => $item->vendedorInstitucion,
                         "iniciales"             => $item->iniciales,
+                        "region"                => $item->region_idregion
                     ];
                 }else{
                     $datos[$key]=[
@@ -562,6 +563,7 @@ class InstitucionController extends Controller
                         "codigo_mitlon_coincidencias" => $item->codigo_mitlon_coincidencias,
                         "vendedorInstitucion"   => $item->vendedorInstitucion,
                         "iniciales"             => $item->iniciales,
+                        "region"                => $item->region_idregion
                     ];
                 }
             }
