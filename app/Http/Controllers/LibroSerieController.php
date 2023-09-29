@@ -32,7 +32,7 @@ class LibroSerieController extends Controller
       ->get();
 
        return  ['librosSerie' => $librosSerie, 'libroslista' => $libro, 'serieslista' => $series];
-   
+
     }
 
     //para ver el libro serie especifico de un libro api:/verLibroSerie
@@ -71,7 +71,7 @@ class LibroSerieController extends Controller
      */
     public function store(Request $request)
     {
-       
+
 
 
         if( $request->id ){
@@ -89,7 +89,7 @@ class LibroSerieController extends Controller
         $librosSerie->version = $request->version2;
         $librosSerie->boton = "success";
 
-       
+
         $librosSerie->save();
 
         return $librosSerie;
@@ -144,9 +144,9 @@ class LibroSerieController extends Controller
 
      public function desactivar(Request $request)
     {
-        
+
         $libroSerie =  LibroSerie::findOrFail($request->get('id_libro_serie'));
-        
+
         $libroSerie->estado = 0;
         $libroSerie->save();
         return response()->json($libroSerie);
@@ -154,9 +154,9 @@ class LibroSerieController extends Controller
 
      public function activar(Request $request)
     {
-       
+
         $libroSerie =  LibroSerie::findOrFail($request->get('id_libro_serie'));
-        
+
         $libroSerie->estado = 1;
         $libroSerie->save();
         return response()->json($libroSerie);
@@ -168,16 +168,17 @@ class LibroSerieController extends Controller
     // return csrf_token();
     $id_periodo  = $request->id_periodo;
     $idinstitucion = $request->idinstitucion;
-    $codigos_libros = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo, 
+    $codigos_libros = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,
      COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
     c.libro_idlibro,ls.nombre as nombrelibro
-        FROM codigoslibros c 
+        FROM codigoslibros c
         LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
         WHERE (c.bc_estado = '2' OR c.estado_liquidacion = '0')
         AND c.estado <> 2
         AND c.bc_periodo  = '$id_periodo'
         AND c.bc_institucion = '$idinstitucion'
-        AND ls.idLibro = c.libro_idlibro 
+        AND ls.idLibro = c.libro_idlibro
+        AND c.prueba_diagnostica = '0'
         GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
     ");
         return  $codigos_libros;
@@ -185,7 +186,7 @@ class LibroSerieController extends Controller
     // $codigos_libros = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
     // c.libro_idlibro,ls.nombre as nombrelibro,i.nombreInstitucion,
     // CONCAT(v.nombres, ' ', v.apellidos) as asesor
-    //     FROM codigoslibros c 
+    //     FROM codigoslibros c
     //     LEFT JOIN usuario u ON c.idusuario = u.idusuario
     //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
     //     LEFT JOIN institucion i ON i.idInstitucion = u.institucion_idInstitucion
@@ -194,17 +195,17 @@ class LibroSerieController extends Controller
     //     AND c.estado <> 2
     //     AND c.bc_periodo  = '$id_periodo'
     //     AND c.bc_institucion = '$idinstitucion'
-    //     AND ls.idLibro = c.libro_idlibro 
+    //     AND ls.idLibro = c.libro_idlibro
     //    GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro");
     //     return  $codigos_libros;
     // }
 
-    //para el listado de bloqueo de codigos 
+    //para el listado de bloqueo de codigos
     public function codigosBloqueados(Request $request){
         $codigosBloqueados = DB::select("SELECT h.id_codlibros, h.id_usuario, h.codigo_libro,
         h.idInstitucion,h.usuario_editor,h.observacion,h.id_periodo,
-        u.nombres,apellidos, i.nombreInstitucion, p.descripcion 
-        FROM  hist_codlibros h 
+        u.nombres,apellidos, i.nombreInstitucion, p.descripcion
+        FROM  hist_codlibros h
         LEFT JOIN usuario u ON u.idusuario = h.id_usuario
         LEFT JOIN institucion i ON i.idInstitucion = h.usuario_editor
         LEFT JOIN periodoescolar p ON p.idperiodoescolar = h.id_periodo

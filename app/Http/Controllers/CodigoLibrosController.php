@@ -71,9 +71,9 @@ class CodigoLibrosController extends Controller
                             $porcentaje++;
                             //====CODIGO====
                             //ingresar en el historico codigo
-                            $this->GuardarEnHistorico(0,$institucion,$traerPeriodo,$item->codigo,$id_usuario,$comentario,$getcodigoPrimero);
+                            $this->GuardarEnHistorico(0,$institucion,$traerPeriodo,$item->codigo,$id_usuario,$comentario,$getcodigoPrimero,null);
                             //====CODIGO UNION=====
-                            $this->GuardarEnHistorico(0,$institucion,$traerPeriodo,$codigo_union,$id_usuario,$comentario,$getcodigoUnion);
+                            $this->GuardarEnHistorico(0,$institucion,$traerPeriodo,$codigo_union,$id_usuario,$comentario,$getcodigoUnion,null);
                         }else{
                             $codigosNoCambiados[$contadorNoCambiado] =[
                                 "codigo"        => $item->codigo,
@@ -88,7 +88,7 @@ class CodigoLibrosController extends Controller
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico(0,$institucion,$traerPeriodo,$item->codigo,$id_usuario,$comentario,$getcodigoPrimero);
+                            $this->GuardarEnHistorico(0,$institucion,$traerPeriodo,$item->codigo,$id_usuario,$comentario,$getcodigoPrimero,null);
                             $codigosSinCodigoUnion[] = $validar[0];
                         }
                         else{
@@ -324,6 +324,38 @@ class CodigoLibrosController extends Controller
         ->update($arraySave);
         return $codigo;
     }
+    public function updateCodigotoRegaladoBloqueado2($numeroProceso,$codigo,$request,$union){
+        $arraySave = [];
+        //regalado
+        if($numeroProceso == '2'){
+            $arraySave  = [
+                'bc_estado' => '1',
+                'estado_liquidacion' => '2',
+                'bc_institucion' => $request->institucion_id,
+                'bc_periodo' => $request->periodo_id,
+                'codigo_union'      => $union
+            ];
+        }
+        //regalado y bloqueado
+         if($numeroProceso == '3'){
+            $arraySave  = [
+                'bc_estado'             => '1',
+                'estado'                => '2',
+                'estado_liquidacion'    => '2',
+                'bc_institucion'        => $request->institucion_id,
+                'bc_periodo'            => $request->periodo_id,
+                'codigo_union'          => $union
+            ];
+        }
+        //actualizar el primer codigo
+        $codigo = DB::table('codigoslibros')
+        ->where('codigo', '=', $codigo)
+        ->where('bc_estado', '1')
+        ->where('estado','<>', '2')
+        ->where('estado_liquidacion','<>', '0')
+        ->update($arraySave);
+        return $codigo;
+    }
     //api:post//codigos/import/gestion
     public function importGestion(Request $request)
     {
@@ -415,9 +447,9 @@ class CodigoLibrosController extends Controller
                             $porcentaje++;
                             //====CODIGO====
                             //ingresar en el historico codigo
-                            $this->GuardarEnHistorico($user,$institucion,$periodo_id,$item->codigo,$usuario_editor,$comentario,$getcodigoPrimero);
+                            $this->GuardarEnHistorico($user,$institucion,$periodo_id,$item->codigo,$usuario_editor,$comentario,$getcodigoPrimero,null);
                             //====CODIGO UNION=====
-                            $this->GuardarEnHistorico($user,$institucion,$periodo_id,$codigo_union,$usuario_editor,$comentario,$getcodigoUnion);
+                            $this->GuardarEnHistorico($user,$institucion,$periodo_id,$codigo_union,$usuario_editor,$comentario,$getcodigoUnion,null);
                         }else{
                             $codigosNoCambiados[$contadorNoCambiado] =[
                                 "codigo"        => $item->codigo,
@@ -432,7 +464,7 @@ class CodigoLibrosController extends Controller
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico($user,$institucion,$periodo_id,$item->codigo,$usuario_editor,$comentario,$getcodigoPrimero);
+                            $this->GuardarEnHistorico($user,$institucion,$periodo_id,$item->codigo,$usuario_editor,$comentario,$getcodigoPrimero,null);
                             $codigosSinCodigoUnion[] = $validar[0];
                         }
                         else{
@@ -526,6 +558,8 @@ class CodigoLibrosController extends Controller
                 $venta_estadoA               = $validarA[0]->venta_estado;
                 //venta lista
                 $ifventa_lista_institucionA  = $validarA[0]->venta_lista_institucion;
+                //codigo de union
+                $codigo_unionA               = $validarA[0]->codigo_union;
                 //======Diagnostico=====
                 //validar si el codigo ya esta liquidado
                 $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
@@ -539,6 +573,8 @@ class CodigoLibrosController extends Controller
                 $venta_estadoD               = $validarD[0]->venta_estado;
                 //venta lista
                 $ifventa_lista_institucionD  = $validarD[0]->venta_lista_institucion;
+                //codigo de union
+                $codigo_unionD               = $validarD[0]->codigo_union;
                 $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get();
                 $old_valuesD = CodigosLibros::findOrFail($codigoDiagnostico);
                 //===PROCESO===========
@@ -546,14 +582,15 @@ class CodigoLibrosController extends Controller
                 if($tipoProceso == '0'){
                     //===VENTA DIRECTA====
                     if($TipoVenta == 1){
-                        if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){
-                            if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){
+                        if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) ){
+                            if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) ){
                             //Ingresar Union a codigo de activacion
                             $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
-                            if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                            if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                             //Ingresar Union a codigo de prueba diagnostico
                             $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
-                            if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                            if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null
+                            ); }
                             }else{
                                 $codigoConProblemas->push($validarD);
                             }
@@ -563,14 +600,14 @@ class CodigoLibrosController extends Controller
                     }
                     //==VENTA LISTA=====
                     if($TipoVenta == 2){
-                        if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){
-                            if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){
+                        if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))){
+                            if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) ){
                                 //Ingresar Union a codigo de activacion
                                 $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
-                                if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                                if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                                 //Ingresar Union a codigo de prueba diagnostico
                                 $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
-                                if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                                if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                             }else{
                                 $codigoConProblemas->push($validarD);
                             }
@@ -583,15 +620,15 @@ class CodigoLibrosController extends Controller
                 //======REGALADO NO ENTRA A LA LIQUIDACION============
                 //numeroProceso => 2 regalado ; 3 regalado y bloqueado;
                 if($tipoProceso == '1'){
-                    if($ifLiquidadoA == '1'){
-                        if($ifLiquidadoD == '1'){
+                    if($ifLiquidadoA == '1' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))){
+                        if($ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0"))){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado(2,$codigoActivacion,$request);
-                        if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoActivacion,$request,$codigoDiagnostico);
+                        if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado(2,$codigoDiagnostico,$request);
-                        if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoDiagnostico,$request,$codigoActivacion);
+                        if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
                         }
@@ -601,15 +638,15 @@ class CodigoLibrosController extends Controller
                 }
                 //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
                 if($tipoProceso == '2'){
-                    if($ifLiquidadoA !='0' && $ifBloqueadoA !=2){
-                        if($ifLiquidadoD !='0' && $ifBloqueadoD !=2){
+                    if($ifLiquidadoA !='0' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))){
+                        if($ifLiquidadoD !='0' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0"))){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado(3,$codigoActivacion,$request);
-                        if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoActivacion,$request,$codigoDiagnostico);
+                        if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado(3,$codigoDiagnostico,$request);
-                        if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoDiagnostico,$request,$codigoActivacion);
+                        if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
                         }
@@ -719,6 +756,7 @@ class CodigoLibrosController extends Controller
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $tipoVenta = DB::SELECT("SELECT
+        c.libro as book,c.serie,
         c.prueba_diagnostica,c.factura,c.codigo_union,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.contrato,c.porcentaje_descuento,
@@ -750,22 +788,28 @@ class CodigoLibrosController extends Controller
         LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
         WHERE (c.bc_institucion = '$request->institucion_id' OR venta_lista_institucion = '$request->institucion_id')
         AND c.bc_periodo = '$request->periodo_id'
+        AND c.prueba_diagnostica = '0'
         ");
         return $tipoVenta;
      }
-     //api:post/codigos/bloquear
-     public function bloquearCodigos(Request $request){
+    //api:post/codigos/bloquear
+    public function bloquearCodigos(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);
-        $codigosNoCambiados=[];
-        $codigoLiquidados =[];
-        $codigoNoExiste = [];
-        $porcentaje = 0;
-        $contador = 0;
-        $usuario_editor = $request->id_usuario;
-        $comentario     = $request->comentario;
-        $periodo_id     = $request->periodo_id;
+        $codigos                = json_decode($request->data_codigos);
+        $codigosNoCambiados     = [];
+        $codigoLiquidados       = [];
+        $codigoNoExiste         = [];
+        $codigosSinCodigoUnion  = [];
+        $porcentaje             = 0;
+        $contador               = 0;
+        $contadorNoExiste       = 0;
+        $contadorNoCambiado     = 0;
+        $id_usuario             = $request->id_usuario;
+        $comentario             = $request->comentario;
+        $traerPeriodo           = $request->periodo_id;
+        $institucion            = $request->institucion_id;
+        $usuarioQuemado         = 45017;
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validar = $this->getCodigos($item->codigo,0);
@@ -774,67 +818,131 @@ class CodigoLibrosController extends Controller
                 $ifLiquidado        = $validar[0]->estado_liquidacion;
                 //validar si el codigo no este liquidado
                 $ifBloqueado        = $validar[0]->estado;
-                if($ifLiquidado !='0' && $ifBloqueado !=2){
-                    $codigo =  DB::table('codigoslibros')
-                    ->where('codigo', $item->codigo)
-                    ->where('estado','<>', '2')
-                    ->where('estado_liquidacion','<>', '0')
-                    ->update([
-                        'estado'             => 2,
-                    ]);
-                    if($codigo){
-                        $porcentaje++;
-                        //ingresar en el historico
-                        $old_values = CodigosLibros::Where('codigo',$item->codigo)->get();
-                        $this->GuardarEnHistorico(0,$request->institucion_id,$periodo_id,$item->codigo,$usuario_editor,$comentario,$old_values);
-                    }else{
-                        $codigosNoCambiados[$key] =[
-                            "codigo" => $item->codigo
-                        ];
+                //validar si tiene codigo de union
+                $codigo_union       = $validar[0]->codigo_union;
+                if($ifLiquidado != '0' && $ifBloqueado != 2){
+                    //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
+                    $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                    $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
+                    if($codigo_union != null || $codigo_union != ""){
+                        //PASAR A LEIDO CON CODIGO DE UNION
+                       $ingreso = $this->pasarABloqueados($item->codigo,$codigo_union,$request,$getcodigoUnion);
+                       //si ingresa correctamente
+                        if($ingreso == 1){
+                            $porcentaje++;
+                            //====CODIGO====
+                            //ingresar en el historico codigo
+                            $this->GuardarEnHistorico($usuarioQuemado,$institucion,$traerPeriodo,$item->codigo,$id_usuario,$comentario,$getcodigoPrimero,null);
+                            //====CODIGO UNION=====
+                            $this->GuardarEnHistorico($usuarioQuemado,$institucion,$traerPeriodo,$codigo_union,$id_usuario,$comentario,$getcodigoUnion,null);
+                        }else{
+                            $codigosNoCambiados[$contadorNoCambiado] =[
+                                "codigo"        => $item->codigo,
+                                "mensaje"       => "Problema con el código union $codigo_union"
+                            ];
+                            $contadorNoCambiado++;
+                        }
+                    }
+                    //ACTUALIZAR CODIGO SIN UNION
+                    else{
+                        $ingreso =  $this->pasarABloqueados($item->codigo,0,$request,null);
+                        if($ingreso == 1){
+                            $porcentaje++;
+                            //ingresar en el historico
+                            $this->GuardarEnHistorico($usuarioQuemado,$institucion,$traerPeriodo,$item->codigo,$id_usuario,$comentario,$getcodigoPrimero,null);
+                            $codigosSinCodigoUnion[] = $validar[0];
+                        }
+                        else{
+                            $codigosNoCambiados[$contadorNoCambiado] =[
+                                "codigo"        => $item->codigo,
+                                "mensaje"       => "0"
+                            ];
+                            $contadorNoCambiado++;
+                        }
                     }
                 }else{
-                    $codigoLiquidados[$contador] = [
-                        "codigo" => $item->codigo,
-                        "prueba_diagnostica" => $validar[0]->prueba_diagnostica,
-                        "tipoCodigo"         => $validar[0]->tipoCodigo,
-                        "barrasEstado" => $validar[0]->barrasEstado,
-                        "codigoEstado" => $validar[0]->codigoEstado,
-                        "liquidacion" => $validar[0]->liquidacion,
-                        "ventaEstado" => $validar[0]->ventaEstado,
-                        "idusuario" => $validar[0]->idusuario,
-                        "estudiante" => $validar[0]->estudiante,
-                        "nombreInstitucion" => $validar[0]->nombreInstitucion,
-                        "institucionBarra" => $validar[0]->institucionBarra,
-                        "periodo" => $validar[0]->periodo,
-                        "periodo_barras" => $validar[0]->periodo_barras,
-                        "cedula" => $validar[0]->cedula,
-                        "email" => $validar[0]->email,
-                        "estado_liquidacion" => $validar[0]->estado_liquidacion,
-                        "estado" => $validar[0]->estado,
-                        "status" => $validar[0]->status,
-                        "contador" => $validar[0]->contador,
-                        "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
-                        "factura"               => $validar[0]->factura,
-                        "codigo_union"          => $validar[0]->codigo_union,
-                    ];
+                    $codigoLiquidados[$contador] = $validar[0];
                     $contador++;
                 }
             }else{
-                $codigoNoExiste[$key] =[
+                $codigoNoExiste[$contadorNoExiste] =[
                     "codigo" => $item->codigo
                 ];
+                $contadorNoExiste++;
             }
         }
         return [
-            "cambiados" => $porcentaje,
-            "codigosNoCambiados" => $codigosNoCambiados,
-            "codigoLiquidados" => $codigoLiquidados,
-            "codigoNoExiste" => $codigoNoExiste
+            "cambiados"             => $porcentaje,
+            "codigosNoCambiados"    => $codigosNoCambiados,
+            "codigoLiquidados"      => $codigoLiquidados,
+            "codigoNoExiste"        => $codigoNoExiste,
+            "codigosSinCodigoUnion" => $codigosSinCodigoUnion,
         ];
-     }
+    }
+    public function pasarABloqueados($codigo,$codigo_union,$request,$objectCodigoUnion){
+        $withCodigoUnion = 1;
+        $estadoIngreso   = 0;
+        $unionCorrecto   = false;
+        ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
+        if($codigo_union == '0') $withCodigoUnion = 0;
+        else                     $withCodigoUnion = 1;
+        $arraySave  = [
+            'estado'             => 2,
+        ];
+        //si hay codigo de union lo actualizo
+        if($withCodigoUnion == 1){
+            //VALIDO SI NO EXISTE EL CODIGO DE UNION LO MANDO COMO ERROR
+            if(count($objectCodigoUnion) == 0){
+                //no se ingreso
+                return 2;
+            }
+            //VALIDO QUE EL CODIGO UNION CUMPLA LA VALIDACION
+            $ifLiquidado        = $objectCodigoUnion[0]->estado_liquidacion;
+            //validar si el codigo no este liquidado
+            $ifBloqueado        = $objectCodigoUnion[0]->estado;
+            if($ifLiquidado != '0' && $ifBloqueado != 2) $unionCorrecto = true;
+            else $unionCorrecto = false;
+            if($unionCorrecto){
+                $codigoU = DB::table('codigoslibros')
+                ->where('codigo', '=', $codigo_union)
+                ->where('estado','<>', '2')
+                ->where('estado_liquidacion','<>', '0')
+                ->update($arraySave);
+                //si el codigo de union se actualiza actualizo el codigo
+                if($codigoU){
+                    //actualizar el primer codigo
+                    $codigo = DB::table('codigoslibros')
+                    ->where('codigo', '=', $codigo)
+                    ->where('estado','<>', '2')
+                    ->where('estado_liquidacion','<>', '0')
+                    ->update($arraySave);
+                }
+            }else{
+                //no se ingreso
+                return 2;
+            }
+        }else{
+            //actualizar el primer codigo
+            $codigo = DB::table('codigoslibros')
+            ->where('codigo', '=', $codigo)
+            ->where('estado','<>', '2')
+            ->where('estado_liquidacion','<>', '0')
+            ->update($arraySave);
+        }
+        //con codigo union
+        ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
+        if($withCodigoUnion == 1){
+            if($codigo && $codigoU)  $estadoIngreso = 1;
+            else                     $estadoIngreso = 2;
+        }
+        //si no existe el codigo de union
+        if($withCodigoUnion == 0){
+            if($codigo)              $estadoIngreso = 1;
+        }
+        return $estadoIngreso;
+    }
 
-
-     public function eliminar(Request $request){
+    public function eliminar(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $codigos = json_decode($request->data_codigos);
@@ -1189,7 +1297,9 @@ class CodigoLibrosController extends Controller
                 }
                 //BODEGA QUE NO SEA LIQUIDADO Y PERTENEZCA A LA MISMA INSTITUCION
                 else{
-                    if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
+                    if($ifLiquidado == '1' || $ifLiquidado == '2') $EstatusProceso = true;
+                    //jorge dice que se quita esta validacion
+                    // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
                 }
                 //SI CUMPLE LA VALIDACION
                 if($EstatusProceso){
@@ -1204,11 +1314,11 @@ class CodigoLibrosController extends Controller
                             $porcentaje++;
                             //====CODIGO====
                             //ingresar en el historico codigo
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null);
                             //ingresar a la tabla de devolucion
                             $this->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                             //====CODIGO UNION=====
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null);
                             $this->saveDevolucion($codigo_union,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                         }else{
                             $codigosNoCambiados[$contadorNoCambiado] =[
@@ -1224,7 +1334,7 @@ class CodigoLibrosController extends Controller
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null);
                             //ingresar a la tabla de devolucion
                             $this->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                             $codigosSinCodigoUnion[] = $validar[0];
@@ -1384,7 +1494,9 @@ class CodigoLibrosController extends Controller
             $ifBc_Institucion   = $validar[0]->bc_institucion;
             //institucion del venta lista
             $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
-            if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )){
+            if(($ifLiquidado == '1' || $ifLiquidado == '2')){
+            //SE QUITA ESTA VALIDACION
+            // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )){
                 $getcodigoPrimero = CodigosLibros::Where('codigo',$getCodigo)->get();
                 if($codigo_union != null || $codigo_union != ""){
                     //devolucion con codigo de union
@@ -1394,11 +1506,11 @@ class CodigoLibrosController extends Controller
                         $porcentaje++;
                         //====CODIGO====
                         //ingresar en el historico codigo
-                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$mensaje,$getcodigoPrimero);
+                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$mensaje,$getcodigoPrimero,null);
                         //ingresar a la tabla de devolucion
                         $this->saveDevolucion($getCodigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
                         //====CODIGO UNION=====
-                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigo_union,$id_usuario,$mensaje,$getcodigoUnion);
+                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigo_union,$id_usuario,$mensaje,$getcodigoUnion,null);
                         $this->saveDevolucion($codigo_union,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
                     }else{
                         $codigosNoCambiados[0] =[
@@ -1413,7 +1525,7 @@ class CodigoLibrosController extends Controller
                     if($ingreso == 1){
                         $porcentaje++;
                         //ingresar en el historico
-                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$observacion,$getcodigoPrimero);
+                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$observacion,$getcodigoPrimero,null);
                         //ingresar a la tabla de devolucion
                         $this->saveDevolucion($getCodigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
                         $codigosSinCodigoUnion[] = $validar[0];
@@ -1500,9 +1612,9 @@ class CodigoLibrosController extends Controller
                             $porcentaje++;
                             //====CODIGO====
                             //ingresar en el historico codigo
-                            $this->GuardarEnHistorico(0,null,null,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero);
+                            $this->GuardarEnHistorico(0,null,null,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null);
                             //====CODIGO UNION=====
-                            $this->GuardarEnHistorico(0,null,null,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion);
+                            $this->GuardarEnHistorico(0,null,null,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null);
                         }else{
                             $codigosNoCambiados[$contadorNoCambiado] =[
                                 "codigo"        => $item->codigo,
@@ -1517,7 +1629,7 @@ class CodigoLibrosController extends Controller
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico(0,null,null,$item->codigo,$request->id_usuario,$mensaje,null);
+                            $this->GuardarEnHistorico(0,null,null,$item->codigo,$request->id_usuario,$mensaje,null,null);
                             $codigosSinCodigoUnion[] = $validar[0];
                         }
                         else{
@@ -1715,111 +1827,6 @@ class CodigoLibrosController extends Controller
         AND c.estado <> '2'
         ");
         return $query;
-    }
-    //api:post/codigos/leidos/venta_directa
-    public function LeerVentaDirecta(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);
-        $institucion        =  $request->institucion_id;
-        $traerPeriodo       =  $request->periodo_id;
-        $nombreInstitucion  =  $request->nombreInstitucion;
-        $nombrePeriodo      =  $request->nombrePeriodo;
-        $venta_estado       =  $request->venta_estado;
-        $comentario         =  "Codigo leido de ".$nombreInstitucion." - ".$nombrePeriodo;
-        $codigosNoCambiados=[];
-        $codigosLeidos =[];
-        $codigoNoExiste = [];
-        $porcentaje = 0;
-        $contador = 0;
-        $todate  = date('Y-m-d H:i:s');
-        foreach($codigos as $key => $item){
-            //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo,0);
-            //valida que el codigo existe
-            if(count($validar)>0){
-                //validar si el codigo ya haya sido leido
-                $ifLeido            = $validar[0]->bc_estado;
-                //validar si el codigo ya esta liquidado
-                $ifLiquidado        = $validar[0]->estado_liquidacion;
-                //validar si el codigo no este liquidado
-                $ifBloqueado        = $validar[0]->estado;
-                //validar si tiene bc_institucion
-                $ifBc_Institucion   = $validar[0]->bc_institucion;
-                //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-                $ifid_periodo       = $validar[0]->id_periodo;
-                //validar que el venta_estado sea cero o igual al enviado desde el front
-                $ifventa_estado     = $validar[0]->venta_estado;
-                //validar el bc_periodo
-                $ifbc_periodo       = $validar[0]->bc_periodo;
-                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && ($ifLeido == '1' || $ifLeido == '2') && $ifLiquidado == '1' && $ifBloqueado !=2){
-                    $codigo =  DB::table('codigoslibros')
-                    ->where('codigo', $item->codigo)
-                    // ->where('bc_estado', '1')
-                    ->where('estado','<>', '2')
-                    ->where('estado_liquidacion','=', '1')
-                    ->update([
-                        'bc_institucion'        => $institucion,
-                        'bc_estado'             => 2,
-                        'bc_periodo'            => $traerPeriodo,
-                        'bc_fecha_ingreso'      => $todate,
-                        'venta_estado'          => $venta_estado
-                    ]);
-                    if($codigo){
-                        $porcentaje++;
-                        //ingresar en el historico
-                        $historico                  = new HistoricoCodigos();
-                        $historico->codigo_libro    = $item->codigo;
-                        $historico->usuario_editor  = $institucion;
-                        $historico->idInstitucion   = $request->id_usuario;
-                        $historico->id_periodo      = $traerPeriodo;
-                        $historico->observacion     = $comentario;
-                        $historico->b_estado        = "1";
-                        $historico->save();
-                    }else{
-                        $codigosNoCambiados[$key] =[
-                            "codigo" => $item->codigo
-                        ];
-                    }
-                }else{
-                    $codigosLeidos[$contador] = [
-                        "codigo"                => $item->codigo,
-                        "prueba_diagnostica"    => $validar[0]->prueba_diagnostica,
-                        "tipoCodigo"            => $validar[0]->tipoCodigo,
-                        "barrasEstado"          => $validar[0]->barrasEstado,
-                        "codigoEstado"          => $validar[0]->codigoEstado,
-                        "liquidacion"           => $validar[0]->liquidacion,
-                        "ventaEstado"           => $validar[0]->ventaEstado,
-                        "idusuario"             => $validar[0]->idusuario,
-                        "estudiante"            => $validar[0]->estudiante,
-                        "nombreInstitucion"     => $validar[0]->nombreInstitucion,
-                        "institucionBarra"      => $validar[0]->institucionBarra,
-                        "periodo"               => $validar[0]->periodo,
-                        "periodo_barras"        => $validar[0]->periodo_barras,
-                        "cedula"                => $validar[0]->cedula,
-                        "email"                 => $validar[0]->email,
-                        "estado_liquidacion"    => $validar[0]->estado_liquidacion,
-                        "estado"                => $validar[0]->estado,
-                        "status"                => $validar[0]->status,
-                        "contador"              => $validar[0]->contador,
-                        "porcentaje_descuento"  => $validar[0]->porcentaje_descuento,
-                        "factura"               => $validar[0]->factura,
-                        "codigo_union"          => $validar[0]->codigo_union,
-                    ];
-                    $contador++;
-                }
-            }else{
-                $codigoNoExiste[$key] =[
-                    "codigo" => $item->codigo
-                ];
-            }
-        }
-        return [
-            "cambiados" => $porcentaje,
-            "codigosNoCambiados" => $codigosNoCambiados,
-            "codigosLeidos" => $codigosLeidos,
-            "codigoNoExiste" => $codigoNoExiste
-        ];
     }
     //api:post/codigos/ingreso
     public function importIngresoCodigos(Request $request){

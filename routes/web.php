@@ -42,7 +42,6 @@ Route::post('codigos/devolucion/activar','CodigoLibrosController@Activardevoluci
 Route::post('codigos/bloquear','CodigoLibrosController@bloquearCodigos');
 Route::post('codigos/ingreso','CodigoLibrosController@importIngresoCodigos');
 Route::get('getTipoVenta','CodigoLibrosController@getTipoVenta');
-Route::post('codigos/leidos/venta_directa','CodigoLibrosController@LeerVentaDirecta');
 //bodega
 Route::post('codigos/bodega/devolver','CodigoLibrosController@devolucionBodega');
 //api para ver las devoluciones de un codigos
@@ -1305,6 +1304,8 @@ Route::post('agregarDocumentosAnteriorPedido','PedidosController@agregarDocument
 //=====APIS NEET DOCUMENTOS=========================================
 Route::resource('neetTema','NeetTemaController');
 Route::post('neetEliminar','NeetTemaController@neetEliminar');
+Route::get('eliminaAsignacionNeet/{id}','NeetTemaController@eliminaAsignacionNeet');
+Route::post('quitarTodasDocumentosAsignados','NeetTemaController@quitarTodasDocumentosAsignados');
 //=====FIN APIS NEET DOCUMENTOS=====================================
 //=====SALLE========================================================
 Route::group(['prefix' => 'salle'],function(){
@@ -1326,6 +1327,18 @@ Route::get('biblioteca/categorias/{area}', 'BibliotecaController@getCategorias')
 Route::post('biblioteca/categorias', 'BibliotecaController@crearCategoria');
 Route::get('biblioteca/libros', 'BibliotecaController@getLibros');
 Route::get('biblioteca/libros/{libro}/unidades', 'BibliotecaController@getUnidades');
+Route::get('biblioteca/series', 'BibliotecaController@getSeries');
+Route::post('biblioteca/contenido', 'BibliotecaController@crearContenido');
+Route::get('biblioteca/contenidos', 'BibliotecaController@getContenidos');
+Route::get('biblioteca/contenido', 'BibliotecaController@getContenido');
+Route::get('biblioteca/contenido/formato', 'BibliotecaController@getFormatoContenido');
+Route::get('biblioteca/areas', 'BibliotecaController@getAreas');
+Route::delete('biblioteca/contenido/{contenido}', 'BibliotecaController@deleteContenido');
+// ====== FIN BIBLIOTECA ====== //
+// ====== FORMATO ====== //
+Route::get('contenidos/formatos', 'FormatoController@getFormatos');
+Route::post('contenido/formato/{areaId}/store', 'FormatoController@crearFormato');
+// ====== FIN FORMATO ====== //
 //=======APIS CODIGOS PAQUETES======================================
 Route::group(['prefix' => 'grafitex'], function () {
     Route::resource('codigos', 'CodigosGrafitexController');

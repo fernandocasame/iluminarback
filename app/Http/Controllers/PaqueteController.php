@@ -47,6 +47,13 @@ class PaqueteController extends Controller
     public function getPaquete($paquete){
         $query = DB::SELECT("SELECT * FROM codigos_paquetes p
         WHERE p.codigo = '$paquete'
+        AND p.estado   = '1'
+        ");
+        return $query;
+    }
+    public function getExistsPaquete($paquete){
+        $query = DB::SELECT("SELECT * FROM codigos_paquetes p
+        WHERE p.codigo = '$paquete'
         ");
         return $query;
     }
@@ -62,6 +69,8 @@ class PaqueteController extends Controller
         $arregloResumen             = [];
         $contadorResumen            = 0;
         $codigoConProblemas         = collect();
+        $arregloProblemaPaquetes    = [];
+        $contadorErrPaquetes        = 0;
         //====PROCESO===================================
         foreach($miArrayDeObjetos as $key => $item){
             $problemasconCodigo         = [];
@@ -74,6 +83,11 @@ class PaqueteController extends Controller
             //VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
             $ExistsPaquete = $this->getPaquete($item->codigoPaquete);
             if(!empty($ExistsPaquete)){
+                //colocar el paquete como utilizado
+                $this->changeUsePaquete($ExistsPaquete[0]->codigo);
+                $paq = CodigosPaquete::findOrFail($ExistsPaquete[0]->codigo);
+                $paq->estado = "0";
+                $paq->save();
                 foreach($item->codigosHijos as $key2 => $tr){
                     $codigoActivacion       = $tr->codigoActivacion;
                     $codigoDiagnostico      = $tr->codigoDiagnostico;
@@ -115,9 +129,9 @@ class PaqueteController extends Controller
                             $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
                             $ingresoD       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoDiagnostico);
                             //si se guarda codigo de activacion
-                            if($ingresoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                            if($ingresoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                             //si se guarda codigo de diagnostico
-                            if($ingresoD){ $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                            if($ingresoD){ $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
                             $problemasconCodigo[$contadorProblemasCodigos] = [
@@ -152,19 +166,33 @@ class PaqueteController extends Controller
                     "noExisteD"         => $noExisteD
                 ];
                 $contadorResumen++;
+            }else{
+                $getProblemaPaquete = $this->getExistsPaquete($item->codigoPaquete);
+                $arregloProblemaPaquetes [$contadorErrPaquetes] = [
+                    "paquete"   => $item->codigoPaquete,
+                    "problema" => count($getProblemaPaquete) > 0 ? 'Paquete utilizado':'Paquete no existe'
+                ];
+                $contadorErrPaquetes++;
             }
         }
         if(count($codigoConProblemas) == 0){
             return [
                 "arregloResumen"                   => $arregloResumen,
                 "codigoConProblemas"               => [],
+                "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
             ];
         }else{
             return [
                 "arregloResumen"                   => $arregloResumen,
                 "codigoConProblemas"               => array_merge(...$codigoConProblemas->all()),
+                "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
             ];
         }
+    }
+    public function changeUsePaquete($codigo){
+        $paq = CodigosPaquete::findOrFail($codigo);
+        $paq->estado = "0";
+        $paq->save();
     }
     public function updatecodigosPaquete($codigoPaquete,$codigo){
         $fecha = date("Y-m-d H:i:s");
@@ -208,8 +236,7 @@ class PaqueteController extends Controller
             $codigos_libros                             = new CodigosPaquete();
             $codigos_libros->user_created               = $request->user_created;
             $codigo_verificar                           = $codigos[$i];
-            $verificar_codigo = DB::SELECT("SELECT codigo from codigos_paquetes
-            WHERE codigo = '$codigo_verificar'");
+            $verificar_codigo  = $this->getExistsPaquete($codigo_verificar);
             if( count($verificar_codigo) > 0 ){
                 $codigosError[$contador] = [
                     "codigo" =>  $codigo_verificar
@@ -258,14 +285,14 @@ class PaqueteController extends Controller
             }
             if( $codigo != 'no_disponible' ){
                 // valida repetidos en DB
-                $validar = DB::SELECT("SELECT codigo from codigos_paquetes WHERE codigo = '$codigo'");
+                $validar  = $this->getExistsPaquete($codigo);
                 $cant_int = 0;
                 $codigo_disponible = 1;
                 while ( count($validar) > 0 ) {
                     // array_push($repetidos, $codigo);
                     $caracter = $this->makeid($longitud);
                     $codigo = $code.$caracter;
-                    $validar = DB::SELECT("SELECT codigo from codigos_paquetes WHERE codigo = '$codigo'");
+                    $validar  = $this->getExistsPaquete($codigo);
                     $cant_int++;
                     if( $cant_int == 10 ){
                         $codigo_disponible = 0;
@@ -287,9 +314,35 @@ class PaqueteController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    //api/get/paquetes/paquetes/id
+    public function show($paquete)
     {
-        //
+        $query = DB::SELECT("SELECT pq.*,
+        CONCAT(u.nombres, ' ', u.apellidos) as editor
+        FROM codigos_paquetes pq
+        LEFT JOIN usuario u ON pq.user_created = u.idusuario
+        WHERE pq.codigo LIKE '%$paquete%'
+        ");
+        $datos = [];
+        foreach($query as $key => $item){
+            $codigosPaquetes = [];
+            $codigosPaquetes = $this->getCodigosXPaquete($item->codigo);
+            $datos[$key] = [
+                "paquete"       => $item->codigo,
+                "editor"        => $item->editor,
+                "user_created"  => $item->user_created,
+                "estado"        => $item->estado,
+                "created_at"    => $item->created_at,
+                "codigos"       => $codigosPaquetes
+            ];
+        }
+        return $datos;
+    }
+    public function getCodigosXPaquete($paquete){
+        $query = DB::SELECT("SELECT codigo,libro FROM codigoslibros c
+        WHERE c.codigo_paquete = '$paquete'
+        ");
+        return $query;
     }
 
     /**

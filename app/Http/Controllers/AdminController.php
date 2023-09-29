@@ -14,6 +14,7 @@ use App\Models\HistoricoCodigos;
 use App\Models\Libro;
 use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
+use App\Models\PedidoDocumentoDocente;
 use App\Models\RepresentanteEconomico;
 use App\Models\RepresentanteLegal;
 use App\Models\SeminarioCapacitador;
@@ -313,178 +314,36 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-        $contrato = "C-C23-0000031-LJ";
-        //codigos
-       $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,l.nombrelibro as nombre_libro,ls.idLibro AS libro_id
-       FROM verificaciones_has_temporadas vl
-       LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
-       LEFT JOIN libro l ON l.idlibro = ls.idLibro
-       WHERE vl.contrato = '$contrato'
-       AND vl.nuevo = '1'
-       AND vl.estado = '1'
-       ");
-       if(empty($codigos)){
-        return 0;
-       }else{
-            $data = [];
-            foreach($codigos as $key => $item){
-                $codigo = DB::SELECT("SELECT id_verificacion_inst,verificacion_id,codigo,cantidad FROM verificaciones_has_temporadas
-                WHERE contrato = '$contrato'
-                AND nuevo = '1'
-                AND codigo = '$item->codigo'
-                ORDER BY verificacion_id ASC
-                ");
-                $data = $codigo;
-                $cantidad = count($codigo);
-                foreach($codigo as $k => $tr){
-                    if($cantidad == 1){
-                        $data2[$key] =[
-                            "codigo"                            => $data[0]->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "total"                             => $data[0]->cantidad
-                        ];
-                    }
-                    if($cantidad == 2){
-                        $suma2 = $data[0]->cantidad+$data[1]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "total"                             => $suma2
-                        ];
-                    }
-                    if($cantidad == 3){
-                        $suma3 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "total"                             => $suma3
-                        ];
-                    }
-                    if($cantidad == 4){
-                        $suma4 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "total"                             => $suma4
-                        ];
-                    }
-                    if($cantidad == 5){
-                        $suma5 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
-                            "total"                             => $suma5
-                        ];
-                    }
-                    if($cantidad == 6){
-                        $suma6 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
-                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
-                            "total"                             => $suma6
-                        ];
-                    }
-                    if($cantidad == 7){
-                        $suma7 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
-                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
-                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
-                            "total"                             => $suma7
-                        ];
-                    }
-                    if($cantidad == 8){
-                        $suma8 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad+$data[7]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
-                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
-                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
-                            "verif".$data[7]->verificacion_id   => $data[7]->cantidad,
-                            "total"                             => $suma8
-                        ];
-                    }
-                    if($cantidad == 9){
-                        $suma9 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad+$data[7]->cantidad+$data[8]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
-                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
-                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
-                            "verif".$data[7]->verificacion_id   => $data[7]->cantidad,
-                            "verif".$data[8]->verificacion_id   => $data[8]->cantidad,
-                            "total"                             => $suma9
-                        ];
-                    }
-                    if($cantidad == 10){
-                        $suma10 = $data[0]->cantidad+$data[1]->cantidad+$data[2]->cantidad+$data[3]->cantidad+$data[4]->cantidad+$data[5]->cantidad+$data[6]->cantidad+$data[7]->cantidad+$data[8]->cantidad+$data[9]->cantidad;
-                        $data2[$key] =[
-                            "codigo" => $item->codigo,
-                            "libro_id"                          => $item->libro_id,
-                            "nombre_libro"                      => $item->nombre_libro,
-                            "verif".$data[0]->verificacion_id   => $data[0]->cantidad,
-                            "verif".$data[1]->verificacion_id   => $data[1]->cantidad,
-                            "verif".$data[2]->verificacion_id   => $data[2]->cantidad,
-                            "verif".$data[3]->verificacion_id   => $data[3]->cantidad,
-                            "verif".$data[4]->verificacion_id   => $data[4]->cantidad,
-                            "verif".$data[5]->verificacion_id   => $data[5]->cantidad,
-                            "verif".$data[6]->verificacion_id   => $data[6]->cantidad,
-                            "verif".$data[7]->verificacion_id   => $data[7]->cantidad,
-                            "verif".$data[8]->verificacion_id   => $data[8]->cantidad,
-                            "verif".$data[9]->verificacion_id   => $data[9]->cantidad,
-                            "total"                             => $suma10
-                        ];
-                    }
-                }
+        $query = DB::SELECT("SELECT p.id_pedido, p.id_institucion, p.imagen,p.doc_ruc,p.id_responsable,
+        p.id_periodo,p.id_periodo,d.cedula
+        FROM pedidos p
+        LEFT JOIN usuario d ON p.id_responsable = d.idusuario
+        WHERE p.estado <> '2'
+        AND p.tipo ='0'
+        AND p.id_periodo <> '20'
+        AND p.imagen IS NOT NULL
+        AND p.imagen <> 'undefined'
+        ");
+        $contador = 0;
+        foreach($query as $key => $item){
+            //validar que si esta creado no lo creo
+            $query2 = DB::SELECT("SELECT  * FROM pedidos_documentos_docentes pd
+            WHERE pd.institucion_id = '$item->id_institucion'
+            AND pd.cedula           = '$item->cedula'
+            AND pd.id_periodo       = '$item->id_periodo'
+            ");
+            if(empty($query2)){
+                $documento = new PedidoDocumentoDocente();
+                $documento->institucion_id  = $item->id_institucion;
+                $documento->cedula          = $item->cedula;
+                $documento->doc_cedula      = $item->imagen;
+                $documento->doc_ruc         = $item->doc_ruc;
+                $documento->id_periodo      = $item->id_periodo;
+                $documento->save();
+                if($documento) $contador++;
             }
-            return $data2;
         }
+        return "Se guardo $contador registros";
         // 'cli_ci'        => $cedula,
         // 'cli_apellidos' => $apellidos,
         // 'cli_nombres'   => $nombres,
@@ -721,18 +580,6 @@ class AdminController extends Controller
         // return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         // }
     }
-    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values){
-        $historico = new HistoricoCodigos();
-        $historico->id_usuario     =  $id_usuario;
-        $historico->usuario_editor =  $institucion_id;
-        $historico->id_periodo     =  $periodo_id;
-        $historico->codigo_libro   =  $codigo;
-        $historico->idInstitucion  =  $usuario_editor;
-        $historico->observacion    =  $comentario;
-        $historico->old_values     =  $old_values;
-        $historico->save();
-     }
-
     public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
         //vadidate that it's not exists
         $query = DB::SELECT("SELECT * FROM pedidos_alcance_historico h

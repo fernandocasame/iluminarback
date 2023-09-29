@@ -460,13 +460,11 @@ class EstudianteController extends Controller
                 AND email LIKE '%$request->razonBusqueda%'
                 ");
             }else{
-
                 $estudiantes =  DB::SELECT("SELECT DISTINCT   u.idusuario, u.nombres, u.apellidos,
                  u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado, u.id_group,
                  u.institucion_idInstitucion ,i.nombreInstitucion, gr.deskripsi as perfil,
                  u.fecha_nacimiento, u.cargo_id, c.cargo, u.iniciales,u.foto_user,
                  u.change_password,u.fecha_change_password,u.capacitador
-
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
@@ -474,19 +472,14 @@ class EstudianteController extends Controller
                 WHERE email LIKE '%$request->razonBusqueda%'
 
                 ");
-
             }
-
-
            if(!empty($estudiantes)){
             return $estudiantes;
            }else{
             return ["status"=> "0","message"=> "No se encontro datos"];
            }
         }
-
         if($request->busqueda == 'cedula'){
-
             if($request->asesor){
                 $estudiantes =  DB::SELECT("SELECT DISTINCT  u.idusuario, u.nombres,
                 u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
@@ -516,14 +509,9 @@ class EstudianteController extends Controller
 
                 ");
             }
-
-
         }
-
         if($request->busqueda == 'usuario'){
-
             if($request->asesor){
-
                 $estudiantes =  DB::SELECT("SELECT DISTINCT  u.idusuario, u.nombres,
                 u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
                  u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion,
@@ -548,7 +536,6 @@ class EstudianteController extends Controller
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
                 LEFT JOIN institucion_cargos  c ON u.cargo_id = c.id
                 WHERE name_usuario LIKE '%$request->razonBusqueda%'
-
                 ");
             }
         }

@@ -7,9 +7,11 @@ use Illuminate\Http\Request;
 use DB;
 use App\Models\CodigosLibros;
 use App\Models\HistoricoCodigos;
+use App\Traits\Codigos\TraitCodigosGeneral;
 
 class GestionCodigosController extends Controller
 {
+    use TraitCodigosGeneral;
     /**
      * Display a listing of the resource.
      *
@@ -18,14 +20,7 @@ class GestionCodigosController extends Controller
     public function index(Request $request)
     {
         $consulta = DB::SELECT("SELECT
-        (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
-            FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo
-            AND d.estado = '1'
-            ORDER BY d.id DESC
-            LIMIT 1) as devolucionInstitucion,
-        (SELECT COUNT(d.id) FROM codigos_devolucion d
-        WHERE d.codigo = c.codigo AND d.estado = '1') as devolucion,c.venta_lista_institucion,
+        c.venta_lista_institucion,
         c.codigos_barras,c.anio,c.serie, c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.serie,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro as book,c.libro_idlibro,
         CONCAT(u.nombres, ' ', u.apellidos) as estudiante, CONCAT(ucr.nombres, ' ', ucr.apellidos) as creador,
@@ -49,7 +44,9 @@ class GestionCodigosController extends Controller
             when (c.venta_estado = '2') then 'Venta por lista'
         end) as ventaEstado,ib.nombreInstitucion as institucionBarra,
         p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
-        c.codigo_paquete,c.fecha_registro_paquete,c.prueba_diagnostica,c.codigo_union
+        c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -102,27 +99,27 @@ class GestionCodigosController extends Controller
             }
             $codigo                             = new CodigosLibros();
             $codigo->codigo                     = $request->codigo;
+            $codigo->idusuario_creador_codigo   = $request->user_created;
         }
             $codigo->serie                      = $request->serie;
             $codigo->libro                      = $request->libro;
             $codigo->anio                       = $request->anio;
             $codigo->idusuario                  = $request->idusuario;
-            $codigo->idusuario_creador_codigo   = $request->user_created;
             $codigo->libro_idlibro              = $request->libro_idlibro;
             $codigo->estado                     = $request->estado;
             $codigo->id_periodo                 = $request->id_periodo;
             $codigo->contrato                   = $request->contrato;
             $codigo->venta_lista_institucion    = $request->venta_lista_institucion;
-            $codigo->verif1                     = $request->verif1;
-            $codigo->verif2                     = $request->verif2;
-            $codigo->verif3                     = $request->verif3;
-            $codigo->verif4                     = $request->verif4;
-            $codigo->verif5                     = $request->verif5;
-            $codigo->verif6                     = $request->verif6;
-            $codigo->verif7                     = $request->verif7;
-            $codigo->verif8                     = $request->verif8;
-            $codigo->verif9                     = $request->verif9;
-            $codigo->verif10                    = $request->verif10;
+            $codigo->verif1                     = $request->verif1 == null || $request->verif1 == "null" ? null : $request->verif1;
+            $codigo->verif2                     = $request->verif2 == null || $request->verif2 == "null" ? null : $request->verif2;
+            $codigo->verif3                     = $request->verif3 == null || $request->verif3 == "null" ? null : $request->verif3;
+            $codigo->verif4                     = $request->verif4 == null || $request->verif4 == "null" ? null : $request->verif4;
+            $codigo->verif5                     = $request->verif5 == null || $request->verif5 == "null" ? null : $request->verif5;
+            $codigo->verif6                     = $request->verif6 == null || $request->verif6 == "null" ? null : $request->verif6;
+            $codigo->verif7                     = $request->verif7 == null || $request->verif7 == "null" ? null : $request->verif7;
+            $codigo->verif8                     = $request->verif8 == null || $request->verif8 == "null" ? null : $request->verif8;
+            $codigo->verif9                     = $request->verif9 == null || $request->verif9 == "null" ? null : $request->verif9;
+            $codigo->verif10                    = $request->verif10 == null || $request->verif10 == "null" ? null : $request->verif10;
             $codigo->estado_liquidacion         = $request->estado_liquidacion;
             $codigo->bc_estado                  = $request->bc_estado;
             $codigo->codigos_barras             = $request->codigos_barras;
@@ -131,6 +128,7 @@ class GestionCodigosController extends Controller
             $codigo->bc_fecha_ingreso           = $request->bc_fecha_ingreso;
             $codigo->venta_estado               = $request->venta_estado;
             $codigo->contador                   = $request->contador;
+            $codigo->codigo_union               = $request->codigo_union;
             $codigo->save();
             if($codigo){
              //Guardar en el historico
@@ -174,7 +172,6 @@ class GestionCodigosController extends Controller
             if($request->chkBc_Codigos_barras           == '1') $codigo->codigos_barras             = $request->codigos_barras;
             if($request->chkBc_Bc_institucion           == '1') $codigo->bc_institucion             = $request->bc_institucion;
             if($request->chkBc_Bc_periodo               == '1') $codigo->bc_periodo                 = $request->bc_periodo;
-            //if($request->chkIdusuario                 == '1') $codigo->bc_fecha_ingreso           = $request->bc_fecha_ingreso;
             if($request->chkBc_Venta_estado             == '1') $codigo->venta_estado               = $request->venta_estado;
             $codigo->save();
             if($codigo){
@@ -193,11 +190,15 @@ class GestionCodigosController extends Controller
         ini_set('max_execution_time', 6000000);
         //CODIGOS REGALADOS
         if($request->tipo == "regalado"){
-           $codigos = DB::SELECT("SELECT c.contrato,
-           c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-           c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
-           ib.nombreInstitucion as institucion_barras,
-           pb.periodoescolar as periodo_barras,
+           $codigos = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+           IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+           c.porcentaje_descuento,
+           c.libro as book,c.serie,c.created_at,
+           c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+           c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+           c.contrato,c.libro, c.venta_lista_institucion,
+           CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+           i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
            (case when (c.estado_liquidacion = '0') then 'liquidado'
                when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -214,12 +215,17 @@ class GestionCodigosController extends Controller
                when (c.venta_estado = '1') then 'Venta directa'
                when (c.venta_estado = '2') then 'Venta por lista'
            end) as ventaEstado,
-           ib.nombreInstitucion as institucionBarra,
-           pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+           ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+           p.periodoescolar as periodo,
+           pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+           c.codigo_paquete,c.fecha_registro_paquete
            FROM codigoslibros c
-           LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-           LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-           LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+           LEFT JOIN usuario u ON c.idusuario = u.idusuario
+            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
+            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
            WHERE
                 (
                 c.bc_institucion = '$request->institucion_id'
@@ -237,11 +243,15 @@ class GestionCodigosController extends Controller
         }
         //CODIGOS LIQUIDADOS
         if($request->tipo == "liquidados"){
-            $codigos = DB::SELECT("SELECT c.contrato,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
-            ib.nombreInstitucion as institucion_barras,
-            pb.periodoescolar as periodo_barras,
+            $codigos = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.porcentaje_descuento,
+            c.libro as book,c.serie,c.created_at,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+            c.contrato,c.libro, c.venta_lista_institucion,
+            CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+            i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -258,11 +268,16 @@ class GestionCodigosController extends Controller
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
-            ib.nombreInstitucion as institucionBarra,
-            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+            ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             FROM codigoslibros c
+            LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
             WHERE
                 (
@@ -281,11 +296,15 @@ class GestionCodigosController extends Controller
         }
         //CODIGOS DEVUELTOS
         if($request->tipo == "devueltos"){
-            $codigos = DB::SELECT("SELECT c.contrato,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
-            ib.nombreInstitucion as institucion_barras,
-            pb.periodoescolar as periodo_barras,
+            $codigos = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.porcentaje_descuento,
+            c.libro as book,c.serie,c.created_at,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+            c.contrato,c.libro, c.venta_lista_institucion,
+            CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+            i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -302,42 +321,59 @@ class GestionCodigosController extends Controller
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
-            ib.nombreInstitucion as institucionBarra,
-            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+            ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             FROM codigoslibros c
+            LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            WHERE c.estado_liquidacion = '3'
-            LIMIT 2000
+            WHERE
+                (
+                c.bc_institucion = '$request->institucion_id'
+                OR venta_lista_institucion = '$request->institucion_id'
+                )
+                AND c.bc_periodo = '$request->periodo_id'
+                AND c.estado_liquidacion = '3'
+                LIMIT 2000
             ");
             return $codigos;
         }
         //CODIGOS LEIDOS
         if($request->tipo == "leidos"){
-        $codigos = DB::SELECT("SELECT c.contrato,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
-            ib.nombreInstitucion as institucion_barras,
-            pb.periodoescolar as periodo_barras,
-            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-            (case when (c.estado_liquidacion = '0') then 'liquidado'
-                when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2') then 'codigo regalado'
-                when (c.estado_liquidacion = '3') then 'codigo devuelto'
-            end) as liquidacion,
-            (case when (c.bc_estado = '2') then 'codigo leido'
-            when (c.bc_estado = '1') then 'codigo sin leer'
-            end) as barrasEstado,
-            (case when (c.codigos_barras = '1') then 'con código de barras'
-                when (c.codigos_barras = '0')  then 'sin código de barras'
-            end) as status,
-            (case when (c.venta_estado = '0') then ''
-                when (c.venta_estado = '1') then 'Venta directa'
-                when (c.venta_estado = '2') then 'Venta por lista'
-            end) as ventaEstado,
-            ib.nombreInstitucion as institucionBarra,
-            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+        $codigos = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+        c.porcentaje_descuento,
+        c.libro as book,c.serie,c.created_at,
+        c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+        c.contrato,c.libro, c.venta_lista_institucion,
+        CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+        i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
+        IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+        (case when (c.estado_liquidacion = '0') then 'liquidado'
+            when (c.estado_liquidacion = '1') then 'sin liquidar'
+            when (c.estado_liquidacion = '2') then 'codigo regalado'
+            when (c.estado_liquidacion = '3') then 'codigo devuelto'
+        end) as liquidacion,
+        (case when (c.bc_estado = '2') then 'codigo leido'
+        when (c.bc_estado = '1') then 'codigo sin leer'
+        end) as barrasEstado,
+        (case when (c.codigos_barras = '1') then 'con código de barras'
+            when (c.codigos_barras = '0')  then 'sin código de barras'
+        end) as status,
+        (case when (c.venta_estado = '0') then ''
+            when (c.venta_estado = '1') then 'Venta directa'
+            when (c.venta_estado = '2') then 'Venta por lista'
+        end) as ventaEstado,
+        ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+        p.periodoescolar as periodo,
+        pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+        c.codigo_paquete,c.fecha_registro_paquete
             FROM codigoslibros c
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
@@ -360,11 +396,15 @@ class GestionCodigosController extends Controller
         }
         //CODIGOS NO LEIDOS
         if($request->tipo == "no_leidos"){
-        $codigos = DB::SELECT("SELECT c.contrato,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
-            ib.nombreInstitucion as institucion_barras,
-            pb.periodoescolar as periodo_barras,
+        $codigos = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.porcentaje_descuento,
+            c.libro as book,c.serie,c.created_at,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+            c.contrato,c.libro, c.venta_lista_institucion,
+            CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+            i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -381,11 +421,16 @@ class GestionCodigosController extends Controller
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
-            ib.nombreInstitucion as institucionBarra,
-            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+            ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             FROM codigoslibros c
+            LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
             WHERE
                 (
@@ -405,11 +450,15 @@ class GestionCodigosController extends Controller
         }
         //TODOS
         if($request->tipo == "todos"){
-        $codigos = DB::SELECT("SELECT c.contrato,
-            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
-            ib.nombreInstitucion as institucion_barras,
-            pb.periodoescolar as periodo_barras,
+        $codigos = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.porcentaje_descuento,
+            c.libro as book,c.serie,c.created_at,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+            c.contrato,c.libro, c.venta_lista_institucion,
+            CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+            i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -426,11 +475,16 @@ class GestionCodigosController extends Controller
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
-            ib.nombreInstitucion as institucionBarra,
-            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
+            ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete
             FROM codigoslibros c
+            LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
             LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
             LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
             WHERE
                 (
@@ -491,20 +545,7 @@ class GestionCodigosController extends Controller
         }else{
             return ["status" => "0" ,"message" => "No se pudo eliminar el codigo puede que este liquidado"];
         }
-
     }
-    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values){
-        $historico = new HistoricoCodigos();
-        $historico->id_usuario     =  $id_usuario;
-        $historico->usuario_editor =  $institucion_id;
-        $historico->id_periodo     =  $periodo_id;
-        $historico->codigo_libro   =  $codigo;
-        $historico->idInstitucion  =  $usuario_editor;
-        $historico->observacion    =  $comentario;
-        $historico->old_values     =  $old_values;
-        $historico->new_values     =  $new_values;
-        $historico->save();
-     }
     public function destroy($id)
     {
 

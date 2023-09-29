@@ -128,24 +128,10 @@ class VerificacionControllerAnterior extends Controller
                    and c.estado_liquidacion = '1'
                    AND c.bc_periodo  = '$periodo'
                    AND c.bc_institucion = '$institucion'
+                   AND c.prueba_diagnostica = '0'
                AND ls.idLibro = c.libro_idlibro
                GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
             ");
-            //AGRUPADO VERSION 1
-            // $data = DB::SELECT("SELECT cl.codigo, COUNT(cl.libro_idlibro) as cantidad, IF(cl.codigo LIKE '%plus', (SELECT lsv.codigo_liquidacion   FROM libros_series lsv WHERE lsv.idLibro = cl.libro_idlibro AND lsv.version = 'PLUS'), ls.codigo_liquidacion) AS codigo, cl.serie, cl.libro as nombrelibro, cl.libro_idlibro, i.nombreInstitucion,  CONCAT(ac.nombres, ' ', ac.apellidos) as asesor  from codigoslibros cl, usuario u,  usuario as ac,institucion i,libros_series ls
-            // WHERE cl.idusuario = u.idusuario
-            // and u.institucion_idInstitucion = i.idInstitucion
-            // and ls.idLibro = cl.libro_idlibro
-            // AND i.idInstitucion = '$institucion'
-            // and ac.cedula = i.vendedorInstitucion
-            // and cl.id_periodo ='$periodo'
-            // and cl.estado <> '2'
-            // and cl.estado_liquidacion = '1'
-            // AND cl.bc_estado <> 3
-            // AND cl.bc_estado <> 2
-            // AND cl.bc_estado <> 1
-            // GROUP by cl.libro_idlibro
-            // ");
             //INVIVIDUAL VERSION 1
             //traigo la liquidacion  con los codigos invidivuales
             $traerCodigosIndividual = DB::SELECT("SELECT c.codigo, ls.codigo_liquidacion,   c.serie,
@@ -160,34 +146,14 @@ class VerificacionControllerAnterior extends Controller
                AND c.bc_institucion = '$institucion'
                AND ls.idLibro = c.libro_idlibro
             ");
-            // $traerCodigosIndividual = DB::SELECT("SELECT cl.codigo, ls.codigo_liquidacion, cl.serie, cl.libro as nombrelibro, cl.libro_idlibro
-            // from codigoslibros cl, usuario u,  usuario as ac,institucion i,libros_series ls
-            // WHERE cl.idusuario = u.idusuario
-            // and u.institucion_idInstitucion = i.idInstitucion
-            // and ls.idLibro = cl.libro_idlibro
-            // AND i.idInstitucion = '$institucion'
-            // and ac.cedula = i.vendedorInstitucion
-            // and cl.id_periodo ='$periodo'
-            // and cl.estado <> '2'
-            // and cl.estado_liquidacion = '1'
-            // AND cl.bc_estado = '0'
-            // AND ls.idLibro = cl.libro_idlibro
-
-
-            // ");
             //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
             if(count($data) >0){
                 //obtener la fecha actual
                 $fechaActual  = date('Y-m-d');
                 //verificar si es el primer contrato
-                $vericacionContrato = DB::select("SELECT
-                * FROM verificaciones
-                WHERE contrato = '$contrato'
-                AND nuevo = '1'
-                ORDER BY id DESC
-                ");
+                $vericacionContrato = $this->getVerificacionXcontrato($contrato);
                 //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
-                if(count($vericacionContrato) >0){
+                if(count($vericacionContrato) > 0){
                     //obtener el numero de verificacion en el que se quedo el contrato
                     $traerNumeroVerificacion =  $vericacionContrato[0]->num_verificacion;
                     $traeridVerificacion     =  $vericacionContrato[0]->id;
@@ -210,49 +176,33 @@ class VerificacionControllerAnterior extends Controller
                             'estado' => "0"
                         ]);
                         //  Para generar una verficacion y que quede abierta
-                        $verificacion =  new Verificacion;
-                        $verificacion->num_verificacion = $traerNumeroVerificacion+1;
-                        $verificacion->fecha_inicio = $fechaActual;
-                        $verificacion->contrato = $contrato;
-                        $verificacion->nuevo = '1';
-                        $verificacion->save();
+                        $this->saveVerificacion($traerNumeroVerificacion+1,$contrato);
                     }
                 }else{
-
                     //=====PARA GUARDAR LA VERIFICACION SI EL CONTRATO AUN NO TIENE VERIFICACIONES======
                     //para indicar que aun no existe el fin de la verificacion
-                     $finVerificacion = "0";
-                    //Para guardar la primera verificacin en la tabla
+                    $finVerificacion = "0";
+                    //Para guardar la primera verificacion en la tabla
                     $verificacion =  new Verificacion;
                     $verificacion->num_verificacion = 1;
-                    $verificacion->fecha_inicio = $fechaActual;
-                    $verificacion->fecha_fin = $fechaActual;
-                    $verificacion->contrato = $contrato;
-                    $verificacion->estado = "0";
-                    $verificacion->nuevo = '1';
+                    $verificacion->fecha_inicio     = $fechaActual;
+                    $verificacion->fecha_fin        = $fechaActual;
+                    $verificacion->contrato         = $contrato;
+                    $verificacion->estado           = "0";
+                    $verificacion->nuevo            = '1';
                     $verificacion->save();
-                        //Obtener Verificacion actual
-                        $encontrarVerificacionContratoInicial = DB::select("SELECT
-                            * FROM verificaciones
-                            WHERE contrato = '$contrato'
-                            AND nuevo = '1'
-                            ORDER BY id DESC
-                        ");
-                        //obtener el numero de verificacion en el que se quedo el contrato
-                        $traerNumeroVerificacionInicial =  $encontrarVerificacionContratoInicial[0]->num_verificacion;
-                        //obtener la clave primaria de la verificacion actual
-                        $traerNumeroVerificacionInicialId = $encontrarVerificacionContratoInicial[0]->id;
-                        //Actualizar cada codigo de la verificacion
-                        $this->updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$traerCodigosIndividual,$contrato,$traerNumeroVerificacionInicial,$periodo,$institucion);
-                        //Ingresar la liquidacion en la base
-                        $this->guardarLiquidacion($data,$traerNumeroVerificacionInicial,$contrato);
-                        //Para generar la siguiente verificacion y quede abierta
-                        $verificacion =  new Verificacion;
-                        $verificacion->num_verificacion = $traerNumeroVerificacionInicial+1;
-                        $verificacion->fecha_inicio = $fechaActual;
-                        $verificacion->contrato = $contrato;
-                        $verificacion->nuevo = "1";
-                        $verificacion->save();
+                    //Obtener Verificacion actual
+                    $encontrarVerificacionContratoInicial = $this->getVerificacionXcontrato($contrato);
+                    //obtener el numero de verificacion en el que se quedo el contrato
+                    $traerNumeroVerificacionInicial     =  $encontrarVerificacionContratoInicial[0]->num_verificacion;
+                    //obtener la clave primaria de la verificacion actual
+                    $traerNumeroVerificacionInicialId   = $encontrarVerificacionContratoInicial[0]->id;
+                    //Actualizar cada codigo de la verificacion
+                    $this->updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$traerCodigosIndividual,$contrato,$traerNumeroVerificacionInicial,$periodo,$institucion);
+                    //Ingresar la liquidacion en la base
+                    $this->guardarLiquidacion($data,$traerNumeroVerificacionInicial,$contrato);
+                    //Para generar la siguiente verificacion y quede abierta
+                    $this->saveVerificacion($traerNumeroVerificacionInicial+1,$contrato);
                 }
                 if($finVerificacion =="yes"){
                     return [
@@ -271,8 +221,25 @@ class VerificacionControllerAnterior extends Controller
             }
         }
     }
-
-     public function guardarLiquidacion($data,$traerNumeroVerificacionInicial,$traerContrato){
+    public function getVerificacionXcontrato($contrato){
+        $query = DB::SELECT("SELECT
+            * FROM verificaciones
+            WHERE contrato = '$contrato'
+            AND nuevo = '1'
+            ORDER BY id DESC
+        ");
+        return $query;
+    }
+    public function saveVerificacion($num_verificacion,$contrato){
+        $fechaActual  = date('Y-m-d');
+        $verificacion =  new Verificacion;
+        $verificacion->num_verificacion = $num_verificacion;
+        $verificacion->fecha_inicio     = $fechaActual;
+        $verificacion->contrato         = $contrato;
+        $verificacion->nuevo            = "1";
+        $verificacion->save();
+    }
+    public function guardarLiquidacion($data,$traerNumeroVerificacionInicial,$traerContrato){
         //Ingresar la liquidacion
         foreach($data as $item){
             VerificacionHasInstitucion::create([
@@ -287,7 +254,6 @@ class VerificacionControllerAnterior extends Controller
 
         }
      }
-
      public function updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$traerCodigosIndividual,$contrato,$num_verificacion,$periodo,$institucion){
         $columnaVerificacion = "verif".$num_verificacion;
         //PARA RECORRER Y IR ACTUALIZANDO A CADA CODIGO LA VERIFICACION
@@ -334,10 +300,7 @@ class VerificacionControllerAnterior extends Controller
 
          //PARA VER LA INFORMACION DE LAS VERIFICACIONES DEL CONTRATO
          if($request->informacion){
-            $verificaciones = DB::SELECT("SELECT * FROM verificaciones
-            WHERE contrato = '$request->contrato'
-            AND  nuevo = '1'
-            ");
+            $verificaciones = $this->getVerificacionXcontrato($request->contrato);
             $institucion = DB::SELECT("SELECT t.*, i.nombreInstitucion
             FROM temporadas t
             LEFT JOIN institucion i ON i.idInstitucion = t.idInstitucion
@@ -426,6 +389,7 @@ class VerificacionControllerAnterior extends Controller
              ->select('codigo')
              ->where($columnaVerificacion, $verificacion_id)
              ->where('contrato', $request->contrato)
+             ->where('prueba_diagnostica', '0')
              ->where('libro_idlibro', $request->libro_id)
              ->get();
              return $codigos;
@@ -456,14 +420,6 @@ class VerificacionControllerAnterior extends Controller
 
      }
     public function historicoContrato($contrato){
-       //codigos
-    //    $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,vl.nombre_libro,ls.idLibro AS libro_id
-    //    FROM verificaciones_has_temporadas vl
-    //    LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
-    //    WHERE vl.contrato = '$contrato'
-    //    AND vl.nuevo = '1'
-    //    AND vl.estado = '1'
-    //    ");
        $codigos = DB::SELECT("SELECT DISTINCT vl.codigo,l.nombrelibro as nombre_libro,ls.idLibro AS libro_id
        FROM verificaciones_has_temporadas vl
        LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
@@ -806,6 +762,7 @@ class VerificacionControllerAnterior extends Controller
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             WHERE p.estado = '1'
             AND p.estado_verificacion ='1'
+            order by p.fecha_solicita_verificacion desc
         ");
         return $query;
     }

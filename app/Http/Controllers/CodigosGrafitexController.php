@@ -284,10 +284,10 @@ class CodigosGrafitexController extends Controller
                             if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){
                             //Ingresar Union a codigo de activacion
                             $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
-                            if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                            if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                             //Ingresar Union a codigo de prueba diagnostico
                             $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
-                            if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                            if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                             }else{
                                 $codigoConProblemas->push($validarD);
                             }
@@ -301,10 +301,10 @@ class CodigosGrafitexController extends Controller
                             if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){
                                 //Ingresar Union a codigo de activacion
                                 $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
-                                if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
+                                if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                                 //Ingresar Union a codigo de prueba diagnostico
                                 $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
-                                if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
+                                if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                             }else{
                                 $codigoConProblemas->push($validarD);
                             }

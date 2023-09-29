@@ -246,6 +246,25 @@ class FacturacionApiController extends Controller
         return $prueba_get;
     }
     */
+    /*SOLO UN PARAMETRO 10.10.1.4*/
+    public function Get_Ventaxfacturabase10_10_1_4(Request $request)
+    {
+        $valor = $request->ven_codigo;
+        //return $valor
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Venta/BusquedaxFactura?ven_codigo=".$valor);
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
+    /*SOLO UN PARAMETRO 10.10.1.1*/
+    public function Get_Ventaxfacturabase10_10_1_1(Request $request)
+    {
+        $valor = $request->ven_codigo;
+        //return $valor
+        $dato = Http::get("http://186.4.218.168:9095/api/f2_Venta/BusquedaxFactura?ven_codigo=".$valor);
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
+    /*DOS PARAMETROS*/
     public function Get_Ventaxcontrato(Request $request)
     {
         $valor = $request->codcontrato;
@@ -255,6 +274,34 @@ class FacturacionApiController extends Controller
         $prueba_get = json_decode($dato, true);
         return $prueba_get;
     }
+    //METODO PARA PONER EN NULL LOS CAMPOS VEN_REMISION Y VEN_FECHA_REMISION DE BASE 10.10.1.4
+    public function Post_EditarVentaxFactura10_10_1_4(Request $request)
+    {
+        $valor = $request->venCodigo;
+        //return $valor;
+        try {
+            $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarRemision_Fecharemision?ven_codigo".$valor);
+            $prueba_update = json_decode($dato, true);
+            return $prueba_update;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
+    }
+
+    //METODO PARA PONER EN NULL LOS CAMPOS VEN_REMISION Y VEN_FECHA_REMISION DE BASE 10.10.1.1
+    public function Post_EditarVentaxFactura10_10_1_1(Request $request)
+    {
+        $valor = $request->venCodigo;
+        //return $valor;
+        try {
+            $dato = Http::post("http://186.4.218.168:9095/api/f2_Venta/ActualizarRemision_Fecharemision?ven_codigo".$valor);
+            $prueba_update = json_decode($dato, true);
+            return $prueba_update;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
+    }
+
     public function Post_VentaEditarestado(Request $request)
     {
         $form_data = [

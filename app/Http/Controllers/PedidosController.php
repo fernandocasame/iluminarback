@@ -19,6 +19,7 @@ use App\Models\PedidoAnticipoAprobadoHistorico;
 use App\Models\PedidoConvenio;
 use App\Models\PedidoConvenioDetalle;
 use App\Models\PedidoDocumentoAnterior;
+use App\Models\PedidoDocumentoDocente;
 use App\Models\PedidoHistoricoActas;
 use App\Models\PedidosGuiasBodega;
 use App\Models\PedidoGuiaEntrega;
@@ -651,7 +652,7 @@ class PedidosController extends Controller
         i.telefonoInstitucion, i.direccionInstitucion, i.ruc, i.nivel,i.tipo_descripcion,
         c.nombre AS nombre_ciudad, p.ifanticipo,pe.porcentaje_descuento,
         i.codigo_institucion_milton,i.codigo_mitlon_coincidencias,pe.region_idregion,
-        ph.estado as historicoEstado,pe.codigo_contrato
+        ph.estado as historicoEstado,pe.codigo_contrato,pe.periodoescolar
         FROM pedidos p
 		LEFT JOIN usuario u ON p.id_asesor = u.idusuario
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -4143,48 +4144,10 @@ class PedidosController extends Controller
         //buscar si hay  contrato
         $query = DB::SELECT("SELECT * FROM pedidos p WHERE p.id_pedido = '$id'");
         $contrato = $query[0]->contrato_generado;
-        // if($contrato == null || $contrato == "null" || $contrato == ""){
-        //     return ["status" => "0", "message" => "No existe contrato en el pedido #$id"];
-        // }
+        if($contrato == null || $contrato == "null" || $contrato == ""){
+            return ["status" => "0", "message" => "No existe contrato en el pedido #$id"];
+        }
         //=======PROCEDIMIENTO==========================
-        $json = '
-            [
-                {
-                "venCodigo": "C-C22-0000030-LJ",
-                "docCodigo": 18834,
-                "docValor": 1200,
-                "docNumero": "CH13374, EG54042",
-                "docNombre": "PRISCILA MARIANA LOPEZ ORDOÑEZ",
-                "docCi": "ANT",
-                "docCuenta": null,
-                "docInstitucion": null,
-                "docTipo": null,
-                "docObservacion": null,
-                "docFecha": null,
-                "estVenCodigo": 4,
-                "venConvertido": ""
-                },
-                {
-                "venCodigo": "C-C22-0000030-LJ",
-                "docCodigo": 19317,
-                "docValor": 252.8,
-                "docNumero": "CH 13793; EG 55655; FACT 13634",
-                "docNombre": "PRISCILA MARIANA LOPEZ ORDOÑEZ",
-                "docCi": "LIQ",
-                "docCuenta": null,
-                "docInstitucion": null,
-                "docTipo": null,
-                "docObservacion": null,
-                "docFecha": null,
-                "estVenCodigo": 4,
-                "venConvertido": ""
-                }
-            ]
-        ';
-        // Convertir la cadena JSON a un array de objetos
-        $arrayObjetos = json_decode($json);
-        return $arrayObjetos;
-        // $contrato = "C-C20-0000008-LJ";
         try {
             $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
             $JsonContrato = json_decode($dato, true);
@@ -4283,19 +4246,19 @@ class PedidosController extends Controller
         LEFT JOIN usuario u ON p.id_responsable = u.idusuario
         WHERE p.id_pedido = '$id_pedido'
         AND (p.estado  = '0' OR  p.estado = '1')
-        AND p.contrato_generado IS NULL
-        AND p.imagen IS NULL
         ");
         $datos = [];
         if(sizeOf($query) > 0){
             //variables
+            $id_periodo                 = $query[0]->id_periodo;
             $institucion                = $query[0]->id_institucion;
             $cedulaDocente              = $query[0]->cedula;
             $docente                    = $query[0]->docente;
-            $query2 = DB::SELECT("SELECT * FROM pedidos_documentos_anteriores pd
-            WHERE pd.institucion_id = '$institucion'
-            AND pd.cedula_docente = '$cedulaDocente'
-            LIMIT 1
+            $query2 = DB::SELECT("SELECT  pd.*,pe.periodoescolar
+                FROM pedidos_documentos_docentes pd
+                LEFT JOIN periodoescolar pe ON pd.id_periodo = pe.idperiodoescolar
+                WHERE pd.institucion_id = '$institucion'
+                ORDER BY pd.id DESC
             ");
             foreach($query2 as $key => $item){
                 $datos[$key] = [
@@ -4304,7 +4267,9 @@ class PedidosController extends Controller
                     "doc_cedula"        => $item->doc_cedula,
                     "doc_ruc"           => $item->doc_ruc,
                     "docente"           => $docente,
-                    "cedulaDocente"     => $cedulaDocente
+                    "cedulaDocente"     => $cedulaDocente,
+                    "periodoescolar"    => $item->periodoescolar,
+                    "id_periodo"        => $item->id_periodo
                 ];
             }
         }
@@ -4322,39 +4287,31 @@ class PedidosController extends Controller
         AND p.estado = '1'
         AND p.ifanticipo  = '1'
         AND p.imagen IS NOT NULL
+        AND p.imagen <> 'undefined'
         ");
         if(sizeOf($query) > 0){
             //variables
             $institucion                = $query[0]->id_institucion;
+            $id_periodo                 = $query[0]->id_periodo;
             $cedulaDocente              = $query[0]->cedula;
             $doc_cedula                 = $query[0]->imagen;
             $doc_ruc                    = $query[0]->doc_ruc;
-            $contrato                   = $query[0]->contrato_generado;
-            //withContrato=> 0 =  guardar sin contrato;  1 = guardarcon contrato
-            //si quiero actualizar los documentos pero envio por parametro sin contrato Entonces valido que no tenga contrato
-            if($withContrato == 0){
-                if($contrato != null || $contrato != ""){
-                    return ["status" => "0", "message" => "El pedido ya tiene contrato"];
-                }
-            }
-            //validar si existe edito si no guardo
-            $validate = DB::SELECT("SELECT * FROM pedidos_documentos_anteriores pd
-            WHERE pd.institucion_id = '$institucion'
-            -- AND pd.cedula_docente = '$cedulaDocente'
-            ");
+            //Valido si existe un registro de documento de la institucion en el periodo
+            $validate = $this->validateDocumento($institucion,$id_periodo);
             if(empty($validate)){
                 //Guardar
-                $documento              = new PedidoDocumentoAnterior();
+                $documento              = new PedidoDocumentoDocente();
             }
             else{
                 $id                     = $validate[0]->id;
                 //Editar
-                $documento              = PedidoDocumentoAnterior::findOrFail($id);
+                $documento              = PedidoDocumentoDocente::findOrFail($id);
             }
             $documento->institucion_id  = $institucion;
-            $documento->cedula_docente  = $cedulaDocente;
+            $documento->cedula          = $cedulaDocente;
             $documento->doc_cedula      = $doc_cedula;
             $documento->doc_ruc         = $doc_ruc;
+            $documento->id_periodo      = $id_periodo;
             $documento->save();
             if($documento){
                 return ["status" => "1","message" => "Se guardo correctamente"];
@@ -4364,14 +4321,19 @@ class PedidosController extends Controller
         }
         return ["status" => "0","message" => "-"];
     }
+    public function validateDocumento($institucion,$id_periodo){
+        $validate = DB::SELECT("SELECT  * FROM pedidos_documentos_docentes pd
+            WHERE pd.institucion_id = '$institucion'
+            AND pd.id_periodo       = '$id_periodo'
+            ORDER BY pd.id DESC
+        ");
+        return $validate;
+    }
     //api:post/agregarDocumentosAnteriorPedido
     public function agregarDocumentosAnteriorPedido(Request $request){
         $pedido         = Pedidos::find($request->id_pedido);
         $fileName       = $request->doc_cedula;
         $fileNameRuc    = $request->doc_ruc;
-        if($pedido->contrato_generado != null || $pedido->contrato_generado != ""){
-            return ["status" => "0", "messsage" => "El pedido ya tiene contrato no se puede actualizar los documentos"];
-        }
         //CEDULA
         if($fileName == "null" || $fileName == null || $fileName == 'undefined'){
             $pedido->imagen             = null;
@@ -4386,9 +4348,9 @@ class PedidosController extends Controller
         }
         $pedido->save();
         if($pedido){
-            return ["status" => "1", "messsage" => "Se guardo correctamente"];
+            return ["status" => "1", "message" => "Se guardo correctamente"];
         }else{
-            return ["status" => "0", "messsage" => "No se pudo guardar"];
+            return ["status" => "0", "message" => "No se pudo guardar"];
         }
     }
     //===FIN APIS DOCUMENTOS ANTERIORES====
@@ -4424,11 +4386,7 @@ class PedidosController extends Controller
         }
         //guardar en historico
         $this->saveHistoricoCambios($request,$getPedido);
-        if($pedido){
-            return ["status" => "1", "message" =>"Se guardo correctamente"];
-        }else{
-            return ["status" => "0","message" => "No se pudo guardar"];
-        }
+        return ["status" => "1", "message" =>"Se guardo correctamente"];
     }
     public function saveHistoricoCambios($request,$old_values){
         $historico = new PedidoHistoricoCambios();

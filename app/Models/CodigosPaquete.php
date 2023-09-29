@@ -8,5 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class CodigosPaquete extends Model
 {
     use HasFactory;
-    protected $table = "codigos_paquetes";
+    protected $table        = "codigos_paquetes";
+    protected $primaryKey   = "codigo";
+    public $incrementing    = false;
 }

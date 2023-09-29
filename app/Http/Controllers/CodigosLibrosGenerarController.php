@@ -563,6 +563,7 @@ class CodigosLibrosGenerarController extends Controller
         LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
         WHERE (c.bc_periodo  = '$periodo' OR c.id_periodo = '$periodo')
         AND (c.bc_institucion = '$id' OR u.institucion_idInstitucion = '$id' OR venta_lista_institucion = '$id' )
+        AND c.prueba_diagnostica = '0'
         ");
         return $codigos_libros;
     }

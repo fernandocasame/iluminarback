@@ -4,6 +4,44 @@ namespace App\Traits\Codigos;
 use App\Models\HistoricoCodigos;
 use DB;
 trait TraitCodigosGeneral{
+    public $columnasSeleccionadas = [
+        'contrato',
+        'codigo',
+        'bc_estado',
+        'estado',
+        'estado_liquidacion',
+        'contador',
+        'venta_estado',
+        'bc_periodo',
+        'bc_institucion',
+        'idusuario',
+        'id_periodo',
+        'contrato',
+        'libro',
+        "IF(c.estado = '2', 'bloqueado', 'activo') AS codigoEstado",
+        "CASE
+            WHEN c.estado_liquidacion = '0' THEN 'liquidado'
+            WHEN c.estado_liquidacion = '1' THEN 'sin liquidar'
+            WHEN c.estado_liquidacion = '2' THEN 'codigo regalado'
+            WHEN c.estado_liquidacion = '3' THEN 'codigo devuelto'
+        END AS liquidacion",
+        "CASE
+            WHEN c.bc_estado = '2' THEN 'codigo leido'
+            WHEN c.bc_estado = '1' THEN 'codigo sin leer'
+        END AS barrasEstado",
+        "CASE
+            WHEN c.codigos_barras = '1' THEN 'con código de barras'
+            WHEN c.codigos_barras = '0' THEN 'sin código de barras'
+        END AS status",
+        "CASE
+            WHEN c.venta_estado = '0' THEN ''
+            WHEN c.venta_estado = '1' THEN 'Venta directa'
+            WHEN c.venta_estado = '2' THEN 'Venta por lista'
+        END AS ventaEstado",
+        'ib.nombreInstitucion AS institucionBarra',
+        'pb.periodoescolar AS periodo_barras',
+        'ivl.nombreInstitucion AS InstitucionLista'
+    ];
     public function makeid($longitud){
         $characters = ['A','B','C','D','E','F','G','H','K','M','N','P','R','S','T','U','V','W','X','Y','Z','2','3','4','5','6','7','8','9'];
         shuffle($characters);
@@ -118,7 +156,7 @@ trait TraitCodigosGeneral{
         }
         return $datos;
     }
-    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values){
+    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values){
         $historico = new HistoricoCodigos();
         $historico->id_usuario     =  $id_usuario;
         $historico->usuario_editor =  $institucion_id;
@@ -127,6 +165,7 @@ trait TraitCodigosGeneral{
         $historico->idInstitucion  =  $usuario_editor;
         $historico->observacion    =  $comentario;
         $historico->old_values     =  $old_values;
+        $historico->new_values     =  $new_values;
         $historico->save();
     }
     public function PeriodoInstitucion($institucion){
