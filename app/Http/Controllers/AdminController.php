@@ -314,6 +314,7 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
+        return "hola mundoooo";
        $query = DB::SELECT("SELECT DISTINCT s.asesor_id, s.cli_ins_codigo
        FROM pedidos_secuencia  s
        WHERE s.cli_ins_codigo IS NOT NULL
@@ -325,7 +326,7 @@ class AdminController extends Controller
             ->update(['cli_ins_codigo' => $item->cli_ins_codigo]);
         if($ingreso) $contador ++;
        }
-       return "Se guardo $contador registros";
+       return "Se guardo $contador registros xd";
 
 
 
