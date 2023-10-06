@@ -314,36 +314,21 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-        $query = DB::SELECT("SELECT p.id_pedido, p.id_institucion, p.imagen,p.doc_ruc,p.id_responsable,
-        p.id_periodo,p.id_periodo,d.cedula
-        FROM pedidos p
-        LEFT JOIN usuario d ON p.id_responsable = d.idusuario
-        WHERE p.estado <> '2'
-        AND p.tipo ='0'
-        AND p.id_periodo <> '20'
-        AND p.imagen IS NOT NULL
-        AND p.imagen <> 'undefined'
-        ");
-        $contador = 0;
-        foreach($query as $key => $item){
-            //validar que si esta creado no lo creo
-            $query2 = DB::SELECT("SELECT  * FROM pedidos_documentos_docentes pd
-            WHERE pd.institucion_id = '$item->id_institucion'
-            AND pd.cedula           = '$item->cedula'
-            AND pd.id_periodo       = '$item->id_periodo'
-            ");
-            if(empty($query2)){
-                $documento = new PedidoDocumentoDocente();
-                $documento->institucion_id  = $item->id_institucion;
-                $documento->cedula          = $item->cedula;
-                $documento->doc_cedula      = $item->imagen;
-                $documento->doc_ruc         = $item->doc_ruc;
-                $documento->id_periodo      = $item->id_periodo;
-                $documento->save();
-                if($documento) $contador++;
-            }
-        }
-        return "Se guardo $contador registros";
+       $query = DB::SELECT("SELECT DISTINCT s.asesor_id, s.cli_ins_codigo
+       FROM pedidos_secuencia  s
+       WHERE s.cli_ins_codigo IS NOT NULL
+       ");
+       $contador = 0;
+       foreach($query as $key => $item){
+        $ingreso = DB::table('usuario')
+            ->where('idusuario', $item->asesor_id)
+            ->update(['cli_ins_codigo' => $item->cli_ins_codigo]);
+        if($ingreso) $contador ++;
+       }
+       return "Se guardo $contador registros";
+
+
+
         // 'cli_ci'        => $cedula,
         // 'cli_apellidos' => $apellidos,
         // 'cli_nombres'   => $nombres,

@@ -5,18 +5,21 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\NeetSubTema;
 use App\Models\NeetTema;
+use App\Models\NeetUpload;
 use App\Models\NeetUsuarioDocumento;
 use App\Traits\Codigos\TraitCodigosGeneral;
+use App\Traits\Usuario\TraitUsuarioGeneral;
 use Illuminate\Http\Request;
 use DB;
 class NeetTemaController extends Controller
 {
     use TraitCodigosGeneral;
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+    use TraitUsuarioGeneral;
+    //api:get>>getUsuarios/{rol}/{institucion}
+    public function getUsuarios($rol,$institucion){
+        $query = $this->userxRolxInstitucion($rol,$institucion);
+        return $query;
+    }
     //api:get/neetTema?listadoTemas=yes
     public function index(Request $request)
     {
@@ -32,13 +35,17 @@ class NeetTemaController extends Controller
         if($request->listadoSubniveles){
             return $this->listadoSubniveles();
         }
-        //asignados
+        //asignados x usuario
         if($request->getAsignados){
             return $this->getAsignados($request);
         }
         //todos asignados incluyendo los documentos generales
         if($request->getAsignadosAll){
             return $this->getAsignadosAll($request);
+        }
+        //TRAER ASIGNACIONES POR DOCUMENTOS DE DOCENTES
+         if($request->getDocentesXDocumento){
+            return $this->getDocentesXDocumento($request->periodo_id,$request->neet_upload_id,$request->institucion_id);
         }
     }
     public function listadoTemas(){
@@ -74,6 +81,12 @@ class NeetTemaController extends Controller
                 "nee_subnivel"      => $item->nee_subnivel,
                 "tipo"              => $item->tipo,
                 "subnivel"          => $item->subnivel,
+                "actividad1"        => $item->actividad1,
+                "actividad2"        => $item->actividad2,
+                "actividad3"        => $item->actividad3,
+                "actividad4"        => $item->actividad4,
+                "actividad5"        => $item->actividad5,
+                "solucionario"      => $item->solucionario,
                 "files"             => $files
             ];
         }
@@ -110,7 +123,8 @@ class NeetTemaController extends Controller
         if(empty($buscarPeriodo)) return ["status" => "0", "message" => "No se encontro un período para la institución"];
         $periodo = $buscarPeriodo[0]->periodo;
         $query = DB::SELECT("SELECT nd.*, nu.nombre AS documento, pe.periodoescolar AS periodo,
-        sn.nombre AS subnivel,t.nombre as tema,nu.nee_subnivel
+        sn.nombre AS subnivel,t.nombre as tema,nu.nee_subnivel,
+        nu.actividad1, nu.actividad2 , nu.actividad3, nu.actividad4, nu.actividad5,nu.solucionario
         FROM neet_usuario_documento nd
         LEFT JOIN neet_upload  nu ON nd.neet_upload_id = nu.id
         LEFT JOIN periodoescolar pe ON nd.periodo_id = pe.idperiodoescolar
@@ -137,6 +151,12 @@ class NeetTemaController extends Controller
                 "periodo"           => $item->periodo,
                 "subnivel"          => $item->subnivel,
                 "tema"              => $item->tema,
+                "actividad1"        => $item->actividad1,
+                "actividad2"        => $item->actividad2,
+                "actividad3"        => $item->actividad3,
+                "actividad4"        => $item->actividad4,
+                "actividad5"        => $item->actividad5,
+                "solucionario"      => $item->solucionario,
                 "files"             => $files
             ];
         }
@@ -179,6 +199,7 @@ class NeetTemaController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+    //neetTema
     public function store(Request $request)
     {
         //AGREGAR TEMAS
@@ -188,6 +209,14 @@ class NeetTemaController extends Controller
         //ASIGNAR DOCUMENTO
         if($request->asignarDocumento){
             return $this->asignarDocumento($request);
+        }
+        //ASIGNAR DOCUMENTOS DOCENTES
+        if($request->asignarDocentes){
+            return $this->asignarDocentes($request);
+        }
+        //GUARDAR ACTIVIDADES
+        if($request->guardarActividadesNeet){
+            return $this->guardarActividadesNeet($request);
         }
     }
 
@@ -211,22 +240,97 @@ class NeetTemaController extends Controller
         $buscarPeriodo = $this->PeriodoInstitucion($request->institucion_id);
         if(empty($buscarPeriodo)) return ["status" => "0", "message" => "No se encontro un período para la institución"];
         $periodo = $buscarPeriodo[0]->periodo;
+        $query = $this->getAsignadoXDocente($request->idusuario,$periodo,$request->neet_upload_id);
         //validar que si existe no se crea
-        $query = DB::SELECT("SELECT nd.*
-        FROM neet_usuario_documento nd
-        WHERE nd.idusuario      = '$request->idusuario'
-        AND nd.periodo_id       = '$periodo'
-        AND nd.neet_upload_id   = '$request->neet_upload_id'
-        ");
         if(count($query) > 0) return ["status" => "0", "message" => "El documento ya ha sido asignado anteriormente"];
         //PROCESO
+        $documento = $this->saveAsignacionDocente($request,$periodo,$request->idusuario);
+        if($documento){
+            return ["status" => "1", "message" => "Se guardo correctamente"];
+        }else{
+            return ["status" => "0", "message" => "No se pudo guardar"];
+        }
+    }
+    public function getAsignadoXDocente($idusuario,$periodo,$neet_upload_id){
+        $query = DB::SELECT("SELECT nd.*
+        FROM neet_usuario_documento nd
+        WHERE nd.idusuario      = '$idusuario'
+        AND nd.periodo_id       = '$periodo'
+        AND nd.neet_upload_id   = '$neet_upload_id'
+        ");
+        return $query;
+    }
+    public function saveAsignacionDocente($request,$periodo,$idusuario){
         $documento = new NeetUsuarioDocumento();
-        $documento->idusuario       = $request->idusuario;
+        $documento->idusuario       = $idusuario;
         $documento->user_created    = $request->user_created;
         $documento->neet_upload_id  = $request->neet_upload_id;
         $documento->periodo_id      = $periodo;
+        $documento->id_group        = $request->id_group;
         $documento->save();
-        if($documento){
+        return $documento;
+    }
+    public function asignarDocentes($request){
+        $periodo_id             = $request->periodo_id;
+        $neet_upload_id         = $request->neet_upload_id;
+        $institucion_id         = $request->institucion_id;
+        $datos                  = json_decode($request->docentes);
+        //eliminar si ya han quitado al docente
+        //traer los documentos asignados a los docentes
+        $getDocentesAsignados   = $this->getDocentesXDocumento($periodo_id,$neet_upload_id,$institucion_id);
+        if(sizeOf($getDocentesAsignados) > 0){
+            foreach($getDocentesAsignados as $key => $item){
+                $docente        = "";
+                $docente        = $item->idusuario;
+                $searchDocente  = collect($datos)->filter(function ($objeto) use ($docente) {
+                    // Condición de filtro
+                    return $objeto->idusuario == $docente;
+                });
+                if(sizeOf($searchDocente) == 0){
+                    DB::DELETE("DELETE FROM neet_usuario_documento
+                      WHERE neet_upload_id  = '$neet_upload_id'
+                      AND idusuario         = '$docente'
+                      AND periodo_id        = '$periodo_id'
+                    ");
+                }
+            }
+        }
+        //guardar las asignaciones para los docentes
+        foreach($datos as $key => $item){
+            $query = $this->getAsignadoXDocente($item->idusuario,$periodo_id,$request->neet_upload_id);
+            if(empty($query)){
+                //guardar
+                $this->saveAsignacionDocente($request,$periodo_id,$item->idusuario);
+            }
+        }
+    }
+    public function getDocentesXDocumento($periodo_id,$neet_upload_id,$institucion_id){
+        $query = DB::SELECT("SELECT  CONCAT(u.nombres,' ',u.apellidos) as nombre_completo,
+        u.id_group,u.cedula,u.idusuario,u.institucion_idInstitucion
+        FROM neet_usuario_documento d
+        LEFT JOIN usuario u ON d.idusuario  = u.idusuario
+        WHERE d.id_group                    = '6'
+        AND d.periodo_id                    = '$periodo_id'
+        AND d.neet_upload_id                = '$neet_upload_id'
+        AND u.institucion_idInstitucion     = '$institucion_id'
+        ");
+        return $query;
+    }
+    public function guardarActividadesNeet($request){
+        $actividad1 = $request->actividad1;
+        $actividad2 = $request->actividad2;
+        $actividad3 = $request->actividad3;
+        $actividad4 = $request->actividad4;
+        $actividad5 = $request->actividad5;
+        $dato = NeetUpload::find($request->id);
+        $dato->actividad1      = $actividad1 == null || $actividad1 == "null" ? null :$actividad1;
+        $dato->actividad2      = $actividad2 == null || $actividad1 == "null" ? null :$actividad2;
+        $dato->actividad3      = $actividad3 == null || $actividad1 == "null" ? null :$actividad3;
+        $dato->actividad4      = $actividad4 == null || $actividad1 == "null" ? null :$actividad4;
+        $dato->actividad5      = $actividad5 == null || $actividad1 == "null" ? null :$actividad5;
+        $dato->user_created    = $request->user_created;
+        $dato->save();
+        if($dato){
             return ["status" => "1", "message" => "Se guardo correctamente"];
         }else{
             return ["status" => "0", "message" => "No se pudo guardar"];

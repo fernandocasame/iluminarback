@@ -307,7 +307,7 @@ class GuiasController extends Controller
             $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
             WHERE s.id_periodo = '$request->id_periodo'
             AND s.ven_d_codigo = '$request->iniciales'
-            AND s.institucion_facturacion = '3858'
+            AND s.institucion_facturacion = '22926'
             ");
             if(empty($query)){
                 return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];

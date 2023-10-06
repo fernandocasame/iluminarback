@@ -451,7 +451,7 @@ class EstudianteController extends Controller
             if($request->asesor){
                 $estudiantes =  DB::SELECT("SELECT DISTINCT   u.idusuario, u.nombres,
                  u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado, u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion, gr.deskripsi as perfil, u.fecha_nacimiento, u.cargo_id, c.cargo, u.iniciales,
-                u.foto_user,u.change_password,u.fecha_change_password,u.capacitador
+                u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
@@ -464,7 +464,7 @@ class EstudianteController extends Controller
                  u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado, u.id_group,
                  u.institucion_idInstitucion ,i.nombreInstitucion, gr.deskripsi as perfil,
                  u.fecha_nacimiento, u.cargo_id, c.cargo, u.iniciales,u.foto_user,
-                 u.change_password,u.fecha_change_password,u.capacitador
+                 u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
@@ -485,7 +485,7 @@ class EstudianteController extends Controller
                 u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
                 u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion,
                 gr.deskripsi as perfil, u.fecha_nacimiento, u.cargo_id, c.cargo,
-                u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador
+                u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
@@ -500,7 +500,7 @@ class EstudianteController extends Controller
                 u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
                  u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion,
                  gr.deskripsi as perfil , u.fecha_nacimiento, u.cargo_id,cargo,
-                  u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador
+                  u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
@@ -516,7 +516,7 @@ class EstudianteController extends Controller
                 u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
                  u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion,
                  gr.deskripsi as perfil, u.fecha_nacimiento, u.cargo_id, c.cargo,
-                  u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador
+                  u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
@@ -530,7 +530,7 @@ class EstudianteController extends Controller
                  u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado,
                   u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion,
                    gr.deskripsi as perfil, u.fecha_nacimiento, u.cargo_id, c.cargo,
-                    u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador
+                    u.iniciales,u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group

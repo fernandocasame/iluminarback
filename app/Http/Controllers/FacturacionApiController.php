@@ -277,10 +277,10 @@ class FacturacionApiController extends Controller
     //METODO PARA PONER EN NULL LOS CAMPOS VEN_REMISION Y VEN_FECHA_REMISION DE BASE 10.10.1.4
     public function Post_EditarVentaxFactura10_10_1_4(Request $request)
     {
-        $valor = $request->venCodigo;
+        $valor = $request->ven_codigo;
         //return $valor;
         try {
-            $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarRemision_Fecharemision?ven_codigo".$valor);
+            $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarRemision_Fecharemision?venCodigo=".$valor);
             $prueba_update = json_decode($dato, true);
             return $prueba_update;
         } catch (\Exception  $ex) {
@@ -291,10 +291,10 @@ class FacturacionApiController extends Controller
     //METODO PARA PONER EN NULL LOS CAMPOS VEN_REMISION Y VEN_FECHA_REMISION DE BASE 10.10.1.1
     public function Post_EditarVentaxFactura10_10_1_1(Request $request)
     {
-        $valor = $request->venCodigo;
+        $valor = $request->ven_codigo;
         //return $valor;
         try {
-            $dato = Http::post("http://186.4.218.168:9095/api/f2_Venta/ActualizarRemision_Fecharemision?ven_codigo".$valor);
+            $dato = Http::post("http://186.4.218.168:9095/api/f2_Venta/ActualizarRemision_Fecharemision?venCodigo=".$valor);
             $prueba_update = json_decode($dato, true);
             return $prueba_update;
         } catch (\Exception  $ex) {

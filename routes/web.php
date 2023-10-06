@@ -1306,6 +1306,7 @@ Route::resource('neetTema','NeetTemaController');
 Route::post('neetEliminar','NeetTemaController@neetEliminar');
 Route::get('eliminaAsignacionNeet/{id}','NeetTemaController@eliminaAsignacionNeet');
 Route::post('quitarTodasDocumentosAsignados','NeetTemaController@quitarTodasDocumentosAsignados');
+Route::get('getUsuarios/{rol}/{institucion}','NeetTemaController@getUsuarios');
 //=====FIN APIS NEET DOCUMENTOS=====================================
 //=====SALLE========================================================
 Route::group(['prefix' => 'salle'],function(){

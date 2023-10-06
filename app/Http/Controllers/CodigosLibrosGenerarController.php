@@ -19,17 +19,11 @@ use GraphQL\Server\RequestError;
 class CodigosLibrosGenerarController extends Controller
 {
     use TraitCodigosGeneral;
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
     public function index(Request $request)
     {
         $codigos_libros = DB::SELECT("SELECT * from codigoslibros limit 100");
         return $codigos_libros;
     }
-
     /**
      * Show the form for creating a new resource.
      *
@@ -39,7 +33,6 @@ class CodigosLibrosGenerarController extends Controller
     {
         //
     }
-
     public function makeid($longitud){
         $characters = ['A','B','C','D','E','F','G','H','K','M','N','P','R','S','T','U','V','W','X','Y','Z','2','3','4','5','6','7','8','9'];
         shuffle($characters);
@@ -90,28 +83,28 @@ class CodigosLibrosGenerarController extends Controller
             $codigosVerif = DB::SELECT("SELECT codigo,libro,estado,fecha_create,estado_codigo_fisico
             FROM codigoslibros WHERE codigo = '$code'");
             $codigosVerificados[$key2] = [
-                "codigo" => $codigosVerif[0]->codigo,
-                "libro" => $codigosVerif[0]->libro,
-                "estado" => $codigosVerif[0]->estado,
-                "fecha_create"=> $codigosVerif[0]->fecha_create,
-                "estado_codigo_fisico" => $codigosVerif[0]->estado_codigo_fisico,
+                "codigo"                    => $codigosVerif[0]->codigo,
+                "libro"                     => $codigosVerif[0]->libro,
+                "estado"                    => $codigosVerif[0]->estado,
+                "fecha_create"              => $codigosVerif[0]->fecha_create,
+                "estado_codigo_fisico"      => $codigosVerif[0]->estado_codigo_fisico,
             ];
         }
         return ["codigos" => $codigosIngresados,"porcentaje" => $contador,"codigosVerificados" => $codigosVerificados];
     }
     public function ingresarCodigo($serie,$libro,$anio,$idlibro,$idusuario,$codigo,$estado_codigo_fisico){
-            $codigos_libros                             = new CodigosLibros();
-            $codigos_libros->serie                      = $serie;
-            $codigos_libros->libro                      = $libro;
-            $codigos_libros->anio                       = $anio;
-            $codigos_libros->libro_idlibro              = $idlibro;
-            $codigos_libros->estado                     = '0';
-			$codigos_libros->idusuario                  = 0;
-            $codigos_libros->bc_estado                  = 1;
-            $codigos_libros->idusuario_creador_codigo   = $idusuario;
-            $codigos_libros->codigo                     = $codigo;
-            $codigos_libros->estado_codigo_fisico       = $estado_codigo_fisico;
-            $codigos_libros->save();
+        $codigos_libros                             = new CodigosLibros();
+        $codigos_libros->serie                      = $serie;
+        $codigos_libros->libro                      = $libro;
+        $codigos_libros->anio                       = $anio;
+        $codigos_libros->libro_idlibro              = $idlibro;
+        $codigos_libros->estado                     = '0';
+        $codigos_libros->idusuario                  = 0;
+        $codigos_libros->bc_estado                  = 1;
+        $codigos_libros->idusuario_creador_codigo   = $idusuario;
+        $codigos_libros->codigo                     = $codigo;
+        $codigos_libros->estado_codigo_fisico       = $estado_codigo_fisico;
+        $codigos_libros->save();
     }
     public function generarCodigos(Request $request){
         $repetidos              = array();

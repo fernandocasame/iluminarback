@@ -108,10 +108,13 @@ class PedidosController extends Controller
         if(empty($validate)){
             // se guardan todas las instituciones nuevas en la base de milton
             //$this->guardar_institucines_base_milton();
-            $asesor = DB::SELECT("SELECT iniciales FROM `usuario` WHERE `idusuario` = ?", [$request->id_asesor]);
+            $asesor = DB::SELECT("SELECT iniciales,cli_ins_codigo FROM `usuario` WHERE `idusuario` = ?", [$request->id_asesor]);
             $institucion = DB::SELECT("SELECT codigo_institucion_milton FROM `institucion` WHERE `idInstitucion` = ?", [$request->institucion]);
             if( !$asesor[0]->iniciales ){
                 return response()->json(['pedido' => '', 'error' => 'Faltan las iniciales del asesor']);
+            }
+            if( !$asesor[0]->cli_ins_codigo ){
+                return response()->json(['pedido' => '', 'error' => 'Faltan el cli_ins_codigo para pedir guias en el asesor']);
             }
             if( !$institucion[0]->codigo_institucion_milton ){
                 return response()->json(['pedido' => '', 'error' => 'Falta el código de la institución, revise si el codigo de la ciudad es correcto.']);
@@ -2089,7 +2092,7 @@ class PedidosController extends Controller
         if(empty($validateBeneficiarios)){
             return ["status" => "0", "message" => "Seleccione algun beneficiario para poder guardar"];
         }
-        $pedido = DB::SELECT("SELECT p.*, pe.codigo_contrato, u.iniciales,
+        $pedido = DB::SELECT("SELECT p.*, pe.codigo_contrato, u.iniciales,u.cli_ins_codigo,
         i.codigo_institucion_milton, pe.region_idregion,
         CONCAT(u.nombres, ' ', u.apellidos) AS asesor,u.cedula,i.nombreInstitucion,
         (
@@ -2106,18 +2109,19 @@ class PedidosController extends Controller
         $usuario_verifica = DB::SELECT("SELECT * FROM `usuario` WHERE `idusuario` = ?", [$usuario_fact]);
         $docente = DB::SELECT("SELECT u.cedula,  CONCAT(u.nombres, ' ', u.apellidos) AS docente FROM  usuario u WHERE `idusuario` = ?", [$pedido[0]->id_responsable]);
         // $observacion = DB::SELECT("SELECT * FROM `pedidos_comentarios` WHERE `id_pedido` = $id_pedido ORDER BY `id` DESC;");
-        $comentario         = '';
-        $comentario         = $pedido[0]->observacion;
-        $institucion        = $pedido[0]->id_institucion;
-        $asesor_id          = $pedido[0]->id_asesor;
-        $asesor             = $pedido[0]->asesor;
-        $cedulaAsesor       = $pedido[0]->cedula;
-        $temporada          = substr($pedido[0]->codigo_contrato,0,1);
-        $periodo            = $pedido[0]->id_periodo;
-        $ciudad             = $pedido[0]->ciudad;
-        $iniciales          = $pedido[0]->iniciales;
-        $codigo_contrato    = $pedido[0]->codigo_contrato;
-        $nombreInstitucion  = $pedido[0]->nombreInstitucion;
+        $comentario             = '';
+        $comentario             = $pedido[0]->observacion;
+        $institucion            = $pedido[0]->id_institucion;
+        $asesor_id              = $pedido[0]->id_asesor;
+        $asesor                 = $pedido[0]->asesor;
+        $cedulaAsesor           = $pedido[0]->cedula;
+        $temporada              = substr($pedido[0]->codigo_contrato,0,1);
+        $periodo                = $pedido[0]->id_periodo;
+        $ciudad                 = $pedido[0]->ciudad;
+        $iniciales              = $pedido[0]->iniciales;
+        $cli_ins_codigoAsesor   = $pedido[0]->cli_ins_codigo;
+        $codigo_contrato        = $pedido[0]->codigo_contrato;
+        $nombreInstitucion      = $pedido[0]->nombreInstitucion;
         $fechaActual = date('Y-m-d H:i:s');
         $setAnticipo = 0;
         //variables del docente beneficiarios
@@ -2159,6 +2163,9 @@ class PedidosController extends Controller
         }
         $codigo_ven = 'C-' . $pedido[0]->codigo_contrato . '-' . $format_id_pedido . '-' . $pedido[0]->iniciales;
         $fecha_formato = date('Y-m-d');
+        if( !$pedido[0]->cli_ins_codigo ){
+            return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el cliente institucion id para solicitar guias']);
+        }
         if( !$pedido[0]->codigo_contrato ){
             return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del periodo']);
         }
@@ -2235,15 +2242,16 @@ class PedidosController extends Controller
             $sec = new PedidosSecuencia();
         }else{
             //editar de secuencia
-            $sec                    = PedidosSecuencia::findOrFail($idSecuencia);
-            $sec->asesor_id         = $asesor_id;
+            $sec                        = PedidosSecuencia::findOrFail($idSecuencia);
+            $sec->asesor_id             = $asesor_id;
         }
         //guardar
-            $sec->sec_ven_nombre    = $codigo_contrato;
-            $sec->sec_ven_valor     = $secuencia;
-            $sec->ven_d_codigo      = $iniciales;
-            $sec->asesor_id         = $asesor_id;
-            $sec->id_periodo        = $periodo;
+            $sec->sec_ven_nombre        = $codigo_contrato;
+            $sec->sec_ven_valor         = $secuencia;
+            $sec->ven_d_codigo          = $iniciales;
+            $sec->asesor_id             = $asesor_id;
+            $sec->id_periodo            = $periodo;
+            $sec->cli_ins_codigo        = $cli_ins_codigoAsesor;
             $sec->save();
         //ACTUALIZAR CONTRATO Y FECHA CREACION CONTRATO
         $query = "UPDATE `pedidos` SET `contrato_generado` = '$codigo_ven', `id_usuario_verif` = $usuario_fact,`fecha_generacion_contrato` = '$fechaActual' WHERE `id_pedido` = $id_pedido;";
@@ -2753,6 +2761,22 @@ class PedidosController extends Controller
     }
     //api:get/getContratosPedidos
     public function getContratosPedidos(Request $request){
+        // $query = DB::SELECT("SELECT p.*,
+        // CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula, u.iniciales,
+        // CONCAT(uv.nombres,' ',uv.apellidos) as verificador, uv.cod_usuario,
+        // i.nombreInstitucion,i.codigo_institucion_milton,
+        // pe.region_idregion, c.nombre AS nombre_ciudad,pe.codigo_contrato
+        // FROM pedidos p
+        // LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        // LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
+        // LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        // LEFT  JOIN usuario uv ON p.id_usuario_verif = uv.idusuario
+        // LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        // WHERE p.contrato_generado IS NOT NULL
+        // AND pe.estado = '1'
+        // AND p.estado = '1'
+        // ORDER BY p.id_pedido DESC
+        // ");
         $query = DB::SELECT("SELECT p.*,
         CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula, u.iniciales,
         CONCAT(uv.nombres,' ',uv.apellidos) as verificador, uv.cod_usuario,
@@ -2764,8 +2788,8 @@ class PedidosController extends Controller
         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
         LEFT  JOIN usuario uv ON p.id_usuario_verif = uv.idusuario
         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        WHERE p.contrato_generado IS NOT NULL
-        AND pe.estado = '1'
+        WHERE p.tipo = '1'
+        AND p.estado = '1'
         ORDER BY p.id_pedido DESC
         ");
         return $query;
@@ -3616,10 +3640,15 @@ class PedidosController extends Controller
             $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
             WHERE s.id_periodo = '$request->id_periodo'
             AND s.asesor_id = '$request->asesor_id'
-            AND s.institucion_facturacion = '3858'
+            AND s.institucion_facturacion = '22926'
             ");
             if(empty($query)){
                 return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
+            }
+            //validar que tenga el cli_inscodigo
+            $getcli_ins_codigo = $query[0]->cli_ins_codigo;
+             if($getcli_ins_codigo == null || $getcli_ins_codigo == "null"){
+                 return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
             }
             //get secuencia
             $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
@@ -3796,196 +3825,144 @@ class PedidosController extends Controller
     }
     //====================FIN APIS GUIAS=======================
     //test2
-    public function guardarGuiasBDMilton2(){
-        //$ven_codigo = "NCI-TEST-000053440";
-        $ven_codigo = "A-C23-VJR-000053408";
-           $cod_fact = "JARN";
-           $iniciales = "TEST";
-           $total_venta          = 0;
-           $observacion          = "";
-           $anticipo             = 0;
-           $descuento            = 0;
-           $fecha_formato        = date("Y-m-d");
-           $region_idregion      = 2;
-           $cuenta               = "0";
-           $fechaActual          = date("Y-m-d H:i:s");
-           $query = DB::SELECT("SELECT * FROM pedidos_asesor_institucion_docente pd
-           WHERE pd.id_asesor = '$iniciales'
-           AND pd.id_institucion = '3858'
-           ");
+    public function guardarGuiasBDMilton2(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        try {
+            //variables
+            // $ven_codigo           = $request->ven_codigo;
+            // $id_pedido            = $request->id_pedido;
+            // $codigo_contrato      = $request->codigo_contrato;
+            // $cod_fact             = "FR";
+            // $usuario_fact         = 64394;
+            // $iniciales            = $request->iniciales;
+            // $total_venta          = 0;
+            // $anticipo             = 0;
+            // $descuento            = 0;
+            // $fecha_formato        = date("Y-m-d");
+            // $region_idregion      = $request->region_idregion;
+            // $cuenta               = "0";
+            // $fechaActual          = date("Y-m-d H:i:s");
+            // $id_periodo           = $request->id_periodo;
+            // $asesor_id            = $request->asesor_id;
 
+            $ven_codigo           = "A-C24-FR-000053933";
+            $id_pedido            = 658;
+            $codigo_contrato      = "C24";
+            $cod_fact             = "FR";
+            $usuario_fact         = 64394;
+            $iniciales            = "LJ";
+            $total_venta          = 0;
+            $anticipo             = 0;
+            $descuento            = 0;
+            $fecha_formato        = date("Y-m-d");
+            $region_idregion      = 2;
+            $cuenta               = "0";
+            $fechaActual          = date("Y-m-d H:i:s");
+            $id_periodo           = 24;
+            $asesor_id            = 26087;
+
+            $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
+            WHERE s.id_periodo = '$id_periodo'
+            AND s.asesor_id = '$asesor_id'
+            AND s.institucion_facturacion = '22926'
+            ");
+            if(empty($query)){
+                return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
+            }
+            //validar que tenga el cli_inscodigo
+            $getcli_ins_codigo = $query[0]->cli_ins_codigo;
+            if($getcli_ins_codigo == null || $getcli_ins_codigo == "null"){
+                return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
+            }
+            //get secuencia
+            $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
+            $json_secuencia_guia = json_decode($secuencia, true);
+            $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
+            // //VARIABLES
              $cod_institucion      = $query[0]->cli_ins_codigo;
-           $form_data = [
-            'veN_CODIGO'            => $ven_codigo,
-            //'veN_CODIGO'            => $codigo_ven, //codigo formato milton
-            'usU_CODIGO'            => strval($cod_fact),
-            //'usU_CODIGO'            => strval($iniciales),
-            'veN_D_CODIGO'          => $iniciales, // codigo del asesor
-            'clI_INS_CODIGO'        => floatval($cod_institucion),
-            'tiP_veN_CODIGO'        => 2, //Venta por lista
-            'esT_veN_CODIGO'        => 2, // por defecto
-            'veN_OBSERVACION'       => null,
-            'veN_VALOR'             => floatval($total_venta),
-            'veN_PAGADO'            => 0.00, // por defecto
-            'veN_ANTICIPO'          => floatval($anticipo),
-            'veN_DESCUENTO'         => floatval($descuento),
-            'veN_FECHA'             => $fecha_formato,
-            'veN_CONVERTIDO'        => '', // por defecto
-            'veN_TRANSPORTE'        => 0.00, // por defecto
-            'veN_ESTADO_TRANSPORTE' => false, // por defecto
-            'veN_FIRMADO'           => 'DS', // por defecto
-            'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
-            'cueN_NUMERO'           => strval($cuenta)
+            $secuencia = $getSecuencia;
+            if( $secuencia < 10 ){
+                $format_id_pedido = '000000' . $secuencia;
+            }
+            if( $secuencia >= 10 && $secuencia < 1000 ){
+                $format_id_pedido = '00000' . $secuencia;
+            }
+            if( $secuencia > 1000 ){
+                $format_id_pedido = '0000' . $secuencia;
+            }
+            // $codigo_ven = 'A-' . $codigo_contrato . '-' .$cod_fact . '-'. $format_id_pedido;
+            $codigo_ven = $ven_codigo;
+            //===ENVIAR A TABLA DE VENTA DE MILTON LAS GUIAS
+            $form_data = [
+                'veN_CODIGO'            => $codigo_ven, //codigo formato milton
+                'usU_CODIGO'            => strval($cod_fact),
+                'veN_D_CODIGO'          => $iniciales, // codigo del asesor
+                'clI_INS_CODIGO'        => floatval($cod_institucion),
+                'tiP_veN_CODIGO'        => 2, //Venta por lista
+                'esT_veN_CODIGO'        => 2, // por defecto
+                'veN_OBSERVACION'       => null,
+                'veN_VALOR'             => floatval($total_venta),
+                'veN_PAGADO'            => 0.00, // por defecto
+                'veN_ANTICIPO'          => floatval($anticipo),
+                'veN_DESCUENTO'         => floatval($descuento),
+                'veN_FECHA'             => $fecha_formato,
+                'veN_CONVERTIDO'        => '', // por defecto
+                'veN_TRANSPORTE'        => 0.00, // por defecto
+                'veN_ESTADO_TRANSPORTE' => false, // por defecto
+                'veN_FIRMADO'           => 'DS', // por defecto
+                'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
+                'cueN_NUMERO'           => strval($cuenta)
             ];
             $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_guias = json_decode($guias, true);
-            return $form_data;
-         //$arregloCodigos = $this->get_val_pedidoInfo(157);
+            // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
+            // $query = "UPDATE `pedidos` SET `ven_codigo` = '$codigo_ven', `id_usuario_verif` = $usuario_fact ,`fecha_aprobado_facturacion` = '$fechaActual', `estado_entrega` = '1' WHERE `id_pedido` = $id_pedido;";
+            // DB::UPDATE($query);
+            //================SAVE DETALLE DE LAS GUIAS======================
             //obtener las guias por libros
-        //     try {
-        //     //consultar el stock
-        //     $arregloCodigos = $this->get_val_pedidoInfo(157);
-        //     $contador = 0;
-        //     $form_data_stock = [];
-        //     foreach($arregloCodigos as $key => $item){
-        //         $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
-        //         $codigoFact     = "G".$codigo;
-        //         $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
-        //         //get stock
-        //         $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-        //         $json_stock     = json_decode($getStock, true);
-        //         $stockAnterior  = $json_stock["producto"][0]["proStock"];
-        //         //post stock
-        //         $valorNew       = $arregloCodigos[$contador]["valor"];
-        //         $nuevoStock     = $stockAnterior - $valorNew;
-        //         $form_data_stock[$contador] = [
-        //         "nombrelibro"    => $nombrelibro,
-        //         "stockAnterior"  => $stockAnterior,
-        //         "valorNew"       => $valorNew,
-        //         "nuevoStock"     => $nuevoStock,
-        //         "codigoFact"     => $codigoFact,
-        //         ];
-        //         $contador++;
-        //     }
-        //     return $form_data_stock;
-        // } catch (\Exception  $ex) {
-        //     return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        // }
-        // return;
-        // try {
-        //   $ven_codigo  = "A-C40-ER-000053383";
-        //   //variables
-        //   $id_pedido            = 157;
-        //   $codigo_contrato      = "C40";
-        //   // $cod_fact             = $request->codigo_usuario_fact;
-        //   //codigo de facturacion se va a usar el codigo de asesor
-        //   //se envía tal código quemado a facturacion debido a proceso anterior requerido
-        //   $cod_fact             = 'JARN';
-        //   //$usuario_fact         = $request->usuario_fact;
-        //   $iniciales            = 'LJ';
-        //   $total_venta          = 0;
-        //   $observacion          = "";
-        //   $anticipo             = 0;
-        //   $descuento            = 0;
-        //   $fecha_formato        = date("Y-m-d");
-        //   $region_idregion      = 2;
-        //   $cuenta               = "0";
-        //   $fechaActual          = date("Y-m-d H:i:s");
-        //   //id general de prolipa para los vendedores
-        //   //buscar el id de institucion de prolipa de facturacion
-        //   $query = DB::SELECT("SELECT * FROM pedidos_asesor_institucion_docente pd
-        //   WHERE pd.id_asesor = '$iniciales'
-        //   AND pd.id_institucion = '3858'
-        //   ");
-        //   if(empty($query)){
-        //       return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
-        //   }
-        //     //get secuencia
-        //     //   $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
-        //     //   $json_secuencia_guia = json_decode($secuencia, true);
-        //     //   $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
-        //     //   //VARIABLES
-        //     $cod_institucion      = $query[0]->cli_ins_codigo;
-        //     //   $secuencia = $getSecuencia;
-        //     //   if( $secuencia < 10 ){
-        //     //       $format_id_pedido = '000000' . $secuencia;
-        //     //   }
-        //     //   if( $secuencia >= 10 && $secuencia < 1000 ){
-        //     //       $format_id_pedido = '00000' . $secuencia;
-        //     //   }
-        //     //   if( $secuencia > 1000 ){
-        //     //       $format_id_pedido = '0000' . $secuencia;
-        //     //   }
-        //     //   $codigo_ven = 'NCI-' . $codigo_contrato . '-' .$iniciales . '-'. $format_id_pedido;
-        //    //===ENVIAR A TABLA DE VENTA DE MILTON LAS GUIAS
-        //    $form_data = [
-        //     'veN_CODIGO'            => $ven_codigo,
-        //     //'veN_CODIGO'            => $codigo_ven, //codigo formato milton
-        //     'usU_CODIGO'            => strval($cod_fact),
-        //     //'usU_CODIGO'            => strval($iniciales),
-        //     'veN_D_CODIGO'          => $iniciales, // codigo del asesor
-        //     'clI_INS_CODIGO'        => floatval($cod_institucion),
-        //     'tiP_veN_CODIGO'        => 2, //Venta por lista
-        //     'esT_veN_CODIGO'        => 2, // por defecto
-        //     'veN_OBSERVACION'       => null,
-        //     'veN_VALOR'             => floatval($total_venta),
-        //     'veN_PAGADO'            => 0.00, // por defecto
-        //     'veN_ANTICIPO'          => floatval($anticipo),
-        //     'veN_DESCUENTO'         => floatval($descuento),
-        //     'veN_FECHA'             => $fecha_formato,
-        //     'veN_CONVERTIDO'        => '', // por defecto
-        //     'veN_TRANSPORTE'        => 0.00, // por defecto
-        //     'veN_ESTADO_TRANSPORTE' => false, // por defecto
-        //     'veN_FIRMADO'           => 'DS', // por defecto
-        //     'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
-        //     'cueN_NUMERO'           => strval($cuenta)
-        //     ];
-        //     $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
-        //     $json_guias = json_decode($guias, true);
-        //     //================SAVE DETALLE DE LAS GUIAS======================
-        //     //obtener las guias por libros
-        //     $detalleGuias = $arregloCodigos;
-        //     //Si no hay nada en detalle de venta
-        //     if(empty($detalleGuias)){
-        //         return ["status" => "0", "message" => "No hay ningun libro para el detalle de las guias a devolver"];
-        //     }
-        //     //variables
-        //     $iva = 0;
-        //     $precio = 0;
-        //     $descontar =0;
+            $detalleGuias = $this->get_val_pedidoInfo($id_pedido);
+            //Si no hay nada en detalle de venta
+            if(empty($detalleGuias)){
+                return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];
+            }
+            //variables
+            $iva = 0;
+            $precio = 0;
+            $descontar =0;
+            //GUARDAR DETALLE DE LAS GUIAS
+            for($i =0; $i< count($detalleGuias);$i++){
+                $form_data_detalleGuias = [
+                    "VEN_CODIGO"            => $codigo_ven,
+                    "PRO_CODIGO"            => "G".$detalleGuias[$i]["codigo_liquidacion"],
+                    "DET_VEN_CANTIDAD"      =>  intval($detalleGuias[$i]["valor"]),
+                    "DET_VEN_VALOR_U"       => floatval($precio),
+                    "DET_VEN_IVA"           => floatval($iva),
+                    "DET_VEN_DESCONTAR"     => intval($descontar),
+                    "DET_VEN_INICIO"        => false,
+                    "DET_VEN_CANTIDAD_REAL" => intval($detalleGuias[$i]["valor"]),
+                ];
+                $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleGuias);
+                $json_detalle = json_decode($detalle, true);
+            }
+            return $form_data;
+            //ACTUALIZAR EL ACTA DE LAS GUIAS
+            //post leer y aumentar secuencia + 1
+            // $form_data_Secuencia = [
+            //     "conCod"        => 23,
+            //     "conNombre"     => "actas",
+            //     "conValorNum"   => $getSecuencia + 1 ,
+            //     "conValorStr"   => null,
+            // ];
+            // $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
+            // $json_secuencia = json_decode($post_Secuencia, true);
+            //===ACTUALIZAR STOCK========
+        //    return $this->actualizarStockFacturacion($detalleGuias,$codigo_ven);
+            //return response()->json(['json_guias' => $json_guias, 'form_data' => $form_data]);
+         } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
 
-        //     //GUARDAR DETALLE DE LAS GUIAS
-        //     for($i =0; $i< count($detalleGuias);$i++){
-        //         $form_data_detalleGuias = [
-        //             "VEN_CODIGO"            => $ven_codigo,
-        //             "PRO_CODIGO"            => "G".$detalleGuias[$i]["codigo_liquidacion"],
-        //             "DET_VEN_CANTIDAD"      =>  intval($detalleGuias[$i]["valor"]),
-        //             "DET_VEN_VALOR_U"       => floatval($precio),
-        //             "DET_VEN_IVA"           => floatval($iva),
-        //             "DET_VEN_DESCONTAR"     => intval($descontar),
-        //             "DET_VEN_INICIO"        => false,
-        //             "DET_VEN_CANTIDAD_REAL" => intval($detalleGuias[$i]["valor"]),
-        //         ];
-        //         $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleGuias);
-        //         $json_detalle = json_decode($detalle, true);
-
-        //     }
-        //     return "se guardo correctament";
-        // } catch (\Exception  $ex) {
-        //          return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        // }
-        //ACTUALIZAR EL ACTA DE LAS GUIAS
-        //post leer y aumentar secuencia + 1
-        // $form_data_Secuencia = [
-        //     "conCod"        => 23,
-        //     "conNombre"     => "actas",
-        //     "conValorNum"   => $getSecuencia + 1 ,
-        //     "conValorStr"   => null,
-        // ];
-        // $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
-        // $json_secuencia = json_decode($post_Secuencia, true);
-        //===ACTUALIZAR STOCK========
-       // return $this->actualizarStockFacturacionTest($detalleGuias,$ven_codigo);
     }
     public function actualizarStockFacturacionTest($arregloCodigos,$codigo_ven){
         $contador = 0;

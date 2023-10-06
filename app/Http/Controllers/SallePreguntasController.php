@@ -181,6 +181,7 @@ class SallePreguntasController extends Controller
         AND ar.estado = 1
         AND p.estado = '$tipoFiltro'
         AND p.id_asignatura = '$id'
+        ORDER BY p.id_pregunta DESC
         ");
         if(!empty($preguntas)){
             foreach ($preguntas as $key => $value) {
@@ -664,7 +665,7 @@ class SallePreguntasController extends Controller
             foreach($miArrayDeObjetos as $key => $item){
                 //validar que la pregunta no este ingresada
                 $pregunta = $this->getPreguntaXNombre($request,$item);
-                if(empty($pregunta)){
+                if(empty($pregunta) || $request->duplicate == 1){
                     $preg_sync = new SallePreguntas();
                     $preg_sync->id_asignatura           = $id_asignatura;
                     $preg_sync->id_tipo_pregunta        = $item->id_tipo_pregunta;

@@ -426,6 +426,7 @@ class UsuarioController extends Controller
             $usuario->curso = $request->curso;
             $usuario->iniciales = $request->iniciales;
             $usuario->capacitador = $request->capacitador;
+            $usuario->cli_ins_codigo = $request->cli_ins_codigo == null || $request->cli_ins_codigo == "null" ? null : $request->cli_ins_codigo;
             $email = $request->email;
             $usuario->save();
         }else{
@@ -901,25 +902,26 @@ class UsuarioController extends Controller
             'name_usuario' => 'required|unique:usuario',
             ]);
         }
-        $usuario->password=sha1(md5($request->cedula));
-        $usuario->cedula = $request->cedula;
-        $str1 = strtolower($request->nombre);
-        $str2 = strtolower($request->apellido);
-        $usuario->nombres = ucwords($str1);
-        $usuario->apellidos = ucwords($str2);
-        $usuario->name_usuario = $request->name_usuario;
-        $usuario->email = $request->email;
-        $usuario->telefono = $request->telefono;
-        $usuario->id_group = $request->grupo;
-        $usuario->p_ingreso=0;
+        $usuario->password          = sha1(md5($request->cedula));
+        $usuario->cedula            = $request->cedula;
+        $str1                       = strtolower($request->nombre);
+        $str2                       = strtolower($request->apellido);
+        $usuario->nombres           = ucwords($str1);
+        $usuario->apellidos         = ucwords($str2);
+        $usuario->name_usuario      = $request->name_usuario;
+        $usuario->email             = $request->email;
+        $usuario->telefono          = $request->telefono;
+        $usuario->id_group          = $request->grupo;
+        $usuario->p_ingreso         = 0;
         $usuario->institucion_idInstitucion = $request->idInstitucion;
-        $usuario->idcreadorusuario = $request->idcreadorusuario;
-        $usuario->modificado_por = $request->modificado_por;
-        $usuario->estado_idEstado = $request->estado;
-        $usuario->fecha_nacimiento = $request->fecha_nacimiento;
-        $usuario->capacitador = $request->capacitador;
+        $usuario->idcreadorusuario  = $request->idcreadorusuario;
+        $usuario->modificado_por    = $request->modificado_por;
+        $usuario->estado_idEstado   = $request->estado;
+        $usuario->fecha_nacimiento  = $request->fecha_nacimiento;
+        $usuario->capacitador       = $request->capacitador;
+        $usuario->cli_ins_codigo    = $request->cli_ins_codigo == null || $request->cli_ins_codigo == "null" || $request->cli_ins_codigo == "" ? null : $request->cli_ins_codigo;
         if($request->grupo == 6){
-            $usuario->cargo_id = $request->cargo_id;
+            $usuario->cargo_id      = $request->cargo_id;
         }
         $usuario->save();
         return $usuario;
