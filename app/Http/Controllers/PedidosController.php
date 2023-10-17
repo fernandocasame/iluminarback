@@ -1404,7 +1404,7 @@ class PedidosController extends Controller
     public function get_pedidos_guias(Request $request){
         $guias = DB::SELECT("SELECT
         p.*, CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
-        CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
+        CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,u.cli_ins_codigo,
         pe.codigo_contrato, pe.region_idregion,
         CONCAT(fac.nombres,' ',fac.apellidos) as facturador, pe.periodoescolar as periodo,
         pe.pedido_facturacion, pe.pedido_bodega, pe.pedido_asesor
@@ -3618,7 +3618,9 @@ class PedidosController extends Controller
         ini_set('max_execution_time', 6000000);
         try {
             //variables
+            $asesor_id            = $request->asesor_id;
             $id_pedido            = $request->id_pedido;
+            $id_periodo           = $request->id_periodo;
             $codigo_contrato      = $request->codigo_contrato;
             $cod_fact             = $request->codigo_usuario_fact;
             $usuario_fact         = $request->usuario_fact;
@@ -3631,22 +3633,35 @@ class PedidosController extends Controller
             $region_idregion      = $request->region_idregion;
             $cuenta               = "0";
             $fechaActual          = date("Y-m-d H:i:s");
+            $cli_ins_codigo       = $request->cli_ins_codigo;
+            $getcli_ins_codigo    = 0;
             //id general de prolipa para los vendedores
-            //buscar el id de institucion de prolipa de facturacion
-            // $query = DB::SELECT("SELECT * FROM pedidos_asesor_institucion_docente pd
-            // WHERE pd.id_asesor = '$request->iniciales'
-            // AND pd.id_institucion = '3858'
-            // ");
             $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
-            WHERE s.id_periodo = '$request->id_periodo'
-            AND s.asesor_id = '$request->asesor_id'
+            WHERE s.id_periodo  = '$request->id_periodo'
+            AND s.asesor_id     = '$request->asesor_id'
             AND s.institucion_facturacion = '22926'
             ");
             if(empty($query)){
-                return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
+                if($cli_ins_codigo == "undefined" || $cli_ins_codigo == null || $cli_ins_codigo == ""){
+                    return ["status" => "0", "message" => "No esta configurado el id de institucion en el usuario"];
+                }
+                //si tiene el cli_ins_codigo en el usuario bien creamos la secuencia
+                $sec = new PedidosSecuencia();
+                $sec->asesor_id             = $asesor_id;
+                //guardar
+                $sec->sec_ven_nombre        = $codigo_contrato;
+                $sec->sec_ven_valor         = 0;
+                $sec->ven_d_codigo          = $iniciales;
+                $sec->asesor_id             = $asesor_id;
+                $sec->id_periodo            = $id_periodo;
+                $sec->cli_ins_codigo        = $cli_ins_codigo;
+                $sec->save();
+                $getcli_ins_codigo          = $cli_ins_codigo;
+            }else{
+                //validar que tenga el cli_inscodigo
+                $getcli_ins_codigo = $query[0]->cli_ins_codigo;
             }
-            //validar que tenga el cli_inscodigo
-            $getcli_ins_codigo = $query[0]->cli_ins_codigo;
+        
              if($getcli_ins_codigo == null || $getcli_ins_codigo == "null"){
                  return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
             }
@@ -3655,7 +3670,7 @@ class PedidosController extends Controller
             $json_secuencia_guia = json_decode($secuencia, true);
             $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
             // //VARIABLES
-             $cod_institucion      = $query[0]->cli_ins_codigo;
+             $cod_institucion      = $getcli_ins_codigo;
             $secuencia = $getSecuencia;
             if( $secuencia < 10 ){
                 $format_id_pedido = '000000' . $secuencia;
