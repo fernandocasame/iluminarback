@@ -16,4 +16,16 @@ trait TraitUsuarioGeneral
         ->get();
         return $query;
     }
+    public function userxRol($rol){
+        $datos = "
+        CONCAT(nombres,' ',apellidos) as nombre_completo,
+        id_group,cedula,idusuario,institucion_idInstitucion
+        ";
+        $query = Usuario::where('id_group',$rol)
+        ->select(DB::RAW($datos))
+        ->where('estado_idEstado', '=', '1')
+        ->OrderBy('idusuario','DESC')
+        ->get();
+        return $query;
+    }
 }

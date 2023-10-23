@@ -42,6 +42,7 @@ Route::post('codigos/devolucion/activar','CodigoLibrosController@Activardevoluci
 Route::post('codigos/bloquear','CodigoLibrosController@bloquearCodigos');
 Route::post('codigos/ingreso','CodigoLibrosController@importIngresoCodigos');
 Route::get('getTipoVenta','CodigoLibrosController@getTipoVenta');
+Route::post('revisarUltimoHistoricoCodigo','CodigoLibrosController@revisarUltimoHistoricoCodigo');
 //bodega
 Route::post('codigos/bodega/devolver','CodigoLibrosController@devolucionBodega');
 //api para ver las devoluciones de un codigos
@@ -182,6 +183,7 @@ Route::get('liquidacion/codigosmovidos/{contrato}','VerificacionController@codig
 //api verificacion nueva
 Route::resource('n_verificacion','VerificacionControllerAnterior');
 Route::get('nliquidacion/verificacion/{contrato}','VerificacionControllerAnterior@liquidacionVerificacion');
+Route::get('nliquidacion/liquidar/{contrato}','VerificacionControllerAnterior@liquidarFacturacion');
 Route::get('nliquidacion/verificacion/{contrato}/{numero}','VerificacionControllerAnterior@liquidacionVerificacionNumero');
 Route::get('changeLiquidacion','VerificacionControllerAnterior@changeLiquidacion');
 Route::post('guardarChangeLiquidacion','VerificacionControllerAnterior@guardarChangeLiquidacion');
@@ -817,7 +819,6 @@ Route::resource('temporadas','TemporadaController')->except(['edit','create']);
 Route::get('validarContrato','TemporadaController@validarContrato');
 //api para traer las temporadas por filtro
 Route::get('getTemporadas','TemporadaController@getTemporadas');
-Route::get('/liquidacion/{contrato}','TemporadaController@liquidacionMilton');
 Route::get('temporadas/liquidacion/{contrato}','TemporadaController@liquidacion');
 //api para traer los contratos para que los asesores puedan visualizar
 Route::post('temporadas/asesor/contratos','TemporadaController@asesorcontratos');
@@ -1018,7 +1019,6 @@ Route::get('get_pedidos_periodoxContrato/{contrato}','PedidosController@get_pedi
 Route::get('get_pedidos_periodo_Only_contrato/{contrato}/{beneficiario}','PedidosController@get_pedidos_periodo_Only_contrato');
 Route::get('get_pedidos_periodo_Only_pedido/{contrato}/{beneficiario}','PedidosController@get_pedidos_periodo_Only_pedido');
 Route::get('get_pedidos_asesor/{periodo}/{asesor}','PedidosController@get_pedidos_asesor');
-// Route::get('get_pedidos_guias/{periodo}/','PedidosController@get_pedidos_guias');
 Route::post('guardarPedidoGuias','PedidosController@guardarPedidoGuias');
 Route::get('get_pedidos_guias','PedidosController@get_pedidos_guias');
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -1304,6 +1304,8 @@ Route::post('agregarDocumentosAnteriorPedido','PedidosController@agregarDocument
 //=====APIS NEET DOCUMENTOS=========================================
 Route::resource('neetTema','NeetTemaController');
 Route::post('neetEliminar','NeetTemaController@neetEliminar');
+Route::get('ifAsignadoUsuario/{idusuario}/{periodo}','NeetTemaController@ifAsignadoUsuario');
+Route::get('ifAsignadoCurso/{codigo}','NeetTemaController@ifAsignadoCurso');
 Route::get('eliminaAsignacionNeet/{id}','NeetTemaController@eliminaAsignacionNeet');
 Route::post('quitarTodasDocumentosAsignados','NeetTemaController@quitarTodasDocumentosAsignados');
 Route::get('getUsuarios/{rol}/{institucion}','NeetTemaController@getUsuarios');
@@ -1346,3 +1348,10 @@ Route::group(['prefix' => 'grafitex'], function () {
     Route::post('generarCodigosGrafitex', 'CodigosGrafitexController@generarCodigosGrafitex');
 });
 //=======FIN CODIGOS PAQUTES========================================
+/******REGALADOS */
+Route::get('getRegalados/{institucion}/{periodo}','TemporadaController@getRegalados');
+Route::get('showRegalados/{institucion}/{periodo}/{libro}','TemporadaController@showRegalados');
+Route::get('getliquidadosDevueltos/{contrato}','TemporadaController@getliquidadosDevueltos');
+Route::get('limpiarCache','TemporadaController@limpiarCache');
+//****API PARA DISTRIBUIDOR */
+Route::resource('distribuidor','DistribuidorController');

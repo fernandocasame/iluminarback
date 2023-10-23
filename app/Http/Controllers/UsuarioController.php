@@ -498,7 +498,14 @@ class UsuarioController extends Controller
             WHERE (s.id = '4' OR s.id = '6' OR s.id = '10')
             ORDER BY id DESC");
             return $perfiles;
-        }else{
+        }
+        if($request->id_group == 22 || $request->id_group == 23){
+            $perfiles = DB::SELECT("SELECT s.* FROM  sys_group_users s
+            WHERE (s.id = '4' OR s.id = '6' OR s.id = '10' OR s.id = '11')
+            ORDER BY id DESC");
+            return $perfiles;
+        }
+        else{
             $perfiles = DB::SELECT("SELECT * FROM  sys_group_users ORDER BY id DESC");
             return $perfiles;
         }
@@ -779,7 +786,8 @@ class UsuarioController extends Controller
     public function usuarioSalle()
     {
         $docentes = DB::select("SELECT u.*, i.idInstitucion, i.nombreInstitucion, i.tipo_institucion,
-         concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion
+         concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion,
+         u.id_group
          FROM usuario u
          INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
          INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
@@ -806,6 +814,7 @@ class UsuarioController extends Controller
         // GROUP BY u.idusuario
         // ");
         $docentes = DB::select("SELECT u.idusuario, u.nombres,u.apellidos,u.cedula,u.email,u.estado_idEstado,
+        u.id_group,u.institucion_idInstitucion,u.telefono,
         i.idInstitucion, i.nombreInstitucion,
         concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad,
         (SELECT   MAX(se.id_evaluacion)
@@ -1586,7 +1595,7 @@ class UsuarioController extends Controller
             'g.level as grupo', 'u.nombres','u.apellidos',
             'u.cargo_id','u.fecha_nacimiento','u.id_group', 'u.email','u.estado_idEstado',
             'u.institucion_idInstitucion','u.telefono','u.iniciales','u.idusuario','u.foto_user',
-            'i.nombreInstitucion','e.nombreestado','u.capacitador'
+            'i.nombreInstitucion','e.nombreestado','u.capacitador','u.cli_ins_codigo'
         )
         ->where('u.id_group','=',$id)
         ->get();

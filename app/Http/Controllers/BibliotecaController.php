@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Redis;
 
 class BibliotecaController extends Controller
 {
@@ -30,11 +32,11 @@ class BibliotecaController extends Controller
 
             return response()->json([
                 'data' => $data
-            ], 200);
+            ], Response::HTTP_OK);
         } catch (\Throwable $th) {
             return response()->json([
                 'error' => $th->getMessage()
-            ], 500);
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -149,15 +151,20 @@ class BibliotecaController extends Controller
     public function getContenidos(Request $request)
     {
         try {
+            $idArea = $request->query('idArea', null);
+            $serie = $request->query('serie', null);
+            $idLibro = $request->query('idLibro', null);
+            $idUnidad = $request->query('idUnidad', null);
+            $param = $request->query('param', null);
+            $filterContent = $request->query('filterContent', false);
+            $boolValue = filter_var($filterContent, FILTER_VALIDATE_BOOLEAN);
+            /*
             $param = $request->query('param', '');
             $idArea = $request->query('idArea', 0);
-            $serie = $request->query('serie', '');
             $idLibro = $request->query('idLibro', 0);
             $idUnidadLibro = $request->query('idUnidadLibro', 0);
             $filterContent = $request->query('filterContent', false);
-            $boolValue = filter_var($filterContent, FILTER_VALIDATE_BOOLEAN);
-
-            Log::info("Se fintra contenido: " . $filterContent);
+            $pa = filter_var($filterContent, FILTER_VALIDATE_BOOLEAN); */
 
             // Verificar si el área cuenta con formato
             $formato = DB::table('formato')
@@ -166,12 +173,62 @@ class BibliotecaController extends Controller
                 ->where('idarea', $idArea)
                 ->first();
 
-            if (!$formato) {
+            if ($formato == null) {
                 return response()->json([
-                    'data' => [],
-                    'state' => 'no-format'
+                    'data' => []
                 ], 200);
             }
+
+            /* // Consulta a la BDD
+            $cacheKey = "getContenidos:param:$param:idArea:$idArea:serie:$serie:idLibro:$idLibro:idUnidadLibro:$idUnidadLibro:filterContent:$boolValue";
+            $res = Cache::remember($cacheKey, 60 * 60, function () use ($param, $idArea, $serie, $idLibro, $idUnidadLibro, $boolValue) {
+                $query = DB::table('contenido_libro')
+                    ->select(
+                        'contenido_libro.id as contenido_libro_id',
+                        'contenido_libro.contenido',
+                        'contenido_libro.created_at',
+                        'series.nombre_serie',
+                        'area.idarea',
+                        'area.nombrearea',
+                        'unidades_libros.unidad',
+                        'unidades_libros.nombre_unidad',
+                        DB::raw("CONCAT('UNIDAD ', unidades_libros.unidad, ': ', unidades_libros.nombre_unidad) AS texto_unidad"),
+                        'libro.idlibro as libro_id',
+                        'libro.nombrelibro',
+                        DB::raw("CONCAT(usuario.apellidos, ' ', usuario.nombres) AS nombre_completo")
+                    )
+                    ->join('libro', 'contenido_libro.idlibro', '=', 'libro.idlibro')
+                    ->join('libros_series', 'libro.idlibro', '=', 'libros_series.idLibro')
+                    ->join('series', 'libros_series.id_serie', '=', 'series.id_serie')
+                    ->join('asignatura', 'libro.asignatura_idasignatura', '=', 'asignatura.idasignatura')
+                    ->join('area', 'asignatura.area_idarea', '=', 'area.idarea')
+                    ->join('unidades_libros', 'contenido_libro.idunidad', '=', 'unidades_libros.id_unidad_libro')
+                    ->join('usuario', 'contenido_libro.idusuario', '=', 'usuario.idusuario')
+                    ->where('contenido_libro.estado', 1)
+                    ->when($param != '', function ($query) use ($param, $boolValue) {
+                        if ($boolValue) {
+                            return $query->where('contenido_libro.contenido', 'LIKE', '%' . $param . '%')->orWhere('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%');
+                        } else {
+                            return $query->where('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%');
+                        }
+                    })
+                    ->when($serie != '' && $serie != null && $serie != 'todas', function ($query) use ($serie) {
+                        return $query->where('series.nombre_serie', 'LIKE', '%' . $serie . '%');
+                    })
+                    ->when($idLibro != 0 && $idLibro != null, function ($query) use ($idLibro) {
+                        return $query->where('libro.idlibro', $idLibro);
+                    })
+                    ->when($idUnidadLibro != 0 && $idUnidadLibro != null, function ($query) use ($idUnidadLibro) {
+                        return $query->where('unidades_libros.id_unidad_libro', $idUnidadLibro);
+                    })
+                    ->get();
+
+                return $query;
+            });
+
+            return response()->json([
+                'data' => $res
+            ], 200); */
 
             $query = DB::table('contenido_libro')
                 ->select(
@@ -179,6 +236,7 @@ class BibliotecaController extends Controller
                     'contenido_libro.contenido',
                     'contenido_libro.created_at',
                     'series.nombre_serie',
+                    'area.idarea',
                     'area.nombrearea',
                     'unidades_libros.unidad',
                     'unidades_libros.nombre_unidad',
@@ -195,31 +253,30 @@ class BibliotecaController extends Controller
                 ->join('unidades_libros', 'contenido_libro.idunidad', '=', 'unidades_libros.id_unidad_libro')
                 ->join('usuario', 'contenido_libro.idusuario', '=', 'usuario.idusuario')
                 ->where('contenido_libro.estado', 1)
-                ->when($param != '', function ($query) use ($param, $boolValue) {
-                    if ($boolValue) {
-                        return $query->where('contenido_libro.contenido', 'LIKE', '%' . $param . '%')->orWhere('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%');
-                    } else {
-                        Log::info("Se fintra contenido por el nombre de la unidad");
-                        return $query->where('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%');
-                    }
+                ->when($idArea, function ($query) use ($idArea) {
+                    return $query->where('area.idarea', $idArea);
                 })
-                ->when($serie != '' && $serie != null && $serie != 'todas', function ($query) use ($serie) {
+                ->when($serie, function ($query) use ($serie) {
                     return $query->where('series.nombre_serie', 'LIKE', '%' . $serie . '%');
                 })
-                ->when($idLibro != 0 && $idLibro != null, function ($query) use ($idLibro) {
+                ->when($idLibro, function ($query) use ($idLibro) {
                     return $query->where('libro.idlibro', $idLibro);
                 })
-                ->when($idUnidadLibro != 0 && $idUnidadLibro != null, function ($query) use ($idUnidadLibro) {
-                    return $query->where('unidades_libros.id_unidad_libro', $idUnidadLibro);
+                ->when($param && !$boolValue, function ($query) use ($param) {
+                    return $query->where('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%')->orWhere('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%');
+                })
+                ->when($param && $boolValue, function ($query) use ($param) {
+                    return $query->where('contenido_libro.contenido', 'LIKE', '%' . $param . '%')->orWhere('unidades_libros.nombre_unidad', 'LIKE', '%' . $param . '%');
+                })
+                ->when($idUnidad, function ($query) use ($idUnidad) {
+                    return $query->where('unidades_libros.id_unidad_libro', $idUnidad);
                 })
                 ->get();
 
-            /* Response */
             return response()->json([
                 'data' => $query
             ], 200);
         } catch (\Throwable $th) {
-            Log::error($th->getMessage());
             return response()->json([
                 'error' => $th->getMessage()
             ], 500);

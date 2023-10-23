@@ -200,7 +200,7 @@ class InstitucionController extends Controller
 
     public function verificarInstitucion($id)
     {
-        $instituciones = DB::SELECT("SELECT u.institucion_idInstitucion, i.aplica_matricula FROM usuario u, institucion i WHERE u.idusuario = $id AND u.institucion_idInstitucion = i.idInstitucion");
+        $instituciones = DB::SELECT("SELECT u.institucion_idInstitucion, i.* FROM usuario u, institucion i WHERE u.idusuario = $id AND u.institucion_idInstitucion = i.idInstitucion");
 
         return $instituciones;
     }

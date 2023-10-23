@@ -128,7 +128,7 @@ class GestionCodigosController extends Controller
             $codigo->bc_fecha_ingreso           = $request->bc_fecha_ingreso;
             $codigo->venta_estado               = $request->venta_estado;
             $codigo->contador                   = $request->contador;
-            $codigo->codigo_union               = $request->codigo_union;
+            $codigo->codigo_union               = $request->codigo_union == null || $request->codigo_union == "null" ? null: $request->codigo_union;
             $codigo->save();
             if($codigo){
              //Guardar en el historico

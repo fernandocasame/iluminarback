@@ -80,6 +80,22 @@ trait TraitCodigosGeneral{
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
+            (
+                SELECT 
+                    (case when (ci.verif1 > '0') then 'verif1'
+                    when (ci.verif2 > 0) then 'verif2'
+                    when (ci.verif3 > 0) then 'verif3'
+                    when (ci.verif4 > 0) then 'verif4'
+                    when (ci.verif5 > 0) then 'verif5'
+                    when (ci.verif6 > 0) then 'verif6'
+                    when (ci.verif7 > 0) then 'verif7'
+                    when (ci.verif8 > 0) then 'verif8'
+                    when (ci.verif9 > 0) then 'verif9'
+                    when (ci.verif10 > 0) then 'verif10'
+                    end) as verificacion
+                FROM codigoslibros ci
+                WHERE ci.codigo = c.codigo
+            ) AS verificacion,
             ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
             p.periodoescolar as periodo,
             pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
@@ -151,21 +167,24 @@ trait TraitCodigosGeneral{
                 "venta_lista_institucion"       => $item->venta_lista_institucion,
                 "codigo_union"                  => $item->codigo_union,
                 "codigo_paquete"                => $item->codigo_paquete,
-                "fecha_registro_paquete"        => $item->fecha_registro_paquete
+                "fecha_registro_paquete"        => $item->fecha_registro_paquete,
+                "verificacion"                  => $item->verificacion
             ];
         }
         return $datos;
     }
-    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values){
+    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values,$devueltos_liquidados=null,$verificacion_liquidada=null){
         $historico = new HistoricoCodigos();
-        $historico->id_usuario     =  $id_usuario;
-        $historico->usuario_editor =  $institucion_id;
-        $historico->id_periodo     =  $periodo_id;
-        $historico->codigo_libro   =  $codigo;
-        $historico->idInstitucion  =  $usuario_editor;
-        $historico->observacion    =  $comentario;
-        $historico->old_values     =  $old_values;
-        $historico->new_values     =  $new_values;
+        $historico->id_usuario              =  $id_usuario;
+        $historico->usuario_editor          =  $institucion_id;
+        $historico->id_periodo              =  $periodo_id;
+        $historico->codigo_libro            =  $codigo;
+        $historico->idInstitucion           =  $usuario_editor;
+        $historico->observacion             =  $comentario;
+        $historico->old_values              =  $old_values;
+        $historico->new_values              =  $new_values;
+        $historico->devueltos_liquidados    = $devueltos_liquidados;
+        $historico->verificacion_liquidada  = $verificacion_liquidada;
         $historico->save();
     }
     public function PeriodoInstitucion($institucion){

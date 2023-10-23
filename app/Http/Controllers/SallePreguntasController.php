@@ -327,27 +327,20 @@ class SallePreguntasController extends Controller
         $fecha_actual = date("Y-m-d G:i:s");
         $periodo = date('Y');
         $configuracion = $this->configuracionXInstitucion($id_institucion,$n_evaluacion);
-        // $configuracion = DB::SELECT("SELECT sc . *
-        // FROM institucion i, salle_configuracion sc
-        // WHERE i.idInstitucion = $id_institucion
-        // AND i.id_configuracion = sc.id_configuracion
-        // AND i.estado_idEstado = 1");
         if( !empty($configuracion) ){
             if( $fecha_actual < $configuracion[0]->fecha_fin && $fecha_actual > $configuracion[0]->fecha_inicio ){
-                //si el admin previsualiza
-                if($admin == 1){
-                    $eval_doc = DB::SELECT("SELECT * FROM `salle_evaluaciones`
-                    WHERE `id_usuario` = $id_docente
-                    AND `estado` != 3
-                    AND intentos = '0'
-                    AND n_evaluacion = '$n_evaluacion'
-                    ");
-                    ///elimino la evaluacion que se genera para previsualizar
-                    if(count($eval_doc) > 0){
-                        $preIdEvaluacion = $eval_doc[0]->id_evaluacion;
-                        DB::DELETE("DELETE FROM salle_evaluaciones WHERE id_evaluacion = '$preIdEvaluacion'");
-                        DB::DELETE("DELETE FROM salle_preguntas_evaluacion WHERE id_evaluacion = '$preIdEvaluacion'");
-                    }
+                //lIMPIO LA EVALUACION Y CARGO LAS NUEVAS ASIGNATURAS
+                $eval_doc = DB::SELECT("SELECT * FROM `salle_evaluaciones`
+                WHERE `id_usuario` = $id_docente
+                AND `estado` != 3
+                AND intentos = '0'
+                AND n_evaluacion = '$n_evaluacion'
+                ");
+                ///elimino la evaluacion que se genera para previsualizar
+                if(count($eval_doc) > 0){
+                    $preIdEvaluacion = $eval_doc[0]->id_evaluacion;
+                    DB::DELETE("DELETE FROM salle_evaluaciones WHERE id_evaluacion = '$preIdEvaluacion'");
+                    DB::DELETE("DELETE FROM salle_preguntas_evaluacion WHERE id_evaluacion = '$preIdEvaluacion'");
                 }
                 // evaluaciones del docente que no esten eliminadas !=3, y que corresponda al periodo actual
                 $eval_doc = DB::SELECT("SELECT * FROM `salle_evaluaciones`

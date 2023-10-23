@@ -16,9 +16,7 @@ use App\Models\CodigosLibros;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-
-
-
+use Illuminate\Support\Facades\Cache;
 
 class TemporadaController extends Controller
 {
@@ -475,72 +473,6 @@ class TemporadaController extends Controller
         }
 
     }
-
-
-     //api para  hacer la liquidacion para MILTON
-     public function liquidacionMilton($contrato){
-        set_time_limit(0);
-        $buscarInstitucion= DB::table('temporadas')
-        ->select('temporadas.idInstitucion')
-        ->where('contrato', $contrato)
-
-        ->get();
-        if(count($buscarInstitucion) <= 0){
-            return "no existe la institucion";
-
-        }else{
-            $institucion = $buscarInstitucion[0]->idInstitucion;
-
-             //verificar que el periodo exista
-             $verificarPeriodo = DB::select("SELECT t.contrato, t.id_periodo, p.idperiodoescolar
-             FROM temporadas t, periodoescolar p
-             WHERE t.id_periodo = p.idperiodoescolar
-             AND contrato = '$contrato'
-             ");
-             if(empty($verificarPeriodo)){
-                return ["status"=>"0", "message" => "No se encontro el periodo"];
-             }
-
-            //traer la liquidacion
-            else{
-                    //almancenar el periodo
-                 $periodo =  $verificarPeriodo[0]->idperiodoescolar;
-                //traer temporadas
-                $temporadas= DB::table('temporadas')
-                ->select('temporadas.*')
-                ->where('contrato', $contrato)
-                ->where('estado','1')
-                ->get();
-
-                $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad,
-                ls.nombre as nombrelibro
-                      FROM codigoslibros c
-                      LEFT JOIN usuario u ON c.idusuario = u.idusuario
-                      LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-                      LEFT JOIN institucion i ON i.idInstitucion = u.institucion_idInstitucion
-                      LEFT JOIN usuario v ON i.vendedorInstitucion = v.cedula
-                         WHERE c.estado <> 2
-                         AND (c.estado_liquidacion = '1' OR c.estado_liquidacion = '0')
-                         AND (c.bc_periodo  = '$periodo' OR c.id_periodo = '$periodo')
-                         AND (c.bc_institucion = '$institucion' OR u.institucion_idInstitucion = '$institucion')
-                     AND ls.idLibro = c.libro_idlibro
-                     GROUP BY ls.codigo_liquidacion,ls.nombre");
-            // $data = DB::select("
-            // CALL`liquidacion_milton_proc`($institucion,$periodo)
-
-            // ");
-                if(count($data) >0){
-                    return ['temporada'=>$temporadas,'codigos_libros' => $data];
-                }else{
-                    return ["status"=>"0", "message" => "No se pudo cargar la informacion"];
-                }
-
-            }
-        }
-
-    }
-
-
     //Api para milton para nos envia la data y nos guarde en nuestra bd
     public function generarApiTemporada(Request $request){
      $contrato= $request->contrato;
@@ -723,5 +655,90 @@ class TemporadaController extends Controller
             }
         }
     }
-
+    //REGALADOS
+    public function getRegalados($institucion,$periodo){
+        $query = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
+            c.libro_idlibro,ls.nombre as nombrelibro,ls.id_serie,a.area_idarea
+            FROM codigoslibros c
+            LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+            WHERE  c.estado_liquidacion = '2'
+            AND c.bc_periodo            = ?
+            AND c.bc_institucion        = ?
+            AND c.prueba_diagnostica    = '0'
+            AND ls.idLibro              = c.libro_idlibro
+            GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
+            ",
+            [$periodo,$institucion]
+        );
+        $datos = [];
+        $contador = 0;
+        foreach($query as $key => $item){
+            //plan lector
+            $precio = 0;
+            $query = [];
+            if($item->id_serie == 6){
+                $query = DB::SELECT("SELECT f.pvp AS precio
+                FROM pedidos_formato f
+                WHERE f.id_serie    = '6'
+                AND f.id_area       = '69'
+                AND f.id_libro      = '$item->libro_id'
+                AND f.id_periodo    = '$periodo'");
+            }else{
+                $query = DB::SELECT("SELECT f.pvp AS precio
+                FROM pedidos_formato f
+                WHERE f.id_serie    = '$item->id_serie'
+                AND f.id_area       = '$item->area_idarea'
+                AND f.id_periodo    = '$periodo'
+                ");
+            }
+            if(count($query) > 0){
+                $precio = $query[0]->precio;
+            }
+            $datos[$contador] = [
+                "codigo"            => $item->codigo,
+                "cantidad"          => $item->cantidad,
+                "serie"             => $item->serie,
+                "libro_idlibro"     => $item->libro_idlibro,
+                "nombre_libro"      => $item->nombrelibro,
+                "id_serie"          => $item->id_serie,
+                "area_idarea"       => $item->area_idarea,
+                "precio"            => $precio,
+                "valor"             => $item->cantidad * $precio
+            ];
+            $contador++;
+        }
+        return $datos;
+    }
+    public function showRegalados($institucion,$periodo,$libro_idlibro){
+        $query = DB::SELECT("SELECT c.codigo FROM codigoslibros c
+        WHERE  c.estado_liquidacion = '2'
+        AND c.bc_periodo            = ?
+        AND c.bc_institucion        = ?
+        AND c.prueba_diagnostica    = '0'
+        AND c.libro_idlibro         = ?
+        ",[$periodo,$institucion,$libro_idlibro]);
+        return $query;
+    }
+    //API:GET/getliquidadosDevueltos/{contrato}
+    public function getliquidadosDevueltos($contrato){
+        $key = "getliquidadosDevueltos".$contrato;
+        if (Cache::has($key)) {
+           $devueltos = Cache::get($key);
+        } else {
+            $devueltos = DB::SELECT("SELECT h.codigo_libro,h.devueltos_liquidados,
+                h.verificacion_liquidada,h.observacion,h.created_at
+                FROM hist_codlibros h
+                LEFT JOIN codigoslibros c ON h.codigo_libro = c.codigo
+                WHERE h.devueltos_liquidados = ?
+                AND c.prueba_diagnostica = '0'
+            ",[$contrato]);
+            Cache::put($key,$devueltos);
+        }
+        return $devueltos;
+    }
+    public function limpiarCache(){
+        Cache::flush();
+    }
 }

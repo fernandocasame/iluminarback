@@ -1162,7 +1162,8 @@ class PedidosController extends Controller
             WHERE  a.id_pedido = p.id_pedido
             AND a.estado_alcance  = '1'
             AND ped.estado = '1'
-        ) as contadorAlcanceCerrado,pe.periodoescolar
+        ) as contadorAlcanceCerrado,pe.periodoescolar,
+        p.cobro_venta_directa,p.tipoPago
         FROM pedidos p
         INNER JOIN usuario u ON p.id_asesor = u.idusuario
         INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -1224,7 +1225,8 @@ class PedidosController extends Controller
                 WHERE  a.id_pedido = p.id_pedido
                 AND a.estado_alcance  = '1'
                 AND ped.estado = '1'
-            ) as contadorAlcanceCerrado,pe.periodoescolar
+            ) as contadorAlcanceCerrado,pe.periodoescolar,
+            p.cobro_venta_directa,p.tipoPago
             FROM pedidos p
             INNER JOIN usuario u ON p.id_asesor = u.idusuario
             INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -2207,7 +2209,7 @@ class PedidosController extends Controller
             $contrato = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
             $json_contrato = json_decode($contrato, true);
          } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
          //GUARDAR DETALLE DE VENTA
         //DETALLE DE VENTA
@@ -2234,7 +2236,7 @@ class PedidosController extends Controller
             $json_detalle = json_decode($detalle, true);
         }
         } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
         //FIN GUARDAR DETALLE DE VENTA
         //si se guardo el contrato actualizo la secuencia
@@ -3055,7 +3057,7 @@ class PedidosController extends Controller
                 "sin_contratos" => $arraySinContrato
             ];
             } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
     }
     public function getVerificaciones($contrato){
@@ -3661,7 +3663,7 @@ class PedidosController extends Controller
                 //validar que tenga el cli_inscodigo
                 $getcli_ins_codigo = $query[0]->cli_ins_codigo;
             }
-        
+
              if($getcli_ins_codigo == null || $getcli_ins_codigo == "null"){
                  return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
             }
@@ -4362,14 +4364,22 @@ class PedidosController extends Controller
         if($request->changeRevisonNotificacion){
             return $this->changeRevisonNotificacion($request->id_pedido,$request->notificados);
         }
+        if($request->actualizarCampo){
+            $pedido =  DB::UPDATE("UPDATE pedidos
+            SET `$request->campo` = ?
+            WHERE `id_pedido`     = ?
+            ",[$request->valor,$request->id_pedido]);
+        }
+        if($request->actualizarDosCampo){
+            $pedido =  DB::UPDATE("UPDATE pedidos
+            SET `$request->campo` = ?,
+            `$request->campo2` = ?
+            WHERE `id_pedido`     = ?
+            ",[$request->valor,$request->valor2,$request->id_pedido]);
+        }
         $getPedido =  Pedidos::findOrFail($request->id_pedido);
         $contrato  =  $getPedido->contrato_generado;
         if($request->noCambios == "yes"){
-        }else{
-            $pedido =  DB::UPDATE("UPDATE pedidos
-            SET `$request->campo` = '$request->valor'
-            WHERE `id_pedido`     = '$request->id_pedido'
-            ");
         }
         //ingresar al historico
         $this->pedidosConAnticipo();

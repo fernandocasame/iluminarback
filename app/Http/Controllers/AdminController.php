@@ -314,230 +314,53 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-        return "hola mundoooo";
-       $query = DB::SELECT("SELECT DISTINCT s.asesor_id, s.cli_ins_codigo
-       FROM pedidos_secuencia  s
-       WHERE s.cli_ins_codigo IS NOT NULL
-       ");
-       $contador = 0;
-       foreach($query as $key => $item){
-        $ingreso = DB::table('usuario')
-            ->where('idusuario', $item->asesor_id)
-            ->update(['cli_ins_codigo' => $item->cli_ins_codigo]);
-        if($ingreso) $contador ++;
-       }
-       return "Se guardo $contador registros xd";
+        return "hoila";
+        try {
+            $fecha = date("Y-m-d");
+            $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
+                c.libro_idlibro,ls.nombre as nombrelibro
+                FROM codigoslibros c
+                LEFT JOIN usuario u ON c.idusuario = u.idusuario
+                LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+                WHERE c.bc_estado           = '2'
+                AND c.estado                <> 2
+                and c.estado_liquidacion    = '1'
+                AND c.bc_periodo            = '20'
+                AND c.bc_institucion        = '1670'
+                AND c.prueba_diagnostica    = '0'
+                AND ls.idLibro              = c.libro_idlibro
+                GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
+            ");
+            $contrato = "C-C40-0000004-TEST";
+            $url      = "f_DetalleVerificacion/GetxVenCodigo_Ultimodet_ver_verificacion?ven_codigo=$contrato";
+            $datos    = $this->FacturacionGet($url);
+            $numeroVerificacion = 1;
+            if(isset($datos[0]["status"])){
+                $numeroVerificacion = 1;
+            }else{
+                $getDatos = $datos["ultimaverificacion"]["detVerVerificacion"];
+                $numeroVerificacion = $getDatos +1;
+            }
+            //PROCESO GUARDAR
+            foreach($data as $key => $item){
+                $formData = [
+                    "proCodigo"             => $item->codigo, 
+                    "venCodigo"             => $contrato,
+                    "detVerCantidad"        => $item->cantidad, 
+                    "detVerVerificacion"    => $numeroVerificacion,
+                    "detVerFecha"           => $fecha
+                ];
+                $url2 = "f_DetalleVerificacion/CreateOrUpdateDetalleVerificacion";
+                $process = $this->FacturacionPost($url2,$formData);
+            }
 
-
-
-        // 'cli_ci'        => $cedula,
-        // 'cli_apellidos' => $apellidos,
-        // 'cli_nombres'   => $nombres,
-        // 'cli_direccion' => null,
-        // 'cli_telefono'  => $telefono,
-        // 'cli_email'     => $email
-        // $form_data = [
-        //     'cliCi'        => '15156151',
-        //     'cliApellidos' => $request->cliApellidos,
-        //     'cliNombres'   => $request->cliNombres,
-        //     'cliDireccion'   => $request->cliDireccion,
-        //     'cliTelefono'   => $request->cliTelefono,
-        //     'cliEmail'   => $request->cliEmail,
-        //     'cliCredito'   => $request->cliCredito,
-        //     'cliPlazo'   => $request->cliPlazo,
-        //     'cliAlias'   => $request->cliAlias,
-        //     'cliCelular'   => $request->cliCelular,
-        //     'cliFechaNacimiento'   => $request->cliFechaNacimiento,
-        //     'venDCodigo'   => $request->venDCodigo,
-        //     'cliTitulo'   => $request->cliTitulo
-        // ];
-        //return $form_data;
-
-
-
-
-        // $libros = DB::SELECT("SELECT * FROM libro l
-        // ");
-        // $contador = 0;
-        // foreach($libros as $key => $item){
-        //     $nombreImprimir = "";
-        //     $nombreImprimir = $this->quitarTildes($item->nombrelibro);
-        //     $libro = Libro::findOrFail($item->idlibro);
-        //     $libro->nombre_imprimir = $nombreImprimir;
-        //     $libro->save();
-        //     if($libro){
-        //         $contador++;
-        //     }
-        // }
-        // return "se guardo ".$contador;
-        // $miArrayDeObjetos = [
-        //     (object) ["codigo" => "SMLL3-Y84W9MP666"],
-        //     (object) ["codigo" => "PSMLL3-HFRTCYT"],
-        //     (object) ["codigo" => "SMLL3-PU2WSDV"],
-        //     (object) ["codigo" => "PSMLL3-PV53YWA"],
-        // ];
-        // $usuario_editor     = 463;
-        // $comentario         = "HOLA MUNDO";
-        // $contador           = 0;
-        // $getLongitud        = sizeof($miArrayDeObjetos);
-        // $longitud           = $getLongitud/2;
-        // $TipoVenta          = 1;
-        // $institucion_id     = 981;
-        // $periodo_id         = 22;
-        // // Supongamos que tienes una colección vacía
-        // $codigoNoExiste     = collect();
-        // $codigoConProblemas = collect();
-        // for($i = 0; $i<$longitud; $i++){
-        //     // Creamos un nuevo array para almacenar los objetos quitados
-        //     $nuevoArray             = [];
-        //     $codigoActivacion       = "";
-        //     $codigoDiagnostico      = "";
-        //     $validarA               = [];
-        //     $validarD               = [];
-        //     // Eliminamos los dos primeros objetos del array original y los agregamos al nuevo array
-        //     $nuevoArray[]           = array_shift($miArrayDeObjetos);
-        //     $nuevoArray[]           = array_shift($miArrayDeObjetos);
-        //     $codigoActivacion       = $nuevoArray[0]->codigo;
-        //     $codigoDiagnostico      = $nuevoArray[1]->codigo;
-        //     //===CODIGO DE ACTIVACION====
-        //     //validacion
-        //     $validarA               = $this->getCodigos($codigoActivacion,0);
-        //     $validarD               = $this->getCodigos($codigoDiagnostico,0);
-        //     //======si ambos codigos existen========
-        //     if(count($validarA) > 0 && count($validarD) > 0){
-        //         //====VARIABLES DE CODIGOS===
-        //         //====Activacion=====
-        //         //validar si el codigo ya esta liquidado
-        //         $ifLiquidadoA                = $validarA[0]->estado_liquidacion;
-        //         //validar si el codigo no este liquidado
-        //         $ifBloqueadoA                = $validarA[0]->estado;
-        //         //validar si tiene bc_institucion
-        //         $ifBc_InstitucionA           = $validarA[0]->bc_institucion;
-        //         //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-        //         $ifid_periodoA               = $validarA[0]->id_periodo;
-        //         //validar si el codigo tiene venta_estado
-        //         $venta_estadoA               = $validarA[0]->venta_estado;
-        //         //venta lista
-        //         $ifventa_lista_institucionA  = $validarA[0]->venta_lista_institucion;
-        //         //======Diagnostico=====
-        //         //validar si el codigo ya esta liquidado
-        //         $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
-        //         //validar si el codigo no este liquidado
-        //         $ifBloqueadoD                = $validarD[0]->estado;
-        //         //validar si tiene bc_institucion
-        //         $ifBc_InstitucionD           = $validarD[0]->bc_institucion;
-        //         //validar que el periodo del estudiante sea 0 o sea igual al que se envia
-        //         $ifid_periodoD               = $validarD[0]->id_periodo;
-        //         //validar si el codigo tiene venta_estado
-        //         $venta_estadoD               = $validarD[0]->venta_estado;
-        //         //venta lista
-        //         $ifventa_lista_institucionD  = $validarD[0]->venta_lista_institucion;
-        //         //===VENTA DIRECTA====
-        //         if($TipoVenta == 1){
-        //             if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null")){
-        //                 if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null")){
-        //                     //Ingresar Union a codigo de activacion
-        //                    $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get();
-        //                    $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$TipoVenta);
-        //                    if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
-        //                    //Ingresar Union a codigo de prueba diagnostico
-        //                    $old_valuesD = CodigosLibros::findOrFail($codigoDiagnostico);
-        //                    $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$TipoVenta);
-        //                    if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
-        //                 }else{
-        //                     $codigoConProblemas->push($validarD);
-        //                 }
-        //             }else{
-        //                 $codigoConProblemas->push($validarA);
-        //             }
-        //         }
-        //         if($TipoVenta == 2){
-        //             if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0'){
-        //                 if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0'){
-        //                     //Ingresar Union a codigo de activacion
-        //                     $old_valuesA    = CodigosLibros::findOrFail($codigoActivacion);
-        //                     $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$TipoVenta);
-        //                     if($codigoA){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA); }
-        //                     //Ingresar Union a codigo de prueba diagnostico
-        //                     $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
-        //                     $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$TipoVenta);
-        //                     if($codigoB){  $contador++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD); }
-        //                 }else{
-        //                     $codigoConProblemas->push($validarD);
-        //                 }
-        //             }
-        //             else{
-        //                 $codigoConProblemas->push($validarA);
-        //             }
-        //         }
-        //     }
-        //     //Si uno de los 2 codigos no existen
-        //     else{
-        //         //si no existe el codigo de activacion
-        //         if(count($validarA) == 0 && count($validarD) > 0){
-        //             $codigoNoExiste->push(['codigoNoExiste' => "activacion", 'codigoActivacion' => $codigoActivacion, 'codigoDiagnostico' => $codigoDiagnostico]);
-        //         }
-        //         //si no existe el codigo de diagnostico
-        //         if(count($validarD) == 0 && count($validarA) > 0){
-        //             $codigoNoExiste->push(['codigoNoExiste' => "diagnostico",'codigoActivacion' => $codigoActivacion, 'codigoDiagnostico' => $codigoDiagnostico]);
-        //         }
-        //         //si no existe ambos
-        //         if(count($validarA) == 0 && count($validarD) == 0){
-        //             $codigoNoExiste->push(['codigoNoExiste' => "ambos",      'codigoActivacion' => $codigoActivacion, 'codigoDiagnostico' => $codigoDiagnostico]);
-        //         }
-        //     }
-        // }
-        // return [
-        //     "codigoNoExiste"        => $codigoNoExiste->all(),
-        //     "codigoConProblemas"    => array_merge(...$codigoConProblemas->all()),
-        //     "cambiados"             => $contador,
-        // ];
-        // Ahora, $nuevoArray contiene los dos primeros objetos
-        // y $miArrayDeObjetos contiene los objetos restantes
-
-        // Imprimimos los objetos del nuevo array
-        // foreach ($nuevoArray as $objeto) {
-        //     echo $objeto->codigo ."<br>";
-        // }
-
-        // Imprimimos los objetos del array original (los restantes)
-        // foreach ($miArrayDeObjetos as $objeto) {
-        //     echo $objeto->codigo."<br>";
-        // }
-        // $json = '
-        //     [
-        //         {
-        //         "venCodigo": "C-C22-0000030-LJ",
-        //         "docCodigo": 18834,
-        //         "docValor": 1200,
-        //         "docNumero": "CH13374, EG54042",
-        //         "docNombre": "PRISCILA MARIANA LOPEZ ORDOÑEZ",
-        //         "docCi": "ANT",
-        //         "docCuenta": null,
-        //         "docInstitucion": null,
-        //         "docTipo": null,
-        //         "docObservacion": null,
-        //         "docFecha": null,
-        //         "estVenCodigo": 4,
-        //         "venConvertido": ""
-        //         },
-        //         {
-        //         "venCodigo": "C-C22-0000030-LJ",
-        //         "docCodigo": 19317,
-        //         "docValor": 252.8,
-        //         "docNumero": "CH 13793; EG 55655; FACT 13634",
-        //         "docNombre": "PRISCILA MARIANA LOPEZ ORDOÑEZ",
-        //         "docCi": "LIQ",
-        //         "docCuenta": null,
-        //         "docInstitucion": null,
-        //         "docTipo": null,
-        //         "docObservacion": null,
-        //         "docFecha": null,
-        //         "estVenCodigo": 4,
-        //         "venConvertido": ""
-        //         }
-        //     ]
-        // ';
+        } catch (\Exception  $ex) {
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+    
+        // $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
+        // $JsonContrato = json_decode($dato, true);
+        // return $JsonContrato;
         // // Convertir la cadena JSON a un array de objetos
         // $arrayObjetos = json_decode($json);
         // return $arrayObjetos;

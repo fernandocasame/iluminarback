@@ -229,8 +229,9 @@ class CursoController extends Controller
 
 
     public function curso_libro_docente(Request $request){
-        // $cursos = DB::SELECT("SELECT DISTINCT c. * FROM curso c, usuario u, periodoescolar_has_institucion phi, periodoescolar p WHERE c.idusuario = u.idusuario AND c.idusuario = $request->id_usuario AND c.id_asignatura = $request->id_asignatura AND c.estado = '1' AND u.institucion_idInstitucion = phi.institucion_idInstitucion AND phi.periodoescolar_idperiodoescolar = p.idperiodoescolar AND p.estado = '1'");
-        $cursos = DB::SELECT("SELECT c.* FROM curso c
+        $cursos = DB::SELECT("SELECT c.*,
+        CONCAT(c.nombre,' - ',c.codigo) as nombreCurso
+        FROM curso c
         WHERE c.idusuario = '$request->id_usuario'
         AND c.id_asignatura = '$request->id_asignatura'
         AND c.id_periodo = '$request->periodo_id'
@@ -1869,9 +1870,9 @@ class CursoController extends Controller
         INNER JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
         INNER JOIN asignaturausuario au ON a.idasignatura = au.asignatura_idasignatura
         INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
-        WHERE a.area_idarea = $area 
+        WHERE a.area_idarea = $area
         AND au.usuario_idusuario = $usuario
-        AND ls.id_serie = $serie 
+        AND ls.id_serie = $serie
         AND au.periodo_id = '$periodo'
         AND l.Estado_idEstado = '1'
         ORDER BY a.nivel_idnivel;
@@ -1883,8 +1884,8 @@ class CursoController extends Controller
             $portada        = $item->portada;
             $pdfsinguia     = $item->pdfsinguia;
             $pdfconguia     = $item->pdfconguia;
-            $guiadidactica  = $item->guiadidactica; 
-            //sierra 
+            $guiadidactica  = $item->guiadidactica;
+            //sierra
             if($region == 1){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->s_weblibro != null || $item->s_weblibro != ""){
@@ -1892,10 +1893,10 @@ class CursoController extends Controller
                     $portada        = $item->s_portada;
                     $pdfsinguia     = $item->s_pdfsinguia;
                     $pdfconguia     = $item->s_pdfconguia;
-                    $guiadidactica  = $item->s_guiadidactica;            
+                    $guiadidactica  = $item->s_guiadidactica;
                 }
             }
-            //costa 
+            //costa
             if($region == 2){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->c_weblibro != null || $item->c_weblibro != ""){
@@ -1936,15 +1937,15 @@ class CursoController extends Controller
     }
 
     public function get_libros_serie($usuario, $serie,$region,$periodo){
-        $series = DB::SELECT("SELECT l.*,a.* 
-        FROM libro l 
+        $series = DB::SELECT("SELECT l.*,a.*
+        FROM libro l
         INNER JOIN libros_series ls ON l.idLibro = ls.idLibro
         INNER JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
         INNER JOIN asignaturausuario au ON a.idasignatura = au.asignatura_idasignatura
         WHERE au.usuario_idusuario = $usuario
-        AND ls.id_serie = $serie 
+        AND ls.id_serie = $serie
         AND au.periodo_id = '$periodo'
-        AND l.Estado_idEstado = '1' 
+        AND l.Estado_idEstado = '1'
         ORDER BY a.nivel_idnivel
         ");
         $datos=[];
@@ -1954,8 +1955,8 @@ class CursoController extends Controller
             $portada        = $item->portada;
             $pdfsinguia     = $item->pdfsinguia;
             $pdfconguia     = $item->pdfconguia;
-            $guiadidactica  = $item->guiadidactica; 
-            //sierra 
+            $guiadidactica  = $item->guiadidactica;
+            //sierra
             if($region == 1){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->s_weblibro != null || $item->s_weblibro != ""){
@@ -1963,10 +1964,10 @@ class CursoController extends Controller
                     $portada        = $item->s_portada;
                     $pdfsinguia     = $item->s_pdfsinguia;
                     $pdfconguia     = $item->s_pdfconguia;
-                    $guiadidactica  = $item->s_guiadidactica;            
+                    $guiadidactica  = $item->s_guiadidactica;
                 }
             }
-            //costa 
+            //costa
             if($region == 2){
                 //si no hay libro de costa asignado tomamos el por defecto
                 if($item->c_weblibro != null || $item->c_weblibro != ""){

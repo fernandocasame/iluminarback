@@ -202,7 +202,7 @@ class CodigoLibrosController extends Controller
         }
         return $estadoIngreso;
     }
-    public function procesoGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$objectCodigoUnion){
+    public function procesoGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$objectCodigoUnion,$factura){
         //numero proceso => 0 = venta directa; 1 = venta lista; 2 = regalado; 3 regalado y bloqueado
         $withCodigoUnion = 1;
         $estadoIngreso   = 0;
@@ -212,7 +212,7 @@ class CodigoLibrosController extends Controller
         $unionCorrecto   = false;
         ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
         if($codigo_union == null) $withCodigoUnion = 0;
-        else                     $withCodigoUnion = 1;
+        else                      $withCodigoUnion = 1;
         //si hay codigo de union lo actualizo
         if($withCodigoUnion == 1){
             //VALIDO SI NO EXISTE EL CODIGO DE UNION LO MANDO COMO ERROR
@@ -257,23 +257,23 @@ class CodigoLibrosController extends Controller
             if($unionCorrecto){
                 //venta directa
                 if($numeroProceso == 0){
-                    $codigoU             = $this->updateCodigoVentaDirecta($codigo_union,$codigo,$request);
-                    if($codigoU) $codigo = $this->updateCodigoVentaDirecta($codigo,$codigo_union,$request);
+                    $codigoU             = $this->updateCodigoVentaDirecta($codigo_union,$codigo,$request,$factura);
+                    if($codigoU) $codigo = $this->updateCodigoVentaDirecta($codigo,$codigo_union,$request,$factura);
                 }
                 //venta lista
                 if($numeroProceso == 1){
-                    $codigoU             = $this->updateCodigoVentaLista($codigo_union,$codigo,$request);
-                    if($codigoU) $codigo = $this->updateCodigoVentaLista($codigo,$codigo_union,$request);
+                    $codigoU             = $this->updateCodigoVentaLista($codigo_union,$codigo,$request,$factura);
+                    if($codigoU) $codigo = $this->updateCodigoVentaLista($codigo,$codigo_union,$request,$factura);
                 }
                 //regalado
                 if($numeroProceso == 2){
-                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request);
-                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request);
+                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request,$factura);
+                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
                 }
                //regalado y bloqueado
                 if($numeroProceso == 3){
-                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request);
-                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request);
+                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request,$factura);
+                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
                 }
             }else{
                 //no se ingreso
@@ -283,13 +283,13 @@ class CodigoLibrosController extends Controller
         //SI EL CODIGO NO TIENE CODIGO DE UNION
         else{
             //venta directa
-            if($numeroProceso == 0) $codigo = $this->updateCodigoVentaDirecta($codigo,$codigo_union,$request);
+            if($numeroProceso == 0) $codigo = $this->updateCodigoVentaDirecta($codigo,$codigo_union,$request,$factura);
             //venta lista
-            if($numeroProceso == 1) $codigo = $this->updateCodigoVentaLista($codigo,$codigo_union,$request);
+            if($numeroProceso == 1) $codigo = $this->updateCodigoVentaLista($codigo,$codigo_union,$request,$factura);
             //regalado
-            if($numeroProceso == 2) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request);
+            if($numeroProceso == 2) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
             //regalado y bloqueado
-            if($numeroProceso == 3) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request);
+            if($numeroProceso == 3) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
         }
         //resultado
         //con codigo union
@@ -304,20 +304,22 @@ class CodigoLibrosController extends Controller
         }
         return $estadoIngreso;
     }
-    public function updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request){
+    public function updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura){
         $arraySave = [];
         //regalado
         if($numeroProceso == '2'){
             $arraySave  = [
-                'bc_estado' => '1',
-                'estado_liquidacion' => '2',
-                'bc_institucion' => $request->institucion_id,
-                'bc_periodo' => $request->periodo_id
+                'factura'               => $factura,
+                'bc_estado'             => '1',
+                'estado_liquidacion'    => '2',
+                'bc_institucion'        => $request->institucion_id,
+                'bc_periodo'            => $request->periodo_id
             ];
         }
         //regalado y bloqueado
          if($numeroProceso == '3'){
             $arraySave  = [
+                'factura'               => $factura,
                 'bc_estado'             => '1',
                 'estado'                => '2',
                 'estado_liquidacion'    => '2',
@@ -334,21 +336,23 @@ class CodigoLibrosController extends Controller
         ->update($arraySave);
         return $codigo;
     }
-    public function updateCodigotoRegaladoBloqueado2($numeroProceso,$codigo,$request,$union){
+    public function updateCodigotoRegaladoBloqueado2($numeroProceso,$codigo,$request,$union,$factura){
         $arraySave = [];
         //regalado
         if($numeroProceso == '2'){
             $arraySave  = [
-                'bc_estado' => '1',
-                'estado_liquidacion' => '2',
-                'bc_institucion' => $request->institucion_id,
-                'bc_periodo' => $request->periodo_id,
-                'codigo_union'      => $union
+                'factura'               => $factura,
+                'bc_estado'             => '1',
+                'estado_liquidacion'    => '2',
+                'bc_institucion'        => $request->institucion_id,
+                'bc_periodo'            => $request->periodo_id,
+                'codigo_union'          => $union
             ];
         }
         //regalado y bloqueado
          if($numeroProceso == '3'){
             $arraySave  = [
+                'factura'               => $factura,
                 'bc_estado'             => '1',
                 'estado'                => '2',
                 'estado_liquidacion'    => '2',
@@ -391,6 +395,7 @@ class CodigoLibrosController extends Controller
         $contadorNoCambiado = 0;
         $numeroProceso      = 0;
         $porcentaje         = 0;
+        $factura            = "";
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validacionCodigo               = false;
@@ -415,6 +420,11 @@ class CodigoLibrosController extends Controller
                 $ifventa_lista_institucion  = $validar[0]->venta_lista_institucion;
                 //validar si tiene codigo de union
                 $codigo_union               = $validar[0]->codigo_union;
+                //obtener la factura si no envian nada le dejo lo mismo
+                $facturaA                   = $validar[0]->factura;
+                if($request->factura == null || $request->factura == "")   $factura = $facturaA;
+                else  $factura = $request->factura;
+
                 //===PROCESO===========
                 //=====VENTA DIRECTA O LISTA=========================
                 if($tipoProceso == '0'){
@@ -451,7 +461,7 @@ class CodigoLibrosController extends Controller
                     $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
                     if($codigo_union != null || $codigo_union != ""){
                         //numero proceso => 0 = venta directa; 1 = venta lista; 2 = regalado; 3 regalado y bloqueado
-                        $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,$codigo_union,$request,$getcodigoUnion);
+                        $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,$codigo_union,$request,$getcodigoUnion,$factura);
                         //si ingresa correctamente
                         if($ingreso == 1){
                             $porcentaje++;
@@ -470,7 +480,7 @@ class CodigoLibrosController extends Controller
                     }
                     //ACTUALIZAR CODIGO SIN UNION
                     else{
-                        $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,null,$request,null);
+                        $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,null,$request,null,$factura);
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
@@ -523,6 +533,7 @@ class CodigoLibrosController extends Controller
         $longitud           = $getLongitud/2;
         $TipoVenta          = $request->venta_estado;
         $tipoBodega         = $request->tipoBodega;
+        $facturaA           = "";
         // Supongamos que tienes una colección vacía
         $codigosNoExisten   = collect();
         $codigoConProblemas = collect();
@@ -540,13 +551,13 @@ class CodigoLibrosController extends Controller
             $nuevoArray[]           = array_shift($miArrayDeObjetos);
             //ACTIVACION - DIAGNOSTICO
             if($tipoBodega == 1){
-                $codigoActivacion       = $nuevoArray[0]->codigo;
-                $codigoDiagnostico      = $nuevoArray[1]->codigo;
+                $codigoActivacion       = strtoupper($nuevoArray[0]->codigo);
+                $codigoDiagnostico      = strtoupper($nuevoArray[1]->codigo);
             }
             //DIAGNOSTICO - ACTIVACION
             if($tipoBodega == 2){
-                $codigoActivacion       = $nuevoArray[0]->codigo;
-                $codigoDiagnostico      = $nuevoArray[1]->codigo;
+                $codigoActivacion       = strtoupper($nuevoArray[0]->codigo);
+                $codigoDiagnostico      = strtoupper($nuevoArray[1]->codigo);
             }
             //===CODIGO DE ACTIVACION====
             //validacion
@@ -569,7 +580,7 @@ class CodigoLibrosController extends Controller
                 //venta lista
                 $ifventa_lista_institucionA  = $validarA[0]->venta_lista_institucion;
                 //codigo de union
-                $codigo_unionA               = $validarA[0]->codigo_union;
+                $codigo_unionA               = strtoupper($validarA[0]->codigo_union);
                 //======Diagnostico=====
                 //validar si el codigo ya esta liquidado
                 $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
@@ -584,9 +595,13 @@ class CodigoLibrosController extends Controller
                 //venta lista
                 $ifventa_lista_institucionD  = $validarD[0]->venta_lista_institucion;
                 //codigo de union
-                $codigo_unionD               = $validarD[0]->codigo_union;
+                $codigo_unionD               = strtoupper($validarD[0]->codigo_union);
                 $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get();
                 $old_valuesD = CodigosLibros::findOrFail($codigoDiagnostico);
+                //obtener la factura si no envian nada le dejo lo mismo
+                $facturaA                   = $validarA[0]->factura;
+                if($request->factura == null || $request->factura == "")   $factura = $facturaA;
+                else  $factura = $request->factura;
                 //===PROCESO===========
                 //=====VENTA DIRECTA O LISTA=========================
                 if($tipoProceso == '0'){
@@ -595,10 +610,10 @@ class CodigoLibrosController extends Controller
                         if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ( $ifBc_InstitucionA == 0 || $ifBc_InstitucionA == $institucion_id )   && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) ){
                             if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ( $ifBc_InstitucionD == 0 || $ifBc_InstitucionD == $institucion_id )   && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) ){
                             //Ingresar Union a codigo de activacion
-                            $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
+                            $codigoA     =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request,$factura);
                             if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                             //Ingresar Union a codigo de prueba diagnostico
-                            $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
+                            $codigoB = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request,$factura);
                             if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null
                             ); }
                             }else{
@@ -613,10 +628,9 @@ class CodigoLibrosController extends Controller
                         if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "") && ($venta_estadoA == 0  || $venta_estadoA == null || $venta_estadoA == "null") && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 && $ifventa_lista_institucionA == '0' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))){
                             if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($venta_estadoD == 0  || $venta_estadoD == null || $venta_estadoD == "null") && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && $ifventa_lista_institucionD == '0' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) ){
                                 //Ingresar Union a codigo de activacion
-                                $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request);
+                                $codigoA        =  $this->UpdateCodigo($codigoActivacion,$codigoDiagnostico,$request,$factura);
                                 if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
-                                //Ingresar Union a codigo de prueba diagnostico
-                                $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request);
+                                $codigoB        = $this->UpdateCodigo($codigoDiagnostico,$codigoActivacion,$request,$factura);
                                 if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                             }else{
                                 $codigoConProblemas->push($validarD);
@@ -634,10 +648,10 @@ class CodigoLibrosController extends Controller
                         if($ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0"))){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoActivacion,$request,$codigoDiagnostico);
+                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoActivacion,$request,$codigoDiagnostico,$factura);
                         if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoDiagnostico,$request,$codigoActivacion);
+                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoDiagnostico,$request,$codigoActivacion,$factura);
                         if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
@@ -652,10 +666,10 @@ class CodigoLibrosController extends Controller
                         if($ifLiquidadoD !='0' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0"))){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoActivacion,$request,$codigoDiagnostico);
+                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoActivacion,$request,$codigoDiagnostico,$factura);
                         if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoDiagnostico,$request,$codigoActivacion);
+                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoDiagnostico,$request,$codigoActivacion,$factura);
                         if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
@@ -697,21 +711,21 @@ class CodigoLibrosController extends Controller
             ];
         }
     }
-    public function UpdateCodigo($codigo,$union,$request){
+    public function UpdateCodigo($codigo,$union,$request,$factura){
         if($request->venta_estado == 1){
-            return $this->updateCodigoVentaDirecta($codigo,$union,$request);
+            return $this->updateCodigoVentaDirecta($codigo,$union,$request,$factura);
         }
         if($request->venta_estado == 2){
-            return $this->updateCodigoVentaLista($codigo,$union,$request);
+            return $this->updateCodigoVentaLista($codigo,$union,$request,$factura);
         }
     }
-    public function updateCodigoVentaDirecta($codigo,$union,$request){
+    public function updateCodigoVentaDirecta($codigo,$union,$request,$factura){
         $codigo = DB::table('codigoslibros')
             ->where('codigo', '=', $codigo)
             ->where('estado_liquidacion', '=', '1')
             //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
             ->update([
-                'factura'           => $request->factura,
+                'factura'           => $factura,
                 'bc_institucion'    => $request->institucion_id,
                 'bc_periodo'        => $request->periodo_id,
                 'venta_estado'      => $request->venta_estado,
@@ -719,13 +733,13 @@ class CodigoLibrosController extends Controller
             ]);
         return $codigo;
     }
-    public function updateCodigoVentaLista($codigo,$union,$request){
+    public function updateCodigoVentaLista($codigo,$union,$request,$factura){
         $codigo = DB::table('codigoslibros')
             ->where('codigo', '=', $codigo)
             ->where('estado_liquidacion', '=', '1')
             //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
             ->update([
-                'factura'                   => $request->factura,
+                'factura'                   => $factura,
                 'venta_lista_institucion'   => $request->institucion_id,
                 'bc_periodo'                => $request->periodo_id,
                 'venta_estado'              => $request->venta_estado,
@@ -789,7 +803,9 @@ class CodigoLibrosController extends Controller
         (case when (c.venta_estado = '0') then ''
             when (c.venta_estado = '1') then 'Venta directa'
             when (c.venta_estado = '2') then 'Venta por lista'
-        end) as ventaEstado,
+        end) as ventaEstado
+        FROM codigoslibros c
+        WHERE c.codigo = c.codigo
         ib.nombreInstitucion as institucionBarra,
         pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
         FROM codigoslibros c
@@ -1330,7 +1346,9 @@ class CodigoLibrosController extends Controller
         $fecha                  = date('Y-m-d H:i:s');
         $contadorNoCambiado     = 0;
         $contadorNoexiste       = 0;
-        $mensaje                = "Se devolvio el código";
+        $mensaje                = $request->observacion;
+        $setContrato            = null;
+        $verificacion_liquidada = null;
         if($request->codigo){
             return $this->devolucionIndividualBodega($request->codigo,$request->id_usuario,$request->cliente,$request->institucion_id,$request->periodo_id,$request->observacion,$mensaje,$request);
         }
@@ -1340,16 +1358,22 @@ class CodigoLibrosController extends Controller
             $ingreso = 0;
             //valida que el codigo existe
             if(count($validar)>0){
-                $codigo_union   = $validar[0]->codigo_union;
+                $codigo_union               = $validar[0]->codigo_union;
                 //validar si el codigo se encuentra liquidado
-                $ifLiquidado = $validar[0]->estado_liquidacion;
+                $ifLiquidado                = $validar[0]->estado_liquidacion;
                 //validar que el bc_institucion sea el mismo desde el front
-                $ifBc_Institucion = $validar[0]->bc_institucion;
+                $ifBc_Institucion           = $validar[0]->bc_institucion;
                 //institucion del venta lista
-                $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
+                $ifventa_lista_institucion  = $validar[0]->venta_lista_institucion;
+                //contrato
+                $ifContrato                 = $validar[0]->contrato;
+                //numero de verificacion
+                $ifVerificacion             = $validar[0]->verificacion;
                 //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
-                $EstatusProceso = false;
+                $EstatusProceso             = false;
                 if($request->dLiquidado ==  '1'){
+                    $setContrato            = $ifContrato;
+                    $verificacion_liquidada = $ifVerificacion;
                     //VALIDACION AUNQUE ESTE LIQUIDADO
                     if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2') $EstatusProceso = true;
                 }else{
@@ -1371,11 +1395,11 @@ class CodigoLibrosController extends Controller
                             $porcentaje++;
                             //====CODIGO====
                             //ingresar en el historico codigo
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
                             //ingresar a la tabla de devolucion
                             $this->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                             //====CODIGO UNION=====
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null,$setContrato,$verificacion_liquidada);
                             $this->saveDevolucion($codigo_union,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                         }else{
                             $codigosNoCambiados[$contadorNoCambiado] =[
@@ -1391,7 +1415,7 @@ class CodigoLibrosController extends Controller
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null);
+                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
                             //ingresar a la tabla de devolucion
                             $this->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                             $codigosSinCodigoUnion[] = $validar[0];
@@ -1957,6 +1981,45 @@ class CodigoLibrosController extends Controller
         $data = [
             "cambiados"             => $porcentaje,
             "CodigosExisten"        => $datos,
+            "CodigosNoIngresados"   => $NoIngresados,
+        ];
+        return $data;
+    }
+    public function revisarUltimoHistoricoCodigo(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos           = json_decode($request->data_codigos);
+        $datos             = [];
+        $NoIngresados      = [];
+        $porcentaje        = 0;
+        $contadorNoExiste  = 0;
+        foreach($codigos as $key => $item){
+            // $consulta = $this->getCodigos($item->codigo,0);
+            //si ya existe el codigo lo mando a un array
+            // if(count($consulta) > 0){
+                $query  = DB::SELECT("SELECT h.id_codlibros,h.codigo_libro,h.idInstitucion,
+                h.usuario_editor,h.observacion,h.id_periodo ,
+                 CONCAT(u.nombres,'', u.apellidos) AS editor ,
+                i.nombreInstitucion
+                FROM hist_codlibros h
+                LEFT JOIN usuario u ON h.idInstitucion = u.idusuario
+                LEFT JOIN institucion i ON h.usuario_editor  = i.idInstitucion
+                WHERE h.codigo_libro = '$item->codigo'
+                ORDER BY h.id_codlibros DESC
+                LIMIT 1
+                ");
+                $porcentaje++;
+               $datos[] = $query[0];
+            // }else{
+            //     $codigoNoExiste[$contadorNoExiste] =[
+            //         "codigo" => $item->codigo
+            //     ];
+            //     $contadorNoExiste++;
+            // }
+        }
+        $data = [
+            "porcentaje"            => $porcentaje,
+            "codigosHistorico"      => $datos,
             "CodigosNoIngresados"   => $NoIngresados,
         ];
         return $data;

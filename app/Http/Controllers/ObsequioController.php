@@ -63,9 +63,11 @@ class ObsequioController extends Controller
         // $setear  = json_decode($data,true);
         // return $setear;
         //obtener contrato de la institucion y periodo
-        $query = DB::SELECT("SELECT t.*, i.maximo_porcentaje_autorizado
+        $query = DB::SELECT("SELECT t.*, i.maximo_porcentaje_autorizado,
+        p.porcentaje_obsequio,i.verificar_obsequios
         FROM temporadas t
         LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
+        LEFT JOIN periodoescolar p ON p.idperiodoescolar = t.id_periodo
         WHERE t.idInstitucion = '$institucion'
         AND t.id_periodo = '$periodo'
         and t.estado = '1'
@@ -79,11 +81,16 @@ class ObsequioController extends Controller
         //variables
         $contrato                       = $query[0]->contrato;
         $maximo_porcentaje_autorizado   = $query[0]->maximo_porcentaje_autorizado;
-        //validar que si tiene verificaciones en prolipa
-        $validate = DB::SELECT("SELECT * FROM verificaciones v
-        WHERE v.contrato = '$contrato'");
-        if(empty($validate)){
-            return ["status" => "0", "message" => "El contrato $contrato no tiene verificaciones"];
+        $porcentaje_obsequio            = $query[0]->porcentaje_obsequio;
+        $verificar_obsequios            = $query[0]->verificar_obsequios;
+        //si tiene marcado verificar en 1 verifica que tiene verificaicones el contrato
+        if($verificar_obsequios == 1){
+            //validar que si tiene verificaciones en prolipa
+            $validate = DB::SELECT("SELECT * FROM verificaciones v
+            WHERE v.contrato = '$contrato'");
+            if(empty($validate)){
+                return ["status" => "0", "message" => "El contrato $contrato no tiene verificaciones"];
+            }
         }
         try {
             $dataFinally    = [];
@@ -125,13 +132,14 @@ class ObsequioController extends Controller
                 }
                 //setear array
                 $obj = new stdClass();
-                $obj->veN_CODIGO    = $JsonContrato["veN_CODIGO"];
-                $obj->veN_VALOR     = $JsonContrato["veN_VALOR"];
-                $obj->veN_ANTICIPO  = $JsonContrato["veN_ANTICIPO"];
-                $obj->veN_CODIGO    = $JsonContrato["veN_CODIGO"];
-                $obj->veN_DESCUENTO = $JsonContrato["veN_DESCUENTO"] + $DescuentoConvertido;
-                $obj->total_gastado = $total_gastado == null ? 0 : $total_gastado;
-                $obj->maximo_porcentaje_autorizado = $maximo_porcentaje_autorizado;
+                $obj->veN_CODIGO                    = $JsonContrato["veN_CODIGO"];
+                $obj->veN_VALOR                     = $JsonContrato["veN_VALOR"];
+                $obj->veN_ANTICIPO                  = $JsonContrato["veN_ANTICIPO"];
+                $obj->veN_CODIGO                    = $JsonContrato["veN_CODIGO"];
+                $obj->veN_DESCUENTO                 = $JsonContrato["veN_DESCUENTO"] + $DescuentoConvertido;
+                $obj->total_gastado                 = $total_gastado == null ? 0 : $total_gastado;
+                $obj->maximo_porcentaje_autorizado  = $maximo_porcentaje_autorizado;
+                $obj->porcentaje_obsequio           = $porcentaje_obsequio;
                 array_push($dataFinally,$obj);
                 return $dataFinally;
             }else{
