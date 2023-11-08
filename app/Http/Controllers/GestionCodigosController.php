@@ -30,7 +30,8 @@ class GestionCodigosController extends Controller
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
         (case when (c.estado_liquidacion = '0') then 'liquidado'
             when (c.estado_liquidacion = '1') then 'sin liquidar'
-            when (c.estado_liquidacion = '2') then 'codigo regalado'
+            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
             when (c.estado_liquidacion = '3') then 'codigo devuelto'
         end) as liquidacion,
         (case when (c.bc_estado = '2') then 'codigo leido'
@@ -46,7 +47,7 @@ class GestionCodigosController extends Controller
         p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
         c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete
+        c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -129,6 +130,7 @@ class GestionCodigosController extends Controller
             $codigo->venta_estado               = $request->venta_estado;
             $codigo->contador                   = $request->contador;
             $codigo->codigo_union               = $request->codigo_union == null || $request->codigo_union == "null" ? null: $request->codigo_union;
+            $codigo->liquidado_regalado         = $request->liquidado_regalado;
             $codigo->save();
             if($codigo){
              //Guardar en el historico

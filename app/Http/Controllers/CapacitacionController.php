@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Capacitacion;
 use App\Models\Seminarios;
 use DB;
+use Illuminate\Support\Facades\Log;
 
 class CapacitacionController extends Controller
 {
@@ -48,8 +49,9 @@ class CapacitacionController extends Controller
         ");
         return $capacitacion;
     }
-    public function temasCapacitacion(Request $request){
-        if($request->validarPorFecha){
+    public function temasCapacitacion(Request $request)
+    {
+        if ($request->validarPorFecha) {
             $validar = DB::SELECT("SELECT * FROM seminarios a
             WHERE a.fecha_inicio_temp = '$request->fecha'
             AND a.tema_id  ='$request->tema_id'
@@ -58,7 +60,7 @@ class CapacitacionController extends Controller
             ");
             return $validar;
         }
-        if($request->encontrarCapacitaciones){
+        if ($request->encontrarCapacitaciones) {
             $capacitaciones = DB::SELECT("SELECT CONCAT(u.nombres,' ',u.apellidos) AS vendedor,
             i.nombreInstitucion,  ciu.nombre AS ciudad, it.ciudad AS ciudad_temporal, t.capacitador, t.tema,
              c.*
@@ -74,8 +76,7 @@ class CapacitacionController extends Controller
             ");
             return $capacitaciones;
 
-        }
-        else{
+        } else {
             $temas = DB::SELECT("SELECT c.*   FROM capacitacion_temas c
             WHERE c.estado = '1'
             ");
@@ -83,49 +84,53 @@ class CapacitacionController extends Controller
         }
 
     }
-    public function solicitarTema(Request $request){
+    public function solicitarTema(Request $request)
+    {
         //para eliminar la solicitud
-    if($request->eliminar){
-        $deleted = DB::table('capacitacion_solicitudes')->where('id', '=', $request->id)->delete();
-        return "se elimino";
+        if ($request->eliminar) {
+            $deleted = DB::table('capacitacion_solicitudes')->where('id', '=', $request->id)->delete();
+            return "se elimino";
+        }
+        //para traer todas las solicitudes de los asesores
+        if ($request->todo) {
+            $todo = $this->todasSolicitudes();
+            return $todo;
+        }
+        if ($request->listado) {
+            $listadoAsesor = $this->solicitudTemasAsesor($request->asesor_id);
+            return $listadoAsesor;
+        }
+        $ingreso = DB::insert('insert into capacitacion_solicitudes (tema, asesor_id,observacion) values (?, ?,?)', [$request->tema, $request->asesor_id, $request->observacion]);
+        if ($ingreso) {
+            return ["status" => "1", "message" => "Se solicito correctamente"];
+        } else {
+            return ["status" => "0", "message" => "No se pudo solicitar"];
+        }
     }
-     //para traer todas las solicitudes de los asesores
-      if($request->todo){
-          $todo = $this->todasSolicitudes();
-         return $todo;
-      }
-      if($request->listado){
-        $listadoAsesor = $this->solicitudTemasAsesor($request->asesor_id);
-        return $listadoAsesor;
-      }
-      $ingreso = DB::insert('insert into capacitacion_solicitudes (tema, asesor_id,observacion) values (?, ?,?)', [$request->tema, $request->asesor_id, $request->observacion]);
-      if($ingreso){
-            return ["status" => "1","message" => "Se solicito correctamente"];
-      }else{
-            return ["status" => "0","message" => "No se pudo solicitar"];
-      }
-    }
-    public function editarSolicitudTema(Request $request){
+    public function editarSolicitudTema(Request $request)
+    {
         DB::table('capacitacion_solicitudes')
-        ->where('id', $request->id)
-        ->where('asesor_id', $request->asesor)
-        ->update([
-            'comentario_admin' => $request->comentario,
-            'estado' => $request->estado,
+            ->where('id', $request->id)
+            ->where('asesor_id', $request->asesor)
+            ->update([
+                'comentario_admin' => $request->comentario,
+                'estado' => $request->estado,
 
-        ]);
+            ]);
         return "se editor correctamente";
     }
-    public function todasSolicitudes(){
+    public function todasSolicitudes()
+    {
         $todo = DB::SELECT("SELECT  c.* , CONCAT(u.nombres, ' ', u.apellidos) AS asesor
         FROM  capacitacion_solicitudes c
        LEFT JOIN usuario u ON u.idusuario = c.asesor_id
        ORDER BY c.id DESC
        LIMIT 50
        ");
-       return $todo;
+        return $todo;
     }
-    public function solicitudTemasAsesor($asesor){
+    public function solicitudTemasAsesor($asesor)
+    {
         $listado = DB::SELECT("SELECT  * FROM  capacitacion_solicitudes
         WHERE asesor_id = '$asesor'
         ORDER BY id DESC
@@ -135,59 +140,69 @@ class CapacitacionController extends Controller
     }
     public function store(Request $request)
     {
-        //para editar la capacitacion agenda
-        if( $request->id != 0 ){
-            $agenda = Seminarios::find($request->id);
-        //para guardar la capacitacion agenda
-        }else{
-            $agenda = new Seminarios();
-            $agenda->fecha_fin = $request->fecha_fin;
-        }
-        //si crean una insitucion temporal
-        if($request->estado_institucion_temporal == 1 ){
-            $agenda->periodo_id                     = $request->periodo_id_temporal;
-            $agenda->institucion_id_temporal        = $request->institucion_id_temporal;
-            $agenda->nombre_institucion_temporal    = $request->nombreInstitucion;
-            $agenda->id_institucion = "";
-        }
-        if($request->estado_institucion_temporal == 0){
-            $agenda->id_institucion                 = $request->id_institucion;
-            $agenda->institucion_id_temporal        = "";
-            $agenda->nombre_institucion_temporal    = "";
-            //para traer el periodo
-            $buscarPeriodo = $this->traerPeriodo($request->id_institucion);
-            if($buscarPeriodo["status"] == "1"){
-                $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
-                $agenda->periodo_id = $obtenerPeriodo;
+        try {
+            Log::info($request->all());
+            //para editar la capacitacion agenda
+            if ($request->id != 0) {
+                $agenda = Seminarios::find($request->id);
+                //para guardar la capacitacion agenda
+            } else {
+                $agenda = new Seminarios();
+                $agenda->fecha_fin = $request->fecha_fin;
             }
+
+            //si crean una insitucion temporal
+            if ($request->estado_institucion_temporal == 1) {
+                $agenda->periodo_id = $request->periodo_id_temporal;
+                $agenda->institucion_id_temporal = $request->institucion_id_temporal;
+                $agenda->nombre_institucion_temporal = $request->nombreInstitucion;
+                $agenda->id_institucion = "";
+            }
+
+            if ($request->estado_institucion_temporal == 0) {
+                $agenda->id_institucion = $request->id_institucion;
+                $agenda->institucion_id_temporal = "";
+                $agenda->nombre_institucion_temporal = "";
+                //para traer el periodo
+                $buscarPeriodo = $this->traerPeriodo($request->id_institucion);
+
+                if ($buscarPeriodo["status"] == "1") {
+                    $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
+                    $agenda->periodo_id = $obtenerPeriodo;
+                }
+            }
+            $agenda->descripcion = $request->fecha_inicio;
+            $agenda->tipo_webinar = "2";
+            $agenda->id_usuario = $request->idusuario;
+            $agenda->nombre = $request->nombre;
+            $agenda->label = $request->label;
+            $agenda->classes = $request->classes;
+            $agenda->fecha_inicio = $request->fecha_inicio;
+            $agenda->fecha_inicio_temp = $request->fecha_inicio;
+            $agenda->tipo = $request->tipo;
+            if ($request->desdeAdmin) {
+                $agenda->capacitador_id = $request->capacitador_id;
+                $agenda->capacitador = $request->capacitador;
+            }
+            if ($request->observacion_admin == "null") {
+                $agenda->observacion_admin = "";
+            } else {
+                $agenda->observacion_admin = $request->observacion_admin;
+            }
+            $agenda->hora_inicio = $request->hora_inicio;
+            $agenda->hora_fin = $request->hora_fin;
+            $agenda->tema_id = $request->tema_id;
+            // $agenda->capacitador = $request->capacitador;
+            $agenda->estado_institucion_temporal = $request->estado_institucion_temporal;
+            $agenda->cant_asistentes = $request->asistentes;
+            $agenda->save();
+            return $agenda;
+        } catch (\Throwable $th) {
+            Log::error($th);
         }
-        $agenda->descripcion                        = $request->fecha_inicio;
-        $agenda->tipo_webinar                       = "2";
-        $agenda->id_usuario                         = $request->idusuario;
-        $agenda->nombre                             = $request->nombre;
-        $agenda->label                              = $request->label;
-        $agenda->classes                            = $request->classes;
-        $agenda->fecha_inicio                       = $request->fecha_inicio;
-        $agenda->fecha_inicio_temp                  = $request->fecha_inicio;
-        $agenda->tipo                               = $request->tipo;
-        if($request->desdeAdmin){
-          $agenda->capacitador_id                   = $request->capacitador_id;
-          $agenda->capacitador                      = $request->capacitador;
-        }
-        if($request->observacion_admin == "null"){
-            $agenda->observacion_admin = "";
-        }else{
-            $agenda->observacion_admin              = $request->observacion_admin;
-        }
-        $agenda->hora_inicio                        = $request->hora_inicio;
-        $agenda->hora_fin                           = $request->hora_fin;
-        $agenda->tema_id                            = $request->tema_id;
-        // $agenda->capacitador = $request->capacitador;
-        $agenda->estado_institucion_temporal        = $request->estado_institucion_temporal;
-        $agenda->save();
-        return $agenda;
     }
-    public function traerPeriodo($institucion_id){
+    public function traerPeriodo($institucion_id)
+    {
         $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
             SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
             from institucion i,  periodoescolar_has_institucion pir
@@ -196,10 +211,10 @@ class CapacitacionController extends Controller
             WHERE phi.institucion_idInstitucion = i.idInstitucion
             AND i.idInstitucion = '$institucion_id'))
         ");
-        if(count($periodoInstitucion)>0){
-            return ["status" => "1", "message"=>"correcto","periodo" => $periodoInstitucion];
-        }else{
-            return ["status" => "0", "message"=>"no hay periodo"];
+        if (count($periodoInstitucion) > 0) {
+            return ["status" => "1", "message" => "correcto", "periodo" => $periodoInstitucion];
+        } else {
+            return ["status" => "0", "message" => "no hay periodo"];
         }
     }
     public function delete_agenda_asesor($id_agenda)
@@ -209,15 +224,16 @@ class CapacitacionController extends Controller
     public function edit_agenda_admin(Request $request)
     {
         $agenda = Capacitacion::find($request->id);
-        $agenda->personas =$request->personas;
-        $agenda->observacion =$request->observacion;
-        $agenda->estado =$request->estado;
+        $agenda->personas = $request->personas;
+        $agenda->observacion = $request->observacion;
+        $agenda->estado = $request->estado;
         $agenda->startDate = $request->endDate;
         $agenda->endDate = $request->endDate;
         $agenda->save();
     }
 
-    public function filtroCapacitacionInstitucion(Request $request){
+    public function filtroCapacitacionInstitucion(Request $request)
+    {
         // $periodo = $this->periodosActivos();
         // if(count($periodo) < 0){
         //     return ["status" => "0","No existe periodos activos"];
@@ -237,14 +253,16 @@ class CapacitacionController extends Controller
         ");
         return $filtro;
     }
-    public function periodosActivos(){
+    public function periodosActivos()
+    {
         $periodo = DB::SELECT("SELECT DISTINCT  p.* FROM periodoescolar p
         LEFT JOIN  codigoslibros c ON p.idperiodoescolar  = c.id_periodo
         WHERE  p.estado = '1'
         ");
         return $periodo;
     }
-    public function getCapacitadores(){
+    public function getCapacitadores()
+    {
         $query = DB::SELECT("SELECT u.idusuario,
         CONCAT(u.nombres, ' ',u.apellidos) AS capacitador
         FROM
@@ -254,15 +272,16 @@ class CapacitacionController extends Controller
        AND u.idusuario <> '70102'
        AND u.idusuario <> '70102'
        ");
-       return $query;
+        return $query;
     }
     //api:get/reporteCapacitacionesGrupal/datos
-    public function reporteCapacitacionesGrupal($periodo){
+    public function reporteCapacitacionesGrupal($periodo)
+    {
         $capacitadores = $this->getCapacitadores();
-        if(!empty($capacitadores)){
-            $datos    = [];
+        if (!empty($capacitadores)) {
+            $datos = [];
             $contador = 0;
-            foreach($capacitadores as $key => $item){
+            foreach ($capacitadores as $key => $item) {
                 //capacitaciones
                 // $query = DB::SELECT("SELECT *
                 // from seminarios s
@@ -279,9 +298,9 @@ class CapacitacionController extends Controller
                 AND s.periodo_id = '$periodo'
                 ");
                 $datos[$contador] = [
-                    "idusuario"     => $item->idusuario,
-                    "capacitador"   => $item->capacitador,
-                    "contador"      => sizeof($query)
+                    "idusuario" => $item->idusuario,
+                    "capacitador" => $item->capacitador,
+                    "contador" => sizeof($query)
                 ];
                 $contador++;
             }
@@ -289,74 +308,80 @@ class CapacitacionController extends Controller
         }
     }
     //api:get/reporteCapacitaciones
-    public function reporteCapacitaciones($data){
+    public function reporteCapacitaciones($data)
+    {
         //Variables
-        $valores        = explode("*", $data);
-        $idusuario      = $valores[0];
+        $valores = explode("*", $data);
+        $idusuario = $valores[0];
         //tipoFiltro => 0 = por periodo; 1 = por meses;
-        $tipoFiltro     = $valores[1];
+        $tipoFiltro = $valores[1];
         //value => periodo_id,anio
-        $value          = $valores[2];
+        $value = $valores[2];
         $datos = [];
         $contador = 0;
         //obtener las instituciones
         $query = $this->getInstitucionesCapacitaciones($idusuario);
-        if(empty($query)){
+        if (empty($query)) {
             return $datos;
         }
-        foreach($query as $key => $item){
+        foreach ($query as $key => $item) {
             $reporte = [];
             //Institucion Prolipa
-            if($item->estado_institucion_temporal == 0){
+            if ($item->estado_institucion_temporal == 0) {
                 //filtro por periodo
-                if($tipoFiltro == 0)   $reporte= $this->getReportePeriodoInstitucion($idusuario,$value,$item->id_institucion);
+                if ($tipoFiltro == 0)
+                    $reporte = $this->getReportePeriodoInstitucion($idusuario, $value, $item->id_institucion);
                 //filtro por meses
-                if($tipoFiltro == 1)   $reporte = $this->getReporteInstitucion($idusuario,$value,$item->id_institucion);
+                if ($tipoFiltro == 1)
+                    $reporte = $this->getReporteInstitucion($idusuario, $value, $item->id_institucion);
             }
             //Institucion Temporal
-            else{
+            else {
                 //filtro por periodo
-                if($tipoFiltro == 0)   $reporte = $this->getReportePeriodoInstitucionTemporal($idusuario,$value,$item->nombre_institucion_temporal);
+                if ($tipoFiltro == 0)
+                    $reporte = $this->getReportePeriodoInstitucionTemporal($idusuario, $value, $item->nombre_institucion_temporal);
                 //filtro por meses
-                if($tipoFiltro == 1)   $reporte = $this->getReporteInstitucionTemporal($idusuario,$value,$item->nombre_institucion_temporal);
+                if ($tipoFiltro == 1)
+                    $reporte = $this->getReporteInstitucionTemporal($idusuario, $value, $item->nombre_institucion_temporal);
             }
             $data = [];
-            if($tipoFiltro == 1){
+            if ($tipoFiltro == 1) {
                 $data[0] = [
-                    "Ene" =>$reporte[0]->Ene == NULL ? '0':$reporte[0]->Ene,
-                    "Feb" =>$reporte[0]->Feb == NULL ? '0':$reporte[0]->Feb,
-                    "Mar" =>$reporte[0]->Mar == NULL ? '0':$reporte[0]->Mar,
-                    "Abr" =>$reporte[0]->Abr == NULL ? '0':$reporte[0]->Abr,
-                    "May" =>$reporte[0]->May == NULL ? '0':$reporte[0]->May,
-                    "Jun" =>$reporte[0]->Jun == NULL ? '0':$reporte[0]->Jun,
-                    "Jul" =>$reporte[0]->Jul == NULL ? '0':$reporte[0]->Jul,
-                    "Ago" =>$reporte[0]->Ago == NULL ? '0':$reporte[0]->Ago,
-                    "Sep" =>$reporte[0]->Sep == NULL ? '0':$reporte[0]->Sep,
-                    "Oct" =>$reporte[0]->Oct == NULL ? '0':$reporte[0]->Oct,
-                    "Nov" =>$reporte[0]->Nov == NULL ? '0':$reporte[0]->Nov,
-                    "Dic" =>$reporte[0]->Feb == NULL ? '0':$reporte[0]->Dic
+                    "Ene" => $reporte[0]->Ene == NULL ? '0' : $reporte[0]->Ene,
+                    "Feb" => $reporte[0]->Feb == NULL ? '0' : $reporte[0]->Feb,
+                    "Mar" => $reporte[0]->Mar == NULL ? '0' : $reporte[0]->Mar,
+                    "Abr" => $reporte[0]->Abr == NULL ? '0' : $reporte[0]->Abr,
+                    "May" => $reporte[0]->May == NULL ? '0' : $reporte[0]->May,
+                    "Jun" => $reporte[0]->Jun == NULL ? '0' : $reporte[0]->Jun,
+                    "Jul" => $reporte[0]->Jul == NULL ? '0' : $reporte[0]->Jul,
+                    "Ago" => $reporte[0]->Ago == NULL ? '0' : $reporte[0]->Ago,
+                    "Sep" => $reporte[0]->Sep == NULL ? '0' : $reporte[0]->Sep,
+                    "Oct" => $reporte[0]->Oct == NULL ? '0' : $reporte[0]->Oct,
+                    "Nov" => $reporte[0]->Nov == NULL ? '0' : $reporte[0]->Nov,
+                    "Dic" => $reporte[0]->Feb == NULL ? '0' : $reporte[0]->Dic
                 ];
-            }else{
+            } else {
                 $data = $reporte;
             }
             $datos[$contador] = [
-                "id_usuario"                    => $item->id_usuario,
-                "asesor"                        => $item->asesor,
-                "id_institucion"                => $item->id_institucion,
-                "estado_institucion_temporal"   => $item->estado_institucion_temporal,
-                "nombreInstitucion"             => $item->nombreInstitucion,
-                "nombre_institucion_temporal"   => $item->nombre_institucion_temporal,
-                "periodo_id"                    => $item->periodo_id,
-                "ciudad_temporal"               => $item->ciudad_temporal,
-                "ciudad"                        => $item->ciudad,
-                "periodo"                       => $item->periodo,
-                "reporte"                       => $data
+                "id_usuario" => $item->id_usuario,
+                "asesor" => $item->asesor,
+                "id_institucion" => $item->id_institucion,
+                "estado_institucion_temporal" => $item->estado_institucion_temporal,
+                "nombreInstitucion" => $item->nombreInstitucion,
+                "nombre_institucion_temporal" => $item->nombre_institucion_temporal,
+                "periodo_id" => $item->periodo_id,
+                "ciudad_temporal" => $item->ciudad_temporal,
+                "ciudad" => $item->ciudad,
+                "periodo" => $item->periodo,
+                "reporte" => $data
             ];
             $contador++;
         }
         return $datos;
     }
-    public function getInstitucionesCapacitaciones($idusuario){
+    public function getInstitucionesCapacitaciones($idusuario)
+    {
         $query = DB::SELECT("SELECT DISTINCT s.id_usuario,s.id_institucion,
             s.estado_institucion_temporal,i.nombreInstitucion,s.nombre_institucion_temporal,
             s.periodo_id,temp.ciudad AS ciudad_temporal,
@@ -391,7 +416,8 @@ class CapacitacionController extends Controller
         // ");
     }
     //========FILTRO POR PERIODO=========
-    public function getReportePeriodoInstitucion($idusuario,$periodo,$institucion){
+    public function getReportePeriodoInstitucion($idusuario, $periodo, $institucion)
+    {
         // $query = DB::SELECT("SELECT s.nombre as tema,  SUBSTRING(s.fecha_inicio, 1, 10) AS fecha_inicio,s.capacitador
         //     from seminarios s
         //     WHERE s.tipo_webinar = '2'
@@ -412,7 +438,8 @@ class CapacitacionController extends Controller
         ");
         return $query;
     }
-    public function getReportePeriodoInstitucionTemporal($idusuario,$periodo,$institucion){
+    public function getReportePeriodoInstitucionTemporal($idusuario, $periodo, $institucion)
+    {
         // $query = DB::SELECT("SELECT
         //     s.nombre as tema, s.fecha_inicio_temp,s.capacitador
         //     from seminarios s
@@ -436,7 +463,8 @@ class CapacitacionController extends Controller
         return $query;
     }
     //========FILTRO POR MESES===========
-    public function getReporteInstitucion($idusuario,$anio,$institucion){
+    public function getReporteInstitucion($idusuario, $anio, $institucion)
+    {
         // $reporteMes = DB::SELECT("SELECT
         // sum(case when month(fecha_inicio) = 1 then 1 else 0 end) Ene
         // , sum(case when month(fecha_inicio) = 2 then 1 else 0 end) Feb
@@ -480,7 +508,8 @@ class CapacitacionController extends Controller
          ");
         return $reporteMes;
     }
-    public function getReporteInstitucionTemporal($idusuario,$anio,$institucion){
+    public function getReporteInstitucionTemporal($idusuario, $anio, $institucion)
+    {
         // $reporteMes = DB::SELECT("SELECT
         // sum(case when month(fecha_inicio) = 1 then 1 else 0 end) Ene
         // , sum(case when month(fecha_inicio) = 2 then 1 else 0 end) Feb

@@ -24,14 +24,15 @@ class DistribuidorController extends Controller
     {
         if($request->getDistribuidores)             { return $this->getDistribuidores(); }
         if($request->getDistribuidorTemporadas)     { return $this->getDistribuidorTemporadas(); }
+        if($request->getDistribuidorTemporadasXId)  { return $this->getDistribuidorTemporadasXId($request->id); }
         if($request->getUserxRol)                   { return $this->userxRol(11); }
     }
     public function getDistribuidores(){
-        $query = DB::SELECT("SELECT 
+        $query = DB::SELECT("SELECT
         CONCAT(u.nombres, ' ',u.apellidos) AS distribuidorUser, u.cedula,d.*
         FROM distribuidor  d
         LEFT JOIN usuario u ON d.idusuario = u.idusuario
-        ORDER BY d.distribuidor_id DESC 
+        ORDER BY d.distribuidor_id DESC
         ");
         return $query;
     }
@@ -42,8 +43,71 @@ class DistribuidorController extends Controller
          FROM distribuidor_temporada dt
         LEFT JOIN usuario u ON dt.idusuario = u.idusuario
         LEFT JOIN periodoescolar p ON dt.periodo_id = p.idperiodoescolar
-        ORDER BY dt.id DESC 
+        ORDER BY dt.id DESC
         ");
+        $datos=[];
+        foreach($query as $key => $item){
+            $getValorPendiente = 0;
+            $query2 = $this->getPendienteAprobarxDistribudor($item->id); 
+            if(empty($query2)) {  $getValorPendiente = 0;}
+            else { $getValorPendiente = $query2[0]->valorPendiente; }
+            $datos[$key] = [
+                "id"                => $item->id,
+                "idusuario"         => $item->idusuario,
+                "periodo_id"        => $item->periodo_id,
+                "saldo_inicial"     => $item->saldo_inicial,
+                "saldo_final"       => $item->saldo_final,
+                "saldo_actual"      => $item->saldo_actual,
+                "user_created"      => $item->user_created,
+                "created_at"        => $item->created_at,
+                "updated_at"        => $item->updated_at,
+                "distribuidorUser"  => $item->distribuidorUser,
+                "periodoescolar"    => $item->periodoescolar,
+                "pendienteAprobar"  => $getValorPendiente == null || $getValorPendiente == "" ? 0 : $getValorPendiente
+            ];
+        }
+        return $datos;
+    }
+    public function getDistribuidorTemporadasXId($id){
+        $query = DB::SELECT("SELECT dt.*,
+        CONCAT(u.nombres, ' ',u.apellidos) AS distribuidorUser,
+        p.periodoescolar
+         FROM distribuidor_temporada dt
+        LEFT JOIN usuario u ON dt.idusuario = u.idusuario
+        LEFT JOIN periodoescolar p ON dt.periodo_id = p.idperiodoescolar
+        WHERE dt.id = ?
+        ORDER BY dt.id DESC
+        ",[$id]);
+        $datos=[];
+        foreach($query as $key => $item){
+            $getValorPendiente = 0;
+            $query2 = $this->getPendienteAprobarxDistribudor($item->id); 
+            if(empty($query2)) {  $getValorPendiente = 0;}
+            else { $getValorPendiente = $query2[0]->valorPendiente; }
+            $datos[$key] = [
+                "id"                => $item->id,
+                "idusuario"         => $item->idusuario,
+                "periodo_id"        => $item->periodo_id,
+                "saldo_inicial"     => $item->saldo_inicial,
+                "saldo_final"       => $item->saldo_final,
+                "saldo_actual"      => $item->saldo_actual,
+                "user_created"      => $item->user_created,
+                "created_at"        => $item->created_at,
+                "updated_at"        => $item->updated_at,
+                "distribuidorUser"  => $item->distribuidorUser,
+                "periodoescolar"    => $item->periodoescolar,
+                "pendienteAprobar"  => $getValorPendiente == null || $getValorPendiente == "" ? 0 : $getValorPendiente
+            ];
+        }
+        return $datos;
+    }
+    public function getPendienteAprobarxDistribudor($distribuidorTemp){
+        $query = DB::SELECT("SELECT SUM(pd.valor) AS valorPendiente
+        FROM verificaciones_pagos_detalles pd
+        lEFT JOIN verificaciones_pagos vp ON vp.verificacion_pago_id = pd.verificacion_pago_id
+        WHERE pd.distribuidor_temporada_id = ?
+       AND vp.estado = '0'
+        ",[$distribuidorTemp]);
         return $query;
     }
     public function getTemporadaDistribuidor($idusuario,$periodo_id){
@@ -101,7 +165,7 @@ class DistribuidorController extends Controller
         }
     }
     public function save_distribuidorTemporada($request){
-   
+
         if($request->id){
             $distribuidorT = DistribuidorTemporada::findOrFail($request->id);
         }else{
@@ -111,7 +175,8 @@ class DistribuidorController extends Controller
                 return ["status" => "0","message" => "Ya existe asignado una temporada para el distribuidor"];
             }
             $distribuidorT = new DistribuidorTemporada();
-            $distribuidorT->periodo_id       = $request->periodo_id;
+            $distribuidorT->periodo_id      = $request->periodo_id;
+            $distribuidorT->saldo_actual    = $request->saldo_inicial;
         }
         $distribuidorT->idusuario        = $request->idusuario;
         $distribuidorT->saldo_inicial    = $request->saldo_inicial;
@@ -130,7 +195,7 @@ class DistribuidorController extends Controller
             'apellidos'                 => 'required',
             'email'                     => 'required|email|unique:usuario',
             'institucion_idInstitucion' => 'required',
-        ]);      
+        ]);
         // LUEGO SE GUARDA EN BASE PROLIPA
         $password                           = sha1(md5($request->cedula));
         $user                               = new User();

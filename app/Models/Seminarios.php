@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class Seminarios extends Model
 {
@@ -21,5 +23,27 @@ class Seminarios extends Model
         'capacitador',
         'cant_asistentes',
         'asistencia_activa',
+        'id_usuario',
+        'tipo'
     ];
+
+    public function institucion(): BelongsTo
+    {
+        return $this->belongsTo(Institucion::class, 'id_institucion');
+    }
+
+    public function asesor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'id_usuario');
+    }
+
+    public function periodo(): BelongsTo
+    {
+        return $this->belongsTo(Periodo::class, 'periodo_id');
+    }
+
+    public function capacitadores(): BelongsToMany
+    {
+        return $this->belongsToMany(Usuario::class, 'seminarios_capacitador', 'seminario_id', 'idusuario');
+    }
 }

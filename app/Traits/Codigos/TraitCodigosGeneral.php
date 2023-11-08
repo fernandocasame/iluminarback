@@ -67,7 +67,8 @@ trait TraitCodigosGeneral{
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2') then 'codigo regalado'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
                 when (c.estado_liquidacion = '3') then 'codigo devuelto'
             end) as liquidacion,
             (case when (c.bc_estado = '2') then 'codigo leido'
@@ -99,7 +100,7 @@ trait TraitCodigosGeneral{
             ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
             p.periodoescolar as periodo,
             pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
-            c.codigo_paquete,c.fecha_registro_paquete
+            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
             FROM codigoslibros c
             LEFT JOIN usuario u ON c.idusuario = u.idusuario
             LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
@@ -168,7 +169,8 @@ trait TraitCodigosGeneral{
                 "codigo_union"                  => $item->codigo_union,
                 "codigo_paquete"                => $item->codigo_paquete,
                 "fecha_registro_paquete"        => $item->fecha_registro_paquete,
-                "verificacion"                  => $item->verificacion
+                "verificacion"                  => $item->verificacion,
+                "liquidado_regalado"            => $item->liquidado_regalado
             ];
         }
         return $datos;

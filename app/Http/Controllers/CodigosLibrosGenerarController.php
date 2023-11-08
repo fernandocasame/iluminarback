@@ -410,7 +410,8 @@ class CodigosLibrosGenerarController extends Controller
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2') then 'codigo regalado'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
                 when (c.estado_liquidacion = '3') then 'codigo devuelto'
             end) as liquidacion,
             (case when (c.bc_estado = '2') then 'codigo leido'
@@ -429,7 +430,7 @@ class CodigosLibrosGenerarController extends Controller
             p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
             c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
             ivl.nombreInstitucion as InstitucionLista,
-            c.codigo_paquete,c.fecha_registro_paquete
+            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
             from codigoslibros c
             LEFT JOIN usuario u on u.idusuario = c.idusuario
             LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
@@ -458,9 +459,11 @@ class CodigosLibrosGenerarController extends Controller
             c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
             c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
             IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2') then 'codigo regalado'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
                 when (c.estado_liquidacion = '3') then 'codigo devuelto'
             end) as liquidacion,
             (case when (c.bc_estado = '2') then 'codigo leido'
@@ -479,7 +482,7 @@ class CodigosLibrosGenerarController extends Controller
             p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
             c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
             ivl.nombreInstitucion as InstitucionLista,
-            c.codigo_paquete,c.fecha_registro_paquete
+            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
             from codigoslibros c
             LEFT JOIN usuario u on u.idusuario = c.idusuario
             LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
@@ -530,9 +533,10 @@ class CodigosLibrosGenerarController extends Controller
         c.estado_liquidacion,bc_institucion,bc_periodo,
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
         (case when (c.estado_liquidacion = '0') then 'liquidado'
-             when (c.estado_liquidacion = '1') then 'sin liquidar'
-             when (c.estado_liquidacion = '2') then 'codigo regalado'
-             when (c.estado_liquidacion = '3') then 'codigo devuelto'
+            when (c.estado_liquidacion = '1') then 'sin liquidar'
+            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
+            when (c.estado_liquidacion = '3') then 'codigo devuelto'
         end) as liquidacion,
         (case when (c.bc_estado = '2') then 'codigo leido'
              when (c.bc_estado = '1') then 'codigo sin leer'
@@ -547,7 +551,8 @@ class CodigosLibrosGenerarController extends Controller
         c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
         (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
           c.updated_at as registrado, u.cedula as cedula, u.nombres, u.apellidos, u.email,
-          p.periodoescolar as periodo, pb.periodoescolar as periodo_barras
+          p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,
+          c.liquidado_regalado
         from codigoslibros c
         LEFT JOIN usuario u on u.idusuario = c.idusuario
         LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo

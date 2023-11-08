@@ -195,14 +195,17 @@ class PedidosController extends Controller
                 $pedido->convenio_anios     = $request->convenio_anios;
             }
             $pedido->save();
-            //ACTUALIZAR INSTITUCION
-            $uinstitucion = Institucion::findOrFail($request->institucion);
-            $uinstitucion->telefonoInstitucion         = $request->telefonoInstitucion;
-            $uinstitucion->direccionInstitucion        = $request->direccionInstitucion;
-            $uinstitucion->ruc                         = $request->ruc;
-            $uinstitucion->nivel                       = $request->nivel;
-            $uinstitucion->tipo_descripcion            = $request->tipo_descripcion;
-            $uinstitucion->save();
+            if($request->generarNuevo == 'yes'){
+            }else{
+                //ACTUALIZAR INSTITUCION
+                $uinstitucion = Institucion::findOrFail($request->institucion);
+                $uinstitucion->telefonoInstitucion         = $request->telefonoInstitucion;
+                $uinstitucion->direccionInstitucion        = $request->direccionInstitucion;
+                $uinstitucion->ruc                         = $request->ruc;
+                $uinstitucion->nivel                       = $request->nivel;
+                $uinstitucion->tipo_descripcion            = $request->tipo_descripcion;
+                $uinstitucion->save();
+            }
             //SI FACTURADOR O ADMIN MODIFICAN EL ANTICIPO APROBADO LO GUARDO EN UN HISTORICO
             if($request->modificarAnticipoAprobado == 1){
                 $this->saveHistoricoAnticipos($request);
@@ -1162,8 +1165,7 @@ class PedidosController extends Controller
             WHERE  a.id_pedido = p.id_pedido
             AND a.estado_alcance  = '1'
             AND ped.estado = '1'
-        ) as contadorAlcanceCerrado,pe.periodoescolar,
-        p.cobro_venta_directa,p.tipoPago
+        ) as contadorAlcanceCerrado,pe.periodoescolar
         FROM pedidos p
         INNER JOIN usuario u ON p.id_asesor = u.idusuario
         INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -1225,8 +1227,7 @@ class PedidosController extends Controller
                 WHERE  a.id_pedido = p.id_pedido
                 AND a.estado_alcance  = '1'
                 AND ped.estado = '1'
-            ) as contadorAlcanceCerrado,pe.periodoescolar,
-            p.cobro_venta_directa,p.tipoPago
+            ) as contadorAlcanceCerrado,pe.periodoescolar
             FROM pedidos p
             INNER JOIN usuario u ON p.id_asesor = u.idusuario
             INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
@@ -1508,7 +1509,7 @@ class PedidosController extends Controller
           FROM usuario u
           LEFT JOIN sys_group_users g ON g.id = id_group
           WHERE u.estado_idEstado = 1
-          AND (u.id_group = 6 OR u.id_group = 10)
+          AND (u.id_group = 6 OR u.id_group = 10 OR u.id_group = 11)
           AND u.cedula like '%$request->cedula%'
           ");
         return $responsables;
@@ -2024,6 +2025,10 @@ class PedidosController extends Controller
         // //actualizar en pedidos que envio a la bd de milton
         // DB::UPDATE("UPDATE pedidos SET enviarMilton = '1' WHERE id_pedido = '$request->id_pedido' ");
         // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
+    }
+    public function getBeneficiariosXPedido($id_pedido){
+        $query = $this->getAllBeneficiarios($id_pedido);
+        return $query;
     }
     public function getBeneficiarios($id_pedido){
         $query = $this->getAllBeneficiarios($id_pedido);
@@ -3056,6 +3061,61 @@ class PedidosController extends Controller
                 "contratos"     => $datosContratos,
                 "sin_contratos" => $arraySinContrato
             ];
+            } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+    }
+    public function getPedidosXAsesorXPeriodo(Request $request){
+        try {
+            $idusuario  = $request->idusuario;
+            $periodo_id = $request->periodo_id;
+            $pedidos = DB::SELECT("SELECT p.*,
+            ph.estado as historicoEstado,pe.periodoescolar as periodo,
+            i.nombreInstitucion,c.nombre AS nombre_ciudad
+            FROM pedidos p
+            LEFT JOIN pedidos_historico  ph ON p.id_pedido = ph.id_pedido
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            WHERE p.id_asesor  = ?
+            AND   p.id_periodo = ?
+            AND   p.tipo       = '0'
+            ORDER BY p.id_pedido DESC
+            ",[$idusuario,$periodo_id]);
+            $datos = [];
+            foreach($pedidos as $key => $item){
+                $verificaciones = $this->getVerificaciones($item->contrato_generado);
+                $datos[$key] = [
+                    "insNombre"             => $item->nombreInstitucion,
+                    "ciuNombre"             => $item->nombre_ciudad,
+                    "anticipo_aprobado"     => $item->anticipo_aprobado,
+                    "venFecha"              => $item->fecha_generacion_contrato,
+                    "id_institucion"        => $item->id_institucion,
+                    "id_pedido"             => $item->id_pedido,
+                    "periodo"               => $item->periodo,
+                    "id_periodo"            => $item->id_periodo,
+                    "contrato"              => $item->contrato_generado,
+                    "contrato_generado"     => $item->contrato_generado,
+                    "tipo_venta"            => $item->tipo_venta,
+                    "estado"                => $item->estado,
+                    "estado_verificacion"   => $item->estado_verificacion,
+                    "facturacion_vee"       => $item->facturacion_vee,
+                    "tipo_venta_descr"      => $item->tipo_venta_descr,
+                    "fecha_entrega"         => $item->fecha_entrega,
+                    "fecha_envio"           => $item->fecha_envio,
+                    "descuento"             => $item->descuento,
+                    "anticipo"              => $item->anticipo,
+                    "id_asesor"             => $item->id_asesor,
+                    "observacion"           => $item->observacion,
+                    "imagen"                => $item->imagen,
+                    "convenio_anios"        => $item->convenio_anios,
+                    "ifanticipo"            => $item->ifanticipo,
+                    "id_responsable"        => $item->id_responsable,
+                    "historicoEstado"       => $item->historicoEstado,
+                    "verificaciones"        => sizeOf($verificaciones),
+                ];
+            }
+            return $datos;
             } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }

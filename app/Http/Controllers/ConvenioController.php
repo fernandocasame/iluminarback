@@ -167,6 +167,7 @@ class ConvenioController extends Controller
             $query = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
             WHERE cd.id_pedido = '$request->id_pedido'
             AND cd.institucion_id = '$request->institucion_id'
+            AND cd.estado = '1'
             ");
             if(empty($query)){
                 //si es un convenio fuera de prolipa
@@ -185,6 +186,7 @@ class ConvenioController extends Controller
                     $query2 = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
                     WHERE cd.id_pedido = '$request->tempid_pedido'
                     AND cd.institucion_id = '$request->institucion_id'
+                    AND cd.estado = '1'
                     ");
                     if(empty($query2)){
                         //solo se va a crear si tiene contrato

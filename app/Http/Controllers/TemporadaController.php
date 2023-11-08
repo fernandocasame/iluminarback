@@ -655,9 +655,48 @@ class TemporadaController extends Controller
             }
         }
     }
+    //GET/getAllRegalados/{institucion,$periodo}
+    public function getAllRegalados($institucion,$periodo){
+        $key = "getAllRegalados".$institucion.$periodo;
+        if (Cache::has($key)) {
+           $regalados = Cache::get($key);
+        } else {
+            $regalados = DB::SELECT("SELECT c.codigo, c.bc_fecha_ingreso, ls.codigo_liquidacion, l.nombrelibro,
+                (
+                    SELECT
+                        (case when (ci.verif1 > '0') then 'verif1'
+                        when (ci.verif2 > 0) then 'verif2'
+                        when (ci.verif3 > 0) then 'verif3'
+                        when (ci.verif4 > 0) then 'verif4'
+                        when (ci.verif5 > 0) then 'verif5'
+                        when (ci.verif6 > 0) then 'verif6'
+                        when (ci.verif7 > 0) then 'verif7'
+                        when (ci.verif8 > 0) then 'verif8'
+                        when (ci.verif9 > 0) then 'verif9'
+                        when (ci.verif10 > 0) then 'verif10'
+                        end) as verificacion
+                    FROM codigoslibros ci
+                    WHERE ci.codigo = c.codigo
+                ) AS verificacionAsignada
+                FROM codigoslibros c
+                LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+                LEFT JOIN libro l ON ls.idLibro = l.idlibro
+                WHERE
+                (c.bc_institucion = '$institucion'  OR c.venta_lista_institucion = '$institucion')
+                AND c.bc_periodo = '$periodo'
+                AND c.estado_liquidacion = '2'
+                AND c.prueba_diagnostica = '0'
+                ");
+            Cache::put($key,$regalados);
+        }
+        return $regalados;
+    }
     //REGALADOS
-    public function getRegalados($institucion,$periodo){
-        $query = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
+    //API:GET/getRegalados/{institucion}/{periodo}/{num_verificacion}/{idverificacion}
+    public function getRegalados($institucion,$periodo,$num_verificacion,$idverificacion){
+        $getnumVerificacion = "verif".$num_verificacion;
+        $query = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad,
+            c.serie,
             c.libro_idlibro,ls.nombre as nombrelibro,ls.id_serie,a.area_idarea
             FROM codigoslibros c
             LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
@@ -665,13 +704,11 @@ class TemporadaController extends Controller
             LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
             WHERE  c.estado_liquidacion = '2'
             AND c.bc_periodo            = ?
-            AND c.bc_institucion        = ?
+            AND( c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
             AND c.prueba_diagnostica    = '0'
-            AND ls.idLibro              = c.libro_idlibro
-            GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
-            ",
-            [$periodo,$institucion]
-        );
+            AND `$getnumVerificacion`   = ?
+            GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro,ls.id_libro_serie
+        ",[$periodo,$idverificacion]);
         $datos = [];
         $contador = 0;
         foreach($query as $key => $item){
@@ -683,7 +720,7 @@ class TemporadaController extends Controller
                 FROM pedidos_formato f
                 WHERE f.id_serie    = '6'
                 AND f.id_area       = '69'
-                AND f.id_libro      = '$item->libro_id'
+                AND f.id_libro      = '$item->libro_idlibro'
                 AND f.id_periodo    = '$periodo'");
             }else{
                 $query = DB::SELECT("SELECT f.pvp AS precio
@@ -711,15 +748,89 @@ class TemporadaController extends Controller
         }
         return $datos;
     }
-    public function showRegalados($institucion,$periodo,$libro_idlibro){
-        $query = DB::SELECT("SELECT c.codigo FROM codigoslibros c
+    public function showRegalados($institucion,$periodo,$libro_idlibro,$num_verificacion,$idverificacion){
+        $getnumVerificacion = "verif".$num_verificacion;
+        $query = DB::SELECT("SELECT c.codigo
+        FROM codigoslibros c
         WHERE  c.estado_liquidacion = '2'
         AND c.bc_periodo            = ?
-        AND c.bc_institucion        = ?
+        AND (c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
         AND c.prueba_diagnostica    = '0'
         AND c.libro_idlibro         = ?
-        ",[$periodo,$institucion,$libro_idlibro]);
+        AND `$getnumVerificacion`   = ?
+        ",[$periodo,$libro_idlibro,$idverificacion]);
         return $query;
+    }
+    //guardar regalados en verificacion
+    public function saveRegaladosXVerificacion(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        //limpiar cache
+        Cache::flush();
+        $fecha                  = date("Y-m-d H:i:s");
+        $codigos                = json_decode($request->data_codigos);
+        $verificacion           = "verif".$request->num_verificacion;
+        $verificacion_id        = $request->verificacion_id;
+        $contrato               = $request->contrato;
+        foreach($codigos as $key => $item){
+            $codigo_union = "";
+            //limpiar verificaciones
+            $this->quitarRegalado($item->codigo);
+            //guardar verificaciones
+            $this->setVerificacionCodigo($item->codigo,$verificacion_id,$fecha,$verificacion,$contrato);
+            //SI TIENE CODIGO DE UNION LO GUARDO
+            $getCodigo = CodigosLibros::findOrFail($item->codigo);
+            $codigo_union = $getCodigo->codigo_union;
+            if($codigo_union == null || $codigo_union == "null" || $codigo_union == ""){
+            }else{
+                $this->setVerificacionCodigo($codigo_union,$verificacion_id,$fecha,$verificacion,$contrato);
+            }
+        }
+    }
+    public function setVerificacionCodigo($codigo,$verificacion_id,$fecha,$verificacion,$contrato){
+        $codigo = DB::table('codigoslibros')
+        ->where('codigo', '=', $codigo)
+        ->update(
+            [
+                $verificacion       => $verificacion_id,
+                "bc_fecha_ingreso"  => $fecha,
+                "liquidado_regalado" => "1",
+                "contrato"          => $contrato
+            ]
+        );
+    }
+    public function  CleanRegalado(Request $request){
+        Cache::flush();
+        $this->quitarRegalado($request->codigo);
+        $getCodigo = CodigosLibros::findOrFail($request->codigo);
+        $codigo_union = $getCodigo->codigo_union;
+        //si tiene codigo de diagnostico
+        if($codigo_union == null || $codigo_union == "null" || $codigo_union == ""){
+        }else{
+            $this->quitarRegalado($codigo_union);
+        }
+        return ["status" => "0", "message" => "Se guardo correctamente"];
+    }
+    public function quitarRegalado($codigo){
+        $codigo = DB::table('codigoslibros')
+        ->where('codigo', '=', $codigo)
+        ->update(
+            [
+                "verif1"       => null,
+                "verif2"       => null,
+                "verif3"       => null,
+                "verif4"       => null,
+                "verif5"       => null,
+                "verif6"       => null,
+                "verif7"       => null,
+                "verif8"       => null,
+                "verif9"       => null,
+                "verif10"       => null,
+                'liquidado_regalado' => "0",
+                "bc_fecha_ingreso"=>null,
+                "contrato"      => null,
+            ]
+        );
     }
     //API:GET/getliquidadosDevueltos/{contrato}
     public function getliquidadosDevueltos($contrato){
@@ -740,5 +851,63 @@ class TemporadaController extends Controller
     }
     public function limpiarCache(){
         Cache::flush();
+    }
+    public function updateVerificacion(Request $request){
+        $campo  = $request->campo;
+        $campo2 = $request->campo2;
+        $campo3 = $request->campo3;
+        $valor  = $request->valor;
+        $valor2 = $request->valor2;
+        $valor3 = $request->valor3;
+        if($request->actualizarDosCampo){
+            DB::table('verificaciones')
+            ->where('id', $request->verificacion_id)
+            ->update([
+                $campo => $valor,
+                $campo2 => $valor2,
+            ]);
+            return "Se guardo correctamente";
+        }
+        else{
+            $campo = $request->campo;
+            $valor = $request->valor;
+            DB::table('verificaciones')
+            ->where('id', $request->verificacion_id)
+            ->update([
+                $campo => $valor,
+            ]);
+        }
+    }
+    //API:POST/saveDescuentosVerificacion
+    public function saveDescuentosVerificacion(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $data_detalle   = json_decode($request->data_detalle);
+        //actualizar la verificacion con los valores de total de descuento y campo dinamico
+        $totalDescuento     = $request->totalDescuento;
+        $personalizado      = $request->personalizado;
+        $campoPersonalizado = $request->campoPersonalizado == null || $request->campoPersonalizado == "" ? null : $request->campoPersonalizado;
+        $user_created       = $request->user_created;
+        $fecha              = date("Y-m-d H:i:s");
+        $ingreso = DB::table('verificaciones')
+        ->where('id', $request->verificacion_id)
+        ->update([
+            'totalDescuento'        => $totalDescuento,
+            'campoPersonalizado'    => $campoPersonalizado,
+            'personalizado'         => $personalizado,
+            // 'tipoPago'              => 4,
+            // 'cobro_venta_directa'   => 3
+        ]);
+        foreach($data_detalle as $key => $item){
+            $descuento = VerificacionHasInstitucion::findOrFail($item->id_verificacion_inst);
+            $descuento->descripcion             = $item->descripcion;
+            $descuento->cantidad_descontar      = $item->cantidad_descontar;
+            $descuento->porcentaje_descuento    = $item->porcentaje_descuento;
+            $descuento->total_descontar         = $item->total_descontar;
+            $descuento->user_created            = $user_created;
+            $descuento->updated_at              = $fecha;
+            $descuento->save();
+        }
+        return ["status" => "1", "message" => "Se guardo correctamente"];
     }
 }

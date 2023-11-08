@@ -174,12 +174,6 @@ Route::post('traerprofesor','TemporadaController@traerprofesores');
 //=========================FIN API TEMPORADAS===========================
 
 //=========================API PARA LIQUIDACIONES==========================
-Route::resource('verificacion','VerificacionController');
-Route::get('liquidacion/verificacion/{contrato}','VerificacionController@liquidacionVerificacion');
-Route::get('liquidacion/verificacion/{contrato}/{numero}','VerificacionController@liquidacionVerificacionNumero');
-Route::get('liquidacion/codigosperdidos/{contrato}','VerificacionController@codigosperdidos');
-Route::get('liquidacion/codigosmovidos/{contrato}','VerificacionController@codigosmovidos');
-
 //api verificacion nueva
 Route::resource('n_verificacion','VerificacionControllerAnterior');
 Route::get('nliquidacion/verificacion/{contrato}','VerificacionControllerAnterior@liquidacionVerificacion');
@@ -804,6 +798,7 @@ Route::get('salleadministrador','UsuarioController@salleadministrador');
 Route::post('add_edit_user_salle','UsuarioController@add_edit_user_salle');
 Route::post('activa_desactiva_user','UsuarioController@activa_desactiva_user');
 Route::post('updatePassword','UsuarioController@cambiarPassword');
+Route::post('ReiniciarEvaluacion_Salle', 'SallePreguntasController@ReiniciarEvaluacion_Salle')->middleware('auth');
 //instituciones Salle
 Route::get('institucionesSalle','InstitucionController@institucionesSalle');
 // Apis steven
@@ -979,6 +974,7 @@ Route::post('guadarIdsMilton','PedidosController@guadarIdsMilton');
 Route::post('guardarContratoBdMilton','PedidosController@guardarContratoBdMilton');
 Route::get('buscarCoincidenciaInstitucionMilton','PedidosController@buscarCoincidenciaInstitucionMilton');
 Route::get('getBeneficiarios/{pedido}','PedidosController@getBeneficiarios');
+Route::get('getBeneficiariosXPedido/{pedido}','PedidosController@getBeneficiariosXPedido');
 Route::get('mostrarAnticiposAnteriores','PedidosController@mostrarAnticiposAnteriores');
 Route::post('cambiarEstadoHistorico','PedidosController@cambiarEstadoHistorico');
 //guardar la deuda
@@ -1021,6 +1017,7 @@ Route::get('get_pedidos_periodo_Only_pedido/{contrato}/{beneficiario}','PedidosC
 Route::get('get_pedidos_asesor/{periodo}/{asesor}','PedidosController@get_pedidos_asesor');
 Route::post('guardarPedidoGuias','PedidosController@guardarPedidoGuias');
 Route::get('get_pedidos_guias','PedidosController@get_pedidos_guias');
+Route::get('getPedidosXAsesorXPeriodo','PedidosController@getPedidosXAsesorXPeriodo');
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
 Route::post('guardarAnticipoAprobadoContrato','PedidosController@guardarAnticipoAprobadoContrato');
 //api para traer el pedido x id
@@ -1349,9 +1346,17 @@ Route::group(['prefix' => 'grafitex'], function () {
 });
 //=======FIN CODIGOS PAQUTES========================================
 /******REGALADOS */
-Route::get('getRegalados/{institucion}/{periodo}','TemporadaController@getRegalados');
-Route::get('showRegalados/{institucion}/{periodo}/{libro}','TemporadaController@showRegalados');
+Route::get('getAllRegalados/{institucion}/{periodo}','TemporadaController@getAllRegalados');
+Route::get('getRegalados/{institucion}/{periodo}/{num_verificacion}/{idverificacion}','TemporadaController@getRegalados');
+Route::post('saveRegaladosXVerificacion','TemporadaController@saveRegaladosXVerificacion');
+Route::get('showRegalados/{institucion}/{periodo}/{libro}/{num_verificacion}/{idverificacion}','TemporadaController@showRegalados');
 Route::get('getliquidadosDevueltos/{contrato}','TemporadaController@getliquidadosDevueltos');
+Route::post('updateVerificacion','TemporadaController@updateVerificacion');
 Route::get('limpiarCache','TemporadaController@limpiarCache');
 //****API PARA DISTRIBUIDOR */
 Route::resource('distribuidor','DistribuidorController');
+/**APIS DE DESCUENTOS VERIFICACIONES */
+Route::post('saveDescuentosVerificacion','TemporadaController@saveDescuentosVerificacion')->middleware('auth');
+////APIS PAGOS======
+Route::resource('pedigo_Pagos','PedidosPagosController');
+//APIS PAGOS

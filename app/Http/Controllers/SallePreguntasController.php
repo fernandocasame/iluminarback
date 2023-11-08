@@ -358,6 +358,7 @@ class SallePreguntasController extends Controller
                         FROM salle_asignaturas_has_docente sd, salle_asignaturas sa
                         WHERE sd.id_docente = '$id_docente'
                         AND sd.id_asignatura = sa.id_asignatura
+                        AND sd.n_evaluacion  = '$n_evaluacion'
                         AND sa.estado = 1
                     ");
                     //CREAR PREGUNTAS NO AREA BASICA
@@ -437,6 +438,7 @@ class SallePreguntasController extends Controller
         AND sp.id_asignatura = sa.id_asignatura
         AND sa.id_area = sar.id_area
         AND spe.id_evaluacion = '$id_evaluacion'
+        AND sar.n_evaluacion = '$n_evaluacion'
         ORDER BY `sar`.`id_area` ASC;
         ");
         $evaluacion = DB::SELECT("SELECT * FROM salle_evaluaciones WHERE id_evaluacion = '$id_evaluacion' ");
