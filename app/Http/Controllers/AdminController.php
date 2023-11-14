@@ -314,7 +314,7 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-        return "hoila";
+        return "hoila MUNDO";
         try {
             $fecha = date("Y-m-d");
             $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
@@ -344,9 +344,9 @@ class AdminController extends Controller
             //PROCESO GUARDAR
             foreach($data as $key => $item){
                 $formData = [
-                    "proCodigo"             => $item->codigo, 
+                    "proCodigo"             => $item->codigo,
                     "venCodigo"             => $contrato,
-                    "detVerCantidad"        => $item->cantidad, 
+                    "detVerCantidad"        => $item->cantidad,
                     "detVerVerificacion"    => $numeroVerificacion,
                     "detVerFecha"           => $fecha
                 ];
@@ -357,7 +357,7 @@ class AdminController extends Controller
         } catch (\Exception  $ex) {
         return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
-    
+
         // $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
         // $JsonContrato = json_decode($dato, true);
         // return $JsonContrato;
