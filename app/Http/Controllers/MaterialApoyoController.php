@@ -75,7 +75,7 @@ class MaterialApoyoController extends Controller
     }
 
 
-    
+
     public function materialapoyolibro($idlibro)
     {
         $material = DB::select("SELECT m.idmaterial, m.nombrematerial, m.descripcionmaterial, m.webmaterial, m.exematerial, m.imagenmaterial, m.Estado_idEstado, m.zipmaterial FROM material m, material_has_asignatura ma, libro l WHERE m.idmaterial = ma.material_idmaterial AND ma.asignatura_idasignatura = l.asignatura_idasignatura AND l.idlibro = $idlibro");
@@ -100,7 +100,7 @@ class MaterialApoyoController extends Controller
     }
 
 
-    
+
     public function calificaciones_material_curso(Request $request)
     {
         $calificaciones = DB::SELECT("SELECT u.nombres, u.apellidos, u.cedula, u.email, mc.calificacion FROM estudiante e, usuario u, ma_calificaciones_material mc WHERE e.usuario_idusuario = u.idusuario AND e.codigo = '$request->codigo_curso' AND e.usuario_idusuario = mc.id_usuario AND mc.id_material = $request->id_material");
@@ -160,10 +160,10 @@ class MaterialApoyoController extends Controller
     {
         $material = DB::select("SELECT distinct mh.*, m.nombrematerial, a.nombreasignatura
         FROM material m, asignatura a, material_has_asignatura mh
-        WHERE mh.material_idmaterial = m.idmaterial 
+        WHERE mh.material_idmaterial = m.idmaterial
         and mh.asignatura_idasignatura = a.idasignatura
         and a.tipo_asignatura = 1" );
-       
+
         return $material;
     }
     public function todo_asignaturas(){
@@ -172,12 +172,12 @@ class MaterialApoyoController extends Controller
     }
     public function agregar_material_asignaturas(Request $request){
         $material= DB::insert("INSERT INTO material_has_asignatura (material_idmaterial, asignatura_idasignatura) VALUES (?,?)",[$request->material_idmaterial, $request->asignatura_idasignatura]);
-        
+
         return $material .' material asignado ';
     }
     public function editar_material_asignaturas(Request $request){
         $material= DB::UPDATE("UPDATE `material_has_asignatura` SET `material_idmaterial`=$request->material_idmaterial,`asignatura_idasignatura`=$request->asignatura_idasignatura WHERE `id_materia_asignatura` = $request->id_material_asignatura");
-        
+
         return $material .' material editado ';
     }
     public function quitar_material_asignatura(Request $request){
@@ -191,7 +191,7 @@ class MaterialApoyoController extends Controller
     }
     public function registrar_material(Request $request)
     {
-        // $material= DB::insert("INSERT INTO material (nombrematerial, descripcionmaterial, zipmaterial, webmaterial, imagenmaterial, exematerial, Estado_idEstado) VALUES (?,?,?,?,?,?,?)",[$request->nombrematerial, $request->descripcionmaterial, $request->zipmaterial, $request->webmaterial, $request->imagenmaterial, $request->exematerial, $request->Estado_idEstado]); 
+        // $material= DB::insert("INSERT INTO material (nombrematerial, descripcionmaterial, zipmaterial, webmaterial, imagenmaterial, exematerial, Estado_idEstado) VALUES (?,?,?,?,?,?,?)",[$request->nombrematerial, $request->descripcionmaterial, $request->zipmaterial, $request->webmaterial, $request->imagenmaterial, $request->exematerial, $request->Estado_idEstado]);
         // return $material. ' material registrado ';
         // return $request;
 
@@ -231,15 +231,23 @@ class MaterialApoyoController extends Controller
         }
     }
 
-    public function temas_por_material($id_asignatura) 
-    {   
+    public function temas_por_material($id_asignatura)
+    {
 
         if( $id_asignatura == 'null' ){
             $material= DB::SELECT("SELECT DISTINCT a.nombreasignatura, m.nombrematerial, m.idmaterial, a.idasignatura, m.descripcionmaterial, m.descripcionmaterial, m.exematerial, m.webmaterial, m.imagenmaterial, m.zipmaterial, m.Estado_idEstado FROM material m, temas_has_material tm, temas t, asignatura a WHERE m.idmaterial = tm.id_material AND tm.id_tema = t.id AND t.id_asignatura = a.idasignatura");
         }else{
-            $material= DB::SELECT("SELECT DISTINCT a.nombreasignatura, m.nombrematerial, m.idmaterial, a.idasignatura, m.descripcionmaterial, m.descripcionmaterial, m.exematerial, m.webmaterial, m.imagenmaterial, m.zipmaterial, m.Estado_idEstado FROM material m, temas_has_material tm, temas t, asignatura a WHERE m.idmaterial = tm.id_material AND tm.id_tema = t.id AND t.id_asignatura = a.idasignatura AND a.idasignatura = $id_asignatura");
+            $material= DB::SELECT("SELECT DISTINCT a.nombreasignatura, m.nombrematerial, m.idmaterial,
+            a.idasignatura, m.descripcionmaterial, m.descripcionmaterial,
+            m.exematerial, m.webmaterial, m.imagenmaterial, m.zipmaterial, m.Estado_idEstado
+            FROM material m, temas_has_material tm, temas t, asignatura a
+            WHERE m.idmaterial = tm.id_material
+            AND tm.id_tema = t.id
+            AND t.id_asignatura = a.idasignatura
+            AND a.idasignatura = $id_asignatura
+            ");
         }
-        
+
 
         if(!empty($material)){
             foreach ($material as $key => $value) {
@@ -256,7 +264,7 @@ class MaterialApoyoController extends Controller
                     'zipmaterial' => $value->zipmaterial,
                     'estado' => $value->Estado_idEstado,
                     'temas'=>$temas,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -265,12 +273,22 @@ class MaterialApoyoController extends Controller
     }
 
     public function temas_asignatura_material(Request $request){
-        // return $request->id_asignatura;
-        // $temas = DB::select("SELECT * FROM temas WHERE id_asignatura = $request->$id_asignatura ");
-        // return $temas;      
+        // $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id, t.nombre_tema AS label, t.id_asignatura,
+        // t.unidad, a.nombreasignatura, t.clasificacion
+        // FROM temas t, asignatura a
+        // WHERE t.id_asignatura = a.idasignatura
+        // AND t.unidad = $request->unidad
+        // AND t.id_asignatura = $request->asignatura
+        // AND t.estado=1 ORDER BY cast(t.nombre_tema as int) ASC");
 
-        $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id, t.nombre_tema AS label, t.id_asignatura, t.unidad, a.nombreasignatura, t.clasificacion FROM temas t, asignatura a WHERE t.id_asignatura = a.idasignatura AND t.unidad = $request->unidad AND t.id_asignatura = $request->asignatura AND t.estado=1 ORDER BY cast(t.nombre_tema as int) ASC");
-
+        $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id, t.nombre_tema AS label, t.id_asignatura,
+        t.unidad, a.nombreasignatura, t.clasificacion
+          FROM temas t, asignatura a
+        WHERE t.id_asignatura = a.idasignatura
+          AND t.unidad          = ?
+        AND t.id_asignatura     = ?
+        ORDER BY CAST(SUBSTRING_INDEX(t.nombre_tema, ' ', 1) AS SIGNED);
+        ",[$request->unidad,$request->asignatura]);
         return $temas;
 
     }
@@ -284,7 +302,7 @@ class MaterialApoyoController extends Controller
         }else{
             $material = DB::select("SELECT m .*, u.id_group, t.id_asignatura FROM material m, usuario u, temas_has_material tm, temas t WHERE m.creador = u.idusuario AND m.idmaterial = tm.id_material AND tm.id_tema = t.id AND t.id_asignatura = $id_asignatura");
         }
-        
+
         return $material;
     }
     public function eliminarMaterial(Request $request)
@@ -302,29 +320,29 @@ class MaterialApoyoController extends Controller
 
 
     ///METODO PARA BORRAR TEMAS DE UN MATERIAL
-    public function borrar_temas_material(Request $request) 
+    public function borrar_temas_material(Request $request)
     {
         $material= DB::SELECT("SELECT tm.id_tema_material FROM temas_has_material tm, temas t WHERE tm.id_material = $request->idmaterial AND tm.id_tema = t.id AND t.id_asignatura = $request->idasignatura");
 
         if(!empty($material)){
             foreach ($material as $key => $value) {
-                $temas = DB::DELETE("DELETE FROM temas_has_material WHERE id_tema_material = ?",[$value->id_tema_material]);        
+                $temas = DB::DELETE("DELETE FROM temas_has_material WHERE id_tema_material = ?",[$value->id_tema_material]);
             }
         }else{
             $data = [];
         }
-        
+
     }
 
-    
-    public function borrar_material_asig(Request $request) 
+
+    public function borrar_material_asig(Request $request)
     {
         DB::SELECT("DELETE FROM `material_has_asignatura` WHERE `material_idmaterial` = $request->idmaterial AND `asignatura_idasignatura` = $request->idasignatura");
     }
 
 
     public function asignar_cursos_material(Request $request)
-    {   
+    {
         $cursos= DB::SELECT("SELECT * FROM ma_cursos_has_material cm WHERE cm.codigo_curso = '$request->codigo_curso' AND cm.id_material = $request->id_material");
 
         if( empty($cursos) ){
@@ -333,7 +351,7 @@ class MaterialApoyoController extends Controller
         }else{
             return ["status" => "0", "message" => "Este material ya se encuentra asignado a este curso"];
         }
-        
+
     }
 
 }

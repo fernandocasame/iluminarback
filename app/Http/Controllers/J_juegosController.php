@@ -236,11 +236,21 @@ class J_juegosController extends Controller
 
     public function j_juegos_tipo(Request $request)
     {
-        $juego= DB::SELECT("SELECT DISTINCT j . * FROM j_juegos j, j_temas_por_juego jt, temas t WHERE j.id_tipo_juego = $request->id_tipo_juego AND j.id_docente = $request->id_docente AND j.id_juego = jt.id_juego AND jt.id_tema = t.id AND t.id_asignatura = $request->id_asignatura");
+        $juego= DB::SELECT("SELECT DISTINCT j . *
+        FROM j_juegos j, j_temas_por_juego jt, temas t
+        WHERE j.id_tipo_juego = $request->id_tipo_juego
+        AND j.id_docente = $request->id_docente
+        AND j.id_juego = jt.id_juego
+        AND jt.id_tema = t.id
+        AND t.id_asignatura = $request->id_asignatura");
 
         if(!empty($juego)){
             foreach ($juego as $key => $value) {
-                $temas = DB::SELECT("SELECT * FROM j_temas_por_juego tj, temas t, asignatura a WHERE tj.id_tema = t.id AND t.id_asignatura = a.idasignatura AND tj.id_juego = ?",[$value->id_juego]);
+                $temas = DB::SELECT("SELECT *
+                FROM j_temas_por_juego tj, temas t, asignatura a
+                WHERE tj.id_tema = t.id
+                AND t.id_asignatura = a.idasignatura
+                AND tj.id_juego = ?",[$value->id_juego]);
                 $data['items'][$key] = [
                     'id_juego' => $value->id_juego,
                     'id_tipo_juego' => $value->id_tipo_juego,
@@ -266,11 +276,22 @@ class J_juegosController extends Controller
 
     public function j_juegos_tipo_prolipa(Request $request)
     {
-        $juego= DB::SELECT("SELECT DISTINCT j . * FROM j_juegos j, j_temas_por_juego jt, temas t, usuario u WHERE j.id_tipo_juego = $request->id_tipo_juego AND j.estado = 1 AND j.id_juego = jt.id_juego AND jt.id_tema = t.id AND t.id_asignatura = $request->id_asignatura AND j.id_docente = u.idusuario AND u.id_group != 6");
-
+        $juego= DB::SELECT("SELECT DISTINCT j . *
+        FROM j_juegos j, j_temas_por_juego jt, temas t, usuario u
+        WHERE j.id_tipo_juego = $request->id_tipo_juego
+        AND j.estado = 1
+        AND j.id_juego = jt.id_juego
+        AND jt.id_tema = t.id
+        AND t.id_asignatura = $request->id_asignatura
+        AND j.id_docente = u.idusuario AND u.id_group != 6
+        ");
         if(!empty($juego)){
             foreach ($juego as $key => $value) {
-                $temas = DB::SELECT("SELECT * FROM j_temas_por_juego tj, temas t, asignatura a WHERE tj.id_tema = t.id AND t.id_asignatura = a.idasignatura AND tj.id_juego = ?",[$value->id_juego]);
+                $temas = DB::SELECT("SELECT *
+                FROM j_temas_por_juego tj, temas t, asignatura a
+                WHERE tj.id_tema = t.id
+                AND t.id_asignatura = a.idasignatura
+                AND tj.id_juego = ?",[$value->id_juego]);
                 $data['items'][$key] = [
                     'id_juego' => $value->id_juego,
                     'id_tipo_juego' => $value->id_tipo_juego,
@@ -290,9 +311,48 @@ class J_juegosController extends Controller
             $data = [];
         }
         return $data;
-
     }
-
+    public function j_juegos_tipo_prolipaTodos(Request $request)
+    {
+        $juego= DB::SELECT("SELECT DISTINCT j . *,tp.nombre_tipo_juego
+        FROM j_juegos j, j_temas_por_juego jt, temas t, usuario u,j_tipos_juegos tp
+        WHERE j.estado      = 1
+        AND j.id_juego      = jt.id_juego
+        AND jt.id_tema      = t.id
+        AND j.id_tipo_juego = tp.id_tipo_juego
+        AND t.id_asignatura = '$request->id_asignatura'
+        AND j.id_docente    = u.idusuario 
+        AND u.id_group      != 6
+        AND t.unidad        = '$request->unidad'
+        ");
+        if(!empty($juego)){
+            foreach ($juego as $key => $value) {
+                $temas = DB::SELECT("SELECT *
+                FROM j_temas_por_juego tj, temas t, asignatura a
+                WHERE tj.id_tema = t.id
+                AND t.id_asignatura = a.idasignatura
+                AND tj.id_juego = ?",[$value->id_juego]);
+                $data['items'][$key] = [
+                    'id_juego' => $value->id_juego,
+                    'id_tipo_juego' => $value->id_tipo_juego,
+                    'id_docente' => $value->id_docente,
+                    'puntos' => $value->puntos,
+                    'duracion' => $value->duracion,
+                    'nombre_juego' => $value->nombre_juego,
+                    'descripcion_juego' => $value->descripcion_juego,
+                    'imagen_juego' => $value->imagen_juego,
+                    'fecha_inicio' => $value->fecha_inicio,
+                    'fecha_fin' => $value->fecha_fin,
+                    'estado_juego' => $value->estado,
+                    'nombre_tipo_juego'=> $value->nombre_tipo_juego,
+                    'temas'=>$temas,
+                ];
+            }
+        }else{
+            $data = [];
+        }
+        return $data;
+    }
 
     public function j_juegos_tipo_curso_doc(Request $request)
     {

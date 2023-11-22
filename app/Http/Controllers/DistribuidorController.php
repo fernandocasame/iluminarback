@@ -26,6 +26,7 @@ class DistribuidorController extends Controller
         if($request->getDistribuidorTemporadas)     { return $this->getDistribuidorTemporadas(); }
         if($request->getDistribuidorTemporadasXId)  { return $this->getDistribuidorTemporadasXId($request->id); }
         if($request->getUserxRol)                   { return $this->userxRol(11); }
+        if($request->movimientosDistribuidor)       { return $this->movimientosDistribuidor(); }
     }
     public function getDistribuidores(){
         $query = DB::SELECT("SELECT
@@ -100,6 +101,19 @@ class DistribuidorController extends Controller
             ];
         }
         return $datos;
+    }
+    public function movimientosDistribuidor(){
+        $query = DB::SELECT("SELECT h.*, pe.periodoescolar AS periodo,
+        CONCAT(u.nombres,' ',u.apellidos) AS distribuidor,
+        CONCAT(edit.nombres,' ',edit.apellidos) AS editor
+         FROM distribuidor_historico h
+        LEFT JOIN periodoescolar pe ON h.periodo_id = pe.idperiodoescolar
+        LEFT JOIN distribuidor d ON  h.distribuidor_id = d.distribuidor_id
+        LEFT JOIN usuario u ON d.idusuario = u.idusuario
+        LEFT JOIN usuario edit ON h.user_created = edit.idusuario
+        WHERE pe.estado = '1'
+        ");
+        return $query;
     }
     public function getPendienteAprobarxDistribudor($distribuidorTemp){
         $query = DB::SELECT("SELECT SUM(pd.valor) AS valorPendiente

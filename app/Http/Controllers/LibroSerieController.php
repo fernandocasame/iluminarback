@@ -173,10 +173,10 @@ class LibroSerieController extends Controller
     c.libro_idlibro,ls.nombre as nombrelibro
         FROM codigoslibros c
         LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-        WHERE (c.bc_estado = '2' OR c.estado_liquidacion = '0')
-        AND c.estado <> 2
+        WHERE (c.bc_estado = '2' OR c.estado_liquidacion = '0' OR c.estado_liquidacion ='2')
+        -- AND c.estado <> 2
         AND c.bc_periodo  = '$id_periodo'
-        AND c.bc_institucion = '$idinstitucion'
+        AND (c.bc_institucion       = '$idinstitucion' OR c.venta_lista_institucion = '$idinstitucion')
         AND ls.idLibro = c.libro_idlibro
         AND c.prueba_diagnostica = '0'
         GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro

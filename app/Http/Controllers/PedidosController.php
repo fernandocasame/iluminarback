@@ -26,6 +26,7 @@ use App\Models\PedidoGuiaEntrega;
 use App\Models\PedidoGuiaEntregaDetalle;
 use App\Models\PedidoHistoricoCambios;
 use App\Models\Periodo;
+use App\Models\Verificacion;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use Carbon\Carbon;
 use DB;
@@ -1362,27 +1363,7 @@ class PedidosController extends Controller
         }
         return $datos;
     }
-    public function getPedidoXID($id_pedido){
-        $pedido = DB::SELECT("SELECT p.*, pe.periodoescolar as periodo,
-        pe.region_idregion as region, CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
-        u.cedula as cedula_asesor,
-        u.iniciales, i.nombreInstitucion,i.telefonoInstitucion,
-        i.direccionInstitucion, i.ruc, i.tipo_descripcion,
-        i.nivel, c.nombre AS nombre_ciudad, uf.cod_usuario,
-        CONCAT(uf.apellidos, ' ',uf.nombres) as facturador, ph.fecha_generar_contrato,
-        pe.codigo_contrato
-        FROM pedidos p
-        INNER JOIN usuario u ON p.id_asesor = u.idusuario
-        LEFT JOIN usuario uf ON p.id_usuario_verif = uf.idusuario
-        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        LEFT JOIN pedidos_historico ph ON p.id_pedido = ph.id_pedido
-        WHERE p.id_pedido = '$id_pedido'
-        LIMIT 1
-        ");
-        return $pedido;
-    }
+
 
     public function get_pedidos_asesor($periodo, $asesor)
     {
@@ -2027,11 +2008,13 @@ class PedidosController extends Controller
         // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
     }
     public function getBeneficiariosXPedido($id_pedido){
-        $query = $this->getAllBeneficiarios($id_pedido);
+        $query              = $this->getAllBeneficiarios($id_pedido);
         return $query;
     }
-    public function getBeneficiarios($id_pedido){
-        $query = $this->getAllBeneficiarios($id_pedido);
+    public function getBeneficiarios($id_pedido,$tipo,$idVerificacion){
+        //tipo => VENTA REAL GENERAL; 1 => VENTA REAL POR VERIFICACION
+        $pedido     = $this->getPedidoXID($id_pedido);
+        $query      = $this->getAllBeneficiarios($id_pedido);
         $datos = [];
         if(empty($query)){
             return $query;
@@ -2045,13 +2028,18 @@ class PedidosController extends Controller
         //si hay contrato traigo la venta real -
         else{
             try {
-                $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
-                $JsonContrato = json_decode($dato, true);
-                if($JsonContrato == "" || $JsonContrato == null){
-                    return ["status" => "0", "message" => "No existe el contrato en facturación"];
+                $comisionReal       = $pedido[0]->descuento;
+                 //tipo => 0 => VENTA REAL GENERAL; 1 => VENTA REAL POR VERIFICACION
+                if($tipo == 1 ){
+                    $getVentaReal       = Verificacion::findOrFail($idVerificacion);
+                    $ventaReal          = $getVentaReal->venta_real;
+                }else{
+                    $verificaciones     = $this->getVerificaciones($contrato);
+
+                    foreach($verificaciones as $key => $item){
+                        $ventaReal      = $ventaReal + $item->venta_real;
+                    }
                 }
-                $ventaReal      = $JsonContrato["veN_VALOR"];
-                $comisionReal   = $JsonContrato["veN_DESCUENTO"];
             } catch (\Exception  $ex) {
                 return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
             }
@@ -2095,7 +2083,7 @@ class PedidosController extends Controller
         return $datos;
     }
     public function generar_contrato_pedido($id_pedido, $usuario_fact){
-        $validateBeneficiarios = $this->getBeneficiarios($id_pedido);
+        $validateBeneficiarios = $this->getAllBeneficiarios($id_pedido);
         if(empty($validateBeneficiarios)){
             return ["status" => "0", "message" => "Seleccione algun beneficiario para poder guardar"];
         }
@@ -3103,6 +3091,7 @@ class PedidosController extends Controller
                     "tipo_venta_descr"      => $item->tipo_venta_descr,
                     "fecha_entrega"         => $item->fecha_entrega,
                     "fecha_envio"           => $item->fecha_envio,
+                    "total_venta"           => $item->total_venta,
                     "descuento"             => $item->descuento,
                     "anticipo"              => $item->anticipo,
                     "id_asesor"             => $item->id_asesor,
@@ -3120,14 +3109,7 @@ class PedidosController extends Controller
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
         }
     }
-    public function getVerificaciones($contrato){
-        $query = DB::SELECT("SELECT * FROM verificaciones
-            WHERE contrato =  '$contrato'
-            and nuevo = '1'
-            and estado = '0'
-        ");
-        return $query;
-    }
+
     //api:Get/detalleContratoFacturacion
     public function detalleContratoFacturacion(Request $request){
         try {
@@ -4419,6 +4401,21 @@ class PedidosController extends Controller
     }
     //===FIN CARGAR FORMATO ANTERIORES VALORES===
      //===METODOS ROOT===
+    //API:POST/updateBeneficiarios
+    public function updateBeneficiarios(Request $request){
+        if($request->todo){
+            set_time_limit(6000000);
+            ini_set('max_execution_time', 6000000);
+            $beneficiarios                = json_decode($request->beneficiarios);
+            foreach($beneficiarios as $key => $item){
+                $porcentaje = Beneficiarios::findOrFail($item->id_beneficiario_pedido);
+                $porcentaje->porcentaje_real = $item->porcentajeReal;
+                $porcentaje->comision_real   = $item->valorPorcentajeReal;
+                $porcentaje->save();
+            }
+            return ["status" => "1", "message" => "Se guardo correctamente"];
+        }
+    }
     //api:post/actualizarPedido
     public function actualizarPedido(Request $request){
         if($request->changeRevisonNotificacion){

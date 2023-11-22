@@ -37,6 +37,8 @@ class PedidosPagosController extends Controller
         if($request->actualizarValorPago)   { return $this->actualizarValorPago($request->verificacion_pago_id); }
         //validar si no hay un pago pendiente por aprobar
         if($request->validatePagoAbierto)   { return $this->validatePagoAbierto($request->contrato); }
+        //traer los tipos de pagos facturacion
+        if($request->tipoPagosFacturacion)  { return $this->pagoRepository->tipoPagosFacturacion(); }
     }
     public function ListadoListaPagos($request){
         $query = VerificacionPago::Where('contrato',$request->contrato)

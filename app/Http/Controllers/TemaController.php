@@ -101,19 +101,26 @@ class TemaController extends Controller
     }
     public function temasignunidad(Request $request)
     {
-        // $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id,
-        // t.nombre_tema AS label, t.id_asignatura,
+       
+        // $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id, t.nombre_tema AS label, t.id_asignatura,
         // t.unidad, a.nombreasignatura, t.clasificacion
-        // FROM temas t, asignatura a
+        // FROM temas t, asignatura a 
         // WHERE t.id_asignatura = a.idasignatura 
         // AND t.unidad = $request->unidad 
         // AND t.id_asignatura = $request->asignatura 
         // AND t.estado=1 
-        // -- ORDER BY cast(t.nombre_tema as int) ASC
+        // ORDER BY cast(t.nombre_tema as int) ASC
         // ");
-
-        $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id, t.nombre_tema AS label, t.id_asignatura, t.unidad, a.nombreasignatura, t.clasificacion FROM temas t, asignatura a WHERE t.id_asignatura = a.idasignatura AND t.unidad = $request->unidad AND t.id_asignatura = $request->asignatura AND t.estado=1 ORDER BY cast(t.nombre_tema as int) ASC");
-
+        // return $temas;
+        $temas = DB::SELECT("SELECT t.nombre_tema, t.id AS id, t.nombre_tema AS label, t.id_asignatura,
+        t.unidad, a.nombreasignatura, t.clasificacion
+        FROM temas t, asignatura a 
+        WHERE t.id_asignatura = a.idasignatura 
+        AND t.unidad        = ?
+        AND t.id_asignatura = ?
+        AND t.estado=1 
+        ORDER BY CAST(SUBSTRING_INDEX(t.nombre_tema, ' ', 1) AS SIGNED);
+        ",[$request->unidad,$request->asignatura]);
         return $temas;
     }
 

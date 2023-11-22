@@ -82,7 +82,7 @@ trait TraitCodigosGeneral{
                 when (c.venta_estado = '2') then 'Venta por lista'
             end) as ventaEstado,
             (
-                SELECT 
+                SELECT
                     (case when (ci.verif1 > '0') then 'verif1'
                     when (ci.verif2 > 0) then 'verif2'
                     when (ci.verif3 > 0) then 'verif3'
@@ -174,6 +174,121 @@ trait TraitCodigosGeneral{
             ];
         }
         return $datos;
+    }
+    public function getCodigosXDocumento($factura){
+        $consulta = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.porcentaje_descuento,
+            c.libro as book,c.serie,c.created_at,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+            c.contrato,c.libro, c.venta_lista_institucion,
+            CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+            i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
+            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+            (case when (c.estado_liquidacion = '0') then 'liquidado'
+                when (c.estado_liquidacion = '1') then 'sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
+                when (c.estado_liquidacion = '3') then 'codigo devuelto'
+            end) as liquidacion,
+            (case when (c.bc_estado = '2') then 'codigo leido'
+            when (c.bc_estado = '1') then 'codigo sin leer'
+            end) as barrasEstado,
+            (case when (c.codigos_barras = '1') then 'con código de barras'
+                when (c.codigos_barras = '0')  then 'sin código de barras'
+            end) as status,
+            (case when (c.venta_estado = '0') then ''
+                when (c.venta_estado = '1') then 'Venta directa'
+                when (c.venta_estado = '2') then 'Venta por lista'
+            end) as ventaEstado,
+            (
+                SELECT
+                    (case when (ci.verif1 > '0') then 'verif1'
+                    when (ci.verif2 > 0) then 'verif2'
+                    when (ci.verif3 > 0) then 'verif3'
+                    when (ci.verif4 > 0) then 'verif4'
+                    when (ci.verif5 > 0) then 'verif5'
+                    when (ci.verif6 > 0) then 'verif6'
+                    when (ci.verif7 > 0) then 'verif7'
+                    when (ci.verif8 > 0) then 'verif8'
+                    when (ci.verif9 > 0) then 'verif9'
+                    when (ci.verif10 > 0) then 'verif10'
+                    end) as verificacion
+                FROM codigoslibros ci
+                WHERE ci.codigo = c.codigo
+            ) AS verificacion,
+            ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
+            FROM codigoslibros c
+            LEFT JOIN usuario u ON c.idusuario = u.idusuario
+            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
+            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+            WHERE factura = '$factura'
+            AND c.prueba_diagnostica ='0'
+        ");
+        if(empty($consulta)){
+            return $consulta;
+        }
+        $datos = [];
+        foreach($consulta as $key => $item){
+            $devolucionInstitucion = "";
+            $datos[$key] = (Object)[
+                "codigo"                        => $item->codigo,
+                "InstitucionLista"              => $item->InstitucionLista,
+                "barrasEstado"                  => $item->barrasEstado,
+                "bc_estado"                     => $item->bc_estado,
+                "bc_fecha_ingreso"              => $item->bc_fecha_ingreso,
+                "bc_institucion"                => $item->bc_institucion,
+                "bc_periodo"                    => $item->bc_periodo,
+                "book"                          => $item->book,
+                "cedula"                        => $item->cedula,
+                "codigoEstado"                  => $item->codigoEstado,
+                "contador"                      => $item->contador,
+                "contrato"                      => $item->contrato,
+                "created_at"                    => $item->created_at,
+                "devolucionInstitucion"         => $devolucionInstitucion,
+                "email"                         => $item->email,
+                "estado"                        => $item->estado,
+                "estado_liquidacion"            => $item->estado_liquidacion,
+                "estudiante"                    => $item->estudiante,
+                "factura"                       => $item->factura,
+                "id_periodo"                    => $item->id_periodo,
+                "idusuario"                     => $item->idusuario,
+                "institucionBarra"              => $item->institucionBarra,
+                "institucion_barras"            => $item->institucion_barras,
+                "libro"                         => $item->libro,
+                "liquidacion"                   => $item->liquidacion,
+                "nombreInstitucion"             => $item->nombreInstitucion,
+                "periodo"                       => $item->periodo,
+                "periodo_barras"                => $item->periodo_barras,
+                "porcentaje_descuento"          => $item->porcentaje_descuento,
+                "prueba_diagnostica"            => $item->prueba_diagnostica,
+                "serie"                         => $item->serie,
+                "status"                        => $item->status,
+                "tipoCodigo"                    => $item->tipoCodigo,
+                "ventaEstado"                   => $item->ventaEstado,
+                "venta_estado"                  => $item->venta_estado,
+                "venta_lista_institucion"       => $item->venta_lista_institucion,
+                "codigo_union"                  => $item->codigo_union,
+                "codigo_paquete"                => $item->codigo_paquete,
+                "fecha_registro_paquete"        => $item->fecha_registro_paquete,
+                "verificacion"                  => $item->verificacion,
+                "liquidado_regalado"            => $item->liquidado_regalado
+            ];
+        }
+        return $datos;
+    }
+    public function obtenerFacturasLike($factura){
+        $query = DB::SELECT("SELECT distinct factura FROM codigoslibros c
+        WHERE c.factura LIKE '%$factura%'
+        ");
+        return $query;
     }
     public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values,$devueltos_liquidados=null,$verificacion_liquidada=null){
         $historico = new HistoricoCodigos();

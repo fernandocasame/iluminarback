@@ -10,7 +10,7 @@ class Usuario extends Model implements Auditable
     use \OwenIt\Auditing\Auditable;
     protected $table = "usuario";
     protected $primaryKey = 'idusuario';
-	public $timestamps = true;
+    public $timestamps = true;
     protected $fillable = [
         //'nombres', 'apellidos', 'name_usuario', 'email', 'password','cedula','id_group','remember_token','session_id'
         'cedula',
@@ -45,4 +45,9 @@ class Usuario extends Model implements Auditable
         'password',
         'remember_token',
     ];
+
+    public function seminarios()
+    {
+        return $this->belongsToMany(Seminarios::class, 'seminarios_capacitador', 'idusuario', 'seminario_id');
+    }
 }

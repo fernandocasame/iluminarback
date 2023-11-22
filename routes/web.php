@@ -45,6 +45,7 @@ Route::get('getTipoVenta','CodigoLibrosController@getTipoVenta');
 Route::post('revisarUltimoHistoricoCodigo','CodigoLibrosController@revisarUltimoHistoricoCodigo');
 //bodega
 Route::post('codigos/bodega/devolver','CodigoLibrosController@devolucionBodega');
+Route::get('procesosbodega','CodigoLibrosController@procesosbodega');
 //api para ver las devoluciones de un codigos
 Route::get('codigo/devoluciones/{codigo}','CodigoLibrosController@verDevoluciones');
 //get periodo individual
@@ -612,6 +613,7 @@ Route::get('juego_y_contenido/{id}', 'J_juegosController@juego_y_contenido');
 Route::post('j_juegos_tipo', 'J_juegosController@j_juegos_tipo');
 Route::get('juegos_prolipa_admin_tipo/{id}', 'J_juegosController@juegos_prolipa_admin_tipo');
 Route::post('j_juegos_tipo_prolipa', 'J_juegosController@j_juegos_tipo_prolipa');
+Route::post('j_juegos_tipo_prolipaTodos', 'J_juegosController@j_juegos_tipo_prolipaTodos');
 Route::post('j_juegos_ficha', 'J_juegosController@j_juegos_ficha');
 Route::post('guardarTemasJuego', 'J_juegosController@guardarTemasJuego');
 Route::get('eliminarTemasJuego/{id}', 'J_juegosController@eliminarTemasJuego');
@@ -973,7 +975,7 @@ Route::get('getContratosPedidos','PedidosController@getContratosPedidos');
 Route::post('guadarIdsMilton','PedidosController@guadarIdsMilton');
 Route::post('guardarContratoBdMilton','PedidosController@guardarContratoBdMilton');
 Route::get('buscarCoincidenciaInstitucionMilton','PedidosController@buscarCoincidenciaInstitucionMilton');
-Route::get('getBeneficiarios/{pedido}','PedidosController@getBeneficiarios');
+Route::get('getBeneficiarios/{pedido}/{tipo}/{idVerificacion}', 'PedidosController@getBeneficiarios');
 Route::get('getBeneficiariosXPedido/{pedido}','PedidosController@getBeneficiariosXPedido');
 Route::get('mostrarAnticiposAnteriores','PedidosController@mostrarAnticiposAnteriores');
 Route::post('cambiarEstadoHistorico','PedidosController@cambiarEstadoHistorico');
@@ -1165,6 +1167,7 @@ Route::get('getPedidoSecuencia/{id}','PedidosController@getPedidoSecuencia');
 Route::post('storePedidoSecuencia','PedidosController@storePedidoSecuencia');
 Route::get('deletePedidoSecuencia/{id}','PedidosController@deletePedidoSecuencia');
 Route::get('deletePedidoGuia/{id}','PedidosController@deletePedidoGuia');
+Route::post('updateBeneficiarios', 'PedidosController@updateBeneficiarios');
 Route::post('actualizarPedido','PedidosController@actualizarPedido');
 //pedidos gerencia aprobar subida 2  verificando git
 Route::get('listaPedidosGerencia','PedidosController@listaPedidosGerencia');
@@ -1318,8 +1321,10 @@ Route::get('exportAllPreguntasXAsignatura','SallePreguntasController@exportAllPr
 //=====FIN SALLE====================================================
 //=======APIS CODIGOS PAQUETES======================================
 Route::group(['prefix' => 'paquetes'],function(){
-  Route::resource('paquetes','PaqueteController');
-  Route::post('generarCodigosPaquete','PaqueteController@generarCodigosPaquete');
+    Route::resource('paquetes', 'PaqueteController');
+    Route::post('generarCodigosPaquete', 'PaqueteController@generarCodigosPaquete');
+    Route::post('guardarPaquete', 'PaqueteController@guardarPaquete');
+    Route::post('importPaqueteGestion','PaqueteController@importPaqueteGestion');
 });
 //=======FIN CODIGOS PAQUTES========================================
 // ====== BIBLIOTECA ====== //
@@ -1339,6 +1344,11 @@ Route::delete('biblioteca/contenido/{contenido}', 'BibliotecaController@deleteCo
 Route::get('contenidos/formatos', 'FormatoController@getFormatos');
 Route::post('contenido/formato/{areaId}/store', 'FormatoController@crearFormato');
 // ====== FIN FORMATO ====== //
+// ====== REPORTE CAPACITACIONES ====== //
+Route::get('reporte/capacitaciones', 'ReporteCapacitacionController@index'); // Obtiene las capacitaciones
+Route::get('capacitadores/disponibles', 'ReporteCapacitacionController@getCapacitadoresDisponibles'); // Obtiene los capacitadores disponibles
+Route::post('capacitaciones/{id}/capacitadores', 'ReporteCapacitacionController@asignarCapacitadores'); // Asigna capacitadores a una capacitacion
+// ====== FIN REPORTE CAPACITACIONES ====== //
 //=======APIS CODIGOS PAQUETES======================================
 Route::group(['prefix' => 'grafitex'], function () {
     Route::resource('codigos', 'CodigosGrafitexController');
@@ -1356,7 +1366,11 @@ Route::get('limpiarCache','TemporadaController@limpiarCache');
 //****API PARA DISTRIBUIDOR */
 Route::resource('distribuidor','DistribuidorController');
 /**APIS DE DESCUENTOS VERIFICACIONES */
-Route::post('saveDescuentosVerificacion','TemporadaController@saveDescuentosVerificacion')->middleware('auth');
+Route::post('saveDescuentosVerificacion','TemporadaController@saveDescuentosVerificacion');
 ////APIS PAGOS======
 Route::resource('pedigo_Pagos','PedidosPagosController');
 //APIS PAGOS
+//====APIS DESCUENTOS-----
+Route::resource('verificacionesDescuentos','Verificacion\VerificacionDescuentoController');
+Route::post('descuentosEliminar','Verificacion\VerificacionDescuentoController@descuentosEliminar');
+//===FIN APIS DESCUENTOS===

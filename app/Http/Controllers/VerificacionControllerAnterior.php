@@ -8,6 +8,7 @@ use App\Models\TemporadaVerificacionHistorico;
 use App\Models\Verificacion;
 use App\Models\VerificacionHasInstitucion;
 use App\Traits\Pedidos\TraitPedidosGeneral;
+use App\Traits\Verificacion\TraitVerificacionGeneral;
 use Illuminate\Http\Request;
 use DB;
 use Illuminate\Support\Facades\Cache;
@@ -16,6 +17,7 @@ class VerificacionControllerAnterior extends Controller
 {
 
     use TraitPedidosGeneral;
+    use TraitVerificacionGeneral;
     //PARA TRAER EL CONTRATO POR NUMERO DE VERIFICACION
     public function liquidacionVerificacionNumero($contrato,$numero){
         if($numero == "regalados"){
@@ -358,6 +360,10 @@ class VerificacionControllerAnterior extends Controller
          if($request->getVentaRealXVerificacion){
             return $this->getVentaRealXVerificacion($request);
          }
+          //para calcular la venta real x Tipo de venta
+         if($request->getVentaRealXVerificacionXTipoVenta){
+            return $this->obtenerVentaRealXVerificacionXTipoVenta($request);
+         }
          //para traer los detalle de cada verificacion
          if($request->detalles){
             Cache::flush();
@@ -366,22 +372,6 @@ class VerificacionControllerAnterior extends Controller
             $verif          = "verif".$request->verificacion_id;
             $IdVerificacion = $request->IdVerificacion;
             $contrato       = $request->contrato;
-            // $detalles = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
-            //     c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea
-            //     FROM codigoslibros c
-            //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-            //     LEFT JOIN libro l ON ls.idLibro = l.idlibro
-            //     LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-            //     WHERE  c.estado_liquidacion = '0'
-            //     AND c.bc_periodo            = ?
-            //     AND c.bc_institucion        = ?
-            //     AND c.prueba_diagnostica    = '0'
-            //     AND `$verif`                = '$IdVerificacion'
-            //     AND c.contrato              = '$contrato'
-            //     GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
-            //     ",
-            //     [$periodo,$institucion]
-            // );
             $detalles = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
                 c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea
                 FROM codigoslibros c
@@ -541,64 +531,8 @@ class VerificacionControllerAnterior extends Controller
         $num_verificacion_id = $request->num_verificacion_id;
         $contrato            = $request->contrato;
         $periodo             = $request->periodo_id;
-        $contador            = 0;
-        $detalles = DB::SELECT("SELECT vl.* ,ls.idLibro AS libro_id,
-            ls.id_serie,t.id_periodo,a.area_idarea
-            FROM verificaciones_has_temporadas vl
-            LEFT JOIN libros_series ls ON vl.codigo = ls.codigo_liquidacion
-            LEFT JOIN libro l ON ls.idLibro = l.idlibro
-            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-            LEFT JOIN temporadas t ON vl.contrato = t.contrato
-            WHERE vl.verificacion_id = '$num_verificacion_id'
-            AND vl.contrato          = '$contrato'
-            AND vl.estado            = '1'
-            AND nuevo                = '1'
-        ",[$num_verificacion_id,$contrato]);
-        foreach($detalles as $key => $item){
-            //plan lector
-            $precio = 0;
-            $query = [];
-            if($item->id_serie == 6){
-                $query = DB::SELECT("SELECT f.pvp AS precio
-                FROM pedidos_formato f
-                WHERE f.id_serie    = '6'
-                AND f.id_area       = '69'
-                AND f.id_libro      = '$item->libro_id'
-                AND f.id_periodo    = '$periodo'");
-            }else{
-                $query = DB::SELECT("SELECT f.pvp AS precio
-                FROM pedidos_formato f
-                WHERE f.id_serie    = '$item->id_serie'
-                AND f.id_area       = '$item->area_idarea'
-                AND f.id_periodo    = '$periodo'
-                ");
-            }
-            if(count($query) > 0){
-                $precio = $query[0]->precio;
-            }
-            $datos[$contador] = [
-                "id_verificacion_inst"  => $item->id_verificacion_inst,
-                "verificacion_id"       => $item->verificacion_id,
-                "contrato"              => $contrato,
-                "codigo"                => $item->codigo,
-                "cantidad"              => $item->cantidad,
-                "nombre_libro"          => $item->nombre_libro,
-                "libro_id"              => $item->libro_id,
-                "id_serie"              => $item->id_serie,
-                "id_periodo"            => $periodo,
-                "precio"                => $precio,
-                "valor"                 => $item->cantidad * $precio,
-                "descripcion"           => $item->descripcion,
-                "cantidad_descontar"    => $item->cantidad_descontar,
-                "porcentaje_descuento"  => $item->porcentaje_descuento,
-                "total_descontar"       => $item->total_descontar,
-            ];
-            $contador++;
-        }
-        return $datos;
-     }
-     public function getVerificacionesXcontrato($contrato){
-
+        $query = $this->FormatoLibrosLiquidados($num_verificacion_id,$contrato,$periodo);
+        return $query;
      }
      //para cambiar la data de la liquidacion a la nueva
      public function changeLiquidacion(Request $request){
@@ -1033,7 +967,44 @@ class VerificacionControllerAnterior extends Controller
         $query = DB::SELECT("SELECT * FROM verificaciones v
         WHERE v.id = '$id'
         ");
-        return $query;
+        if(empty($query)){
+            return $query;
+        }
+        $datos = [];
+        foreach($query as $key => $item){
+            $descuentos = DB::SELECT("SELECT *
+            FROM verificaciones_descuentos d
+            WHERE d.verificacion_id    = ?
+            AND d.estado               = '1'
+            ",[$item->id]);
+            $datos[$key] = [
+                "id"                            => $item->id,
+                "num_verificacion"              => $item->num_verificacion,
+                "fecha_inicio"                  => $item->fecha_inicio,
+                "fecha_fin"                     => $item->fecha_fin,
+                "estado"                        => $item->estado,
+                "contrato"                      => $item->contrato,
+                "nuevo"                         => $item->nuevo,
+                "file_evidencia"                => $item->file_evidencia,
+                "observacion"                   => $item->observacion,
+                "valor_liquidacion"             => $item->valor_liquidacion,
+                "fecha_subir_evidencia"         => $item->fecha_subir_evidencia,
+                "cobro_venta_directa"           => $item->cobro_venta_directa,
+                "tipoPago"                      => $item->tipoPago,
+                "personalizado"                 => $item->personalizado,
+                "totalDescuento"                => $item->totalDescuento,
+                "campoPersonalizado"            => $item->campoPersonalizado,
+                "abonado"                       => $item->abonado,
+                "estado_pago"                   => $item->estado_pago,
+                "venta_real"                    => $item->venta_real,
+                "venta_real_regalados"          => $item->venta_real_regalados,
+                "permiso_anticipo_deuda"        => $item->permiso_anticipo_deuda,
+                "permiso_convenio"              => $item->permiso_convenio,
+                "permiso_cobro_venta_directa"   => $item->permiso_cobro_venta_directa,
+                "descuentos"                    => $descuentos
+            ];
+        }
+        return $datos;
     }
     //api:post/saveDatosVerificacion
     public function saveDatosVerificacion(Request $request){

@@ -13,6 +13,8 @@ use App\Models\HistoricoContratos;
 use App\Models\Verificacion;
 use App\Models\VerificacionHasInstitucion;
 use App\Models\CodigosLibros;
+use App\Models\Models\Verificacion\VerificacionDescuentoDetalle;
+use App\Traits\Verificacion\TraitVerificacionGeneral;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -20,6 +22,7 @@ use Illuminate\Support\Facades\Cache;
 
 class TemporadaController extends Controller
 {
+    use TraitVerificacionGeneral;
     /**
      * Display a listing of the resource.
      *
@@ -661,32 +664,7 @@ class TemporadaController extends Controller
         if (Cache::has($key)) {
            $regalados = Cache::get($key);
         } else {
-            $regalados = DB::SELECT("SELECT c.codigo, c.bc_fecha_ingreso, ls.codigo_liquidacion, l.nombrelibro,
-                (
-                    SELECT
-                        (case when (ci.verif1 > '0') then 'verif1'
-                        when (ci.verif2 > 0) then 'verif2'
-                        when (ci.verif3 > 0) then 'verif3'
-                        when (ci.verif4 > 0) then 'verif4'
-                        when (ci.verif5 > 0) then 'verif5'
-                        when (ci.verif6 > 0) then 'verif6'
-                        when (ci.verif7 > 0) then 'verif7'
-                        when (ci.verif8 > 0) then 'verif8'
-                        when (ci.verif9 > 0) then 'verif9'
-                        when (ci.verif10 > 0) then 'verif10'
-                        end) as verificacion
-                    FROM codigoslibros ci
-                    WHERE ci.codigo = c.codigo
-                ) AS verificacionAsignada
-                FROM codigoslibros c
-                LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-                LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                WHERE
-                (c.bc_institucion = '$institucion'  OR c.venta_lista_institucion = '$institucion')
-                AND c.bc_periodo = '$periodo'
-                AND c.estado_liquidacion = '2'
-                AND c.prueba_diagnostica = '0'
-                ");
+            $regalados = $this->obtenerAllRegalados($institucion,$periodo);
             Cache::put($key,$regalados);
         }
         return $regalados;
@@ -694,59 +672,8 @@ class TemporadaController extends Controller
     //REGALADOS
     //API:GET/getRegalados/{institucion}/{periodo}/{num_verificacion}/{idverificacion}
     public function getRegalados($institucion,$periodo,$num_verificacion,$idverificacion){
-        $getnumVerificacion = "verif".$num_verificacion;
-        $query = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad,
-            c.serie,
-            c.libro_idlibro,ls.nombre as nombrelibro,ls.id_serie,a.area_idarea
-            FROM codigoslibros c
-            LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-            LEFT JOIN libro l ON ls.idLibro = l.idlibro
-            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-            WHERE  c.estado_liquidacion = '2'
-            AND c.bc_periodo            = ?
-            AND( c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
-            AND c.prueba_diagnostica    = '0'
-            AND `$getnumVerificacion`   = ?
-            GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro,ls.id_libro_serie
-        ",[$periodo,$idverificacion]);
-        $datos = [];
-        $contador = 0;
-        foreach($query as $key => $item){
-            //plan lector
-            $precio = 0;
-            $query = [];
-            if($item->id_serie == 6){
-                $query = DB::SELECT("SELECT f.pvp AS precio
-                FROM pedidos_formato f
-                WHERE f.id_serie    = '6'
-                AND f.id_area       = '69'
-                AND f.id_libro      = '$item->libro_idlibro'
-                AND f.id_periodo    = '$periodo'");
-            }else{
-                $query = DB::SELECT("SELECT f.pvp AS precio
-                FROM pedidos_formato f
-                WHERE f.id_serie    = '$item->id_serie'
-                AND f.id_area       = '$item->area_idarea'
-                AND f.id_periodo    = '$periodo'
-                ");
-            }
-            if(count($query) > 0){
-                $precio = $query[0]->precio;
-            }
-            $datos[$contador] = [
-                "codigo"            => $item->codigo,
-                "cantidad"          => $item->cantidad,
-                "serie"             => $item->serie,
-                "libro_idlibro"     => $item->libro_idlibro,
-                "nombre_libro"      => $item->nombrelibro,
-                "id_serie"          => $item->id_serie,
-                "area_idarea"       => $item->area_idarea,
-                "precio"            => $precio,
-                "valor"             => $item->cantidad * $precio
-            ];
-            $contador++;
-        }
-        return $datos;
+       $query =  $this->ObtenerRegalados($institucion,$periodo,$num_verificacion,$idverificacion);
+       return $query;
     }
     public function showRegalados($institucion,$periodo,$libro_idlibro,$num_verificacion,$idverificacion){
         $getnumVerificacion = "verif".$num_verificacion;
@@ -868,6 +795,16 @@ class TemporadaController extends Controller
             ]);
             return "Se guardo correctamente";
         }
+        if($request->actualizarTresCampo){
+            DB::table('verificaciones')
+            ->where('id', $request->verificacion_id)
+            ->update([
+                $campo => $valor,
+                $campo2 => $valor2,
+                $campo3 => $valor3,
+            ]);
+            return "Se guardo correctamente";
+        }
         else{
             $campo = $request->campo;
             $valor = $request->valor;
@@ -889,23 +826,21 @@ class TemporadaController extends Controller
         $campoPersonalizado = $request->campoPersonalizado == null || $request->campoPersonalizado == "" ? null : $request->campoPersonalizado;
         $user_created       = $request->user_created;
         $fecha              = date("Y-m-d H:i:s");
-        $ingreso = DB::table('verificaciones')
-        ->where('id', $request->verificacion_id)
+        $ingreso = DB::table('verificaciones_descuentos')
+        ->where('id', $request->verificaciones_descuentos_id)
         ->update([
-            'totalDescuento'        => $totalDescuento,
-            'campoPersonalizado'    => $campoPersonalizado,
-            'personalizado'         => $personalizado,
-            // 'tipoPago'              => 4,
-            // 'cobro_venta_directa'   => 3
+            'total_descuento'       => $totalDescuento,
+            'nombre_descuento'      => $campoPersonalizado,
+            'estado'                => $personalizado,
+            'user_created'          => $user_created
         ]);
         foreach($data_detalle as $key => $item){
-            $descuento = VerificacionHasInstitucion::findOrFail($item->id_verificacion_inst);
+            $descuento = VerificacionDescuentoDetalle::findOrFail($item->detalle_id);
             $descuento->descripcion             = $item->descripcion;
             $descuento->cantidad_descontar      = $item->cantidad_descontar;
             $descuento->porcentaje_descuento    = $item->porcentaje_descuento;
             $descuento->total_descontar         = $item->total_descontar;
-            $descuento->user_created            = $user_created;
-            $descuento->updated_at              = $fecha;
+            $descuento->tipo_calculo            = $item->tipo_calculo;
             $descuento->save();
         }
         return ["status" => "1", "message" => "Se guardo correctamente"];

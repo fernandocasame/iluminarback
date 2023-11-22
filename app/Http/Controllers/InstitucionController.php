@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use DB;
 use App\Quotation;
 use App\Models\Configuracion_salle;
+use Illuminate\Support\Facades\Cache;
 
 class InstitucionController extends Controller
 {
@@ -18,12 +19,40 @@ class InstitucionController extends Controller
      * @return \Illuminate\Http\Response
      */
 
-
-    public function index()
+    //API:GET/institucion
+    public function index(Request $request)
     {
+        if($request->listaInstitucionesActivaXRegion){
+            return $this->listaInstitucionesActivaXRegion($request->region);
+        }
         $institucion = DB::select("CALL `listar_instituciones_periodo_activo` ();");
         return $institucion;
 
+    }
+    //API:GET/institucion?listaInstitucionesActivaXRegion=yes&region=2
+    public function listaInstitucionesActivaXRegion($region){
+        $key = "listaInstitucionesActivaXRegion".$region;
+        if (Cache::has($key)) {
+           $institucion = Cache::get($key);
+        } else {
+            $institucion = DB::SELECT("SELECT inst.idInstitucion,
+            UPPER(inst.nombreInstitucion) as nombreInstitucion,
+            UPPER(ciu.nombre) as ciudad,
+            UPPER(reg.nombreregion) as nombreregion,
+            inst.solicitudInstitucion,
+            -- inst.vendedorInstitucion as asesor
+            concat_ws(' ', usu.nombres, usu.apellidos) as asesor,
+            inst.region_idregion
+            FROM institucion inst, ciudad ciu, region reg, usuario usu
+            where inst.ciudad_id = ciu.idciudad
+            AND inst.region_idregion = reg.idregion
+            AND inst.vendedorInstitucion = usu.cedula
+            AND inst.estado_idEstado = 1
+            AND inst.region_idregion = ?
+            ",[$region]);
+            Cache::put($key,$institucion);
+        }
+        return $institucion;
     }
     public function traerInstitucion(Request $request){
         $institucion = DB::select("SELECT * FROM institucion WHERE  idInstitucion = $request->institucion_idInstitucion

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\Institucion;
 use App\Models\Obsequio;
 use App\Models\ObsequioDetalle;
 use Illuminate\Http\Request;
@@ -51,12 +52,13 @@ class ObsequioController extends Controller
         // $data = '
         //     [
         //         {
-        //         "veN_CODIGO": "C-C22-0000013-CHL",
-        //         "veN_VALOR": 5046,
+        //         "veN_CODIGO": "C-S23-0000006-DC",
+        //         "veN_VALOR": 50314.5,
         //         "veN_ANTICIPO": 0,
-        //         "veN_DESCUENTO": 44,
+        //         "veN_DESCUENTO": 45,
         //         "total_gastado": 0,
-        //         "maximo_porcentaje_autorizado": 46
+        //         "maximo_porcentaje_autorizado": 45,
+        //         "porcentaje_obsequio": 2
         //         }
         //     ]
         // ';
@@ -108,15 +110,15 @@ class ObsequioController extends Controller
                 $JsonConvertido = json_decode($dato, true);
                 $DescuentoConvertido = 0;
                 //Si NO existe contratos con ven_convertido
-                if($JsonConvertido == "" || $JsonConvertido == null){
-                }
-                //Si existen contratos con ven_convertido
-                else{
-                    foreach($JsonConvertido as $key => $item){
-                        //variables
-                        $DescuentoConvertido += $JsonConvertido[$key]["venDescuento"];
-                    }
-                }
+                // if($JsonConvertido == "" || $JsonConvertido == null){
+                // }
+                // //Si existen contratos con ven_convertido
+                // else{
+                //     foreach($JsonConvertido as $key => $item){
+                //         //variables
+                //         $DescuentoConvertido += $JsonConvertido[$key]["venDescuento"];
+                //     }
+                // }
                 //=====FIN PROCESO VEN CONVERTIDO========
                 //get total gastado
                 $query2 = DB::SELECT("SELECT
@@ -199,11 +201,14 @@ class ObsequioController extends Controller
                 return ["status" => "0", "message" => "El pedido de obsequios ya no se puede editar"];
             }
         }else{
+            //OBTENER EL id del asesor
+            $institucion            = Institucion::findOrFail($request->institucion_id);
+            $asesor_id              = $institucion->asesor_id;
             $ob = new Obsequio();
+            $ob->asesor_id          = $asesor_id;
         }
-        $ob->institucion_id     = $request->institucion_id;
-        $ob->periodo_id         = $request->periodo_id;
-        $ob->asesor_id          = $request->asesor_id;
+        $ob->institucion_id         = $request->institucion_id;
+        $ob->periodo_id             = $request->periodo_id;
         $ob->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
         $ob->save();
         //detalle obsequio
@@ -235,7 +240,7 @@ class ObsequioController extends Controller
         //=====FACTURADOR APRUEBA======
         if($request->estado == 3){
             $ob->id_facturador              = $request->id_facturador;
-            if( $request->observacion_facturador == null ||  $request->observacion_facturador == ""){
+            if( $request->observacion_facturador == null ||  $request->observacion_facturador == "null"){
                 $ob->observacion_facturador     = null;
             }else{
                 $ob->observacion_facturador     = $request->observacion_facturador;
@@ -250,7 +255,7 @@ class ObsequioController extends Controller
          //=====FACTURADOR NO APRUEBA======
          if($request->estado == 2){
             $ob->id_facturador              = $request->id_facturador;
-            if( $request->observacion_facturador == null ||  $request->observacion_facturador == ""){
+            if( $request->observacion_facturador == null ||  $request->observacion_facturador == "null"){
                 $ob->observacion_facturador     = null;
             }else{
                 $ob->observacion_facturador     = $request->observacion_facturador;

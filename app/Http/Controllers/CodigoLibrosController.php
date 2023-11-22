@@ -11,6 +11,7 @@ use App\Models\CodigosDevolucion;
 use App\Models\CodigosLibros;
 use App\Models\HistoricoCodigos;
 use App\Traits\Codigos\TraitCodigosGeneral;
+use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
 use PDO;
 
@@ -482,7 +483,7 @@ class CodigoLibrosController extends Controller
                     //     else $validacionCodigo = false;
                     // }
                     $numeroProceso     = 0;
-                    if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifLeido == '1') && $ifLiquidado == '1' && $ifBloqueado !=2 ) $validacionCodigo = true;
+                    if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifLeido == '1') && $ifLiquidado == '1' && $ifBloqueado !=2  && $ifliquidado_regalado == '0') $validacionCodigo = true;
                     else $validacionCodigo = false;
                 }
                 //======REGALADO NO ENTRA A LA LIQUIDACION============
@@ -663,8 +664,8 @@ class CodigoLibrosController extends Controller
                 //===PROCESO===========
                 //=====USAN Y LIQUIDAN=========================
                 if($tipoProceso == '0'){
-                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) ){
-                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) ){
+                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0')){
+                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')){
                         //Ingresar Union a codigo de activacion
                         $codigoA     =  $this->updateCodigoUsanLiquidan($codigoActivacion,$codigoDiagnostico,$request,$factura);
                         if($codigoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
@@ -2079,5 +2080,30 @@ class CodigoLibrosController extends Controller
             "CodigosNoIngresados"   => $NoIngresados,
         ];
         return $data;
+    }
+    //API:GET/procesosbodega
+    public function procesosbodega(Request $request){
+        //buscar factura like
+        if($request->obtenerFacturasLike){
+            $key = "obtenerFacturasLike".$request->factura;
+            if (Cache::has($key)) {
+            $query = Cache::get($key);
+            } else {
+                $query = $this->obtenerFacturasLike($request->factura);
+                Cache::put($key,$query);
+            }
+            return $query;
+        }
+        //Buscar documento
+        if($request->getCodigosXDocumento)    {
+            $key = "searchDocumento".$request->factura;
+            if (Cache::has($key)) {
+            $query = Cache::get($key);
+            } else {
+                $query = $this->getCodigosXDocumento($request->factura);
+                Cache::put($key,$query);
+            }
+            return $query;
+        }
     }
 }
