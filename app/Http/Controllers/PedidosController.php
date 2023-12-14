@@ -3138,6 +3138,7 @@ class PedidosController extends Controller
         }
     }
     public function getPedidosXAsesorXPeriodo(Request $request){
+        return "hola mundo";
         try {
             $idusuario  = $request->idusuario;
             $periodo_id = $request->periodo_id;

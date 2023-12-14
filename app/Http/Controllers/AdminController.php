@@ -330,6 +330,7 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
+        return "xd";
         $query = DB::SELECT("SELECT DISTINCT v.*, t.id_periodo
         FROM verificaciones v , temporadas t,pedidos_formato f
         WHERE v.contrato = t.contrato
