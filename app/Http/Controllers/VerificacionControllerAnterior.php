@@ -256,13 +256,48 @@ class VerificacionControllerAnterior extends Controller
         return $query;
     }
     public function getVerificacionXcontrato($contrato){
+        $pagos = $this->getPagos($contrato);
         $query = DB::SELECT("SELECT
-            * FROM verificaciones
-            WHERE contrato = ?
-            AND nuevo = '1'
-            ORDER BY id DESC
-        ",[$contrato]);
-        return $query;
+            v.* FROM verificaciones v
+            WHERE v.contrato = '$contrato'
+            AND v.nuevo = '1'
+            ORDER BY v.id DESC
+        ");
+        $datos = [];
+        $contador = 0;
+        foreach($query as $key => $item){
+           $datos [$contador] = (Object)[
+            // "totalPagado"                   => $item->totalPagado,
+            "Pcliente"                      => $pagos["Pcliente"],
+            "PProlipaAumentar"              => $pagos["PProlipaAumentar"],
+            "PProlipaDisminuir"             => $pagos["PProlipaDisminuir"],
+            "id"                            => $item->id,
+            "num_verificacion"              => $item->num_verificacion,
+            "fecha_inicio"                  => $item->fecha_inicio,
+            "fecha_fin"                     => $item->fecha_fin,
+            "estado"                        => $item->estado,
+            "contrato"                      => $item->contrato,
+            "nuevo"                         => $item->nuevo,
+            "file_evidencia"                => $item->file_evidencia,
+            "observacion"                   => $item->observacion,
+            "valor_liquidacion"             => $item->valor_liquidacion,
+            "fecha_subir_evidencia"         => $item->fecha_subir_evidencia,
+            "cobro_venta_directa"           => $item->cobro_venta_directa,
+            "tipoPago"                      => $item->tipoPago,
+            "personalizado"                 => $item->personalizado,
+            "totalDescuento"                => $item->totalDescuento,
+            "abonado"                       => $item->abonado,
+            "estado_pago"                   => $item->estado_pago,
+            "venta_real"                    => $item->venta_real,
+            "venta_real_regalados"          => $item->venta_real_regalados,
+            "valor_comision"                => $item->valor_comision,
+            "permiso_anticipo_deuda"        => $item->permiso_anticipo_deuda,
+            "permiso_convenio"              => $item->permiso_convenio,
+            "permiso_cobro_venta_directa"   => $item->permiso_cobro_venta_directa,
+           ];
+           $contador++;
+        }
+        return $datos;
     }
     public function saveVerificacion($num_verificacion,$contrato){
         $fechaActual  = date('Y-m-d');
@@ -972,10 +1007,19 @@ class VerificacionControllerAnterior extends Controller
         }
         $datos = [];
         foreach($query as $key => $item){
+            //restar con comision
             $descuentos = DB::SELECT("SELECT *
             FROM verificaciones_descuentos d
             WHERE d.verificacion_id    = ?
             AND d.estado               = '1'
+            AND d.restar               = '0'
+            ",[$item->id]);
+            //restar a venta
+            $descuentosVenta = DB::SELECT("SELECT *
+            FROM verificaciones_descuentos d
+            WHERE d.verificacion_id    = ?
+            AND d.estado               = '1'
+            AND d.restar               = '1'
             ",[$item->id]);
             $datos[$key] = [
                 "id"                            => $item->id,
@@ -993,7 +1037,7 @@ class VerificacionControllerAnterior extends Controller
                 "tipoPago"                      => $item->tipoPago,
                 "personalizado"                 => $item->personalizado,
                 "totalDescuento"                => $item->totalDescuento,
-                "campoPersonalizado"            => $item->campoPersonalizado,
+                "totalDescuentoVenta"           => $item->totalDescuentoVenta,
                 "abonado"                       => $item->abonado,
                 "estado_pago"                   => $item->estado_pago,
                 "venta_real"                    => $item->venta_real,
@@ -1001,7 +1045,8 @@ class VerificacionControllerAnterior extends Controller
                 "permiso_anticipo_deuda"        => $item->permiso_anticipo_deuda,
                 "permiso_convenio"              => $item->permiso_convenio,
                 "permiso_cobro_venta_directa"   => $item->permiso_cobro_venta_directa,
-                "descuentos"                    => $descuentos
+                "descuentos"                    => $descuentos,
+                "descuentosVenta"               => $descuentosVenta
             ];
         }
         return $datos;
@@ -1109,6 +1154,164 @@ class VerificacionControllerAnterior extends Controller
                     //obtener el numero de verificacion en el que se quedo el contrato
                     $traerNumeroVerificacion =  $vericacionContrato[0]->num_verificacion;
                     $traeridVerificacion     =  $vericacionContrato[0]->id;
+                    //Para guardar la verificacion si  existe el contrato
+                    //SI EXCEDE LAS 10 VERIFICACIONES
+                    $finVerificacion="no";
+                    if($traerNumeroVerificacion >10){
+                        $finVerificacion = "yes";
+                    }
+                    else{
+                        //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
+                        $this->updateCodigoIndividualInicial($traeridVerificacion,$traerCodigosIndividual,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"liquidacion");
+                        //ACTUALIZAR EN LOS CODIGOS REGALADOS LOS DATOS DE VERIFICACION
+                        if(count($arregloRegalados) > 0) {
+                            $this->updateCodigoIndividualInicial($traeridVerificacion,$arregloRegalados,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"regalado");
+                        }
+                        //Ingresar la liquidacion en la base
+                        $this->guardarLiquidacion($data,$traerNumeroVerificacion,$contrato);
+                        //Actualizo a estado 0 la verificacion anterior
+                        DB::table('verificaciones')
+                        ->where('id', $traeridVerificacion)
+                        ->update([
+                            'fecha_fin' => $fechaActual,
+                            'estado' => "0"
+                        ]);
+                        //  Para generar una verficacion y que quede abierta
+                        $this->saveVerificacion($traerNumeroVerificacion+1,$contrato);
+                    }
+                }else{
+                    //=====PARA GUARDAR LA VERIFICACION SI EL CONTRATO AUN NO TIENE VERIFICACIONES======
+                    //para indicar que aun no existe el fin de la verificacion
+                    $finVerificacion = "0";
+                    //Para guardar la primera verificacion en la tabla
+                    $verificacion =  new Verificacion;
+                    $verificacion->num_verificacion = 1;
+                    $verificacion->fecha_inicio     = $fechaActual;
+                    $verificacion->fecha_fin        = $fechaActual;
+                    $verificacion->contrato         = $contrato;
+                    $verificacion->estado           = "0";
+                    $verificacion->nuevo            = '1';
+                    $verificacion->save();
+                    //Obtener Verificacion actual
+                    $encontrarVerificacionContratoInicial = $this->getVerificacionXcontrato($contrato);
+                    //obtener el numero de verificacion en el que se quedo el contrato
+                    $traerNumeroVerificacionInicial     =  $encontrarVerificacionContratoInicial[0]->num_verificacion;
+                    //obtener la clave primaria de la verificacion actual
+                    $traerNumeroVerificacionInicialId   = $encontrarVerificacionContratoInicial[0]->id;
+                    //Actualizar cada codigo de la verificacion
+                    $this->updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$traerCodigosIndividual,$contrato,$traerNumeroVerificacionInicial,$periodo,$institucion,"liquidacion");
+                    //ACTUALIZAR EN LOS CODIGOS REGALADOS LOS DATOS DE VERIFICACION
+                    if(count($arregloRegalados) > 0) {
+                        $this->updateCodigoIndividualInicial($traerNumeroVerificacionInicialId,$arregloRegalados,$contrato,$traerNumeroVerificacionInicial,$periodo,$institucion,"regalado");
+                    }
+                    //Ingresar la liquidacion en la base
+                    $this->guardarLiquidacion($data,$traerNumeroVerificacionInicial,$contrato);
+                    //Para generar la siguiente verificacion y quede abierta
+                    $this->saveVerificacion($traerNumeroVerificacionInicial+1,$contrato);
+                }
+                if($finVerificacion =="yes"){
+                    return [
+                        "verificaciones"=>"Ha alzancado el limite de verificaciones permitidas",
+                        'temporada'=>$temporadas,
+                        'codigos_libros' => $data
+                    ];
+                }else{
+                    $fecha2 = date('Y-m-d H:i:s');
+                    DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+                    DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' WHERE contrato = '$contrato' AND estado = '1'");
+                    return ['temporada'=>$temporadas,'codigos_libros' => $data];
+                }
+            }else{
+                return ["status"=>"0", "message" => "No existe NUEVOS VALORES para guardar la verificación"];
+            }
+        }
+    }
+    ///TEST
+    public function liquidacionTest($contrato){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        //validar si el contrato esta activo
+        $validarContrato = DB::select("SELECT t.*
+            FROM temporadas t
+            WHERE t.contrato = ?
+        ",[$contrato]);
+        if(empty($validarContrato)){
+            return ["status" => "0", "message" => "No existe el contrato"];
+        }
+        $estado = $validarContrato[0]->estado;
+        if($estado == '0'){
+            return ["status" => "0", "message" => "El contrato esta inactivo"];
+        }
+        //almacenar el id de la institucion
+        $institucion    = $validarContrato[0]->idInstitucion;
+        //almancenar el periodo
+        $periodo        =  $validarContrato[0]->id_periodo;
+        //traer temporadas
+        $temporadas     = $validarContrato;
+        //validar que el contrato este en pedidos
+        $query = DB::SELECT("SELECT * FROM pedidos p
+        WHERE p.contrato_generado = ?
+        AND p.estado = '1'
+        ",[$contrato]);
+        $id_pedido = $query[0]->id_pedido;
+        //validar que el pedido no tenga alcaces abiertos o activos
+        $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa
+        WHERE pa.id_pedido = ?
+        AND pa.estado_alcance = '0'
+        ",[$id_pedido]);
+        if(count($query2) > 0){
+            return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"];
+        }
+        if($periodo ==  null || $periodo == 0 || $periodo == ""){
+            return ["status"=>"0", "message" => "El contrato no tiene asignado a un período"];
+         }else{
+           //traigo la liquidacion actual por cantidad GRUPAL
+           $data                   = $this->getCodigosGrupalLiquidar($institucion,$periodo);
+           //INVIVIDUAL VERSION 1
+           //traigo la liquidacion  con los codigos invidivuales
+           $traerCodigosIndividual = $this->getCodigosIndividualLiquidar($institucion,$periodo);
+           //TRAER LOS CODIGOS REGALADOS
+           $arregloRegalados       = $this->getRegaladosXLiquidar($institucion,$periodo);
+           //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
+            //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
+            if(count($data) >0){
+                //====PROCESO GUARDAR EN FACTURACION=======
+                //obtener la fecha actual
+                $fechaActual  = date('Y-m-d');
+                // try {
+                //     //GUARDAR EN BASE DE DATOS
+                //     $url      = "f_DetalleVerificacion/GetxVenCodigo_Ultimodet_ver_verificacion?ven_codigo=$contrato";
+                //     $datos    = $this->FacturacionGet($url);
+                //     $numeroVerificacion = 1;
+                //     if(isset($datos[0]["status"])){
+                //         $numeroVerificacion = 1;
+                //     }else{
+                //         $getDatos = $datos["ultimaverificacion"]["detVerVerificacion"];
+                //         $numeroVerificacion = $getDatos +1;
+                //     }
+                //     foreach($data as $key => $item){
+                //         $formData = [
+                //             "proCodigo"             => $item->codigo,
+                //             "venCodigo"             => $contrato,
+                //             "detVerCantidad"        => $item->cantidad,
+                //             "detVerVerificacion"    => $numeroVerificacion,
+                //             "detVerFecha"           => $fechaActual
+                //         ];
+                //         $url2 = "f_DetalleVerificacion/CreateOrUpdateDetalleVerificacion";
+                //         $process = $this->FacturacionPost($url2,$formData);
+                //     }
+
+                // } catch (\Exception  $ex) {
+                // return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+                // }
+                //verificar si es el primer contrato
+                $vericacionContrato = $this->getVerificacionXcontrato($contrato);
+                //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
+                if(count($vericacionContrato) > 0){
+                    //obtener el numero de verificacion en el que se quedo el contrato
+                    $traerNumeroVerificacion =  $vericacionContrato[0]->num_verificacion;
+                    $traeridVerificacion     =  $vericacionContrato[0]->id;
+                    return "$traerNumeroVerificacion id $traeridVerificacion";
                     //Para guardar la verificacion si  existe el contrato
                     //SI EXCEDE LAS 10 VERIFICACIONES
                     $finVerificacion="no";

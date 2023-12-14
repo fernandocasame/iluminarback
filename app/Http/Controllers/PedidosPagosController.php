@@ -10,8 +10,11 @@ use App\Models\Models\Pagos\VerificacionPago;
 use App\Models\Models\Pagos\VerificacionPagoDetalle;
 use App\Models\Temporada;
 use App\Models\Verificacion;
+use App\Repositories\pedidos\VerificacionRepository;
 use App\Repositories\PedidosPagosRepository;
+use App\Traits\Pedidos\TraitPagosGeneral;
 use DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Http\Request;
 
 class PedidosPagosController extends Controller
@@ -21,11 +24,15 @@ class PedidosPagosController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public $pagoRepository;
-    public function __construct(PedidosPagosRepository $repositorio)
+    private $pagoRepository;
+    private $verificacionRepository;
+    public function __construct(PedidosPagosRepository $repositorio,VerificacionRepository $verificacionRepository)
     {
-     $this->pagoRepository = $repositorio;
+     $this->pagoRepository          = $repositorio;
+     $this->verificacionRepository  = $verificacionRepository;
     }
+    //traits
+    use TraitPagosGeneral;
     //api:get/pedigo_Pagos
     public function index(Request $request)
     {
@@ -39,12 +46,50 @@ class PedidosPagosController extends Controller
         if($request->validatePagoAbierto)   { return $this->validatePagoAbierto($request->contrato); }
         //traer los tipos de pagos facturacion
         if($request->tipoPagosFacturacion)  { return $this->pagoRepository->tipoPagosFacturacion(); }
+        //generar registros de anticipos y deudas
+        if($request->generateAnticiposDeuda) { return $this->generateAnticiposDeuda($request->contrato); }
     }
     public function ListadoListaPagos($request){
-        $query = VerificacionPago::Where('contrato',$request->contrato)
-        ->OrderBy('verificacion_pago_id','DESC')
-        ->get();
+        $query = DB::SELECT("SELECT * FROM verificaciones_pagos WHERE contrato = '$request->contrato' order by verificacion_pago_id DESC");
         return $query;
+        // $query = VerificacionPago::Where('contrato',$request->contrato)
+        // ->OrderBy('verificacion_pago_id','DESC')
+        // ->get();
+        //data facturacion
+        // $pagosFacturacion = $this->PagosFacturacion($request->contrato);
+        //SOLO FACTURACION
+        // $setear           = [];
+        // $contador         = 0;
+        // foreach($pagosFacturacion as $key => $item){
+        //     if($item->verificaciones_pagos_detalles_id == 0){
+        //         $setear[$contador] = [
+        //             "verificacion_pago_id"                  => 0,
+        //             "contrato"                              => $item->ven_codigo,
+        //             "valor_pago"                            => $item->doc_valor,
+        //             "tipo_pago"                             => null,
+        //             "fecha_pago"                            => $item->doc_fecha,
+        //             "observacion"                           => $item->doc_observacion,
+        //             "user_created"                          => 0,
+        //             "periodo_id"                            => null,
+        //             "nombres"                               => $item->doc_nombre,
+        //             "apellidos"                             => null,
+        //             "email"                                 => null,
+        //             "ruc"                                   => null,
+        //             "banco"                                 => $item->doc_institucion,
+        //             "doc_ci"                                => $item->doc_ci,
+        //             "tipo_cuenta"                           => $item->doc_tipo,
+        //             "doc_tipo"                              => $item->doc_tipo,
+        //             "num_cuenta"                            => $item->doc_cuenta,
+        //             "doc_numero"                            => $item->doc_numero,
+        //             "estado"                                => 1,
+        //             "created_at"                            => $item->doc_fecha,
+        //         ];
+        //         $contador++;
+        //     }
+        // }
+        // $resultado = [];
+        // $resultado = array_merge($query, $setear);
+        // return $resultado;
     }
     public function listadoPagos($request){
         $query = $this->pagoRepository->getPagosXID($request->verificacion_pago_id);
@@ -71,6 +116,22 @@ class PedidosPagosController extends Controller
             return ["status" => "0", "message" =>  "Existe pagos pendientes por aprobar"];
         }
     }
+    //api:get/pedigo_Pagos?generateAnticiposDeuda=yes&contrato=contrato
+    public function generateAnticiposDeuda($contrato){
+        $verificaciones = $this->verificacionRepository->getAllXField(1,"contrato",$contrato,"ASC");
+        $totalAnticipos = 0;
+        $totalDeuda     = 0;
+        if( count($verificaciones) == 0 ) { return $verificaciones; }
+        $verificacionesCerradas = collect($verificaciones)->filter(function ($p) use ($totalAnticipos) {
+            return $p->estado   == 0;
+        });
+        foreach($verificacionesCerradas as $key => $item){
+           $totalAnticipos  = $totalAnticipos + $item->totalAnticipos;
+           $totalDeuda      = $totalDeuda     + $item->totalDeuda;
+        }
+        if($totalAnticipos > 0){ $this->pagoRepository->saveDocumentosLiq($data); }
+        return $totalDeuda;
+    }
     /**
      * Show the form for creating a new resource.
      *
@@ -90,12 +151,18 @@ class PedidosPagosController extends Controller
     //api:post/pedigo_Pagos
     public function store(Request $request)
     {
+        if($request->saveValorPago){
+            $this->saveValorPago($request);
+        }
         if($request->saveInfoPago){
             return $this->saveInfoPago($request);
         }
         if($request->aprobarPagoVerificacion){
             return $this->aprobarPagoVerificacion($request);
         }
+    }
+    public function saveValorPago($request){
+        return $this->pagoRepository->saveDocumentosLiq($request);
     }
     public function saveInfoPago($request){
         //validar si ya se pago
@@ -137,6 +204,8 @@ class PedidosPagosController extends Controller
     }
 
     public function aprobarPagoVerificacion($request){
+        //limpiar cache
+        Cache::flush();
         $contrato               = $request->contrato;
         $user_created           = $request->user_created;
         $periodo_id             = $request->periodo_id;
@@ -145,63 +214,25 @@ class PedidosPagosController extends Controller
         $verificacion_pago_id   = $request->verificacion_pago_id;
         $info = VerificacionPago::findOrFail($verificacion_pago_id);
         $cantidadPago           = floatval($info->valor_pago);
+        $totalLiquidacion       = $request->totalLiquidacion;
         //0 => sin pagar ; 1 => pagado
         $EstadoPago             = $info->estado;
         if($EstadoPago == 1) { return ["status" => "0", "message" => "El pago ya ha sido aprobado anteriormente"]; }
         if($EstadoPago == 2) { return ["status" => "0", "message" => "El pago ha sido desactivado anteriormente"]; }
-        //obtener los valores pendientes
-        //estado_pago => 0 = nada; 1 = deuda; 2 por pagar; 3 = pagado;
-        $query = Verificacion::Where('contrato',$contrato)
-        ->Where('estado_pago','2')
-        ->OrderBy('id','ASC')
-        ->get();
-        if(count($query) == 0) return ["status" => "0", "message" => "No hay valores para pagar"];
-        foreach($query as $key => $item){
-            $verificacion_id    = $item->id;
-            $valor_liquidacion  = $item->valor_liquidacion;
-            $valor_pendiente    = 0;
-            if($cantidadPago > 0){
-                $valor_pendiente = round(floatval($item->valor_liquidacion),2) -  round(floatval($item->abonado),2);
-                $valorAbonado   = 0;
-                $totalAbonado   = 0;
-                $valorAbonado = $item->abonado;
-                //Si el (valor_pendiente) a pagar es menor al valor del pago restante
-                //coloco el valor pendiente como 0 ya pagado
-                if($valor_pendiente < $cantidadPago){
-                    $totalAbonado = $valorAbonado + $valor_pendiente;
-                    $ingreso = DB::table('verificaciones')
-                    ->where('id', $verificacion_id)
-                    ->update([
-                        "abonado"         => $totalAbonado,
-                    ]);
-                    if($ingreso){
-                        $this->verificaciones_historico($contrato,$user_created,$observacion,$verificacion_id,$valor_pendiente,$valor_liquidacion,$periodo_id,$item);
-                    }
-                    $cantidadPago = $cantidadPago - $valor_pendiente;
-                }
-                //Si el (valor_pendiente) a pagar es mayor al valor del pago restante
-                //Coloco la cantidad de pago a 0
-                else{
-                    $totalAbonado   = $valorAbonado + $cantidadPago;
-                    $ingreso = DB::table('verificaciones')
-                    ->where('id', $verificacion_id)
-                    ->update([
-                        "abonado"         => $totalAbonado,
-                    ]);
-                    if($ingreso){
-                        $this->verificaciones_historico($contrato,$user_created,$observacion,$verificacion_id,$cantidadPago,$valor_liquidacion,$periodo_id,$item);
-                    }
-                    $cantidadPago   = 0;
-                }
-            }
-        }
-        //COLOR EL PAGO COMO PAGADO
+        //MARCAR LA SOLICITUD DE PAGO COMO PAGADO
         $info->estado = 1;
         $info->save();
-        //SI EL PAGO ES DISTRIBUIDOR DESCUENTO AL DISTRIBUIDOR EL PAGO
-        if($tipo_pago == 4){ $this->DescontarDistribuidor($request); }
         if($info){
-            return ["status" => "1", "message" => "Se guardo correctamente"];
+            $detalles = VerificacionPagoDetalle::Where('verificacion_pago_id',$verificacion_pago_id)->get();
+            //GUARDAR EN DOCUMENTOS LIQ
+            $this->pagoRepository->savePagoDocumentoLiq($detalles,$info,$contrato);
+            //GUARDAR EN HISTORICO EL PAGO
+            $this->verificaciones_historico($contrato,$user_created,$observacion,$cantidadPago,$totalLiquidacion,$periodo_id);
+            //SI EL PAGO ES DISTRIBUIDOR DESCUENTO AL DISTRIBUIDOR EL PAGO
+            if($tipo_pago == 4){ $this->DescontarDistribuidor($request); }
+            if($info){
+                return ["status" => "1", "message" => "Se guardo correctamente"];
+            }
         }
     }
     public function DescontarDistribuidor($request){
@@ -233,16 +264,14 @@ class PedidosPagosController extends Controller
         $historico->user_created    = $user_created;
         $historico->save();
     }
-    public function verificaciones_historico($contrato,$user_created,$observacion,$verificacion_id,$valor_abonado,$valor_liquidacion,$periodo_id,$old_values){
+    public function verificaciones_historico($contrato,$user_created,$observacion,$valor_abonado,$valor_liquidacion,$periodo_id){
         $historico = new VerificacionHistorico();
         $historico->contrato            = $contrato;
         $historico->user_created        = $user_created;
         $historico->observacion         = $observacion;
-        $historico->verificacion_id     = $verificacion_id;
         $historico->valor_abonado       = $valor_abonado;
         $historico->valor_liquidacion   = $valor_liquidacion;
         $historico->periodo_id          = $periodo_id;
-        $historico->old_values          = $old_values;
         $historico->save();
     }
     /**

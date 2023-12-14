@@ -14,16 +14,30 @@ class PlanificacionesController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
+        if($request->getPlanificacionesXIdAsignatura){
+            return $this->getPlanificacionesXIdAsignatura($request->asignatura_idasignatura);
+        }
         $planificaciones = DB::SELECT("SELECT p.*, a.idasignatura, a.nombreasignatura,a.area_idarea,a.nivel_idnivel,a.tipo_asignatura,
         CONCAT(u.nombres,' ',u.apellidos) as usuario
          FROM planificacion p
         LEFT JOIN asignatura a ON a.idasignatura = p.asignatura_idasignatura
         LEFT JOIN usuario u On p.user_created = u.idusuario
         -- WHERE p.Estado_idEstado = '1'
-        ORDER BY p.idplanificacion DESC 
+        ORDER BY p.idplanificacion DESC
         ");
+        return $planificaciones;
+    }
+    public function getPlanificacionesXIdAsignatura($idasignatura){
+        $planificaciones = DB::SELECT("SELECT p.*, a.idasignatura, a.nombreasignatura,a.area_idarea,a.nivel_idnivel,a.tipo_asignatura,
+        CONCAT(u.nombres,' ',u.apellidos) as usuario
+         FROM planificacion p
+        LEFT JOIN asignatura a ON a.idasignatura = p.asignatura_idasignatura
+        LEFT JOIN usuario u On p.user_created = u.idusuario
+        WHERE a.idasignatura = ?
+        ORDER BY p.idplanificacion DESC
+        ",[$idasignatura]);
         return $planificaciones;
     }
 

@@ -40,10 +40,9 @@ class LibroController extends Controller
         }
         return $libro;
     }
-
     //api:get/getAllBooks
     public function getAllBooks(Request $request){
-        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura , l.conteodemo,
+        $query = DB::SELECT("SELECT l.nombrelibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
         a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
          FROM libros_series ls
          LEFT JOIN series s ON ls.id_serie = s.id_serie
@@ -52,48 +51,9 @@ class LibroController extends Controller
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
-         AND l.demo IS NOT NULL
-         AND TRIM(l.demo) <> ''
         ");
         return $query;
     }
-
-    //api:get/getxLibrosdemo
-    public function getxNombredemo($nombrelike){
-        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura , l.conteodemo,
-        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
-         FROM libros_series ls
-         LEFT JOIN series s ON ls.id_serie = s.id_serie
-         LEFT JOIN libro l ON ls.idLibro = l.idlibro
-         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-         LEFT JOIN area ar ON a.area_idarea = ar.idarea
-         WHERE l.Estado_idEstado = '1'
-         AND a.estado = '1'
-         AND l.demo IS NOT NULL
-         AND TRIM(l.demo) <> ''
-         AND l.nombrelibro like '%$nombrelike%'
-        ");
-        return $query;
-    }
-
-    //api:get/getxAreasdemo
-    public function getxAreasdemo($nombrearea){
-        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura , l.conteodemo,
-        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
-         FROM libros_series ls
-         LEFT JOIN series s ON ls.id_serie = s.id_serie
-         LEFT JOIN libro l ON ls.idLibro = l.idlibro
-         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-         LEFT JOIN area ar ON a.area_idarea = ar.idarea
-         WHERE l.Estado_idEstado = '1'
-         AND a.estado = '1'
-         AND l.demo IS NOT NULL
-         AND TRIM(l.demo) <> ''
-         AND ar.nombrearea = '$nombrearea'
-        ");
-        return $query;
-    }
-
     public function librosEstudiante(Request $request)
     {
         $idregion='';
@@ -625,7 +585,7 @@ class LibroController extends Controller
                 $libro->guiadidactica               = $request->guiadidactica;
                 $libro->asignatura_idasignatura     = $request->asignatura_idasignatura;
                 $libro->portada                     = $request->portada;
-                $libro->demo                        = ($request->demo      == null           || $request->demo      == "null") ? null : $request->demo;
+                $libro->demo                        = $request->demo;
                 //DATOS SIERRA
                 $libro->s_weblibro                  = ($request->s_weblibro      == null     || $request->s_weblibro      == "null") ? null : $request->s_weblibro;
                 $libro->s_pdfsinguia                = ($request->s_pdfsinguia    == null     || $request->s_pdfsinguia    == "null") ? null : $request->s_pdfsinguia;
@@ -674,25 +634,6 @@ class LibroController extends Controller
         return ["error"=>"0", "message" => "No se pudo actualizar/guardar"];
         }
     }
-
-    //actualizar campo conteodemo
-    public function editarconteodemo(Request $request)
-    {
-        //return $request;
-        try {
-            if($request->idlibro){
-                $ConteoDemo = Libro::findOrFail($request->idlibro);
-                $ConteoDemo->conteodemo = $request->conteodemo;
-                $ConteoDemo->save();
-            }
-            else{
-                echo "no se guardo";
-            }
-        } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        }
-    }
-
     //para eliminar el libro
     public function eliminarLibro(Request $request){
        $res =DB::table('libro')

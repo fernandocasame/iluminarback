@@ -48,7 +48,7 @@ class PlanificacionController extends Controller
     public function create()
     {
     }
-    
+
     /**
      * Store a newly created resource in storage.
      *
@@ -74,21 +74,21 @@ class PlanificacionController extends Controller
     public function planificacion_asignatura($id)
     {
         $planificaciones = DB::SELECT("SELECT p .*, l.nombrelibro, l.idlibro
-         FROM planificacion p, libro l 
-         WHERE p.asignatura_idasignatura = l.asignatura_idasignatura 
+         FROM planificacion p, libro l
+         WHERE p.asignatura_idasignatura = l.asignatura_idasignatura
          AND l.Estado_idEstado = '1'
          AND p.Estado_idEstado = '1'
          AND l.idlibro = $id
          ORDER BY p.idplanificacion");
-        
+
         return $planificaciones;
     }
 
-    
+
     public function planificacionesunidades(Request $request)
     {
         $planificaciones = DB::SELECT("SELECT p.idplanificacion, p.nombreplanificacion, p.descripcionplanificacion, p.unidad, p.webplanificacion, p.Estado_idEstado, p.asignatura_idasignatura FROM planificacion p, libro l WHERE p.asignatura_idasignatura = l.asignatura_idasignatura AND l.idlibro = $request->idlibro AND  (p.unidad = $request->unidad OR p.unidad = 0)");
-        
+
         return $planificaciones;
     }
 

@@ -196,41 +196,6 @@ class CodigosLibrosGenerarController extends Controller
         return $datos;
     }
 
-    // public function store(Request $request)
-    // {
-    //     set_time_limit(600000);
-    //     ini_set('max_execution_time', 600000);
-    //     $porcentaje = 0;
-    //     $contador   = $request->contador;
-    //     $codigos    = explode(",", $request->codigo);
-    //     $tam        = sizeof($codigos);
-    //     $codigosError = [];
-    //     for( $i=0; $i<$tam; $i++ ){
-    //         $codigos_libros                             = new CodigosLibros();
-    //         $codigos_libros->serie                      = $request->serie;
-    //         $codigos_libros->libro                      = $request->libro;
-    //         $codigos_libros->anio                       = $request->anio;
-    //         $codigos_libros->libro_idlibro              = $request->idlibro;
-    //         $codigos_libros->estado                     = $request->estado;
-	// 		$codigos_libros->idusuario                  = 0;
-    //         $codigos_libros->bc_estado                  = 1;
-    //         $codigos_libros->idusuario_creador_codigo = $request->idusuario;
-    //         $codigo_verificar = $codigos[$i];
-    //         $verificar_codigo = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo_verificar'");
-    //         if( $verificar_codigo ){
-    //             $codigoNoIngresado = $codigos[$i];
-    //             $codigosError[$i] = [
-    //                 "codigos" => $codigoNoIngresado
-    //             ];
-    //         }else{
-    //             $codigos_libros->codigo = $codigos[$i];
-    //             $codigos_libros->contador = ++$contador;
-    //             $codigos_libros->save();
-    //             $porcentaje++;
-    //         }
-    //     }
-    //     return ["porcentaje" =>$porcentaje ,"codigosNoIngresados" => $codigosError] ;
-    // }
     public function store(Request $request)
     {
         set_time_limit(600000);
@@ -395,105 +360,11 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarCodigoXContador($idlibro,$contador){
-        $codigos_libros = DB::SELECT("SELECT
-            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
-            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-             u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
-            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
-            FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo
-            AND d.estado = '1'
-            ORDER BY d.id DESC
-            LIMIT 1) as devolucionInstitucion,
-            c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
-            c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
-            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-            (case when (c.estado_liquidacion = '0') then 'liquidado'
-                when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
-                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
-                when (c.estado_liquidacion = '3') then 'codigo devuelto'
-            end) as liquidacion,
-            (case when (c.bc_estado = '2') then 'codigo leido'
-                when (c.bc_estado = '1') then 'codigo sin leer'
-            end) as barrasEstado,
-            (case when (c.codigos_barras = '1') then 'con código de barras'
-                when (c.codigos_barras = '0')  then 'sin código de barras'
-            end) as status,
-            (case when (c.venta_estado = '0') then ''
-                when (c.venta_estado = '1') then 'Venta directa'
-                when (c.venta_estado = '2') then 'Venta por lista'
-            end) as ventaEstado,
-            c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-            (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
-            c.updated_at as registrado, CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.cedula as cedula,  u.email,
-            p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
-            c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
-            ivl.nombreInstitucion as InstitucionLista,
-            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
-            from codigoslibros c
-            LEFT JOIN usuario u on u.idusuario = c.idusuario
-            LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
-            LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
-            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-            LEFT JOIN ciudad ci ON ci.idciudad = ib.ciudad_id
-            WHERE c.libro_idlibro = '$idlibro'
-            AND c.contador = '$contador'
-        ");
+        $codigos_libros = $this->getCodigos(null,0,2,$idlibro,$contador);
         return $codigos_libros;
     }
     public function codigosBuscarCodigo($codigo){
-        $codigos_libros = DB::SELECT("SELECT c.id_periodo,
-            c.factura, c.prueba_diagnostica, c.porcentaje_descuento,c.codigo_union,
-            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-             u.idusuario,c.anio,c.fecha_create,c.libro_idlibro,c.serie,
-            (SELECT CONCAT(' Cliente: ', d.cliente  , ' - ',d.fecha_devolucion) AS devolucion
-            FROM codigos_devolucion d
-            WHERE d.codigo = c.codigo
-            AND d.estado = '1'
-            ORDER BY d.id DESC
-            LIMIT 1) as devolucionInstitucion,
-            c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
-            c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
-            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-            (case when (c.estado_liquidacion = '0') then 'liquidado'
-                when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
-                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
-                when (c.estado_liquidacion = '3') then 'codigo devuelto'
-            end) as liquidacion,
-            (case when (c.bc_estado = '2') then 'codigo leido'
-                when (c.bc_estado = '1') then 'codigo sin leer'
-            end) as barrasEstado,
-            (case when (c.codigos_barras = '1') then 'con código de barras'
-                when (c.codigos_barras = '0')  then 'sin código de barras'
-            end) as status,
-            (case when (c.venta_estado = '0') then ''
-                        when (c.venta_estado = '1') then 'Venta directa'
-                        when (c.venta_estado = '2') then 'Venta por lista'
-            end) as ventaEstado,
-            c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-            (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
-            c.updated_at as registrado, CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.cedula as cedula,  u.email,
-            p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ci.nombre as ciudad,
-            c.libro as book,c.created_at,CONCAT(cr.nombres, ' ', cr.apellidos) as creador,
-            ivl.nombreInstitucion as InstitucionLista,
-            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
-            from codigoslibros c
-            LEFT JOIN usuario u on u.idusuario = c.idusuario
-            LEFT JOIN usuario cr on c.idusuario_creador_codigo = cr.idusuario
-            LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
-            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-            LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-            LEFT JOIN ciudad ci ON ci.idciudad = ib.ciudad_id
-            WHERE c.codigo like '%$codigo%'
-        ");
+        $codigos_libros = $this->getCodigos($codigo,0,1);
         return $codigos_libros;
     }
     public function codigosBuscarxCodigo($codigo){
@@ -525,75 +396,63 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function reportesCodigoAsesor($id,$periodo){
-        $codigos_libros = DB::SELECT("SELECT
-        c.prueba_diagnostica, c.factura,
-        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.porcentaje_descuento,
-        c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,
-        c.estado_liquidacion,bc_institucion,bc_periodo,
-        IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-        (case when (c.estado_liquidacion = '0') then 'liquidado'
-            when (c.estado_liquidacion = '1') then 'sin liquidar'
-            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
-            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
-            when (c.estado_liquidacion = '3') then 'codigo devuelto'
-        end) as liquidacion,
-        (case when (c.bc_estado = '2') then 'codigo leido'
-             when (c.bc_estado = '1') then 'codigo sin leer'
-        end) as barrasEstado,
-        (case when (c.codigos_barras = '1') then 'con código de barras'
-             when (c.codigos_barras = '0')  then 'sin código de barras'
-        end) as status,
-        (case when (c.venta_estado = '0') then ''
-                    when (c.venta_estado = '1') then 'Venta directa'
-                    when (c.venta_estado = '2') then 'Venta por lista'
-        end) as ventaEstado,
-        c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-        (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
-          c.updated_at as registrado, u.cedula as cedula, u.nombres, u.apellidos, u.email,
-          p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,
-          c.liquidado_regalado
+        $codigos_libros = DB::SELECT("SELECT c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.porcentaje_descuento,
+            c.libro as book,c.serie,c.created_at,
+            c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,c.bc_fecha_ingreso,
+            c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,
+            c.contrato,c.libro, c.venta_lista_institucion,
+            CONCAT(u.nombres, ' ', u.apellidos) as estudiante, u.email,u.cedula, ib.nombreInstitucion as institucion_barras,
+            i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,
+            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+            (case when (c.estado_liquidacion = '0') then 'liquidado'
+                when (c.estado_liquidacion = '1') then 'sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
+                when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
+                when (c.estado_liquidacion = '3') then 'codigo devuelto'
+                when (c.estado_liquidacion = '4') then 'Código Guia'
+            end) as liquidacion,
+            (case when (c.bc_estado = '2') then 'codigo leido'
+            when (c.bc_estado = '1') then 'codigo sin leer'
+            end) as barrasEstado,
+            (case when (c.codigos_barras = '1') then 'con código de barras'
+                when (c.codigos_barras = '0')  then 'sin código de barras'
+            end) as status,
+            (case when (c.venta_estado = '0') then ''
+                when (c.venta_estado = '1') then 'Venta directa'
+                when (c.venta_estado = '2') then 'Venta por lista'
+            end) as ventaEstado,
+            (
+                SELECT
+                    (case when (ci.verif1 > '0') then 'verif1'
+                    when (ci.verif2 > 0) then 'verif2'
+                    when (ci.verif3 > 0) then 'verif3'
+                    when (ci.verif4 > 0) then 'verif4'
+                    when (ci.verif5 > 0) then 'verif5'
+                    when (ci.verif6 > 0) then 'verif6'
+                    when (ci.verif7 > 0) then 'verif7'
+                    when (ci.verif8 > 0) then 'verif8'
+                    when (ci.verif9 > 0) then 'verif9'
+                    when (ci.verif10 > 0) then 'verif10'
+                    end) as verificacion
+                FROM codigoslibros ci
+                WHERE ci.codigo = c.codigo
+            ) AS verificacion,
+            ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
+            p.periodoescolar as periodo,
+            pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
         from codigoslibros c
-        LEFT JOIN usuario u on u.idusuario = c.idusuario
-        LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
-        LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+        LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
         LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+        LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+        LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
+        LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
         WHERE (c.bc_periodo  = '$periodo' OR c.id_periodo = '$periodo')
-        AND (c.bc_institucion = '$id' OR u.institucion_idInstitucion = '$id' OR venta_lista_institucion = '$id' )
+        AND (c.bc_institucion = '$id' OR u.institucion_idInstitucion = '$id' OR c.venta_lista_institucion = '$id' )
         AND c.prueba_diagnostica = '0'
-        ");
-        return $codigos_libros;
-    }
-    public function reporteCodigosBarras($id,$periodo){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $codigos_libros = DB::SELECT("SELECT c.codigo,c.estado, c.contrato,c.bc_estado,c.contador,c.estado_liquidacion,
-        IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-        (case when (c.estado_liquidacion = '0') then 'liquidado'
-             when (c.estado_liquidacion = '1') then 'sin liquidar'
-             when (c.estado_liquidacion = '2') then 'codigo regalado'
-        end) as liquidacion,
-        (case when (c.bc_estado = '1') then 'codigo de barras'
-             when (c.bc_estado = '2') then 'codigo de barras leido'
-             when (c.bc_estado = '3') then 'codigo de barras liquidado'
-        end) as barrasEstado,
-        (case when (c.venta_estado = '0') then ''
-                    when (c.venta_estado = '1') then 'Venta directa'
-                    when (c.venta_estado = '2') then 'Venta por lista'
-        end) as ventaEstado,
-        c.venta_estado,ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
-        (SELECT l.nombrelibro FROM libro l WHERE l.idlibro = c.libro_idlibro) as libro,
-          c.updated_at as registrado, u.cedula as cedula, u.nombres, u.apellidos, u.email,
-          p.periodoescolar as periodo, pb.periodoescolar as periodo_barras
-        from codigoslibros c
-        LEFT JOIN usuario u on u.idusuario = c.idusuario
-        LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
-        LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-        LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-        LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-        WHERE c.bc_periodo  = '$periodo'
-        AND c.bc_institucion = '$id'
         ");
         return $codigos_libros;
     }

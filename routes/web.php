@@ -179,6 +179,7 @@ Route::post('traerprofesor','TemporadaController@traerprofesores');
 Route::resource('n_verificacion','VerificacionControllerAnterior');
 Route::get('nliquidacion/verificacion/{contrato}','VerificacionControllerAnterior@liquidacionVerificacion');
 Route::get('nliquidacion/liquidar/{contrato}','VerificacionControllerAnterior@liquidarFacturacion');
+Route::get('liquidacionTest/{contrato}', 'VerificacionControllerAnterior@liquidacionTest');
 Route::get('nliquidacion/verificacion/{contrato}/{numero}','VerificacionControllerAnterior@liquidacionVerificacionNumero');
 Route::get('changeLiquidacion','VerificacionControllerAnterior@changeLiquidacion');
 Route::post('guardarChangeLiquidacion','VerificacionControllerAnterior@guardarChangeLiquidacion');
@@ -195,7 +196,6 @@ Route::post('saveDatosVerificacion','VerificacionControllerAnterior@saveDatosVer
 Route::resource('bc_verificacion','VerificacionBarrasController');
 Route::get('bc_liquidacion/verificacion/{contrato}','VerificacionBarrasController@liquidacionVerificacion');
 Route::get('bc_liquidacion/verificacion/{contrato}/{numero}','VerificacionBarrasController@liquidacionVerificacionNumero');
-Route::get('reporteCodigosBarras/{id}/{periodo}', 'CodigosLibrosGenerarController@reporteCodigosBarras');
 
 //=========================FIN DE API DE LIQUIDACIONES con codigos de barras=======================
 
@@ -1286,6 +1286,7 @@ Route::resource('registroDocente','RegistroDocenteController');
 Route::post('guardarDocente','RegistroDocenteController@guardarDocente');
 //CONVENIOS//
 Route::resource('convenio','ConvenioController');
+Route::post('eliminarConvenio','ConvenioController@eliminarConvenio');
 //API CODIGOS ESTUDIANTE
 Route::get('getEstudianteCodigos/{valores}','CodigosLibrosController@getEstudianteCodigos');
 ///ILUMINAR
@@ -1361,16 +1362,22 @@ Route::get('getRegalados/{institucion}/{periodo}/{num_verificacion}/{idverificac
 Route::post('saveRegaladosXVerificacion','TemporadaController@saveRegaladosXVerificacion');
 Route::get('showRegalados/{institucion}/{periodo}/{libro}/{num_verificacion}/{idverificacion}','TemporadaController@showRegalados');
 Route::get('getliquidadosDevueltos/{contrato}','TemporadaController@getliquidadosDevueltos');
+Route::post('CleanRegalado', 'TemporadaController@CleanRegalado');
+Route::post('updateVentaReal', 'TemporadaController@updateVentaReal');
 Route::post('updateVerificacion','TemporadaController@updateVerificacion');
 Route::get('limpiarCache','TemporadaController@limpiarCache');
 //****API PARA DISTRIBUIDOR */
 Route::resource('distribuidor','DistribuidorController');
-/**APIS DE DESCUENTOS VERIFICACIONES */
-Route::post('saveDescuentosVerificacion','TemporadaController@saveDescuentosVerificacion');
 ////APIS PAGOS======
 Route::resource('pedigo_Pagos','PedidosPagosController');
 //APIS PAGOS
 //====APIS DESCUENTOS-----
+Route::post('saveDescuentosVerificacion', 'Verificacion\VerificacionDescuentoController@saveDescuentosVerificacion');
 Route::resource('verificacionesDescuentos','Verificacion\VerificacionDescuentoController');
 Route::post('descuentosEliminar','Verificacion\VerificacionDescuentoController@descuentosEliminar');
 //===FIN APIS DESCUENTOS===
+/***PEDIDOS UNIDO CON FACTURACION */
+Route::group(['prefix' => 'pedidos2'], function () {
+  Route::resource('pedidos', 'Pedidos2Controller');
+});
+///FIN PEDIDOS UNIDO CON FACTURACION///

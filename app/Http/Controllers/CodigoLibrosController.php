@@ -10,6 +10,7 @@ use App\Imports\CodigosImport;
 use App\Models\CodigosDevolucion;
 use App\Models\CodigosLibros;
 use App\Models\HistoricoCodigos;
+use App\Repositories\Codigos\CodigosRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
@@ -18,6 +19,10 @@ use PDO;
 class CodigoLibrosController extends Controller
 {
     use TraitCodigosGeneral;
+    private $codigosRepository;
+    public function __construct(CodigosRepository $codigosRepository) {
+        $this->codigosRepository = $codigosRepository;
+    }
     //api:post//codigos/importar
     public function importar(Request $request){
         set_time_limit(6000000);
@@ -207,9 +212,7 @@ class CodigoLibrosController extends Controller
         //numero proceso => 0 = usan y liquidan; 1 = venta lista; 2 = regalado; 3 regalado y bloqueado
         $withCodigoUnion = 1;
         $estadoIngreso   = 0;
-        $institucion_id  = $request->institucion_id;
         $periodo_id      = $request->periodo_id;
-        $venta_estado    = $request->venta_estado;
         $unionCorrecto   = false;
         ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
         if($codigo_union == null) $withCodigoUnion = 0;
@@ -249,35 +252,23 @@ class CodigoLibrosController extends Controller
             }
             //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
             if($numeroProceso == '2'){
-                if($ifLiquidado !='0' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
+                if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
                 else $unionCorrecto = false;
             }
             //======BLOQUEADO(No usan y no liquidan)=============
             if($numeroProceso == '3'){
-                if($ifLiquidado !='0' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
+                if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
+                else $unionCorrecto = false;
+            }
+            //=======CODIGO GUIA==================================
+            if($numeroProceso == '4'){
+                $numeroProceso     = 4;
+                if(($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
                 else $unionCorrecto = false;
             }
             if($unionCorrecto){
-                //USAN Y LIQUIDAN
-                if($numeroProceso == 0){
-                    $codigoU             = $this->updateCodigoUsanLiquidan($codigo_union,$codigo,$request,$factura);
-                    if($codigoU) $codigo = $this->updateCodigoUsanLiquidan($codigo,$codigo_union,$request,$factura);
-                }
-                //regalado
-                if($numeroProceso == 1){
-                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request,$factura);
-                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
-                }
-               //regalado y bloqueado
-                if($numeroProceso == 2){
-                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request,$factura);
-                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
-                }
-                //bloqueado
-                if($numeroProceso == 3){
-                    $codigoU             = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo_union,$request,$factura);
-                    if($codigoU) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
-                }
+                $codigoU             = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo_union,$codigo,$request,$factura);
+                if($codigoU) $codigo = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$factura);
             }else{
                 //no se ingreso
                 return 2;
@@ -285,14 +276,7 @@ class CodigoLibrosController extends Controller
         }
         //SI EL CODIGO NO TIENE CODIGO DE UNION
         else{
-            //usan y liquidan
-            if($numeroProceso == 0) $codigo = $this->updateCodigoUsanLiquidan($codigo,$codigo_union,$request,$factura);
-            //regalado
-            if($numeroProceso == 1) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
-            //regalado y bloqueado
-            if($numeroProceso == 2) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
-            //bloqueado
-            if($numeroProceso == 3) $codigo = $this->updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura);
+            $codigo = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo,null,$request,$factura);
         }
         //resultado
         //con codigo union
@@ -307,108 +291,6 @@ class CodigoLibrosController extends Controller
         }
         return $estadoIngreso;
     }
-    public function updateCodigotoRegaladoBloqueado($numeroProceso,$codigo,$request,$factura){
-        $venta_estado = $request->venta_estado;
-        $campoInstitucion = "";
-        if($venta_estado == 1) { $campoInstitucion = "bc_institucion"; }
-        else{                    $campoInstitucion = "venta_lista_institucion";  }
-        $arraySave = [];
-        //regalado
-        if($numeroProceso == '1'){
-            $arraySave  = [
-                'factura'               => $factura,
-                'bc_estado'             => '1',
-                'estado_liquidacion'    => '2',
-                $campoInstitucion       => $request->institucion_id,
-                'bc_periodo'            => $request->periodo_id,
-                'venta_estado'          => $venta_estado
-            ];
-        }
-        //regalado y bloqueado
-         if($numeroProceso == '2'){
-            $arraySave  = [
-                'factura'               => $factura,
-                'bc_estado'             => '1',
-                'estado'                => '2',
-                'estado_liquidacion'    => '2',
-                $campoInstitucion       => $request->institucion_id,
-                'bc_periodo'            => $request->periodo_id,
-                'venta_estado'          => $venta_estado
-            ];
-        }
-        //bloqueado
-        if($numeroProceso == '3'){
-            $arraySave  = [
-                'factura'               => $factura,
-                'bc_estado'             => '1',
-                'estado'                => '2',
-                $campoInstitucion       => $request->institucion_id,
-                'bc_periodo'            => $request->periodo_id,
-                'venta_estado'          => $venta_estado
-            ];
-        }
-
-        //actualizar el primer codigo
-        $codigo = DB::table('codigoslibros')
-        ->where('codigo', '=', $codigo)
-        ->where('bc_estado', '1')
-        ->where('estado','<>', '2')
-        ->where('estado_liquidacion','<>', '0')
-        ->update($arraySave);
-        return $codigo;
-    }
-    public function updateCodigotoRegaladoBloqueado2($numeroProceso,$codigo,$request,$union,$factura){
-        $venta_estado = $request->venta_estado;
-        $campoInstitucion = "";
-        if($venta_estado == 1) { $campoInstitucion = "bc_institucion"; }
-        else{                    $campoInstitucion = "venta_lista_institucion";  }
-        $arraySave = [];
-        //regalado
-        if($numeroProceso == '1'){
-            $arraySave  = [
-                'factura'               => $factura,
-                'bc_estado'             => '1',
-                'estado_liquidacion'    => '2',
-                $campoInstitucion       => $request->institucion_id,
-                'bc_periodo'            => $request->periodo_id,
-                'codigo_union'          => $union,
-                'venta_estado'          => $venta_estado
-            ];
-        }
-        //regalado y bloqueado
-         if($numeroProceso == '2'){
-            $arraySave  = [
-                'factura'               => $factura,
-                'bc_estado'             => '1',
-                'estado'                => '2',
-                'estado_liquidacion'    => '2',
-                $campoInstitucion       => $request->institucion_id,
-                'bc_periodo'            => $request->periodo_id,
-                'codigo_union'          => $union,
-                'venta_estado'          => $venta_estado
-            ];
-        }
-        //bloqueado
-        if($numeroProceso == '3'){
-            $arraySave  = [
-                'factura'               => $factura,
-                'bc_estado'             => '1',
-                'estado'                => '2',
-                $campoInstitucion       => $request->institucion_id,
-                'bc_periodo'            => $request->periodo_id,
-                'codigo_union'          => $union,
-                'venta_estado'          => $venta_estado
-            ];
-        }
-        //actualizar el primer codigo
-        $codigo = DB::table('codigoslibros')
-        ->where('codigo', '=', $codigo)
-        ->where('bc_estado', '1')
-        ->where('estado','<>', '2')
-        ->where('estado_liquidacion','<>', '0')
-        ->update($arraySave);
-        return $codigo;
-    }
     //api:post//codigos/import/gestion
     public function importGestion(Request $request)
     {
@@ -420,7 +302,6 @@ class CodigoLibrosController extends Controller
         $institucion        = $request->institucion_id;
         $comentario         = $request->comentario;
         $periodo_id         = $request->periodo_id;
-        $TipoVenta          = $request->venta_estado;
         //0=> USAN Y LIQUIDAN ; 1=> regalado; 2 regalado y bloqueado; 3 = bloqueado
         $tipoProceso        = $request->regalado;
         $codigoNoExiste     = [];
@@ -463,9 +344,8 @@ class CodigoLibrosController extends Controller
                 $facturaA                   = $validar[0]->factura;
                 //validar si un regalado esta liquidado
                 $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
-                if($request->factura == null || $request->factura == "")   $factura = $facturaA;
-                else  $factura = $request->factura;
-
+                if($request->factura == null || $request->factura == "")   { $factura = $facturaA; }
+                else{ $factura = $request->factura; }
                 //===PROCESO===========
                 //=====USAN Y LIQUIDAN=========================
                 if($tipoProceso == '0'){
@@ -483,28 +363,34 @@ class CodigoLibrosController extends Controller
                     //     else $validacionCodigo = false;
                     // }
                     $numeroProceso     = 0;
-                    if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifLeido == '1') && $ifLiquidado == '1' && $ifBloqueado !=2  && $ifliquidado_regalado == '0') $validacionCodigo = true;
-                    else $validacionCodigo = false;
+                    if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2  && $ifliquidado_regalado == '0') {  $validacionCodigo = true; }
+                    else { $validacionCodigo = false; }
                 }
                 //======REGALADO NO ENTRA A LA LIQUIDACION============
                 if($tipoProceso == '1'){
                     $numeroProceso     = 1;
-                    if($ifLiquidado == '1' && $ifliquidado_regalado == '0') $validacionCodigo = true;
-                    else $validacionCodigo = false;
+                    if($ifLiquidado == '1' && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
+                    else  { $validacionCodigo = false; }
                 }
                 //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
-                   if($tipoProceso == '2'){
+                if($tipoProceso == '2'){
                     $numeroProceso     = 2;
                     $user              = $usuarioQuemado;
-                    if($ifLiquidado !='0' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $validacionCodigo = true;
-                    else $validacionCodigo = false;
+                    if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
+                    else { $validacionCodigo = false; }
                 }
                 //======BLOQUEADO(No usan y no liquidan)=============
                 if($tipoProceso == '3'){
                     $numeroProceso     = 3;
                     $user              = $usuarioQuemado;
-                    if($ifLiquidado !='0' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $validacionCodigo = true;
-                    else $validacionCodigo = false;
+                    if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
+                    else { $validacionCodigo = false; }
+                }
+                //=======CODIGO GUIA==================================
+                if($tipoProceso == '4'){
+                    $numeroProceso     = 4;
+                    if(($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
+                    else { $validacionCodigo = false; }
                 }
                 //si todo sale bien
                 if($validacionCodigo){
@@ -512,7 +398,7 @@ class CodigoLibrosController extends Controller
                     $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                     $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
                     if($codigo_union != null || $codigo_union != ""){
-                        //numero proceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado
+                        //numero proceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado; 4 = guia
                         $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,$codigo_union,$request,$getcodigoUnion,$factura);
                         //si ingresa correctamente
                         if($ingreso == 1){
@@ -532,7 +418,7 @@ class CodigoLibrosController extends Controller
                     }
                     //ACTUALIZAR CODIGO SIN UNION
                     else{
-                       $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,null,$request,null,$factura);
+                        $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,null,$request,null,$factura);
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
@@ -667,10 +553,10 @@ class CodigoLibrosController extends Controller
                     if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0')){
                         if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')){
                         //Ingresar Union a codigo de activacion
-                        $codigoA     =  $this->updateCodigoUsanLiquidan($codigoActivacion,$codigoDiagnostico,$request,$factura);
+                        $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
                         if($codigoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Ingresar Union a codigo de prueba diagnostico
-                        $codigoB = $this->updateCodigoUsanLiquidan($codigoDiagnostico,$codigoActivacion,$request,$factura);
+                        $codigoB     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoDiagnostico,$codigoActivacion,$request,$factura);
                         if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null
                         ); }
                         }else{
@@ -687,10 +573,10 @@ class CodigoLibrosController extends Controller
                         if($ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') ){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(1,$codigoActivacion,$request,$codigoDiagnostico,$factura);
+                        $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
                         if($codigoA){  $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(1,$codigoDiagnostico,$request,$codigoActivacion,$factura);
+                        $codigoB     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoDiagnostico,$codigoActivacion,$request,$factura);
                         if($codigoB){  $contadorD++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
@@ -701,14 +587,14 @@ class CodigoLibrosController extends Controller
                 }
                 //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
                 if($tipoProceso == '2'){
-                    if($ifLiquidadoA !='0' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
-                        if($ifLiquidadoD !='0' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') ){
+                    if((    $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
+                        if(($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') ){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoActivacion,$request,$codigoDiagnostico,$factura);
+                        $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
                         if($codigoA){  $contadorA++; $this->GuardarEnHistorico($usuarioQuemado,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(2,$codigoDiagnostico,$request,$codigoActivacion,$factura);
+                        $codigoB     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoDiagnostico,$codigoActivacion,$request,$factura);
                         if($codigoB){  $contadorD++; $this->GuardarEnHistorico($usuarioQuemado,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
@@ -717,16 +603,34 @@ class CodigoLibrosController extends Controller
                         $codigoConProblemas->push($validarA);
                     }
                 }
-                  //===== BLOQUEADO(No usan y no liquidan)=============
-                  if($tipoProceso == '3'){
-                    if($ifLiquidadoA !='0' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
-                        if($ifLiquidadoD !='0' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ){
+                //===== BLOQUEADO(No usan y no liquidan)=============
+                if($tipoProceso == '3'){
+                    if((    $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
+                        if(($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
-                        $codigoA     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoActivacion,$request,$codigoDiagnostico,$factura);
+                        $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
                         if($codigoA){  $contadorA++; $this->GuardarEnHistorico($usuarioQuemado,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                         //Cambiar a regalado a codigo de diagnostico
-                        $codigoB     = $this->updateCodigotoRegaladoBloqueado2(3,$codigoDiagnostico,$request,$codigoActivacion,$factura);
+                        $codigoB     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoDiagnostico,$codigoActivacion,$request,$factura);
+                        if($codigoB){  $contadorD++; $this->GuardarEnHistorico($usuarioQuemado,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
+                        }else{
+                            $codigoConProblemas->push($validarD);
+                        }
+                    }else{
+                        $codigoConProblemas->push($validarA);
+                    }
+                }
+                //==GUIA===
+                if($tipoProceso == '4'){
+                    if((  $ifLiquidadoA   =='1')   && $ifBcEstadoA == '1' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
+                        if(($ifLiquidadoD =='1')   && $ifBcEstadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ){
+                        //Cambiar a regalado a codigo de activacion
+                        //(numeroProceso,codigo,$request)
+                        $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
+                        if($codigoA){  $contadorA++; $this->GuardarEnHistorico($usuarioQuemado,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
+                        //Cambiar a regalado a codigo de diagnostico
+                        $codigoB     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoDiagnostico,$codigoActivacion,$request,$factura);
                         if($codigoB){  $contadorD++; $this->GuardarEnHistorico($usuarioQuemado,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null); }
                         }else{
                             $codigoConProblemas->push($validarD);
@@ -767,25 +671,6 @@ class CodigoLibrosController extends Controller
                 "contadorD"                        => $contadorD,
             ];
         }
-    }
-    public function updateCodigoUsanLiquidan($codigo,$union,$request,$factura){
-        $venta_estado = $request->venta_estado;
-        $campoInstitucion = "";
-        if($venta_estado == 1) { $campoInstitucion = "bc_institucion"; }
-        else{                    $campoInstitucion = "venta_lista_institucion";  }
-        $codigo = DB::table('codigoslibros')
-            ->where('codigo', '=', $codigo)
-            ->where('estado_liquidacion', '=', '1')
-            ->where('bc_estado', '=', '1')
-            //(SE QUITARA PARA AHORA EL ESTUDIANTE YA ENVIA LEIDO) ->where('bc_estado', '=', '1')
-            ->update([
-                'factura'           => $factura,
-                $campoInstitucion   => $request->institucion_id,
-                'bc_periodo'        => $request->periodo_id,
-                'venta_estado'      => $request->venta_estado,
-                'codigo_union'      => $union
-            ]);
-        return $codigo;
     }
      //api:get>>/codigos/revision
      public function revision(Request $request){
@@ -833,6 +718,7 @@ class CodigoLibrosController extends Controller
             when (c.estado_liquidacion = '1') then 'sin liquidar'
             when (c.estado_liquidacion = '2') then 'codigo regalado'
             when (c.estado_liquidacion = '3') then 'codigo devuelto'
+            when (c.estado_liquidacion = '4') then 'Código Guia'
         end) as liquidacion,
         (case when (c.bc_estado = '2') then 'codigo leido'
         when (c.bc_estado = '1') then 'codigo sin leer'
@@ -886,7 +772,7 @@ class CodigoLibrosController extends Controller
                 $codigo_union       = $validar[0]->codigo_union;
                 //validar que el si es regalado no este liquidado
                 $liquidado_regalado = $validar[0]->liquidado_regalado;
-                if($ifLiquidado != '0' && $ifBloqueado != 2 && $liquidado_regalado == '0'){
+                if($ifLiquidado != '0' && $ifLiquidado != '4' && $ifBloqueado != 2 && $liquidado_regalado == '0'){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
                     $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                     $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
@@ -968,7 +854,7 @@ class CodigoLibrosController extends Controller
             $ifBloqueado        = $objectCodigoUnion[0]->estado;
             //validar que el si es regalado no este liquidado
             $liquidado_regalado = $objectCodigoUnion[0]->liquidado_regalado;
-            if($ifLiquidado != '0' && $ifBloqueado != 2 && $liquidado_regalado == '0') $unionCorrecto = true;
+            if($ifLiquidado != '0' && $ifLiquidado != '4' && $ifBloqueado != 2 && $liquidado_regalado == '0') $unionCorrecto = true;
             else $unionCorrecto = false;
             if($unionCorrecto){
                 $codigoU = DB::table('codigoslibros')
@@ -1035,7 +921,7 @@ class CodigoLibrosController extends Controller
                 $liquidado_regalado = $validar[0]->liquidado_regalado;
                 //validar si tiene codigo de union
                 $codigo_union       = $validar[0]->codigo_union;
-                if(($usuario == 0  || $usuario == null || $usuario == "null") && $liquidado > 0 && $liquidado_regalado == '0'){
+                if(($usuario == 0  || $usuario == null || $usuario == "null") && ($liquidado == '1' || $liquidado == '2' || $liquidado == '3') && $liquidado_regalado == '0'){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
                     $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                     $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
@@ -1112,7 +998,7 @@ class CodigoLibrosController extends Controller
             $usuario            = $objectCodigoUnion[0]->idusuario;
             $liquidado          = $objectCodigoUnion[0]->estado_liquidacion;
             $liquidado_regalado = $objectCodigoUnion[0]->liquidado_regalado;
-            if( ($usuario == 0  || $usuario == null || $usuario == "null") && $liquidado > 0 && $liquidado_regalado == '0') $unionCorrecto = true;
+            if( ($usuario == 0  || $usuario == null || $usuario == "null") && ($liquidado == '1' || $liquidado == '2' || $liquidado == '3') && $liquidado_regalado == '0') $unionCorrecto = true;
             else $unionCorrecto = false;
             if($unionCorrecto){
                 $codigoU = DB::table('codigoslibros')->where('codigo', '=', $codigo_union)->delete();
@@ -1421,7 +1307,7 @@ class CodigoLibrosController extends Controller
                     $setContrato            = $ifContrato;
                     $verificacion_liquidada = $ifVerificacion;
                     //VALIDACION AUNQUE ESTE LIQUIDADO
-                    if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2') $EstatusProceso = true;
+                    if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
                 }else{
                     //VALIDACION QUE NO SEA LIQUIDADO
                     if(($ifLiquidado == '1' || $ifLiquidado == '2') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
@@ -1562,12 +1448,12 @@ class CodigoLibrosController extends Controller
             $ifliquidado_regalado       = $objectCodigoUnion[0]->liquidado_regalado;
             if($request->dLiquidado ==  '1'){
                 //VALIDACION AUNQUE ESTE LIQUIDADO
-                if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2')               $unionCorrecto = true;
-                else                                                                                $unionCorrecto = false;
+                if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4')    $unionCorrecto = true;
+                else                                                                                            $unionCorrecto = false;
             }else{
                 //VALIDACION QUE NO SEA LIQUIDADO
-                if(($ifLiquidado == '1' || $ifLiquidado == '2') && $ifliquidado_regalado == '0')    $unionCorrecto = true;
-                else                                                                                $unionCorrecto = false;
+                if(($ifLiquidado == '1' || $ifLiquidado == '2') && $ifliquidado_regalado == '0')                $unionCorrecto = true;
+                else                                                                                            $unionCorrecto = false;
             }
             //==PROCESO====
             if($unionCorrecto){
@@ -1697,11 +1583,16 @@ class CodigoLibrosController extends Controller
                 if($ifLiquidado == 0){
                     $mensaje_personalizado = "Código liquidado";
                 }
+                if($ifLiquidado == 2){
+                    if($ifliquidado_regalado == '1'){
+                        $mensaje_personalizado = "Código  Regalado liquidado";
+                    }
+                }
                 if($ifLiquidado == 3){
                     $mensaje_personalizado = "Código  ya devuelto";
                 }
-                if($ifliquidado_regalado == '1'){
-                    $mensaje_personalizado = "Código  Regalado liquidado";
+                if($ifLiquidado == 4){
+                    $mensaje_personalizado = "Código Guia";
                 }
                 // if(($ifLiquidado == 1 || $ifLiquidado == 2) && ($ifBc_Institucion <> $institucion_id || $ifventa_lista_institucion <> $institucion_id)){
                 //     $mensaje_personalizado = "Código no pertenece a la institución que salio";

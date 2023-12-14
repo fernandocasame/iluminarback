@@ -779,70 +779,91 @@ class TemporadaController extends Controller
     public function limpiarCache(){
         Cache::flush();
     }
-    public function updateVerificacion(Request $request){
-        $campo  = $request->campo;
-        $campo2 = $request->campo2;
-        $campo3 = $request->campo3;
-        $valor  = $request->valor;
-        $valor2 = $request->valor2;
-        $valor3 = $request->valor3;
-        if($request->actualizarDosCampo){
-            DB::table('verificaciones')
-            ->where('id', $request->verificacion_id)
-            ->update([
-                $campo => $valor,
-                $campo2 => $valor2,
-            ]);
-            return "Se guardo correctamente";
-        }
-        if($request->actualizarTresCampo){
-            DB::table('verificaciones')
-            ->where('id', $request->verificacion_id)
-            ->update([
-                $campo => $valor,
-                $campo2 => $valor2,
-                $campo3 => $valor3,
-            ]);
-            return "Se guardo correctamente";
-        }
-        else{
-            $campo = $request->campo;
-            $valor = $request->valor;
-            DB::table('verificaciones')
-            ->where('id', $request->verificacion_id)
-            ->update([
-                $campo => $valor,
-            ]);
-        }
-    }
-    //API:POST/saveDescuentosVerificacion
-    public function saveDescuentosVerificacion(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $data_detalle   = json_decode($request->data_detalle);
-        //actualizar la verificacion con los valores de total de descuento y campo dinamico
-        $totalDescuento     = $request->totalDescuento;
-        $personalizado      = $request->personalizado;
-        $campoPersonalizado = $request->campoPersonalizado == null || $request->campoPersonalizado == "" ? null : $request->campoPersonalizado;
-        $user_created       = $request->user_created;
-        $fecha              = date("Y-m-d H:i:s");
-        $ingreso = DB::table('verificaciones_descuentos')
-        ->where('id', $request->verificaciones_descuentos_id)
+    public function updateVentaReal(Request $request){
+        $verificacion = Verificacion::findOrFail($request->verificacion_id);
+        $totalDescuentoVenta = $verificacion->totalDescuentoVenta;
+        $totalVentaReal      = $request->venta_real;
+        $resultadoReal       = $totalVentaReal - ( $request->venta_real_regalado + $totalDescuentoVenta);
+        DB::table('verificaciones')
+        ->where('id', $request->verificacion_id)
         ->update([
-            'total_descuento'       => $totalDescuento,
-            'nombre_descuento'      => $campoPersonalizado,
-            'estado'                => $personalizado,
-            'user_created'          => $user_created
+            'venta_real'            => $resultadoReal,
+            'venta_real_regalados'  => $request->venta_real_regalados,
         ]);
-        foreach($data_detalle as $key => $item){
-            $descuento = VerificacionDescuentoDetalle::findOrFail($item->detalle_id);
-            $descuento->descripcion             = $item->descripcion;
-            $descuento->cantidad_descontar      = $item->cantidad_descontar;
-            $descuento->porcentaje_descuento    = $item->porcentaje_descuento;
-            $descuento->total_descontar         = $item->total_descontar;
-            $descuento->tipo_calculo            = $item->tipo_calculo;
-            $descuento->save();
-        }
-        return ["status" => "1", "message" => "Se guardo correctamente"];
     }
+    public function updateVerificacion(Request $request){
+        // $campo  = $request->campo;
+        // $campo2 = $request->campo2;
+        // $campo3 = $request->campo3;
+        // $valor  = $request->valor;
+        // $valor2 = $request->valor2;
+        // $valor3 = $request->valor3;
+        // if($request->actualizarDosCampo){
+        //     DB::table('verificaciones')
+        //     ->where('id', $request->verificacion_id)
+        //     ->update([
+        //         $campo => $valor,
+        //         $campo2 => $valor2,
+        //     ]);
+        //     return "Se guardo correctamente";
+        // }
+        // if($request->actualizarTresCampo){
+        //     DB::table('verificaciones')
+        //     ->where('id', $request->verificacion_id)
+        //     ->update([
+        //         $campo => $valor,
+        //         $campo2 => $valor2,
+        //         $campo3 => $valor3,
+        //     ]);
+        //     return "Se guardo correctamente";
+        // }
+        // else{
+        //     $campo = $request->campo;
+        //     $valor = $request->valor;
+        //     DB::table('verificaciones')
+        //     ->where('id', $request->verificacion_id)
+        //     ->update([
+        //         $campo => $valor,
+        //     ]);
+        // } $verificacionId = $request->verificacion_id;
+
+        $verificacionId = $request->verificacion_id;
+        //CAMPOS
+        $campo          = $request->campo;
+        $campo2         = $request->campo2;
+        $campo3         = $request->campo3;
+        $campo4         = $request->campo4;
+        $campo5         = $request->campo5;
+        $campo6         = $request->campo6;
+        $campo7         = $request->campo7;
+        //VALUES
+        $valor          = $request->valor;
+        $valor2         = $request->valor2;
+        $valor3         = $request->valor3;
+        $valor4         = $request->valor4;
+        $valor5         = $request->valor5;
+        $valor6         = $request->valor6;
+        $valor7         = $request->valor7;
+        //format
+        $dataToUpdate   = [];
+        //PROCESS====
+        if($request->actualizarDosCampo){
+            $fieldsToUpdate = [$campo, $campo2,];
+            $valuesToUpdate = [$valor, $valor2,];
+        }
+        if ($request->actualizarTresCampo) {
+            $fieldsToUpdate = [$campo, $campo2, $campo3];
+            $valuesToUpdate = [$valor, $valor2, $valor3];
+        }
+        if($request->actualizarSieteCampo){
+            $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4 ,$campo5 ,$campo6, $campo7];
+            $valuesToUpdate = [$valor, $valor2, $valor3, $valor4, $valor5, $valor6, $valor7];
+        }
+        $dataToUpdate   = array_merge($dataToUpdate, array_combine($fieldsToUpdate, $valuesToUpdate));
+        DB::table('verificaciones')
+            ->where('id', $verificacionId)
+            ->update($dataToUpdate);
+        return "Se guardó correctamente";
+    }
+
 }

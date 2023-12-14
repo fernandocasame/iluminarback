@@ -28,21 +28,29 @@ use App\Models\PedidoHistoricoCambios;
 use App\Models\Periodo;
 use App\Models\Verificacion;
 use App\Traits\Pedidos\TraitPedidosGeneral;
+use App\Traits\Verificacion\TraitVerificacionGeneral;
 use Carbon\Carbon;
 use DB;
 use DateTime;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use stdClass;
 class PedidosController extends Controller
 {
     use TraitPedidosGeneral;
+    use TraitVerificacionGeneral;
+    //api:get/pedidos
     public function index(Request $request)
     {
         if($request->homeAdmin){
             return $this->homeAdmin();
         }
 
+    }
+    //api:get/pedidos{id}
+    public function show($idpedido){
+       return $this->getPedidoXID($idpedido);
     }
     public function homeAdmin(){
         $periodos = DB::SELECT("SELECT * FROM periodoescolar p
@@ -134,6 +142,12 @@ class PedidosController extends Controller
                 if($request->ifagregado_anticipo_aprobado == 1){
                     $this->aprobarAnticipo($request->id_pedido);
                 }
+                //convenio
+                if($request->convenio_anios == "null" || $request->convenio_anios == null || $request->convenio_anios == 0){
+                    $pedido->convenio_anios     = null;
+                }else{
+                    $pedido->convenio_anios     = $request->convenio_anios;
+                }
             }else{
                 $pedido = new Pedidos();
                 //si existe convenio de la institucion
@@ -152,7 +166,9 @@ class PedidosController extends Controller
                     }
                     //si aun falta anios agrego convenio a este pedido
                     else{
-                        $pedido->convenio_origen = $getConvenio[0]->id_pedido;
+                        //update a pedido
+                        $pedido->convenio_anios         = $aniosConvenio;
+                        $pedido->pedidos_convenios_id   = $idConvenio;
                     }
                 }
             }
@@ -189,11 +205,6 @@ class PedidosController extends Controller
                 $pedido->periodo_deuda          = null;
             }else{
                 $pedido->periodo_deuda          = $request->periodo_deuda;
-            }
-            if($request->convenio_anios == "null" || $request->convenio_anios == null || $request->convenio_anios == 0){
-                $pedido->convenio_anios     = null;
-            }else{
-                $pedido->convenio_anios     = $request->convenio_anios;
             }
             $pedido->save();
             if($request->generarNuevo == 'yes'){
@@ -1125,76 +1136,18 @@ class PedidosController extends Controller
 
     public function get_pedidos_periodo($periodo)
     {
-        $pedidos = DB::SELECT("SELECT p.*,
-        SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
-        SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
-        CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
-        i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
-        CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
-        ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
-        IF(p.estado = 2,'Anulado','Activo') AS estadoPedido,
-        (SELECT f.id_facturador from pedidos_asesores_facturador
-        f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
-        (
-            SELECT SUM(pa.venta_bruta) AS contador_alcance
-            FROM pedidos_alcance pa
-            WHERE pa.id_pedido = p.id_pedido
-            AND pa.estado_alcance = '1'
-            AND pa.venta_bruta > 0
-        ) AS contador_alcance,
-        (
-            SELECT SUM(pa.total_unidades)  AS alcanceUnidades
-            FROM pedidos_alcance pa
-            WHERE pa.id_pedido = p.id_pedido
-            AND pa.estado_alcance = '1'
-            AND pa.venta_bruta > 0
-        ) AS alcanceUnidades,
-        (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
-        (
-            SELECT COUNT(a.id) AS contadorAlcanceAbierto
-            FROM pedidos_alcance a
-            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
-            WHERE  a.id_pedido = p.id_pedido
-            AND a.estado_alcance  = '0'
-            AND ped.estado = '1'
-            AND a.venta_bruta > 0
-        ) as contadorAlcanceAbierto,
-        (
-            SELECT COUNT(a.id) AS contadorAlcanceCerrado
-            FROM pedidos_alcance a
-            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
-            WHERE  a.id_pedido = p.id_pedido
-            AND a.estado_alcance  = '1'
-            AND ped.estado = '1'
-        ) as contadorAlcanceCerrado,pe.periodoescolar
-        FROM pedidos p
-        INNER JOIN usuario u ON p.id_asesor = u.idusuario
-        INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
-        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = p.id_periodo
-        LEFT JOIN pedidos_historico ph ON p.id_pedido = ph.id_pedido
-        WHERE p.id_periodo = $periodo
-        AND p.tipo = '0'
-        AND p.estado <> '0'
-        ORDER BY p.id_pedido DESC
-        ");
-        return $pedidos;
-    }
-    public function get_pedidos_periodo_facturador($periodo,$id_facturador){
-        //traer los asesores que tiene asignado el facturador
-        $query = DB::SELECT("SELECT DISTINCT f.id_asesor FROM pedidos_asesores_facturador f
-        WHERE f.id_facturador = '$id_facturador'
-        ");
-        $datos = [];
-        foreach($query as $key => $item){
+        $clave = "get_pedidos_periodo".$periodo;
+        if (Cache::has($clave)) {
+            $response = Cache::get($clave);
+        } else {
             $pedidos = DB::SELECT("SELECT p.*,
-            CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
             SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
             SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
+            CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
             i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
             CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
             ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
-            IF(p.estado = 2,'Desactivado','Activo') AS estadoPedido,
+            IF(p.estado = 2,'Anulado','Activo') AS estadoPedido,
             (SELECT f.id_facturador from pedidos_asesores_facturador
             f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
             (
@@ -1228,22 +1181,139 @@ class PedidosController extends Controller
                 WHERE  a.id_pedido = p.id_pedido
                 AND a.estado_alcance  = '1'
                 AND ped.estado = '1'
-            ) as contadorAlcanceCerrado,pe.periodoescolar
+            ) as contadorAlcanceCerrado,pe.periodoescolar,
+            pe.periodoescolar as periodo,
+            (
+                SELECT  SUM(v.valor_liquidacion) as totalLiquidacion
+                FROM verificaciones v
+                WHERE v.contrato = p.contrato_generado
+                AND v.estado  ='0'
+            ) as TotalLiquidaciones
             FROM pedidos p
             INNER JOIN usuario u ON p.id_asesor = u.idusuario
             INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = p.id_periodo
             LEFT JOIN pedidos_historico ph ON p.id_pedido = ph.id_pedido
-            WHERE p.id_periodo = $periodo
-            AND p.id_asesor = '$item->id_asesor'
+            WHERE p.id_periodo = ?
             AND p.tipo = '0'
             AND p.estado <> '0'
             ORDER BY p.id_pedido DESC
-            ");
-            $datos[$key] = $pedidos;
+            ",[$periodo]);
+            $datos = [];
+            foreach($pedidos as $key => $item){
+                $resultado  = [];
+                $valores    = (array) $item;
+                $pagos      = (array) $this->getPagos($item->contrato_generado);
+                $resultado  = array_merge($valores,$pagos);
+                $datos[$key] = [
+                    $resultado
+                ];
+            }
+            //quitar algunos []
+            $response = [];
+            $response = array_merge(...$datos);
+            Cache::put($clave,$response);
         }
-        return array_merge(...$datos);
+        return $response;
+    }
+    public function get_pedidos_periodo_facturador($periodo,$id_facturador){
+        $clave = "get_pedidos_periodo_facturador".$periodo.$id_facturador;
+        if (Cache::has($clave)) {
+            $response = Cache::get($clave);
+        } else {
+           //traer los asesores que tiene asignado el facturador
+            $query = DB::SELECT("SELECT DISTINCT f.id_asesor FROM pedidos_asesores_facturador f
+            WHERE f.id_facturador = '$id_facturador'
+            ");
+            $arreglo = [];
+            foreach($query as $key => $item){
+                $pedidos = DB::SELECT("SELECT p.*,
+                CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
+                SUBSTRING(p.fecha_envio,1,10) as f_fecha_envio,
+                SUBSTRING(p.fecha_entrega,1,10) as f_fecha_entrega,
+                i.nombreInstitucion,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
+                CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,
+                ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
+                IF(p.estado = 2,'Desactivado','Activo') AS estadoPedido,
+                (SELECT f.id_facturador from pedidos_asesores_facturador
+                f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
+                (
+                    SELECT SUM(pa.venta_bruta) AS contador_alcance
+                    FROM pedidos_alcance pa
+                    WHERE pa.id_pedido = p.id_pedido
+                    AND pa.estado_alcance = '1'
+                    AND pa.venta_bruta > 0
+                ) AS contador_alcance,
+                (
+                    SELECT SUM(pa.total_unidades)  AS alcanceUnidades
+                    FROM pedidos_alcance pa
+                    WHERE pa.id_pedido = p.id_pedido
+                    AND pa.estado_alcance = '1'
+                    AND pa.venta_bruta > 0
+                ) AS alcanceUnidades,
+                (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = '1' AND v.estado = '0') as verificaciones,
+                (
+                    SELECT COUNT(a.id) AS contadorAlcanceAbierto
+                    FROM pedidos_alcance a
+                    LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+                    WHERE  a.id_pedido = p.id_pedido
+                    AND a.estado_alcance  = '0'
+                    AND ped.estado = '1'
+                    AND a.venta_bruta > 0
+                ) as contadorAlcanceAbierto,
+                (
+                    SELECT COUNT(a.id) AS contadorAlcanceCerrado
+                    FROM pedidos_alcance a
+                    LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+                    WHERE  a.id_pedido = p.id_pedido
+                    AND a.estado_alcance  = '1'
+                    AND ped.estado = '1'
+                ) as contadorAlcanceCerrado,pe.periodoescolar,
+                pe.periodoescolar as periodo,
+                (
+                SELECT  SUM(v.valor_liquidacion) as totalLiquidacion
+                FROM verificaciones v
+                WHERE v.contrato = p.contrato_generado
+                AND v.estado  ='0'
+                ) as TotalLiquidaciones,
+                (
+                    SELECT SUM(lq.doc_valor) AS totalPagado
+                    FROM 1_4_documento_liq lq
+                    WHERE lq.ven_codigo = p.contrato_generado
+                    AND (lq.doc_ci like '%ANT%' OR lq.doc_ci like '%LIQ%')
+                )  AS totalPagado
+                FROM pedidos p
+                INNER JOIN usuario u ON p.id_asesor = u.idusuario
+                INNER JOIN institucion i ON p.id_institucion = i.idInstitucion
+                LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+                LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = p.id_periodo
+                LEFT JOIN pedidos_historico ph ON p.id_pedido = ph.id_pedido
+                WHERE p.id_periodo = $periodo
+                AND p.id_asesor = '$item->id_asesor'
+                AND p.tipo = '0'
+                AND p.estado <> '0'
+                ORDER BY p.id_pedido DESC
+                ");
+                $arreglo[$key] = $pedidos;
+            }
+            $getPedidos =  array_merge(...$arreglo);
+            $datos = [];
+            foreach($getPedidos as $key => $item){
+                $resultado  = [];
+                $valores    = (array) $item;
+                $pagos      = (array) $this->getPagos($item->contrato_generado);
+                $resultado  = array_merge($valores,$pagos);
+                $datos[$key] = [
+                $resultado
+                ];
+            }
+            //quitar algunos []
+            $response = [];
+            $response = array_merge(...$datos);
+            Cache::put($clave,$response);
+        }
+        return $response;
     }
     public function get_pedidos_periodo_contrato($contrato){
         $pedidos = DB::SELECT("SELECT p.*, pe.periodoescolar as periodo,
@@ -2083,6 +2153,8 @@ class PedidosController extends Controller
         return $datos;
     }
     public function generar_contrato_pedido($id_pedido, $usuario_fact){
+        //limpiar cache
+        Cache::flush();
         $validateBeneficiarios = $this->getAllBeneficiarios($id_pedido);
         if(empty($validateBeneficiarios)){
             return ["status" => "0", "message" => "Seleccione algun beneficiario para poder guardar"];
@@ -2117,6 +2189,7 @@ class PedidosController extends Controller
         $cli_ins_codigoAsesor   = $pedido[0]->cli_ins_codigo;
         $codigo_contrato        = $pedido[0]->codigo_contrato;
         $nombreInstitucion      = $pedido[0]->nombreInstitucion;
+        $convenio_anios         = $pedido[0]->convenio_anios;
         $fechaActual = date('Y-m-d H:i:s');
         $setAnticipo = 0;
         //variables del docente beneficiarios
@@ -2255,28 +2328,51 @@ class PedidosController extends Controller
         $queryHistorico = "UPDATE `pedidos_historico` SET `fecha_generar_contrato` = '$fechaActual', `estado` = '2' WHERE `id_pedido` = $id_pedido;";
         DB::UPDATE($queryHistorico);
         //ASIGNAR A TABLA CONVENIO HIJOS
-        $getConvenio = $this->asignarToConvenio($institucion,$id_pedido,$codigo_ven);
+        if($convenio_anios > 0){
+            $getConvenio = $this->asignarToConvenio($institucion,$id_pedido,$codigo_ven,$convenio_anios,$periodo);
+        }
         //DEJAR NOTIFICACION REVIVISION A CERO
         $this->changeRevisonNotificacion($id_pedido,0);
         return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
     }
-    public function asignarToConvenio($institucion,$id_pedido,$contrato){
+    public function asignarToConvenio($institucion,$id_pedido,$contrato,$convenio_anios,$periodo){
         $getConvenio = $this->getConvenioInstitucion($institucion);
+        //asigno cuando hay convneio
         if(!empty($getConvenio)){
-            $idConvenio = $getConvenio[0]->id;
-            //validate que el contrato hijo convenio no este creado
-            $query = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
-            WHERE cd.id_pedido = '$id_pedido'");
-            if(empty($query)){
-                $hijoConvenio = new PedidoConvenioDetalle();
-                $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
-                $hijoConvenio->id_pedido                    = $id_pedido;
-                $hijoConvenio->contrato                     = $contrato;
-                $hijoConvenio->institucion_id               = $institucion;
-                $hijoConvenio->save();
+           $this->registrerConvenioHijo($getConvenio[0]->id,$id_pedido,$contrato,$institucion);
+        }
+        //si no hay un registro de convenio el asesor marco el convenio
+        else{
+            if($convenio_anios > 1){
+                $global = new PedidoConvenio;
+                $global->anticipo_global = 0;
+                $global->convenio_anios  = $convenio_anios;
+                $global->institucion_id  = $institucion;
+                $global->periodo_id      = $periodo;
+                $global->id_pedido       = $id_pedido;
+                $global->user_created    = 0;
+                $global->observacion     = null;
+                $global->save();
             }
+            $this->registrerConvenioHijo($global->id,$id_pedido,$contrato,$institucion);
         }
 
+    }
+    public function registrerConvenioHijo($idConvenio,$id_pedido,$contrato,$institucion){
+        $padreConvenio   = PedidoConvenio::findOrFail($idConvenio);
+        //validate que el contrato hijo convenio no este creado
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios_detalle cd
+        WHERE cd.id_pedido = '$id_pedido'");
+        if(empty($query)){
+            $hijoConvenio = new PedidoConvenioDetalle();
+            $hijoConvenio->pedido_convenio_institucion  = $idConvenio;
+            $hijoConvenio->id_pedido                    = $id_pedido;
+            $hijoConvenio->contrato                     = $contrato;
+            $hijoConvenio->institucion_id               = $institucion;
+            $hijoConvenio->save();
+        }
+        //update a pedido
+        $this->updatePedido($contrato,$padreConvenio->convenio_anios,$idConvenio);
     }
     public function guardarContratoTemporada($contrato,$institucion,$asesor_id,$temporadas,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion){
         //validar que el contrato no existe
@@ -2632,17 +2728,6 @@ class PedidosController extends Controller
             ->update(['ifagregado_anticipo_aprobado'=> 4]);
             return 'Pedido rechazado';
         }
-    //    if($request->op == 0){
-    //     $dato = DB::table('pedidos_historico')
-    //     ->where('id',$request->id)
-    //     ->update(['estado'=> 2,'fecha_aprobacion_anticipo_gerencia'=> date('Y-m-d H:i:s')]);
-    //    }
-    //    if($request->op == 1){
-    //     $dato = DB::table('pedidos_historico')
-    //     ->where('id',$request->id)
-    //     ->update(['estado'=>3,'fecha_rechazo_gerencia'=> date('Y-m-d H:i:s')]);
-    //     return 'Pedido rechazado';
-    //    }
     }
     public function aprobarYRechazarPedido($datos){
         //aprobar
@@ -2659,11 +2744,11 @@ class PedidosController extends Controller
             $contrato = $datos->contrato_generado;
             if($contrato == null || $contrato  == "null" || $contrato == ""){
             }else{
-                $form_data = [
-                    'venAnticipo'   => floatval($datos->cantidadAprobar),
-                ];
-                $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
-                $prueba_get = json_decode($dato, true);
+                // $form_data = [
+                //     'venAnticipo'   => floatval($datos->cantidadAprobar),
+                // ];
+                // $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
+                // $prueba_get = json_decode($dato, true);
             }
             //HISTORICO ANTICIPOS
             $this->saveHistoricoAnticipos($datos);
@@ -2795,7 +2880,6 @@ class PedidosController extends Controller
             $extractValues = explode(',',$request->codigosM);
             $temporada     = $request->temporada;
             $escuela = $extractValues[0];
-            // $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_apipentahoxinsCodigo?insCodigo=".$escuela);
             $dato = Http::get("http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_api3yearanteriorxinsCodigoyvenCodigo?insCodigo=".$escuela.'&venCodigo='.$temporada);
             $JsonDocumentos = json_decode($dato, true);
             return $JsonDocumentos;
@@ -3059,22 +3143,31 @@ class PedidosController extends Controller
             $periodo_id = $request->periodo_id;
             $pedidos = DB::SELECT("SELECT p.*,
             ph.estado as historicoEstado,pe.periodoescolar as periodo,
-            i.nombreInstitucion,c.nombre AS nombre_ciudad
+            i.nombreInstitucion,c.nombre AS nombre_ciudad,
+            CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+            (
+            SELECT  SUM(v.valor_liquidacion) as totalLiquidacion
+            FROM verificaciones v
+            WHERE v.contrato = p.contrato_generado
+            AND v.estado  ='0'
+            ) as TotalLiquidaciones
             FROM pedidos p
             LEFT JOIN pedidos_historico  ph ON p.id_pedido = ph.id_pedido
             LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
             WHERE p.id_asesor  = ?
             AND   p.id_periodo = ?
             AND   p.tipo       = '0'
             ORDER BY p.id_pedido DESC
             ",[$idusuario,$periodo_id]);
-            $datos = [];
+            $arreglo = [];
             foreach($pedidos as $key => $item){
                 $verificaciones = $this->getVerificaciones($item->contrato_generado);
-                $datos[$key] = [
+                $arreglo[$key] = (Object) [
                     "insNombre"             => $item->nombreInstitucion,
+                    "nombreInstitucion"     => $item->nombreInstitucion,
                     "ciuNombre"             => $item->nombre_ciudad,
                     "anticipo_aprobado"     => $item->anticipo_aprobado,
                     "venFecha"              => $item->fecha_generacion_contrato,
@@ -3095,28 +3188,34 @@ class PedidosController extends Controller
                     "descuento"             => $item->descuento,
                     "anticipo"              => $item->anticipo,
                     "id_asesor"             => $item->id_asesor,
+                    "asesor"                => $item->asesor,
                     "observacion"           => $item->observacion,
                     "imagen"                => $item->imagen,
                     "convenio_anios"        => $item->convenio_anios,
+                    "pedidos_convenios_id"  => $item->pedidos_convenios_id,
                     "ifanticipo"            => $item->ifanticipo,
                     "id_responsable"        => $item->id_responsable,
                     "historicoEstado"       => $item->historicoEstado,
+                    "convenio_origen"       => $item->convenio_origen,
+                    "deuda"                 => $item->deuda,
                     "verificaciones"        => sizeOf($verificaciones),
+                    "TotalLiquidaciones"    => $item->TotalLiquidaciones,
                 ];
             }
-            return $datos;
+            $datos = [];
+            // return $arreglo;
+            foreach($arreglo as $key => $item){
+                $resultado  = [];
+                $valores    = (array) $item;
+                $pagos      = (array) $this->getPagos($item->contrato_generado);
+                $resultado  = array_merge($valores,$pagos);
+                $datos[$key] = [
+                   $resultado
+                ];
+            }
+            //quitar algunos []
+            return array_merge(...$datos);
             } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-        }
-    }
-
-    //api:Get/detalleContratoFacturacion
-    public function detalleContratoFacturacion(Request $request){
-        try {
-            $test = Http::get('http://186.4.218.168:9095/api/f_DetalleVenta/Busquedaxvencodigo?ven_codigo='.$request->ven_codigo);
-            $json = json_decode($test, true);
-            return $json;
-        } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
     }

@@ -124,8 +124,8 @@ class PaqueteController extends Controller
                         $ifliquidado_regaladoD       = $validarD[0]->liquidado_regalado;
                         //===VALIDACION====
                         //error 0 => no hay error; 1 hay error
-                        if($ifLiquidadoA == 1 && $ifBloqueadoA != '2' && $ifcodigo_paqueteA == null && ($ifliquidado_regaladoA == '0') && (($codigo_unionA == $codigoDiagnostico) || ($codigoActivacion  == null || $codigoActivacion == "" || $codigoActivacion == "0")) )    $errorA = 0;
-                        if($ifLiquidadoD == 1 && $ifBloqueadoD != '2' && $ifcodigo_paqueteD == null && ($ifliquidado_regaladoD == '0') && (($codigo_unionD == $codigoActivacion)  || ($codigoDiagnostico == null || $codigoDiagnostico == "" || $codigoDiagnostico == "0")) )  $errorD = 0;
+                        if($ifLiquidadoA   == 1 && $ifBloqueadoA != '2' && $ifcodigo_paqueteA == null && ($ifliquidado_regaladoA == '0') && (($codigo_unionA == $codigoDiagnostico) || ($codigoActivacion  == null || $codigoActivacion == "" || $codigoActivacion == "0")) )    $errorA = 0;
+                        if($ifLiquidadoD    == 1 && $ifBloqueadoD != '2' && $ifcodigo_paqueteD == null && ($ifliquidado_regaladoD == '0') && (($codigo_unionD == $codigoActivacion)  || ($codigoDiagnostico == null || $codigoDiagnostico == "" || $codigoDiagnostico == "0")) )  $errorD = 0;
                         //===MENSAJE VALIDACION====
                         if($errorA == 1 && $errorD == 0) { $mensajeError = "Problema con el código de activación";  $codigoConProblemas->push($validarA); }
                         if($errorA == 0 && $errorD == 1) { $mensajeError = "Problema con el código de diagnóstico"; $codigoConProblemas->push($validarD); }

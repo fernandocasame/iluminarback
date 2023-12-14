@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\Institucion;
 use App\Models\Obsequio;
 use App\Models\ObsequioDetalle;
+use App\Models\Pedidos;
+use App\Traits\Pedidos\TraitPedidosGeneral;
 use Illuminate\Http\Request;
 use DB;
 use Illuminate\Support\Facades\Http;
 use stdClass;
 class ObsequioController extends Controller
 {
+    use TraitPedidosGeneral;
     /**
      * Display a listing of the resource.
      *
@@ -49,31 +52,16 @@ class ObsequioController extends Controller
         return $query;
     }
     public function institucionPedido($institucion,$periodo){
-        // $data = '
-        //     [
-        //         {
-        //         "veN_CODIGO": "C-S23-0000006-DC",
-        //         "veN_VALOR": 50314.5,
-        //         "veN_ANTICIPO": 0,
-        //         "veN_DESCUENTO": 45,
-        //         "total_gastado": 0,
-        //         "maximo_porcentaje_autorizado": 45,
-        //         "porcentaje_obsequio": 2
-        //         }
-        //     ]
-        // ';
-        // $setear  = json_decode($data,true);
-        // return $setear;
         //obtener contrato de la institucion y periodo
         $query = DB::SELECT("SELECT t.*, i.maximo_porcentaje_autorizado,
         p.porcentaje_obsequio,i.verificar_obsequios
         FROM temporadas t
         LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
         LEFT JOIN periodoescolar p ON p.idperiodoescolar = t.id_periodo
-        WHERE t.idInstitucion = '$institucion'
-        AND t.id_periodo = '$periodo'
+        WHERE t.idInstitucion   = ?
+        AND t.id_periodo        = ?
         and t.estado = '1'
-        ");
+        ",[$institucion,$periodo]);
         if(count($query)  == 0){
             return ["status" => "0", "message" => "No existe un contrato asociado a está institución en este período"];
         }
@@ -95,62 +83,61 @@ class ObsequioController extends Controller
             }
         }
         try {
+            //get total gastado
+            $query2 = DB::SELECT("SELECT
+                SUM(o.valor_total) AS total_gastado
+                FROM obsequios o
+                WHERE o.institucion_id  = '$institucion'
+                AND o.periodo_id        = '$periodo'
+                AND (o.estado = '4' OR o.estado = '5' OR o.estado = '6')
+            ");
+            $total_gastado = 0;
+            if(count($query2) > 0){
+                $total_gastado = $query2[0]->total_gastado;
+            }
+            //VARIABLES
+            $ven_valor      = 0;
+            $ven_anticipo   = 0;
+            $ven_descuento  = 0;
             $dataFinally    = [];
-            $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
-            $JsonContrato = json_decode($dato, true);
-            if($JsonContrato == "" || $JsonContrato == null){
-                return ["status" => "0", "message" => "No existe el contrato en facturación"];
-            }
-            $convertido      = $JsonContrato["veN_CONVERTIDO"];
-            $estado         = $JsonContrato["esT_VEN_CODIGO"];
-            if($estado != 3 && !str_starts_with($convertido , 'C')){
-                //=====PROCESO VEN CONVERTIDO==========
-                //si el contrato tiene ven convertidos -> para sumar el ven_descuento
-                $dato = Http::get("http://186.4.218.168:9095/api/f_Venta/GetxVenconvertido?venConvertido=".$contrato);
-                $JsonConvertido = json_decode($dato, true);
-                $DescuentoConvertido = 0;
-                //Si NO existe contratos con ven_convertido
-                // if($JsonConvertido == "" || $JsonConvertido == null){
-                // }
-                // //Si existen contratos con ven_convertido
-                // else{
-                //     foreach($JsonConvertido as $key => $item){
-                //         //variables
-                //         $DescuentoConvertido += $JsonConvertido[$key]["venDescuento"];
-                //     }
-                // }
-                //=====FIN PROCESO VEN CONVERTIDO========
-                //get total gastado
-                $query2 = DB::SELECT("SELECT
-                    SUM(o.valor_total) AS total_gastado
-                    FROM obsequios o
-                    WHERE o.institucion_id = '$institucion'
-                    AND o.periodo_id = '$periodo'
-                    AND (o.estado = '4' OR o.estado = '5' OR o.estado = '6')
-                ");
-                $total_gastado = 0;
-                if(count($query2) > 0){
-                    $total_gastado = $query2[0]->total_gastado;
+            //si es costa 23 y sierra 23 traigo de prolipa
+            if($periodo > 21){
+                 //TRAER DETALLE CONTRATO
+                $getPedido          = Pedidos::Where('contrato_generado',$contrato)->get();
+                if(count($getPedido) == 0){
+                    return ["status" => "0","message" => "No se encontro el contrato en pedidos"];
                 }
-                //setear array
-                $obj = new stdClass();
-                $obj->veN_CODIGO                    = $JsonContrato["veN_CODIGO"];
-                $obj->veN_VALOR                     = $JsonContrato["veN_VALOR"];
-                $obj->veN_ANTICIPO                  = $JsonContrato["veN_ANTICIPO"];
-                $obj->veN_CODIGO                    = $JsonContrato["veN_CODIGO"];
-                $obj->veN_DESCUENTO                 = $JsonContrato["veN_DESCUENTO"] + $DescuentoConvertido;
-                $obj->total_gastado                 = $total_gastado == null ? 0 : $total_gastado;
-                $obj->maximo_porcentaje_autorizado  = $maximo_porcentaje_autorizado;
-                $obj->porcentaje_obsequio           = $porcentaje_obsequio;
-                array_push($dataFinally,$obj);
-                return $dataFinally;
-            }else{
-                //return $dataFinally;
-                return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
+                $pedido             = $this->getPedidoXID($getPedido[0]->id_pedido);
+                $ven_descuento      = $pedido[0]->descuento;
+                $ven_anticipo       = $pedido[0]->anticipo_aprobado;
+                $verificaciones     = $this->getVerificaciones($contrato);
+                foreach($verificaciones as $key => $item){
+                    $ven_valor      = $ven_valor + $item->venta_real;
+                }
             }
-
+            //si no traigo de la tabla facturacion
+            else{
+                $getDetailsContrato = DB::SELECT("SELECT *
+                FROM 1_4_venta
+                WHERE ven_codigo = ?
+                ",[$contrato]);
+                $ven_valor      = $getDetailsContrato[0]->ven_valor;
+                $ven_anticipo   = $getDetailsContrato[0]->ven_anticipo;
+                $ven_descuento  = $getDetailsContrato[0]->ven_descuento;
+            }
+            //setear array
+            $obj = new stdClass();
+            $obj->veN_CODIGO                    = $contrato;
+            $obj->veN_VALOR                     = $ven_valor;
+            $obj->veN_ANTICIPO                  = $ven_anticipo;
+            $obj->veN_DESCUENTO                 = $ven_descuento;
+            $obj->total_gastado                 = $total_gastado == null ? 0 : $total_gastado;
+            $obj->maximo_porcentaje_autorizado  = $maximo_porcentaje_autorizado;
+            $obj->porcentaje_obsequio           = $porcentaje_obsequio;
+            array_push($dataFinally,$obj);
+            return $dataFinally;
         } catch (\Exception  $ex) {
-        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
         return $query;
     }

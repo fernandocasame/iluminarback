@@ -1,6 +1,8 @@
 <?php
 
 namespace App\Traits\Pedidos;
+
+use App\Models\Models\Pedidos\PedidosDocumentosLiq;
 use DB;
 use Illuminate\Support\Facades\Http;
 trait TraitPedidosGeneral
@@ -54,5 +56,38 @@ trait TraitPedidosGeneral
         WHERE b.id_pedido = '$id_pedido'
         ");
         return $query;
+    }
+    public function obtenerDocumentosLiq($contrato){
+        $query = DB::SELECT("SELECT lq.*
+        FROM 1_4_documento_liq lq
+        WHERE lq.ven_codigo = ?
+        AND (lq.doc_ci like '%ANT%' OR lq.doc_ci like '%LIQ%')
+        ORDER BY lq.doc_codigo DESC
+        ",[$contrato]);
+        $datos  = [];
+        foreach($query as $key => $item){
+            $datos[$key] = [
+                "venCodigo"                         => $item->ven_codigo,
+                "docCodigo"                         => $item->doc_codigo,
+                "docValor"                          => $item->doc_valor,
+                "docNumero"                         => $item->doc_numero,
+                "docNombre"                         => $item->doc_nombre,
+                "docCi"                             => $item->doc_ci,
+                "docCuenta"                         => $item->doc_cuenta,
+                "docInstitucion"                    => $item->doc_institucion,
+                "docTipo"                           => $item->doc_tipo,
+                "docObservacion"                    => $item->doc_observacion,
+                "docFecha"                          => $item->ven_codigo,
+                "estVenCodigo"                      => $item->doc_fecha,
+                "verificaciones_pagos_detalles_id"  => $item->verificaciones_pagos_detalles_id
+            ];
+        }
+        return $datos;
+    }
+    //CONVENIOS
+    public function updatePedido($contrato,$convenio_anios,$pedidos_convenios_id){
+        DB::table('pedidos')
+        ->where('contrato_generado',$contrato)
+        ->update(["convenio_anios" => $convenio_anios,"pedidos_convenios_id" => $pedidos_convenios_id]);
     }
 }

@@ -12,6 +12,8 @@ use App\Models\CuotasPorCobrar;
 use App\Models\EstudianteMatriculado;
 use App\Models\HistoricoCodigos;
 use App\Models\Libro;
+use App\Models\Models\Verificacion\VerificacionDescuento;
+use App\Models\Models\Verificacion\VerificacionDescuentoDetalle;
 use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
 use App\Models\PedidoDocumentoDocente;
@@ -20,6 +22,7 @@ use App\Models\RepresentanteLegal;
 use App\Models\SeminarioCapacitador;
 use App\Models\Temporada;
 use App\Models\Usuario;
+use App\Models\Verificacion;
 use DB;
 use GraphQL\Server\RequestError;
 use Mail;
@@ -27,13 +30,26 @@ use Illuminate\Support\Facades\Http;
 use stdClass;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use App\Traits\Codigos\TraitCodigosGeneral;
+use App\Traits\Verificacion\TraitVerificacionGeneral;
+
 class AdminController extends Controller
 {
     use TraitPedidosGeneral;
     use TraitCodigosGeneral;
+    use TraitVerificacionGeneral;
     public function getFilesTest(){
-        $query = DB::SELECT("SELECT * FROM tempfiles");
-        return $query;
+      $query = DB::SELECT("SELECT pd.*,c.convenio_anios
+      FROM pedidos_convenios_detalle pd
+      LEFT JOIN pedidos_convenios c on  pd.pedido_convenio_institucion = c.id
+      where pd.id_pedido > 1
+      and pd.estado = '1'
+      ");
+        foreach($query as $key => $item){
+            DB::table('pedidos')
+            ->where('id_pedido',$item->id_pedido)
+            ->update(["convenio_anios" => $item->convenio_anios,"pedidos_convenios_id" => $item->pedido_convenio_institucion]);
+        }
+        return "se guardo correctamente";
     }
 
     // public function datoEscuela(Request $request){
@@ -314,80 +330,29 @@ class AdminController extends Controller
         return strtr($texto, $tildes);
     }
     public function pruebaData(Request $request){
-        return "hoila MUNDO";
-        try {
-            $fecha = date("Y-m-d");
-            $data = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
-                c.libro_idlibro,ls.nombre as nombrelibro
-                FROM codigoslibros c
-                LEFT JOIN usuario u ON c.idusuario = u.idusuario
-                LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-                WHERE c.bc_estado           = '2'
-                AND c.estado                <> 2
-                and c.estado_liquidacion    = '1'
-                AND c.bc_periodo            = '20'
-                AND c.bc_institucion        = '1670'
-                AND c.prueba_diagnostica    = '0'
-                AND ls.idLibro              = c.libro_idlibro
-                GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
-            ");
-            $contrato = "C-C40-0000004-TEST";
-            $url      = "f_DetalleVerificacion/GetxVenCodigo_Ultimodet_ver_verificacion?ven_codigo=$contrato";
-            $datos    = $this->FacturacionGet($url);
-            $numeroVerificacion = 1;
-            if(isset($datos[0]["status"])){
-                $numeroVerificacion = 1;
-            }else{
-                $getDatos = $datos["ultimaverificacion"]["detVerVerificacion"];
-                $numeroVerificacion = $getDatos +1;
+        $query = DB::SELECT("SELECT DISTINCT v.*, t.id_periodo
+        FROM verificaciones v , temporadas t,pedidos_formato f
+        WHERE v.contrato = t.contrato
+        and  v.estado = '0'
+        AND v.venta_real = 0
+        AND t.id_periodo = f.id_periodo
+        LIMIT 100
+        ");
+        $contador = 0;
+        foreach($query as $key => $item){
+            $idVerificacion = 0;
+            $idVerificacion = $item->id;
+            $query2 = $this->FormatoLibrosLiquidados($item->num_verificacion,$item->contrato,$item->id_periodo);
+            $ventaReal = 0;
+            foreach($query2 as $key => $item){
+                $ventaReal = $ventaReal + $item->valor;
             }
-            //PROCESO GUARDAR
-            foreach($data as $key => $item){
-                $formData = [
-                    "proCodigo"             => $item->codigo,
-                    "venCodigo"             => $contrato,
-                    "detVerCantidad"        => $item->cantidad,
-                    "detVerVerificacion"    => $numeroVerificacion,
-                    "detVerFecha"           => $fecha
-                ];
-                $url2 = "f_DetalleVerificacion/CreateOrUpdateDetalleVerificacion";
-                $process = $this->FacturacionPost($url2,$formData);
-            }
-
-        } catch (\Exception  $ex) {
-        return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+            $verificacion = Verificacion::findOrFail($idVerificacion);
+            $verificacion->venta_real  = $ventaReal;
+            $verificacion->save();
+            if($verificacion){  $contador++; }
         }
-
-        // $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
-        // $JsonContrato = json_decode($dato, true);
-        // return $JsonContrato;
-        // // Convertir la cadena JSON a un array de objetos
-        // $arrayObjetos = json_decode($json);
-        // return $arrayObjetos;
-        // //variables
-        // $contrato = "C-C20-0000008-LJ";
-        // try {
-        //     $dataFinally    = [];
-        //     $dato = Http::get("http://186.4.218.168:9095/api/Contrato/".$contrato);
-        //     $JsonContrato = json_decode($dato, true);
-        //     if($JsonContrato == "" || $JsonContrato == null){
-        //         return ["status" => "0", "message" => "No existe el contrato en facturación"];
-        //     }
-        //     $covertido      = $JsonContrato["veN_CONVERTIDO"];
-        //     $estado         = $JsonContrato["esT_VEN_CODIGO"];
-        //     if($estado != 3 && !str_starts_with($covertido , 'C')){
-        //         //===PROCESO======
-        //         $dato2 = Http::get("http://186.4.218.168:9095/api/f_DocumentoLiq/Get_docliq_venta_x_vencod?venCodigo=".$contrato);
-        //         $JsonDocumentos = json_decode($dato2, true);
-        //         return $JsonDocumentos;
-        //     }else{
-        //         // return $dataFinally;
-        //         return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
-        //     }
-
-        // } catch (\Exception  $ex) {
-        // return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-        // }
+        return "Se guardo $contador veces";
     }
     public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
         //vadidate that it's not exists

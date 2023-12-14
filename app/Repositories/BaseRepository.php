@@ -35,7 +35,10 @@ class BaseRepository
 
         return $query->OrderBy('id','DESC')->get();
     }
-
+    public function getAllXField($cantidad,$field1,$parametro1,$orden){
+        $query = $this->model;
+        if($cantidad == 1) { return $query->Where($field1,'=',$parametro1)->OrderBy('id',$orden)->get(); }
+    }
     public function get(int $id)
     {
         return $this->model->find($id);
