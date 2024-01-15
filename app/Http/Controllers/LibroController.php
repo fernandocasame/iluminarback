@@ -42,7 +42,7 @@ class LibroController extends Controller
     }
     //api:get/getAllBooks
     public function getAllBooks(Request $request){
-        $query = DB::SELECT("SELECT l.nombrelibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
+        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura , l.conteodemo,
         a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
          FROM libros_series ls
          LEFT JOIN series s ON ls.id_serie = s.id_serie
@@ -51,6 +51,44 @@ class LibroController extends Controller
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
+         AND l.demo IS NOT NULL
+         AND TRIM(l.demo) <> ''
+        ");
+        return $query;
+    }
+
+    //api:get/getxLibrosdemo
+    public function getxNombredemo($nombrelike){
+        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura , l.conteodemo,
+        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
+         FROM libros_series ls
+         LEFT JOIN series s ON ls.id_serie = s.id_serie
+         LEFT JOIN libro l ON ls.idLibro = l.idlibro
+         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+         LEFT JOIN area ar ON a.area_idarea = ar.idarea
+         WHERE l.Estado_idEstado = '1'
+         AND a.estado = '1'
+         AND l.demo IS NOT NULL
+         AND TRIM(l.demo) <> ''
+         AND l.nombrelibro like '%$nombrelike%'
+        ");
+        return $query;
+    }
+
+    //api:get/getxAreasdemo
+    public function getxAreasdemo($nombrearea){
+        $query = DB::SELECT("SELECT l.nombrelibro, l.weblibro, l.demo,  l.idlibro,l.asignatura_idasignatura , l.conteodemo,
+        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
+         FROM libros_series ls
+         LEFT JOIN series s ON ls.id_serie = s.id_serie
+         LEFT JOIN libro l ON ls.idLibro = l.idlibro
+         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+         LEFT JOIN area ar ON a.area_idarea = ar.idarea
+         WHERE l.Estado_idEstado = '1'
+         AND a.estado = '1'
+         AND l.demo IS NOT NULL
+         AND TRIM(l.demo) <> ''
+         AND ar.nombrearea = '$nombrearea'
         ");
         return $query;
     }
