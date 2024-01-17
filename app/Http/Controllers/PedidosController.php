@@ -350,7 +350,9 @@ class PedidosController extends Controller
             ",
             [$request->id_pedido, $request->tipo_val, $request->id_area, $request->id_serie]);
             if( count($val_pedido) > 0 ){
-                $valor = $request->valor;
+                $valor          = $request->valor;
+                $valorReserva   = 0;
+                $totalAReservar = 0;
                 if($request->valor == "" || $request->valor == null || $request->valor == 0){
                     DB::DELETE("DELETE FROM pedidos_val_area
                      where id_pedido ='$request->id_pedido'
@@ -363,6 +365,15 @@ class PedidosController extends Controller
                 ///PROCESO DE VALIDACION EN GUIAS SI HAY STOCK
                 if($request->guias){
                     try{
+                        //VALIDACION CONTANDO LOS HAN RESERVADO LAS GUIAS EXCEPTO DEL PEDIDO MAS LUEGO SE VA A SUMAR
+                        $getReserva = $this->getReservaCodigosStock($request);
+                        if(count($getReserva) > 0){
+                            foreach($getReserva as $key2 => $item2){
+                                $valorReserva = $valorReserva + $item2->valor;
+                            }
+                        }
+                        $totalAReservar = $valorReserva + $valor;
+                        ///PROCESO
                         $query = $this->pedidoxLibro($request);
                         if(empty($query)){
                             return ["status" => "0", "message" => "No existe el libro"];
@@ -378,15 +389,17 @@ class PedidosController extends Controller
                        $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
                        $json_stock     = json_decode($getStock, true);
                        $stockAnterior  = $json_stock["producto"][0]["proStock"];
+                        // $stockAnterior = 16;
                        //post stock
-                       $nuevoStock     = $stockAnterior - $cantidad;
+                       //MENOS 1 ES PORQUE es el minimo que se puede pedir
+                       $nuevoStock     = $stockAnterior - $totalAReservar;
+                       $stockDisponible = $stockAnterior - $valorReserva -1;
                        if($nuevoStock < 1){
-                        return ["status" => "0", "message" => "No existe stock del libro ".$nombreLibro." cantidad disponible: ".$stockAnterior];
+                        return ["status" => "0", "message" => "No existe stock del libro ".$nombreLibro." cantidad disponible: ".$stockDisponible];
                        }
                     } catch (\Exception  $ex) {
                         return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
                     }
-
                 }
                 ///FIN PROCESO DE GUIAS
                 DB::UPDATE("UPDATE `pedidos_val_area`
@@ -399,9 +412,21 @@ class PedidosController extends Controller
                 if($request->valor == "" || $request->valor == null){
                     return ["status" => "2"];
                 }
+                $valor          = $request->valor;
+                $valorReserva   = 0;
+                $totalAReservar = 0;
                    ///PROCESO DE VALIDACION EN GUIAS SI HAY STOCK
                    if($request->guias){
                     try{
+                         //VALIDACION CONTANDO LOS HAN RESERVADO LAS GUIAS EXCEPTO DEL PEDIDO MAS LUEGO SE VA A SUMAR
+                         $getReserva = $this->getReservaCodigosStock($request);
+                         if(count($getReserva) > 0){
+                             foreach($getReserva as $key2 => $item2){
+                                 $valorReserva = $valorReserva + $item2->valor;
+                             }
+                         }
+                         $totalAReservar = $valorReserva + $valor;
+                         ///PROCESO
                         $query = $this->pedidoxLibro($request);
                         if(empty($query)){
                             return ["status" => "0", "message" => "No existe el libro"];
@@ -417,10 +442,13 @@ class PedidosController extends Controller
                        $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
                        $json_stock     = json_decode($getStock, true);
                        $stockAnterior  = $json_stock["producto"][0]["proStock"];
-                       //post stock
-                       $nuevoStock     = $stockAnterior - $cantidad;
+                        // $stockAnterior = 16;
+                        //post stock
+                        //MENOS 1 ES PORQUE es el minimo que se puede pedir
+                        $nuevoStock     = $stockAnterior - $totalAReservar;
+                        $stockDisponible = $stockAnterior - $valorReserva -1;
                        if($nuevoStock < 1){
-                        return ["status" => "0", "message" => "No existe stock del libro ".$nombreLibro." cantidad disponible: ".$stockAnterior];
+                        return ["status" => "0", "message" => "No existe stock del libro ".$nombreLibro." cantidad disponible: ".$stockDisponible ];
                        }
                     } catch (\Exception  $ex) {
                         return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
@@ -445,6 +473,21 @@ class PedidosController extends Controller
         }else{
             return ["status" => "0", "message" => "El pedido ya fue entregado por bodega no se puede modificar"];
         }
+    }
+    public function getReservaCodigosStock($request){
+        $query = DB::SELECT("SELECT pa.*
+        FROM pedidos p
+        LEFT JOIN pedidos_val_area pa ON p.id_pedido = pa.id_pedido
+        WHERE p.tipo = '1'
+        AND p.estado = '1'
+        AND p.estado_entrega = '0'
+        and `tipo_val` = '$request->tipo_val'
+        AND `id_area` = '$request->id_area'
+        AND `id_serie` = '$request->id_serie'
+        AND `alcance`  = 0
+        AND p.id_pedido <> '$request->id_pedido'
+       ");
+       return $query;
     }
     public function pedidoxLibro($request){
         $query = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro
