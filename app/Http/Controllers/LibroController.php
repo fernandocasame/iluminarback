@@ -56,6 +56,19 @@ class LibroController extends Controller
         ");
         return $query;
     }
+    public function getAllBooks1(Request $request){
+        $query = DB::SELECT("SELECT l.nombrelibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
+        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
+         FROM libros_series ls
+         LEFT JOIN series s ON ls.id_serie = s.id_serie
+         LEFT JOIN libro l ON ls.idLibro = l.idlibro
+         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+         LEFT JOIN area ar ON a.area_idarea = ar.idarea
+         WHERE l.Estado_idEstado = '1'
+         AND a.estado = '1'
+        ");
+        return $query;
+    }
 
     //api:get/getxLibrosdemo
     public function getxNombredemo($nombrelike){
