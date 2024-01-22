@@ -1291,6 +1291,7 @@ Route::post('eliminarConvenio','ConvenioController@eliminarConvenio');
 Route::get('getEstudianteCodigos/{valores}','CodigosLibrosController@getEstudianteCodigos');
 ///ILUMINAR
 Route::get('getAllBooks','LibroController@getAllBooks');
+Route::get('getAllBooks1','LibroController@getAllBooks1');
 Route::get('getxNombredemo/{nombrelike}','LibroController@getxNombredemo');
 Route::get('getxAreasdemo/{nombrearea}','LibroController@getxAreasdemo');
 Route::post('editarconteodemo','LibroController@editarconteodemo');
