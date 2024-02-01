@@ -165,7 +165,7 @@ class CodigosLibrosController extends Controller
     //     return $libros;
     // }
 
-    public function codigos_libros_estudiante($id,$institucion,$periodo,$region){
+    public function codigos_libros_estudiante($id,$institucion,$periodo,$region,$grupo){
         $auxlibros = [];
         $nivel = 0;
         $auxlibros = $codigos_libros = DB::SELECT("SELECT libro.*,asignatura.*,
@@ -199,72 +199,106 @@ class CodigosLibrosController extends Controller
         }
         $datos = [];
         foreach ($auxlibros as $key => $item) {
-        //variables por defecto
-        $weblibro       = $item->weblibro;
-        $portada        = $item->portada;
-        $pdfsinguia     = $item->pdfsinguia;
-        $pdfconguia     = $item->pdfconguia;
-        $guiadidactica  = $item->guiadidactica;
-        //sierra
-        if($region == 1){
-            //si no hay libro de costa asignado tomamos el por defecto
-            if($item->s_weblibro != null || $item->s_weblibro != ""){
-                $weblibro       = $item->s_weblibro;
-                $portada        = $item->s_portada;
-                $pdfsinguia     = $item->s_pdfsinguia;
-                $pdfconguia     = $item->s_pdfconguia;
-                $guiadidactica  = $item->s_guiadidactica;
+            //variables por defecto
+            $weblibro       = $item->weblibro;
+            $portada        = $item->portada;
+            $pdfsinguia     = $item->pdfsinguia;
+            $pdfconguia     = $item->pdfconguia;
+            $guiadidactica  = $item->guiadidactica;
+            //sierra
+            if($region == 1){
+                //si no hay libro de costa asignado tomamos el por defecto
+                if($item->s_weblibro != null || $item->s_weblibro != ""){
+                    $weblibro       = $item->s_weblibro;
+                    $portada        = $item->s_portada;
+                    $pdfsinguia     = $item->s_pdfsinguia;
+                    $pdfconguia     = $item->s_pdfconguia;
+                    $guiadidactica  = $item->s_guiadidactica;
+                }
             }
-        }
-        //costa
-        if($region == 2){
-            //si no hay libro de costa asignado tomamos el por defecto
-            if($item->c_weblibro != null || $item->c_weblibro != ""){
-                $weblibro       = $item->c_weblibro;
-                $portada        = $item->c_portada;
-                $pdfsinguia     = $item->c_pdfsinguia;
-                $pdfconguia     = $item->c_pdfconguia;
-                $guiadidactica  = $item->c_guiadidactica;
+            //costa
+            if($region == 2){
+                //si no hay libro de costa asignado tomamos el por defecto
+                if($item->c_weblibro != null || $item->c_weblibro != ""){
+                    $weblibro       = $item->c_weblibro;
+                    $portada        = $item->c_portada;
+                    $pdfsinguia     = $item->c_pdfsinguia;
+                    $pdfconguia     = $item->c_pdfconguia;
+                    $guiadidactica  = $item->c_guiadidactica;
+                }
             }
-        }
-        $mostratCode = "";
-        if(isset($item->codigo)){
-            $mostratCode  = $item->codigo;
-        }
-        $datos[$key] =[
-            "idlibro"                   => $item->idlibro,
-            "nombrelibro"               => $item->nombrelibro,
-            "descripcionlibro"          => $item->descripcionlibro,
-            "serie"                     => $item->serieCodigo,
-            "anio"                      => $item->anio,
-            "fechaUpdate"               => $item->fechaUpdate,
-            "codigo"                    => $mostratCode,
-            "titulo"                    => $item->titulo,
-            "portada"                   => $portada,
-            "weblibro"                  => $weblibro,
-            "pdfsinguia"                => $pdfsinguia,
-            "pdfconguia"                => $pdfconguia,
-            "guiadidactica"             => $guiadidactica,
-            "Estado_idEstado"           => $item->Estado_idEstado,
-            "asignatura_idasignatura"   => $item->asignatura_idasignatura,
-            "ziplibro"                  => $item->ziplibro,
-            "libroFechaModificacion"    => $item->libroFechaModificacion,
-            "grupo"                     => $item->grupo,
-            "puerto"                    => $item->puerto,
-            "creado_at"                 => $item->creado_at,
-            "actualizado_at"            => $item->actualizado_at,
-            "idasignatura"              => $item->idasignatura,
-            "nombreasignatura"          => $item->nombreasignatura,
-            "area_idarea"               => $item->area_idarea,
-            "nivel_idnivel"             => $item->nivel_idnivel,
-            "tipo_asignatura"           => $item->tipo_asignatura,
-            "estado"                    => $item->estado,
-            "created_at"                => $item->created_at,
-            "updated_at"                => $item->updated_at,
-        ];
+            $mostratCode = "";
+            if(isset($item->codigo)){
+                $mostratCode  = $item->codigo;
+            }
+            if($grupo == 10){
+                $datos[$key] =[
+                    "idlibro"                   => $item->idlibro,
+                    "nombrelibro"               => $item->nombrelibro,
+                    "descripcionlibro"          => $item->descripcionlibro,
+                    "serie"                     => $item->serieCodigo,
+                    "anio"                      => $item->anio,
+                    "fechaUpdate"               => $item->fechaUpdate,
+                    "codigo"                    => $mostratCode,
+                    "titulo"                    => $item->titulo,
+                    "portada"                   => $portada,
+                    "weblibro"                  => $weblibro,
+                    "pdfsinguia"                => $pdfsinguia,
+                    "pdfconguia"                => $pdfconguia,
+                    "guiadidactica"             => $guiadidactica,
+                    "Estado_idEstado"           => $item->Estado_idEstado,
+                    "asignatura_idasignatura"   => $item->asignatura_idasignatura,
+                    "ziplibro"                  => $item->ziplibro,
+                    "libroFechaModificacion"    => $item->libroFechaModificacion,
+                    "grupo"                     => $item->grupo,
+                    "puerto"                    => $item->puerto,
+                    "creado_at"                 => $item->creado_at,
+                    "actualizado_at"            => $item->actualizado_at,
+                    "idasignatura"              => $item->idasignatura,
+                    "nombreasignatura"          => $item->nombreasignatura,
+                    "area_idarea"               => $item->area_idarea,
+                    "nivel_idnivel"             => $item->nivel_idnivel,
+                    "tipo_asignatura"           => $item->tipo_asignatura,
+                    "estado"                    => $item->estado,
+                    "created_at"                => $item->created_at,
+                    "updated_at"                => $item->updated_at,
+                ];
+            }else{
+                $datos[$key] =[
+                    "idlibro"                   => $item->idlibro,
+                    "nombrelibro"               => $item->nombrelibro,
+                    "descripcionlibro"          => $item->descripcionlibro,
+                    "serie"                     => $item->serieCodigo,
+                    "anio"                      => $item->anio,
+                    // "fechaUpdate"               => $item->fechaUpdate,
+                    // "codigo"                    => $mostratCode,
+                    "titulo"                    => $item->titulo,
+                    "portada"                   => $portada,
+                    "weblibro"                  => $weblibro,
+                    "pdfsinguia"                => $pdfsinguia,
+                    "pdfconguia"                => $pdfconguia,
+                    "guiadidactica"             => $guiadidactica,
+                    "Estado_idEstado"           => $item->Estado_idEstado,
+                    "asignatura_idasignatura"   => $item->asignatura_idasignatura,
+                    "ziplibro"                  => $item->ziplibro,
+                    "libroFechaModificacion"    => $item->libroFechaModificacion,
+                    "grupo"                     => $item->grupo,
+                    "puerto"                    => $item->puerto,
+                    // "creado_at"                 => $item->creado_at,
+                    // "actualizado_at"            => $item->actualizado_at,
+                    "idasignatura"              => $item->idasignatura,
+                    "nombreasignatura"          => $item->nombreasignatura,
+                    "area_idarea"               => $item->area_idarea,
+                    "nivel_idnivel"             => $item->nivel_idnivel,
+                    "tipo_asignatura"           => $item->tipo_asignatura,
+                    "estado"                    => $item->estado,
+                    // "created_at"                => $item->created_at,
+                    // "updated_at"                => $item->updated_at,
+                ];
+            }
         }
         $data=[
-            'libros'=>$auxlibrosf = array_unique($datos, SORT_REGULAR),
+            'libros'=>$auxlibrosf = array_values(array_unique($datos, SORT_REGULAR)),
             // 'libros'=>$auxlibrosf = array_unique($auxlibros, SORT_REGULAR),
             'nivel'=>$nivel,
             'institucion'=>$institucion,

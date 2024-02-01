@@ -364,8 +364,8 @@ class CodigosLibrosGenerarController extends Controller
         return $codigos_libros;
     }
     public function codigosBuscarCodigo($codigo){
-        $codigos_libros = $this->getCodigos($codigo,0,1);
-        return $codigos_libros;
+        $consulta = $this->getCodigosVerificaciones($codigo);
+        return $consulta;
     }
     public function codigosBuscarxCodigo($codigo){
         $codigos_libros = $this->getCodigos($codigo,0);

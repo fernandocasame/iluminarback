@@ -35,6 +35,7 @@ class CodigoLibrosController extends Controller
         $venta_estado           = $request->venta_estado;
         $comentario             = "Codigo leido de ".$nombreInstitucion." - ".$nombrePeriodo;
         $id_usuario             = $request->id_usuario;
+        $id_group               = $request->id_group;
         $codigosNoCambiados     = [];
         $contadorNoCambiado     = 0;
         $codigosLeidos          = [];
@@ -64,8 +65,12 @@ class CodigoLibrosController extends Controller
                 $ifbc_periodo       = $validar[0]->bc_periodo;
                 //validar si tiene codigo de union
                 $codigo_union       = $validar[0]->codigo_union;
+                $preValidate         = false;
+                //VALIDACION
+                if($id_group == 11) { $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado != 0) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+                else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
                 //===PROCESO===========
-                if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2){
+                if($preValidate){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
                     $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                     $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
@@ -131,17 +136,28 @@ class CodigoLibrosController extends Controller
         $institucion     = $request->institucion_id;
         $traerPeriodo    = $request->periodo_id;
         $venta_estado    = $request->venta_estado;
+        $id_group        = $request->id_group;
         $unionCorrecto   = false;
         ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
         if($codigo_union == '0') $withCodigoUnion = 0;
         else                     $withCodigoUnion = 1;
-        $arraySave  = [
-            'bc_institucion'        => $institucion,
-            'bc_estado'             => 2,
-            'bc_periodo'            => $traerPeriodo,
-            'bc_fecha_ingreso'      => $todate,
-            'venta_estado'          => $venta_estado
-        ];
+        if($id_group == 11){
+            $arraySave  = [
+                'bc_institucion'        => $institucion,
+                'bc_estado'             => 2,
+                'bc_periodo'            => $traerPeriodo,
+                // 'bc_fecha_ingreso'      => $todate,
+                // 'venta_estado'          => $venta_estado
+            ];
+        }else{
+            $arraySave  = [
+                'bc_institucion'        => $institucion,
+                'bc_estado'             => 2,
+                'bc_periodo'            => $traerPeriodo,
+                'bc_fecha_ingreso'      => $todate,
+                'venta_estado'          => $venta_estado
+            ];
+        }
         //si hay codigo de union lo actualizo
         if($withCodigoUnion == 1){
             //VALIDO SI NO EXISTE EL CODIGO DE UNION LO MANDO COMO ERROR
@@ -164,8 +180,15 @@ class CodigoLibrosController extends Controller
             $ifventa_estado     = $objectCodigoUnion[0]->venta_estado;
             //validar el bc_periodo
             $ifbc_periodo       = $objectCodigoUnion[0]->bc_periodo;
-            if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2) $unionCorrecto = true;
-            else $unionCorrecto = false;
+            $preValidate        = false;
+            //VALIDACIO N
+            if($id_group == 11) { $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado != 0) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+            else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+            //===PROCESO===========
+            if($preValidate){
+                $unionCorrecto = true;
+            // if(($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2) $unionCorrecto = true;
+            }else { $unionCorrecto = false; }
             if($unionCorrecto){
                 $codigoU = DB::table('codigoslibros')
                 ->where('codigo', '=', $codigo_union)

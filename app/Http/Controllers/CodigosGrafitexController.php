@@ -129,6 +129,7 @@ class CodigosGrafitexController extends Controller
         $codigos_libros->idusuario_creador_codigo   = $request->user_created;
         $codigos_libros->prueba_diagnostica         = $prueba_diagnostica;
         $codigos_libros->codigo_union               = $codigo_union;
+        $codigos_libros->creado_grafitex            = 1;
         $codigo_verificar                           = $codigo;
         $verificar_codigo = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo_verificar'");
         if( $verificar_codigo ){
