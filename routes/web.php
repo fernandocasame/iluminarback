@@ -370,7 +370,7 @@ Route::get('unidades_asignatura/{id}','LibroController@unidades_asignatura');
 
 Route::apiResource('codigoslibros','CodigosLibrosController');
 Route::get('codigoslibrosEstudiante','CodigosLibrosController@codigoslibrosEstudiante');
-Route::get('codigos_libros_estudiante/{id}/{institucion}/{periodo}/{region}','CodigosLibrosController@codigos_libros_estudiante');
+Route::get('codigos_libros_estudiante/{id}/{institucion}/{periodo}/{region}/{grupo}', 'CodigosLibrosController@codigos_libros_estudiante');
 Route::post('addContenido', 'CursoController@addContenido');
 Route::get('getContenido','CursoController@getContenido');
 Route::get('getContenidoTodo','CursoController@getContenidoTodo');
