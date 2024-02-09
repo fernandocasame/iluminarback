@@ -199,13 +199,13 @@ class CodigosGrafitexController extends Controller
         }
         if( $codigo != 'no_disponible' ){
             // valida repetidos en DB
-            $validar = DB::SELECT("SELECT codigo from codigos_paquetes WHERE codigo = '$codigo'");
+            $validar = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo'");
             $cant_int = 0;
             $codigo_disponible = 1;
             while ( count($validar) > 0 ) {
                 $caracter = $this->makeid($longitud);
                 $codigo = $code.$caracter;
-                $validar = DB::SELECT("SELECT codigo from codigos_paquetes WHERE codigo = '$codigo'");
+                $validar = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo'");
                 $cant_int++;
                 if( $cant_int == 10 ){
                     $codigo_disponible = 0;
