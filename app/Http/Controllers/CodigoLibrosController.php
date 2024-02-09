@@ -1034,7 +1034,7 @@ class CodigoLibrosController extends Controller
                 return 2;
             }
         }else{
-            $codigoU = DB::table('codigoslibros')->where('codigo', '=', $codigo)->delete();
+            $codigo = DB::table('codigoslibros')->where('codigo', '=', $codigo)->delete();
         }
         //con codigo union
         ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
