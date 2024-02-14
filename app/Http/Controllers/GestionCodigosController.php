@@ -19,44 +19,7 @@ class GestionCodigosController extends Controller
      */
     public function index(Request $request)
     {
-        $consulta = DB::SELECT("SELECT
-        c.venta_lista_institucion,
-        c.codigos_barras,c.anio,c.serie, c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.serie,
-        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro as book,c.libro_idlibro,
-        CONCAT(u.nombres, ' ', u.apellidos) as estudiante, CONCAT(ucr.nombres, ' ', ucr.apellidos) as creador,
-         u.email,u.cedula, ib.nombreInstitucion as institucion_barras,c.created_at,
-        i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,c.bc_fecha_ingreso,
-        c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
-        IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-        (case when (c.estado_liquidacion = '0') then 'liquidado'
-            when (c.estado_liquidacion = '1') then 'sin liquidar'
-            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '0') then 'Regalado sin liquidar'
-            when (c.estado_liquidacion = '2' AND c.liquidado_regalado = '1') then 'Regalado liquidado'
-            when (c.estado_liquidacion = '3') then 'codigo devuelto'
-        end) as liquidacion,
-        (case when (c.bc_estado = '2') then 'codigo leido'
-        when (c.bc_estado = '1') then 'codigo sin leer'
-        end) as barrasEstado,
-        (case when (c.codigos_barras = '1') then 'con código de barras'
-            when (c.codigos_barras = '0')  then 'sin código de barras'
-        end) as status,
-        (case when (c.venta_estado = '0') then ''
-            when (c.venta_estado = '1') then 'Venta directa'
-            when (c.venta_estado = '2') then 'Venta por lista'
-        end) as ventaEstado,ib.nombreInstitucion as institucionBarra,
-        p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
-        c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
-        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
-        FROM codigoslibros c
-        LEFT JOIN usuario u ON c.idusuario = u.idusuario
-        LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
-        LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-        LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-        LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-        LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
-        LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-        WHERE c.codigo LIKE '%$request->codigo%'");
+        $consulta = $this->getCodigosVerificaciones($request->codigo);
         if(empty($consulta)){
             return ["status" => "0","message" => "No se encontro codigos"];
         }else{
@@ -86,11 +49,11 @@ class GestionCodigosController extends Controller
         if($request->editar == "1"){
             $codigo     = CodigosLibros::findOrFail($request->codigo);
             $old_values = CodigosLibros::findOrFail($request->codigo);
-            $comentario = "Se edito el codigo desde administracion";
+            $comentario = $request->comentario;
         }
         //guardar
         else{
-            $comentario = "Se creo el codigo desde administracion";
+            $comentario = $request->comentario;
             $old_values = "";
             //validar si existe codigo
             $validate = DB::SELECT("SELECT * FROM codigoslibros WHERE codigo = '$request->codigo'");
@@ -152,7 +115,7 @@ class GestionCodigosController extends Controller
         foreach($codigos as $key => $item){
             $codigo     = CodigosLibros::findOrFail($item->codigo);
             $old_values = CodigosLibros::findOrFail($item->codigo);
-            $comentario = "Se edito el codigo desde administracion";
+            $comentario = $request->comentario;
             //update
             if($request->chkIdusuario                   == '1') $codigo->idusuario                  = $request->idusuario;
             if($request->chkBc_Estado                   == '1') $codigo->estado                     = $request->estado;
@@ -505,9 +468,15 @@ class GestionCodigosController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
+    //gestionCodigos/{codigo}
+    public function show($codigo)
     {
-
+        $query     = CodigosLibros::Where('codigo','=',$codigo)->get();
+        if(count($query) > 0){
+            return $query[0];
+        }else{
+            return 0;
+        }
     }
 
     /**

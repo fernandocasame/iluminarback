@@ -10,6 +10,7 @@ use App\Imports\CodigosImport;
 use App\Models\CodigosDevolucion;
 use App\Models\CodigosLibros;
 use App\Models\HistoricoCodigos;
+use App\Models\Institucion;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use Illuminate\Support\Facades\Cache;
@@ -29,8 +30,10 @@ class CodigoLibrosController extends Controller
         ini_set('max_execution_time', 6000000);
         $codigos                = json_decode($request->data_codigos);
         $institucion            = $request->institucion_id;
+        $getDataInstitucion     = Institucion::Where('idInstitucion',$institucion)->get();
+        $nombreInstitucion      = $getDataInstitucion[0]->nombreInstitucion;
         $traerPeriodo           = $request->periodo_id;
-        $nombreInstitucion      = $request->nombreInstitucion;
+        // $nombreInstitucion      = $request->nombreInstitucion;
         $nombrePeriodo          = $request->nombrePeriodo;
         $venta_estado           = $request->venta_estado;
         $comentario             = "Codigo leido de ".$nombreInstitucion." - ".$nombrePeriodo;
@@ -932,7 +935,7 @@ class CodigoLibrosController extends Controller
         $contadorNoCambiado     = 0;
         $traerPeriodo           = $request->periodo_id;
         $id_usuario             = $request->id_usuario;
-        $comentario             = "Se elimino el codigo";
+        $comentario             = $request->observacion;
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validar = $this->getCodigos($item->codigo,0);

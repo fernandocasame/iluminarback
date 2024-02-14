@@ -170,10 +170,10 @@ class UsuarioController extends Controller
     {
     set_time_limit(6000000);
     ini_set('max_execution_time', 6000000);
-     $client = new Client([
-            'base_uri'=> 'https://foro.prolipadigital.com.ec',
-            // 'timeout' => 60.0,
-    ]);
+    //  $client = new Client([
+    //         'base_uri'=> 'https://foro.prolipadigital.com.ec',
+    //         // 'timeout' => 60.0,
+    // ]);
     $datos = [];
     $idinstitucion = $request->idInstitucion;
      // $consulta=DB::select("CALL `docentes`(?);",[$idinstitucion]);
@@ -190,85 +190,113 @@ class UsuarioController extends Controller
         LEFT JOIN institucion_cargos c ON usuario.cargo_id = c.id
         where usuario.institucion_idInstitucion = '$idinstitucion'
         AND (usuario.id_group = '6' OR usuario.id_group = '10')
+        AND usuario.estado_idEstado = '1'
     ");
      return $consulta;
-        foreach($consulta as $key => $item){
-            $response = $client->request('GET','estudiantes?idusuario='.$item->idusuario);
-            $getDocente =   json_decode($response->getBody()->getContents());
-            $datos [$key] =[
-                "idusuario" => $item->idusuario,
-                "cedula" =>    $item->cedula,
-                "nombres" =>   $item->nombres,
-                "apellidos" => $item->apellidos,
-                "name_usuario" =>$item->name_usuario,
-                "email" => $item->email,
-                "date_created" => $item->date_created,
-                "id_group" => $item->id_group,
-                "p_ingreso" => $item->p_ingreso,
-                "institucion_idInstitucion" => $item->institucion_idInstitucion,
-                "estado_idEstado" => $item->estado_idEstado,
-                "foto_user" => $item->foto_user,
-                "password_status" => $item->password_status,
-                "telefono" => $item->telefono,
-                "updated_at" => $item->updated_at,
-                "created_at" => $item->created_at,
-                "cargo" => $item->cargo,
-                "cargo_id" => $item->cargo_id,
-                "visitas" => count($getDocente)
+        // foreach($consulta as $key => $item){
+        //     $response = $client->request('GET','estudiantes?idusuario='.$item->idusuario);
+        //     $getDocente =   json_decode($response->getBody()->getContents());
+        //     $datos [$key] =[
+        //         "idusuario" => $item->idusuario,
+        //         "cedula" =>    $item->cedula,
+        //         "nombres" =>   $item->nombres,
+        //         "apellidos" => $item->apellidos,
+        //         "name_usuario" =>$item->name_usuario,
+        //         "email" => $item->email,
+        //         "date_created" => $item->date_created,
+        //         "id_group" => $item->id_group,
+        //         "p_ingreso" => $item->p_ingreso,
+        //         "institucion_idInstitucion" => $item->institucion_idInstitucion,
+        //         "estado_idEstado" => $item->estado_idEstado,
+        //         "foto_user" => $item->foto_user,
+        //         "password_status" => $item->password_status,
+        //         "telefono" => $item->telefono,
+        //         "updated_at" => $item->updated_at,
+        //         "created_at" => $item->created_at,
+        //         "cargo" => $item->cargo,
+        //         "cargo_id" => $item->cargo_id,
+        //         "visitas" => count($getDocente)
 
-            ];
-        }
-        return $datos;
+        //     ];
+        // }
+        // return $datos;
     }
     //visitas docente
     public function docentesVisitas(Request $request)
     {
-    $datos = [];
-    $idinstitucion = $request->idInstitucion;
-    $consulta = DB::SELECT("SELECT `usuario`.`idusuario`,`usuario`. `cedula`, UPPER(`usuario`.`nombres`) as nombres,
-    UPPER(`usuario`.`apellidos`) as apellidos,
-        `usuario`.`name_usuario`, `usuario`.`password`,
-        `usuario`.`email`, `usuario`.`date_created`, `usuario`.`id_group`, `usuario`.`p_ingreso`,
-        `usuario`.`institucion_idInstitucion`, `usuario`.`estado_idEstado`,
-        `usuario`.`idcreadorusuario`, `usuario`.`modificado_por`, `usuario`.`password_status`,
-            `usuario`.`remember_token`, `usuario`.`session_id`, `usuario`.`foto_user`, `usuario`.`telefono`,
-            `usuario`.`updated_at`, `usuario`.`created_at` , c.cargo, c.id AS cargo_id
+    set_time_limit(6000000);
+    ini_set('max_execution_time', 6000000);
+    // $datos = [];
+    // $idinstitucion = $request->idInstitucion;
+    // $consulta = DB::SELECT("SELECT `usuario`.`idusuario`,`usuario`. `cedula`, UPPER(`usuario`.`nombres`) as nombres,
+    // UPPER(`usuario`.`apellidos`) as apellidos,
+    //     `usuario`.`name_usuario`, `usuario`.`password`,
+    //     `usuario`.`email`, `usuario`.`date_created`, `usuario`.`id_group`, `usuario`.`p_ingreso`,
+    //     `usuario`.`institucion_idInstitucion`, `usuario`.`estado_idEstado`,
+    //     `usuario`.`idcreadorusuario`, `usuario`.`modificado_por`, `usuario`.`password_status`,
+    //         `usuario`.`remember_token`, `usuario`.`session_id`, `usuario`.`foto_user`, `usuario`.`telefono`,
+    //         `usuario`.`updated_at`, `usuario`.`created_at` , c.cargo, c.id AS cargo_id
 
-        from usuario
-        LEFT JOIN institucion_cargos c ON usuario.cargo_id = c.id
-        where usuario.institucion_idInstitucion = '$idinstitucion'
-        AND usuario.id_group=6
-    ");
-        foreach($consulta as $key => $item){
-            $getDocente = DB::SELECT("SELECT v.* FROM historico_visitas v
-            WHERE  v.idusuario = '$item->idusuario'
-            AND v.recurso = '15'
-            AND v.created_at BETWEEN '$request->fromDate' AND  '$request->toDate'
-            ");
-            $datos [$key] =[
-                "idusuario" => $item->idusuario,
-                "cedula" =>    $item->cedula,
-                "nombres" =>   $item->nombres,
-                "apellidos" => $item->apellidos,
-                "name_usuario" =>$item->name_usuario,
-                "email" => $item->email,
-                "date_created" => $item->date_created,
-                "id_group" => $item->id_group,
-                "p_ingreso" => $item->p_ingreso,
-                "institucion_idInstitucion" => $item->institucion_idInstitucion,
-                "estado_idEstado" => $item->estado_idEstado,
-                "foto_user" => $item->foto_user,
-                "password_status" => $item->password_status,
-                "telefono" => $item->telefono,
-                "updated_at" => $item->updated_at,
-                "created_at" => $item->created_at,
-                "cargo" => $item->cargo,
-                "cargo_id" => $item->cargo_id,
-                "visitas" => count($getDocente)
+    //     from usuario
+    //     LEFT JOIN institucion_cargos c ON usuario.cargo_id = c.id
+    //     where usuario.institucion_idInstitucion = '$idinstitucion'
+    //     AND usuario.id_group=6
+    //     AND usuario.estado_idEstado = '1'
+    // ");
+    //     foreach($consulta as $key => $item){
+    //         $getDocente = DB::SELECT("SELECT v.* FROM historico_visitas v
+    //         WHERE  v.idusuario = '$item->idusuario'
+    //         AND v.recurso = '15'
+    //         AND v.created_at BETWEEN '$request->fromDate' AND  '$request->toDate'
+    //         ");
+    //         $datos [$key] =[
+    //             "idusuario" => $item->idusuario,
+    //             "cedula" =>    $item->cedula,
+    //             "nombres" =>   $item->nombres,
+    //             "apellidos" => $item->apellidos,
+    //             "name_usuario" =>$item->name_usuario,
+    //             "email" => $item->email,
+    //             "date_created" => $item->date_created,
+    //             "id_group" => $item->id_group,
+    //             "p_ingreso" => $item->p_ingreso,
+    //             "institucion_idInstitucion" => $item->institucion_idInstitucion,
+    //             "estado_idEstado" => $item->estado_idEstado,
+    //             "foto_user" => $item->foto_user,
+    //             "password_status" => $item->password_status,
+    //             "telefono" => $item->telefono,
+    //             "updated_at" => $item->updated_at,
+    //             "created_at" => $item->created_at,
+    //             "cargo" => $item->cargo,
+    //             "cargo_id" => $item->cargo_id,
+    //             "visitas" => count($getDocente)
 
-            ];
-        }
-        return $datos;
+    //         ];
+    //     }
+    //     return $datos;
+            $idInstitucion = $request->idInstitucion;
+            $fromDate = $request->fromDate;
+            $toDate = $request->toDate;
+
+
+        $usuarios = DB::table('usuario')
+            ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
+            ->leftJoin('historico_visitas', function ($join) use ($fromDate, $toDate) {
+                $join->on('usuario.idusuario', '=', 'historico_visitas.idusuario')
+                    ->where('historico_visitas.recurso', '=', 15)
+                    ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate]);
+            })
+            ->select('usuario.*', 'institucion_cargos.cargo', 'institucion_cargos.id as cargo_id', DB::raw('COUNT(historico_visitas.id) as visitas'))
+            ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
+            ->where('usuario.id_group', '=', 6)
+            ->where('usuario.estado_idEstado', '=', '1')
+            ->groupBy('usuario.idusuario')
+            ->get();
+
+        return $usuarios;
+
+
+
+
     }
     public function usuarioVisitas(Request $request){
         $datos = DB::SELECT("SELECT h.*, i.nombreInstitucion, p.periodoescolar AS periodo,
@@ -747,6 +775,7 @@ class UsuarioController extends Controller
         LEFT JOIN mat_paralelos p ON u.paralelo = p.paralelo_id
         WHERE u.institucion_idInstitucion = '$id'
         AND u.id_group = '4'
+        and u.estado_idEstado = '1'
         ORDER BY u.idusuario DESC
         ");
         return $usuario;
