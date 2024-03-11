@@ -266,31 +266,53 @@ class CodigoLibrosController extends Controller
             $ifventa_lista_institucion  = $objectCodigoUnion[0]->venta_lista_institucion;
             //para ver si un codigo regalado esta liquidado
             $ifliquidado_regalado       = $objectCodigoUnion[0]->liquidado_regalado;
+            //validar que no tenga paquete
+            $codigo_paquete             = $objectCodigoUnion[0]->codigo_paquete;
+            $ifNotPaquete               = false;
+            $ifNotPaquete               = (($codigo_paquete == null || $codigo_paquete == ""));
             //=====USAN Y LIQUIDAN=========================
             if($numeroProceso == '0'){
-                if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && ($ifLeido == '1') && $ifLiquidado == '1' && $ifBloqueado !=2 ) $unionCorrecto = true;
+                if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && ($ifLeido == '1') && $ifLiquidado == '1' && $ifBloqueado !=2 && $ifNotPaquete) $unionCorrecto = true;
                 else $unionCorrecto = false;
             }
             //======REGALADO NO ENTRA A LA LIQUIDACION============
-            if($numeroProceso == '1'){
-                if($ifLiquidado == '1' && $ifliquidado_regalado == '0') $unionCorrecto = true;
-                else $unionCorrecto = false;
+            if($numeroProceso == '1' || $numeroProceso == '5'){
+                $booleanRegalado = false;
+                if($numeroProceso == '5') { $booleanRegalado = ($ifLiquidado == '1' && $ifliquidado_regalado == '0' ); }
+                //si no es el import de paquete valido que el codigo no tenga paquete
+                else{ $booleanRegalado                     = ($ifLiquidado == '1' && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                if($booleanRegalado) { $unionCorrecto = true; }
+                else  { $unionCorrecto = false; }
             }
             //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
-            if($numeroProceso == '2'){
-                if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
-                else $unionCorrecto = false;
+            if($numeroProceso == '2' || $numeroProceso == '6'){
+                $booleanRegaladoB = false;
+                //paquete
+                if($numeroProceso == '6') { $booleanRegaladoB = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' ); }
+                //si no es el import de paquete valido que el codigo no tenga paquete
+                else{ $booleanRegaladoB                     = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                if($booleanRegaladoB) { $unionCorrecto = true; }
+                else  { $unionCorrecto = false; }
             }
             //======BLOQUEADO(No usan y no liquidan)=============
-            if($numeroProceso == '3'){
-                if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
-                else $unionCorrecto = false;
+            if($numeroProceso == '3' || $numeroProceso == '7'){
+                $booleanBloqueado  = false;
+                //paquete
+                if($numeroProceso == '7') { $booleanBloqueado = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' ); }
+                //si no es el import de paquete valido que el codigo no tenga paquete
+                else{ $booleanBloqueado                     = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                if($booleanBloqueado) { $unionCorrecto = true; }
+                else  { $unionCorrecto = false; }
             }
             //=======CODIGO GUIA==================================
-            if($numeroProceso == '4'){
-                $numeroProceso     = 4;
-                if(($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') $unionCorrecto = true;
-                else $unionCorrecto = false;
+            if($numeroProceso == '4' || $numeroProceso == '8'){
+                $booleanGuia = false;
+                //paquete
+                if($numeroProceso == '8') { $booleanGuia = (($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0'); }
+                //si no es el import de paquete valido que el codigo no tenga paquete
+                else{ $booleanGuia                     = (($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                if($booleanGuia) { $unionCorrecto = true; }
+                else  { $unionCorrecto = false; }
             }
             if($unionCorrecto){
                 $codigoU             = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo_union,$codigo,$request,$factura);
@@ -339,13 +361,13 @@ class CodigoLibrosController extends Controller
         $instUserQuemado    = 66;
         $contador           = 0;
         $contadorNoCambiado = 0;
-        $numeroProceso      = 0;
+        $numeroProceso      = $request->regalado;
         $porcentaje         = 0;
         $factura            = "";
+        $tipoBodega         = $request->tipo_bodega;
         foreach($codigos as $key => $item){
             //validar si el codigo existe
             $validacionCodigo               = false;
-            $numeroProceso                  = 0;
             $user                           = 0;
             $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
@@ -368,10 +390,14 @@ class CodigoLibrosController extends Controller
                 $codigo_union               = $validar[0]->codigo_union;
                 //obtener la factura si no envian nada le dejo lo mismo
                 $facturaA                   = $validar[0]->factura;
+                //el codigo de paquete debe ser vacio
+                $codigo_paquete             = $validar[0]->codigo_paquete;
                 //validar si un regalado esta liquidado
                 $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
                 if($request->factura == null || $request->factura == "")   { $factura = $facturaA; }
                 else{ $factura = $request->factura; }
+                $ifNotPaquete  = false;
+                $ifNotPaquete  = (($codigo_paquete == null || $codigo_paquete == ""));
                 //===PROCESO===========
                 //=====USAN Y LIQUIDAN=========================
                 if($tipoProceso == '0'){
@@ -388,35 +414,49 @@ class CodigoLibrosController extends Controller
                     //     if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "")  && ($ifLeido == '1' || $ifLeido == '2') && ($venta_estado == 0  || $venta_estado == null || $venta_estado == "null") && $ifLiquidado == '1' && $ifBloqueado !=2 && $ifventa_lista_institucion == '0') $validacionCodigo = true;
                     //     else $validacionCodigo = false;
                     // }
-                    $numeroProceso     = 0;
-                    if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2  && $ifliquidado_regalado == '0') {  $validacionCodigo = true; }
+                    if(($ifid_periodo  == $periodo_id || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2  && $ifliquidado_regalado == '0' && $ifNotPaquete) {  $validacionCodigo = true; }
                     else { $validacionCodigo = false; }
                 }
                 //======REGALADO NO ENTRA A LA LIQUIDACION============
-                if($tipoProceso == '1'){
-                    $numeroProceso     = 1;
-                    if($ifLiquidado == '1' && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
+                if($tipoProceso == '1' || $tipoProceso == '5'){
+                    $booleanRegalado = false;
+                    if($tipoProceso == '5') { $booleanRegalado = ($ifLiquidado == '1' && $ifliquidado_regalado == '0' ); }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{ $booleanRegalado                     = ($ifLiquidado == '1' && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                    if($booleanRegalado) { $validacionCodigo = true; }
                     else  { $validacionCodigo = false; }
                 }
                 //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
-                if($tipoProceso == '2'){
-                    $numeroProceso     = 2;
+                if($tipoProceso == '2' || $tipoProceso == '6'){
                     $user              = $usuarioQuemado;
-                    if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
-                    else { $validacionCodigo = false; }
+                    $booleanRegaladoB = false;
+                    //paquete
+                    if($tipoProceso == '6') { $booleanRegaladoB = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' ); }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{ $booleanRegaladoB                     = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                    if($booleanRegaladoB) { $validacionCodigo = true; }
+                    else  { $validacionCodigo = false; }
                 }
                 //======BLOQUEADO(No usan y no liquidan)=============
-                if($tipoProceso == '3'){
-                    $numeroProceso     = 3;
+                if($tipoProceso == '3' || $tipoProceso == '7'){
                     $user              = $usuarioQuemado;
-                    if(($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
-                    else { $validacionCodigo = false; }
+                    $booleanBloqueado  = false;
+                    //paquete
+                    if($tipoProceso == '7') { $booleanBloqueado = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' ); }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{ $booleanBloqueado                     = (($ifLiquidado !='0' && $ifLiquidado !='4') && $ifBloqueado !=2 && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                    if($booleanBloqueado) { $validacionCodigo = true; }
+                    else  { $validacionCodigo = false; }
                 }
                 //=======CODIGO GUIA==================================
-                if($tipoProceso == '4'){
-                    $numeroProceso     = 4;
-                    if(($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0') { $validacionCodigo = true; }
-                    else { $validacionCodigo = false; }
+                if($tipoProceso == '4' || $tipoProceso == '8'){
+                    $booleanGuia = false;
+                    //paquete
+                    if($tipoProceso == '8') { $booleanGuia = (($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0'); }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{ $booleanGuia                     = (($ifLiquidado == '1') && $ifLeido == '1' && $ifBloqueado !=2 && $ifliquidado_regalado == '0' && $ifNotPaquete);}
+                    if($booleanGuia) { $validacionCodigo = true; }
+                    else  { $validacionCodigo = false; }
                 }
                 //si todo sale bien
                 if($validacionCodigo){
@@ -424,7 +464,7 @@ class CodigoLibrosController extends Controller
                     $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                     $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
                     if($codigo_union != null || $codigo_union != ""){
-                        //numero proceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado; 4 = guia
+                        //numero proceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado; 4 = guia; 5 = regalado; 6 = regalado y bloqueado; 7 = bloqueado; 8 = guia
                         $ingreso = $this->procesoGestionBodega($numeroProceso,$item->codigo,$codigo_union,$request,$getcodigoUnion,$factura);
                         //si ingresa correctamente
                         if($ingreso == 1){
@@ -478,12 +518,12 @@ class CodigoLibrosController extends Controller
             "codigosSinCodigoUnion" => $codigosSinCodigoUnion,
         ];
         return $data;
-     }
+    }
     //API:POST/codigos/import/gestion/diagnostico
     public function importGestionDiagnostico(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        //0=> venta directa ; 1=> regalado; 2 regalado y bloqueado
+        //0=> venta directa ; 1=> regalado; 2 regalado y bloqueado, 3 = bloqueado, 4 = guia, 5 = regalado
         $tipoProceso        = $request->regalado;
         $miArrayDeObjetos   = json_decode($request->data_codigos);
         //variables
@@ -531,6 +571,8 @@ class CodigoLibrosController extends Controller
             //======si ambos codigos existen========
             if(count($validarA) > 0 && count($validarD) > 0){
                 //====VARIABLES DE CODIGOS===
+                $booleanValidacionA = false;
+                $booleanValidacionD = false;
                 //====Activacion=====
                 //validar si el codigo ya esta liquidado
                 $ifLiquidadoA                = $validarA[0]->estado_liquidacion;
@@ -549,6 +591,8 @@ class CodigoLibrosController extends Controller
                 //codigo de union
                 $codigo_unionA               = strtoupper($validarA[0]->codigo_union);
                 $ifliquidado_regaladoA       = $validarA[0]->liquidado_regalado;
+                //que el paquete sea vacio
+                $codigo_paqueteA             = $validarA[0]->codigo_paquete;
                 //======Diagnostico=====
                 //validar si el codigo ya esta liquidado
                 $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
@@ -567,17 +611,23 @@ class CodigoLibrosController extends Controller
                 //codigo de union
                 $codigo_unionD               = strtoupper($validarD[0]->codigo_union);
                 $ifliquidado_regaladoD       = $validarD[0]->liquidado_regalado;
+                //que el paquete sea vacio
+                $codigo_paqueteD             = $validarD[0]->codigo_paquete;
                 $old_valuesA = CodigosLibros::Where('codigo',$codigoActivacion)->get();
                 $old_valuesD = CodigosLibros::findOrFail($codigoDiagnostico);
                 //obtener la factura si no envian nada le dejo lo mismo
                 $facturaA                   = $validarA[0]->factura;
                 if($request->factura == null || $request->factura == "")   $factura = $facturaA;
                 else  $factura = $request->factura;
+                $ifNotPaqueteA  = false;
+                $ifNotPaqueteD  = false;
+                $ifNotPaqueteA  = (($codigo_paqueteA == null || $codigo_paqueteA == ""));
+                $ifNotPaqueteD  = (($codigo_paqueteD == null || $codigo_paqueteD == ""));
                 //===PROCESO===========
                 //=====USAN Y LIQUIDAN=========================
                 if($tipoProceso == '0'){
-                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0')){
-                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')){
+                    if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0')  && $ifNotPaqueteA ){
+                        if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') && $ifNotPaqueteD ){
                         //Ingresar Union a codigo de activacion
                         $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
                         if($codigoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
@@ -593,10 +643,19 @@ class CodigoLibrosController extends Controller
                     }
                 }
                 //======REGALADO NO ENTRA A LA LIQUIDACION============
-                //numeroProceso => 1 regalado ; 2 regalado y bloqueado; 3 = bloqueado;
-                if($tipoProceso == '1'){
-                    if($ifLiquidadoA == '1' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
-                        if($ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') ){
+                //numeroProceso => 1 regalado ; 2 regalado y bloqueado; 3 = bloqueado; 4 = guia; 5 = regalado sin institucion ; 6 = regalado y bloqueado sin institucion; gui
+                if($tipoProceso == '1' || $tipoProceso == '5'){
+                    if($tipoProceso == '5') {
+                        $booleanValidacionA = ($ifLiquidadoA == '1' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') );
+                        $booleanValidacionD = ($ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') );
+                    }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{
+                        $booleanValidacionA = ($ifLiquidadoA == '1' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') && $ifNotPaqueteA);
+                        $booleanValidacionD = ($ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') && $ifNotPaqueteD);
+                    }
+                    if($booleanValidacionA ){
+                        if($booleanValidacionD ){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
                         $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
@@ -612,9 +671,18 @@ class CodigoLibrosController extends Controller
                     }
                 }
                 //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
-                if($tipoProceso == '2'){
-                    if((    $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
-                        if(($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') ){
+                if($tipoProceso == '2' || $tipoProceso == '6'){
+                    if($tipoProceso == '6') {
+                        $booleanValidacionA = (( $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') );
+                        $booleanValidacionD = (($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') );
+                    }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{
+                        $booleanValidacionA = (( $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') && $ifNotPaqueteA);
+                        $booleanValidacionD = (($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') && $ifNotPaqueteD);
+                    }
+                    if($booleanValidacionA){
+                        if($booleanValidacionD){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
                         $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
@@ -630,9 +698,18 @@ class CodigoLibrosController extends Controller
                     }
                 }
                 //===== BLOQUEADO(No usan y no liquidan)=============
-                if($tipoProceso == '3'){
-                    if((    $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
-                        if(($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ){
+                if($tipoProceso == '3' || $tipoProceso == '7'){
+                    if($tipoProceso == '7') {
+                        $booleanValidacionA = (( $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') );
+                        $booleanValidacionD = (($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  );
+                    }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{
+                        $booleanValidacionA = (( $ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') && $ifNotPaqueteA );
+                        $booleanValidacionD = (($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0') && $ifNotPaqueteD );
+                    }
+                    if($booleanValidacionA){
+                        if($booleanValidacionD){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
                         $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
@@ -648,9 +725,18 @@ class CodigoLibrosController extends Controller
                     }
                 }
                 //==GUIA===
-                if($tipoProceso == '4'){
-                    if((  $ifLiquidadoA   =='1')   && $ifBcEstadoA == '1' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') ){
-                        if(($ifLiquidadoD =='1')   && $ifBcEstadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ){
+                if($tipoProceso == '4' || $tipoProceso == '8'){
+                    if($tipoProceso == '8') {
+                        $booleanValidacionA = ((  $ifLiquidadoA   =='1') && $ifBcEstadoA == '1' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') );
+                        $booleanValidacionD = (($ifLiquidadoD =='1')   && $ifBcEstadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  );
+                    }
+                    //si no es el import de paquete valido que el codigo no tenga paquete
+                    else{
+                        $booleanValidacionA = ((  $ifLiquidadoA   =='1') && $ifBcEstadoA == '1' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') && $ifNotPaqueteA);
+                        $booleanValidacionD = (($ifLiquidadoD =='1')   && $ifBcEstadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  && $ifNotPaqueteD);
+                    }
+                    if($booleanValidacionA){
+                        if($booleanValidacionD){
                         //Cambiar a regalado a codigo de activacion
                         //(numeroProceso,codigo,$request)
                         $codigoA     = $this->codigosRepository->procesoUpdateGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura);
@@ -1336,7 +1422,7 @@ class CodigoLibrosController extends Controller
                     if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
                 }else{
                     //VALIDACION QUE NO SEA LIQUIDADO
-                    if(($ifLiquidado == '1' || $ifLiquidado == '2') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
+                    if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
                 }
                 //jorge dice que se quita esta validacion
                 // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
@@ -1478,7 +1564,7 @@ class CodigoLibrosController extends Controller
                 else                                                                                            $unionCorrecto = false;
             }else{
                 //VALIDACION QUE NO SEA LIQUIDADO
-                if(($ifLiquidado == '1' || $ifLiquidado == '2') && $ifliquidado_regalado == '0')                $unionCorrecto = true;
+                if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0')                $unionCorrecto = true;
                 else                                                                                            $unionCorrecto = false;
             }
             //==PROCESO====
@@ -1560,7 +1646,7 @@ class CodigoLibrosController extends Controller
             $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
             $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
             //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
-            if(($ifLiquidado == '1' || $ifLiquidado == '2') && $ifliquidado_regalado == '0'){
+            if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0'){
             //SE QUITA ESTA VALIDACION
             // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )){
                 $getcodigoPrimero = CodigosLibros::Where('codigo',$getCodigo)->get();
@@ -1671,16 +1757,17 @@ class CodigoLibrosController extends Controller
             //valida que el codigo existe
             if(count($validar)>0){
                 //validar si el codigo se encuentra liquidado
-                $ifDevuelto = $validar[0]->estado_liquidacion;
+                $ifDevuelto             = $validar[0]->estado_liquidacion;
                 //validar si tiene codigo de union
-                $codigo_union   = $validar[0]->codigo_union;
-                if($ifDevuelto == '3'){
+                $codigo_union           = $validar[0]->codigo_union;
+                $ifliquidado_regalado   = $validar[0]->liquidado_regalado;
+                if($ifDevuelto != '0' && $ifliquidado_regalado == '0' ){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
                     if($codigo_union != null || $codigo_union != ""){
                         $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                         $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
                         //ACTIVACION CON CODIGO DE UNION
-                        $ingreso =  $this->updateActivacion($item->codigo,$codigo_union,$getcodigoUnion);
+                        $ingreso =  $this->codigosRepository->updateActivacion($item->codigo,$codigo_union,$getcodigoUnion,false,1);
                         //si ingresa correctamente
                         if($ingreso == 1){
                             $porcentaje++;
@@ -1699,7 +1786,7 @@ class CodigoLibrosController extends Controller
                     }
                     //ACTUALIZAR CODIGO SIN UNION
                     else{
-                        $ingreso =  $this->updateActivacion($item->codigo,0,null);
+                        $ingreso =  $this->codigosRepository->updateActivacion($item->codigo,0,null,false,1);
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
@@ -1733,80 +1820,7 @@ class CodigoLibrosController extends Controller
             "codigosSinCodigoUnion" => $codigosSinCodigoUnion,
         ];
     }
-    public function updateActivacion($codigo,$codigo_union,$objectCodigoUnion){
-        $withCodigoUnion = 1;
-        $estadoIngreso   = 0;
-        ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
-        if($codigo_union == '0') $withCodigoUnion = 0;
-        else                     $withCodigoUnion = 1;
-        $arrayLimpiar  = [
-            'idusuario'                 => "0",
-            'id_periodo'                => "0",
-            'id_institucion'            => '',
-            'bc_estado'                 => '1',
-            'estado'                    => '0',
-            'estado_liquidacion'        => '1',
-            'venta_estado'              => '0',
-            'bc_periodo'                => '',
-            'bc_institucion'            => '',
-            'bc_fecha_ingreso'          => null,
-            'contrato'                  => '',
-            'verif1'                    => null,
-            'verif2'                    => null,
-            'verif3'                    => null,
-            'verif4'                    => null,
-            'verif5'                    => null,
-            'verif6'                    => null,
-            'verif7'                    => null,
-            'verif8'                    => null,
-            'verif9'                    => null,
-            'verif10'                   => null,
-            'venta_lista_institucion'   => '0',
-            'porcentaje_descuento'      => '0',
-            'factura'                   => null,
-            'liquidado_regalado'        => '0'
-        ];
-        //si hay codigo de union lo actualizo
-        if($withCodigoUnion == 1){
-            //VALIDO SI NO EXISTE EL CODIGO DE UNION LO MANDO COMO ERROR
-            if(count($objectCodigoUnion) == 0){
-                //no se ingreso
-                return 2;
-            }
-            $codigoU = DB::table('codigoslibros')
-            ->where('codigo', '=', $codigo_union)
-            ->where('estado_liquidacion',   '<>', '0')
-            ->where('bc_estado',            '=', '1')
-            ->update($arrayLimpiar);
-            //si el codigo de union se actualiza actualizo el codigo
-            if($codigoU){
-                //actualizar el primer codigo
-                $codigo = DB::table('codigoslibros')
-                ->where('codigo', '=', $codigo)
-                ->where('estado_liquidacion',   '<>', '0')
-                ->where('bc_estado',            '=', '1')
-                ->update($arrayLimpiar);
-            }
-        }else{
-            //actualizar el primer codigo
-            $codigo = DB::table('codigoslibros')
-            ->where('codigo', '=', $codigo)
-            ->where('estado_liquidacion',   '<>', '0')
-            ->where('bc_estado',            '=', '1')
-            ->update($arrayLimpiar);
-        }
-        //con codigo union
-        ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
-        if($withCodigoUnion == 1){
-            if($codigo && $codigoU)  $estadoIngreso = 1;
-            else                     $estadoIngreso = 2;
-        }
-        //si no existe el codigo de union
-        if($withCodigoUnion == 0){
-            if($codigo)              $estadoIngreso = 1;
-        }
-        return $estadoIngreso;
-    }
+
     public function PeriodoInstitucion($institucion){
         $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
             SELECT  pir.periodoescolar_idperiodoescolar as id_periodo

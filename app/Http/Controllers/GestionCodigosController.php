@@ -94,6 +94,7 @@ class GestionCodigosController extends Controller
             $codigo->contador                   = $request->contador;
             $codigo->codigo_union               = $request->codigo_union == null || $request->codigo_union == "null" ? null: $request->codigo_union;
             $codigo->liquidado_regalado         = $request->liquidado_regalado;
+            $codigo->prueba_diagnostica         = $request->prueba_diagnostica;
             $codigo->save();
             if($codigo){
              //Guardar en el historico

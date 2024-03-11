@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CodigoLibros;
 use App\Models\CodigosLibros;
 use App\Models\CodigosPaquete;
+use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Codigos\PaquetesRepository;
 use Illuminate\Http\Request;
 use DB;
@@ -19,8 +20,10 @@ class PaqueteController extends Controller
      * @return \Illuminate\Http\Respons
      */
     private $paqueteRepository;
-    public function __construct(PaquetesRepository $paqueteRepository) {
+    private $codigosRepository;
+    public function __construct(PaquetesRepository $paqueteRepository ,CodigosRepository $codigosRepository) {
         $this->paqueteRepository = $paqueteRepository;
+        $this->codigosRepository = $codigosRepository;
     }
     //api:get/paquetes/paquetes
     public function index(Request $request)
@@ -87,18 +90,18 @@ class PaqueteController extends Controller
             $noExisteA                  = 0;
             $noExisteD                  = 0;
             //VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
-            $ExistsPaquete = $this->getPaquete($item->codigoPaquete);
+            $ExistsPaquete = $this->getPaquete(strtoupper($item->codigoPaquete));
             if(!empty($ExistsPaquete)){
                 foreach($item->codigosHijos as $key2 => $tr){
-                    $codigoActivacion       = $tr->codigoActivacion;
-                    $codigoDiagnostico      = $tr->codigoDiagnostico;
+                    $codigoActivacion       = strtoupper($tr->codigoActivacion);
+                    $codigoDiagnostico      = strtoupper($tr->codigoDiagnostico);
                     $errorA                 = 1;
                     $errorD                 = 1;
                     $mensajeError           = "";
                     //validacion
                     $validarA               = $this->getCodigos($codigoActivacion,0);
                     $validarD               = $this->getCodigos($codigoDiagnostico,0);
-                    $comentario             = "Se agrego al paquete ".$item->codigoPaquete;
+                    $comentario             = "Se agrego al paquete ".strtoupper($item->codigoPaquete);
                     //======si ambos codigos existen========
                     if(count($validarA) > 0 && count($validarD) > 0){
                         //====Activacion=====
@@ -123,9 +126,9 @@ class PaqueteController extends Controller
                         //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
                         if($errorA == 0 && $errorD == 0){
                             $old_valuesA    = CodigosLibros::Where('codigo',$codigoActivacion)->get();
-                            $ingresoA       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoActivacion,$codigoDiagnostico);
+                            $ingresoA       = $this->updatecodigosPaquete(strtoupper($item->codigoPaquete),$codigoActivacion,$codigoDiagnostico);
                             $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
-                            $ingresoD       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoDiagnostico,$codigoActivacion);
+                            $ingresoD       = $this->updatecodigosPaquete(strtoupper($item->codigoPaquete),$codigoDiagnostico,$codigoActivacion);
                             //si se guarda codigo de activacion
                             if($ingresoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null); }
                             //si se guarda codigo de diagnostico
@@ -212,17 +215,17 @@ class PaqueteController extends Controller
             $noExisteA                  = 0;
             $noExisteB                  = 0;
             //VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
-            $ExistsPaquete = $this->getPaquete($item->codigoPaquete);
+            $ExistsPaquete = $this->getPaquete(strtoupper($item->codigoPaquete));
             if(!empty($ExistsPaquete)){
                 foreach($item->codigosHijos as $key2 => $tr){
-                    $codigoA                = $tr->codigo;
+                    $codigoA                = strtoupper($tr->codigo);
                     $errorA                 = 1;
                     $errorB                 = 1;
-                    $comentario             = "Se agrego al paquete ".$item->codigoPaquete;
+                    $comentario             = "Se agrego al paquete ".strtoupper($item->codigoPaquete);
                     //validar si el codigo existe
                     $validarA               = CodigosLibros::Where('codigo',$codigoA)->get();
                     if(count($validarA) > 0){
-                        $codigoB        =  $validarA[0]->codigo_union;
+                        $codigoB        =  strtoupper($validarA[0]->codigo_union);
                         $validarB       = CodigosLibros::Where('codigo',$codigoB)->get();
                         if(count($validarB) > 0){
                             //VARIABLES  PARA EL PROCESO
@@ -246,9 +249,9 @@ class PaqueteController extends Controller
                             //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
                             if($errorA == 0 && $errorB == 0){
                                 $old_valuesA    = $validarA;
-                                $ingresoA       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoA,$codigoB);
+                                $ingresoA       = $this->updatecodigosPaquete(strtoupper($item->codigoPaquete),$codigoA,$codigoB);
                                 $old_valuesB    = $validarB;
-                                $ingresoB       = $this->updatecodigosPaquete($item->codigoPaquete,$codigoB,$codigoA);
+                                $ingresoB       = $this->updatecodigosPaquete(strtoupper($item->codigoPaquete),$codigoB,$codigoA);
                                 //si se guarda codigo de activacion
                                 if($ingresoA){ $contadorA++; $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoA,$usuario_editor,$comentario,$old_valuesA,null); }
                                 //si se guarda codigo de diagnostico
@@ -360,6 +363,7 @@ class PaqueteController extends Controller
         $tipoProceso                = $request->regalado;
         $factura                    = "";
         $obsevacion                 = $request->comentario;
+        $tipoBodega                 = $request->tipoBodega;
         //====PROCESO===================================
         foreach($miArrayDeObjetos as $key => $item){
             $problemasconCodigo         = [];
@@ -371,19 +375,25 @@ class PaqueteController extends Controller
             $noExisteD                  = 0;
             //estadoPaquete => 0 utilizado; 1 => abierto;
             $estadoPaquete              = 0;
-            //VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
+            //VALIDAR QUE EL CODIGO DE PAQUETE ESTE UTILIZADO
             $ExistsPaquete      = $this->getPaquete($item->codigoPaquete);
             if(empty($ExistsPaquete)) { $estadoPaquete = 0; }
+            //validar
             $getExistsPaquete   = $this->getExistsPaquete($item->codigoPaquete);
             if(!empty($getExistsPaquete)){
-                foreach($item->codigosHijos as $key2 => $tr){
-                    $codigoActivacion       = strtoupper($tr->codigoActivacion);
-                    $codigoDiagnostico      = strtoupper($tr->codigoDiagnostico);
+                //codigos hijos del paquete
+                $codigosHijos =  $this->getCodigos($item->codigoPaquete,0,3);
+                foreach($codigosHijos as $key2 => $tr){
+                    $validarA               = [];
+                    $codigoActivacion       = "";
+                    $codigoDiagnostico      = "";
+                    $codigoActivacion       = strtoupper($tr->codigo);
+                    $codigoDiagnostico      = strtoupper($tr->codigo_union);
                     $errorA                 = 1;
                     $errorD                 = 1;
                     $mensajeError           = "";
                     //validacion
-                    $validarA               = $this->getCodigos($codigoActivacion,0);
+                    $validarA               = [$tr];
                     $validarD               = $this->getCodigos($codigoDiagnostico,0);
                     $comentario             = "Se agrego al paquete ".$item->codigoPaquete . " - " .$obsevacion;
                     //======si ambos codigos existen========
@@ -398,8 +408,8 @@ class PaqueteController extends Controller
                         if($errorA == 0 && $errorD == 0){
                             $old_valuesA    = CodigosLibros::Where('codigo',$codigoActivacion)->get();
                             $old_valuesD    = CodigosLibros::findOrFail($codigoDiagnostico);
-                            //tipoProceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado
-                            $ingreso = $this->paqueteRepository->procesoGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura,$item->codigoPaquete);
+                            //tipoProceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado ; 4 = guia; 5 = regalado sin institucion ; 6 = bloqueado y regalado sin institucion; 7 = bloqueado sin institucion ; 8 =  guia sin institucion
+                            $ingreso = $this->paqueteRepository->procesoGestionBodega($tipoProceso,$codigoActivacion,$codigoDiagnostico,$request,$factura,$item->codigoPaquete,$tipoBodega);
                             //si se guarda codigo de activacion
                             if($ingreso == 1){
                                 $contadorA++;
@@ -673,5 +683,265 @@ class PaqueteController extends Controller
     public function destroy($id)
     {
         //
+    }
+    //API:POST/paquetes/revision
+    public function revision(Request $request){
+        set_time_limit(600000);
+        ini_set('max_execution_time', 600000);
+        $miArrayDeObjetos           = json_decode($request->data_codigos);
+        $arregloProblemaPaquetes    = [];
+        $informacion                = [];
+        $contadorErrPaquetes        = 0;
+        $contadorResumen            = 0;
+        //====PROCESO===================================
+        foreach($miArrayDeObjetos as $key => $item){
+            $problemasconCodigo         = [];
+            $contadorProblemasCodigos   = 0;
+            $contadorA                  = 0;
+            $contadorD                  = 0;
+            $noExisteA                  = 0;
+            $noExisteD                  = 0;
+            $getExistsPaquete   = $this->getExistsPaquete($item->codigoPaquete);
+            if(!empty($getExistsPaquete)){
+                //codigos hijos del paquete
+                $codigosHijos =  $this->getCodigos($item->codigoPaquete,0,3);
+                foreach($codigosHijos as $key2 => $tr){
+                    $validarA               = [];
+                    $validarD               = [];
+                    $codigoActivacion       = "";
+                    $codigoDiagnostico      = "";
+                    $codigoActivacion       = $tr->codigo;
+                    $codigoDiagnostico      = $tr->codigo_union;
+                    $mensajeError           = "";
+                    //validacion
+                    $validarA               = [$tr];
+                    $validarD               = $this->getCodigos($codigoDiagnostico,0);
+                    //======si ambos codigos existen========
+                    if(count($validarA) > 0 && count($validarD) > 0){
+                        $informacion[]      = $validarA[0];
+                        $informacion[]      = $validarD[0];
+                        //que existen ambos codigos
+                        $contadorA++;
+                        $contadorD++;
+                    }
+                    //====SI NO EXISTEN LOS CODIGOS==============
+                    else{
+                        if(empty($validarA)  && !empty($validarD)) { $noExisteA++;               $mensajeError = "Código de activación no existe";  }
+                        if(!empty($validarA) && empty($validarD))  { $noExisteD++;               $mensajeError = "Código de diagnóstico no existe"; }
+                        if(empty($validarA)  && empty($validarD))  { $noExisteA++; $noExisteD++; $mensajeError = "Ambos códigos no existen"; }
+                        $problemasconCodigo[$contadorProblemasCodigos] = [
+                            "codigoActivacion"  => $codigoActivacion,
+                            "codigoDiagnostico" => $codigoDiagnostico,
+                            "problema"          => $mensajeError
+                        ];
+                        $contadorProblemasCodigos++;
+                    }
+                }
+                //codigos resumen
+                $arregloResumen[$contadorResumen] = [
+                    "codigoPaquete"     => $item->codigoPaquete,
+                    "codigosHijos"      => $problemasconCodigo,
+                    "mensaje"           => empty($getExistsPaquete) ? 1 : '0',
+                    "ingresoA"          => $contadorA,
+                    "ingresoD"          => $contadorD,
+                    "noExisteA"         => $noExisteA,
+                    "noExisteD"         => $noExisteD
+                ];
+                $contadorResumen++;
+            }else{
+                $arregloProblemaPaquetes [$contadorErrPaquetes] = [
+                    "paquete"   => $item->codigoPaquete,
+                    "problema" => 'Paquete no existe'
+                ];
+                $contadorErrPaquetes++;
+            }
+        }
+        return [
+            "arregloResumen"                   => $arregloResumen,
+            "informacion"                      => $informacion,
+            "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
+        ];
+    }
+    //API:POST/paquetes/activar_devolucion_paquete
+    public function activar_devolucion_paquete(Request $request){
+        set_time_limit(600000);
+        ini_set('max_execution_time', 600000);
+        $miArrayDeObjetos           = json_decode($request->data_codigos);
+        $arregloProblemaPaquetes    = [];
+        $informacion                = [];
+        $codigoConProblemas         = collect();
+        $contadorErrPaquetes        = 0;
+        $contadorResumen            = 0;
+        $periodo_id                 = $request->periodo_id;
+        $usuario_editor             = $request->id_usuario;
+        $comentario                 = $request->observacion;
+        //====PROCESO===================================
+        foreach($miArrayDeObjetos as $key => $item){
+            $problemasconCodigo         = [];
+            $contadorProblemasCodigos   = 0;
+            $contadorA                  = 0;
+            $contadorD                  = 0;
+            $noExisteA                  = 0;
+            $noExisteD                  = 0;
+            $getExistsPaquete   = $this->getExistsPaquete($item->codigoPaquete);
+            if(!empty($getExistsPaquete)){
+                $codigosHijos       = [];
+                $arrayDiagnosticos   = collect();
+                //codigos hijos del paquete activacion
+                $codigosHijos = $this->getCodigos($item->codigoPaquete,0,3);
+                //Codigos hijos del paquete diagnostico
+                $arrayDiagnosticos   = collect($this->getCodigos($item->codigoPaquete,0,4));
+                if(count($codigosHijos)){
+                    foreach($codigosHijos as $key2 => $tr){
+                        $validarA               = [];
+                        $validarD               = [];
+                        $errorA                 = 1;
+                        $errorD                 = 1;
+                        $codigoActivacion       = "";
+                        $codigoDiagnostico      = "";
+                        $codeDiagnostico        = [];
+                        $codigo_unionA          = "";
+                        //proceso
+                        $codigoActivacion       = strtoupper($tr->codigo);
+                        $codigoDiagnostico      = strtoupper($tr->codigo_union);
+                        $codeDiagnostico        = $arrayDiagnosticos->filter(function($value, $key) use($tr){
+                            return $value->codigo == $tr->codigo_union;
+                        })->values();
+                        $mensajeError           = "";
+                        //validacion
+                        $validarA               = [$tr];
+                        $validarD               = $codeDiagnostico;
+                        //======si ambos codigos existen========
+                        if(count($validarA) > 0 && count($validarD) > 0){
+                            $mensajeFront               = "";
+                            //====Activacion=====
+                            //codigo de union
+                            $codigo_unionA              = strtoupper($validarA[0]->codigo_union);
+                            //validar si el codigo se encuentra liquidado
+                            $ifDevueltoA                = $validarA[0]->estado_liquidacion;
+                            $ifliquidado_regaladoA      = $validarA[0]->liquidado_regalado;
+                            //que el paquete sea vacio
+                            $codigo_paqueteA            = $validarA[0]->codigo_paquete;
+                            //estado codigo de activacion
+                            $estadoA                    = $validarA[0]->estado;
+                            //liquidado regalado
+                            //======Diagnostico=====
+                            //codigo de union
+                            $codigo_unionD              = strtoupper($validarD[0]->codigo_union);
+                            //validar si el codigo se encuentra liquidado
+                            $ifDevueltoD                = $validarD[0]->estado_liquidacion;
+                            $ifliquidado_regaladoD      = $validarD[0]->liquidado_regalado;
+                            //que el paquete sea vacio
+                            $codigo_paqueteD            = $validarD[0]->codigo_paquete;
+                            //estado codigo de diagnostico
+                            $estadoD                    = $validarD[0]->estado;
+                            //===VALIDACION====
+                            //error 0 => no hay error; 1 hay error
+                            // if($codigo_unionA == $codigoDiagnostico && $ifDevueltoA == 3 )    { $errorA = 0; }
+                            // if($codigo_unionD == $codigoActivacion  && $ifDevueltoD == 3 )    { $errorD = 0; }
+                            //OMITIR CUANDO SEA REGALADO ; BLOQUEADO; GUIA
+                            $ifOmitirA = false;
+                            $ifOmitirD = false;
+                            //si el codigo de activacion esta  regalado  GUIA o bloqueado
+                            if( $ifDevueltoA == '2' || $ifDevueltoA == '4' || $estadoA == '2' ) { $ifOmitirA = true; }
+                            //si el codigo de diagnostico esta regalado GUIA o bloqueado
+                            if( $ifDevueltoD == '2' || $ifDevueltoD == '4' || $estadoD == '2' ) { $ifOmitirD = true; }
+                            //===========VALIDACION====
+                            if($ifOmitirA){
+                                $mensajeFront   = "_(No esta bloqueado o regalado o no tiene guia)";
+                                if($ifDevueltoA !=0 && $ifliquidado_regaladoA == '0' && $ifOmitirA)   { $errorA = 0; }
+                                if($ifDevueltoD !=0 && $ifliquidado_regaladoD == '0' && $ifOmitirD)   { $errorD = 0; }
+                            }else{
+                                if($ifDevueltoA !=0 && $ifliquidado_regaladoA == '0')   { $errorA = 0; }
+                                if($ifDevueltoD !=0 && $ifliquidado_regaladoD == '0')   { $errorD = 0; }
+                            }
+
+                            //===MENSAJE VALIDACION====
+                            if($errorA == 1 && $errorD == 0) { $mensajeError = "Problema con el código de activación".$mensajeFront;  $codigoConProblemas->push($validarA); }
+                            if($errorA == 0 && $errorD == 1) { $mensajeError = "Problema con el código de diagnóstico".$mensajeFront; $codigoConProblemas->push($validarD); }
+                            if($errorA == 1 && $errorD == 1) { $mensajeError = "Ambos códigos tienen problemas";        $codigoConProblemas->push($validarA); $codigoConProblemas->push($validarD);}
+                            //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
+                            if($errorA == 0 && $errorD == 0){
+                                $old_valuesA    = json_encode($validarA);
+                                $old_valuesD    = json_encode($validarD);
+                                //tipoProceso => 0 = Usan y liquidan; 1 =  regalado; 2 = regalado y bloqueado ; 3 = bloqueado
+                                //ACTIVACION CON CODIGO DE UNION
+                                $ingreso =  $this->codigosRepository->updateActivacion($codigoActivacion,$codigoDiagnostico,$validarD,$ifOmitirA,0);
+                                //si se guarda codigo de activacion
+                                if($ingreso == 1){
+                                    $contadorA++;
+                                    $contadorD++;
+                                    //====CODIGO====
+                                    //ingresar en el historico codigo
+                                     $this->GuardarEnHistorico(0,0,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null);
+                                    //====CODIGO UNION=====
+                                    $this->GuardarEnHistorico(0,0,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null);
+                                }else{
+                                    //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
+                                    $problemasconCodigo[$contadorProblemasCodigos] = [
+                                        "codigoActivacion"  => $codigoActivacion,
+                                        "codigoDiagnostico" => $codigoDiagnostico,
+                                        "problema"          => "No se pudo guardar"
+                                    ];
+                                    $contadorProblemasCodigos++;
+                                }
+                            }else{
+                                //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
+                                $problemasconCodigo[$contadorProblemasCodigos] = [
+                                    "codigoActivacion"      => $codigoActivacion,
+                                    "codigoDiagnostico"     => $codigoDiagnostico,
+                                    "problema"              => $mensajeError
+                                ];
+                                $contadorProblemasCodigos++;
+                            }
+                        }
+                        //====SI NO EXISTEN LOS CODIGOS==============
+                        else{
+                            if(empty($validarA)  && !empty($validarD)) { $noExisteA++;               $mensajeError = "Código de activación no existe";  }
+                            if(!empty($validarA) && empty($validarD))  { $noExisteD++;               $mensajeError = "Código de diagnóstico no existe"; }
+                            if(empty($validarA)  && empty($validarD))  { $noExisteA++; $noExisteD++; $mensajeError = "Ambos códigos no existen"; }
+                            $problemasconCodigo[$contadorProblemasCodigos] = [
+                                "codigoActivacion"  => $codigoActivacion,
+                                "codigoDiagnostico" => $codigoDiagnostico,
+                                "problema"          => $mensajeError
+                            ];
+                            $contadorProblemasCodigos++;
+                        }
+                    }
+                }
+                //codigos resumen
+                $arregloResumen[$contadorResumen] = [
+                    "codigoPaquete"     => $item->codigoPaquete,
+                    "codigosHijos"      => $problemasconCodigo,
+                    "mensaje"           => empty($getExistsPaquete) ? 1 : '0',
+                    "ingresoA"          => $contadorA,
+                    "ingresoD"          => $contadorD,
+                    "noExisteA"         => $noExisteA,
+                    "noExisteD"         => $noExisteD
+                ];
+                $contadorResumen++;
+            }else{
+                $arregloProblemaPaquetes [$contadorErrPaquetes] = [
+                    "paquete"   => $item->codigoPaquete,
+                    "problema" => 'Paquete no existe'
+                ];
+                $contadorErrPaquetes++;
+            }
+        }
+        if(count($codigoConProblemas) == 0){
+            return [
+                "arregloResumen"                   => $arregloResumen,
+                "codigoConProblemas"               => [],
+                "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
+            ];
+        }else{
+            $resultado = collect($codigoConProblemas);
+            $send      = $resultado->flatten(10);
+            return [
+                "arregloResumen"                   => $arregloResumen,
+                "codigoConProblemas"               => $send,
+                "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
+            ];
+        }
     }
 }

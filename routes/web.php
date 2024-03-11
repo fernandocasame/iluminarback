@@ -1326,7 +1326,11 @@ Route::group(['prefix' => 'paquetes'],function(){
     Route::resource('paquetes', 'PaqueteController');
     Route::post('generarCodigosPaquete', 'PaqueteController@generarCodigosPaquete');
     Route::post('guardarPaquete', 'PaqueteController@guardarPaquete');
+    Route::post('guardarPaquete2', 'PaqueteController@guardarPaquete2');
     Route::post('importPaqueteGestion','PaqueteController@importPaqueteGestion');
+    Route::post('PaqueteModificar','PaqueteController@PaqueteModificar');
+    Route::post('revision','PaqueteController@revision');
+    Route::post('activar_devolucion_paquete','PaqueteController@activar_devolucion_paquete');
 });
 //=======FIN CODIGOS PAQUTES========================================
 // ====== BIBLIOTECA ====== //

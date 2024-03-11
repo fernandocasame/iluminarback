@@ -650,6 +650,7 @@ class CodigosLibrosGenerarController extends Controller
         $agregar->idusuario =$request->idusuario;
         $agregar->idusuario_creador_codigo = $request->idusuario_creador_codigo;
         $agregar->libro_idlibro = $request->libro_idlibro;
+        $agregar->prueba_diagnostica = $request->prueba_diagnostica;
         $agregar->estado = $request->estado;
         $agregar->save();
         return $agregar;
