@@ -943,5 +943,44 @@ class PaqueteController extends Controller
                 "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
             ];
         }
+
+    }
+    //API:POST/paquetes/ingreso
+    public function importPaqueteIngreso(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos           = json_decode($request->data_codigos);
+        $id_usuario        = $request->id_usuario;
+        $datos             = [];
+        $NoIngresados      = [];
+        $porcentaje        = 0;
+        $contador          = 0;
+        foreach($codigos as $key => $item){
+            $consulta = $this->getExistsPaquete($item->codigo);
+            //si ya existe el codigo lo mando a un array
+            if(count($consulta) > 0){
+               $datos[] = $consulta[0];
+            }else{
+                //si no existen los agrego
+                $codigos_libros                             = new CodigosPaquete();
+                $codigos_libros->user_created               = $id_usuario;
+                $codigos_libros->codigo                     = $item->codigo;
+                $codigos_libros->save();
+                if($codigos_libros){
+                    $porcentaje++;
+                }else{
+                    $NoIngresados[$contador] =[
+                        "codigo" => $item->codigo
+                    ];
+                    $contador++;
+                }
+            }
+        }
+        $data = [
+            "cambiados"             => $porcentaje,
+            "CodigosExisten"        => $datos,
+            "CodigosNoIngresados"   => $NoIngresados,
+        ];
+        return $data;
     }
 }
