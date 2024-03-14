@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CodigoLibros;
 use App\Models\CodigosLibros;
 use App\Models\CodigosPaquete;
+use App\Models\HistoricoPaquetes;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Codigos\PaquetesRepository;
 use Illuminate\Http\Request;
@@ -982,5 +983,71 @@ class PaqueteController extends Controller
             "CodigosNoIngresados"   => $NoIngresados,
         ];
         return $data;
+    }
+    public function ImporteliminarPaquete(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos                = json_decode($request->data_codigos);
+        $id_usuario             = $request->id_usuario;
+        $NoEliminados           = [];
+        $porcentaje             = 0;
+        $contador               = 0;
+        $codigosNoExisten       = [];
+        $contadorNoExisten      = 0;
+        $contadorNoEliminados   = 0;
+        $observacion            = $request->observacion;
+        foreach($codigos as $key => $item){
+            $consulta = $this->getExistsPaquete($item->codigo);
+            //si ya existe el codigo lo mando a un array
+            if(count($consulta) > 0){
+               $estadoPaquete = $consulta[0]->estado;
+               //estado 0 => paquete utilizado; 1 => paquete no utilizado
+                if($estadoPaquete == 1){
+                    $codigos_libros = CodigosPaquete::findOrFail($item->codigo);
+                    $codigos_libros->delete();
+                    $porcentaje++;
+                    //guardar en historico
+                    $this->save_historico_paquetes([
+                        "codigo_paquete"    => $item->codigo,
+                        "user_created"      => $id_usuario,
+                        "observacion"       => $observacion,
+                        "old_values"        => json_encode($consulta[0])
+                    ]);
+                }
+                //paquetes utilizados
+                else{
+                    $NoEliminados[$contadorNoEliminados] =[
+                        "codigo" => $item->codigo,
+                        "problema" => "Paquete utilizado"
+                    ];
+                    $contadorNoEliminados++;
+                }
+            }
+            //paquete no existen
+            else{
+                $codigosNoExisten[$contadorNoExisten] =[
+                    "codigo" => $item->codigo,
+                    "problema" => "No existe"
+                ];
+                $contadorNoExisten++;
+            }
+        }
+        $data = [
+            "porcentaje"            => $porcentaje,
+            "codigosNoExisten"      => $codigosNoExisten,
+            "NoEliminados"          => $NoEliminados,
+            "contadorNoExisten"     => $contadorNoExisten,
+            "contadorNoEliminados"  => $contadorNoEliminados,
+        ];
+        return $data;
+    }
+    ///guardar en historico
+    public function save_historico_paquetes($data){
+        $historico                  = new HistoricoPaquetes();
+        $historico->codigo          = $data["codigo_paquete"];
+        $historico->user_created    = $data["user_created"];
+        $historico->observacion     = $data["observacion"];
+        $historico->old_values      = $data["old_values"];
+        $historico->save();
     }
 }
