@@ -2,21 +2,21 @@ name: Laravel
 
 on:
   push:
-    branches: ["master"]
+    branches: [ "master" ]
   pull_request:
-    branches: ["master"]
+    branches: [ "master" ]
 
 jobs:
   laravel-tests:
     runs-on: self-hosted
-
     steps:
-      - uses: actions/checkout@v3
-      - name: Directory Permissions Rol
-        run: chown -R root:nginx storage bootstrap/cache
-      - name: Directory Permissions
-        run: chmod 777 -R storage bootstrap/cache
-      - name: Scrip Permissions
-        run: chmod 777 script.sh
-      - name: Directory Permissions ug
-        run: ./script.sh
+
+    - uses: actions/checkout@v3
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+    - name: Install Dependencies
+      run: composer install
+    - name: Copiar
+      run: echo 'admin9230' | sudo -S cp -rf /home/svrfront1/Documentos/iluminar_server/actions-runner/iluminarback/iluminarback /var/www/html/
+    - name: Directory Permissions
+      run: echo 'admin9230' | sudo -S chmod -R 777 /var/www/html/iluminarback
