@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use DB;
+use Illuminate\Support\Facades\Cache;
 
 class LoginController extends Controller
 {
@@ -43,6 +44,7 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
+        Cache::flush();
         $credentials=$request->only('name_usuario', 'password');
 
         if (Auth::attempt(['name_usuario' => $request->name_usuario, 'password' => $request->password, 'estado_idEstado' => 1])) {
@@ -77,15 +79,13 @@ class LoginController extends Controller
         }
     }
 
-    // public function authenticate(Request $request)
-    // {
-    //     $credentials=$request->only('name_usuario', 'password');
-
-    //     if (Auth::attempt(['name_usuario' => $request->$name_usuario, 'password' => $request->$password, 'estado_idEstado' => 1])) {
-    //         // Authentication passed...
-    //         return redirect()->intended('dashboard');
-    //     }
-    // }
+    public function validateCredentials($user, $credentials)
+    {
+        // Implementa tu lógica de validación personalizada aquí
+        $plain = $credentials['password'];
+        $hashed_value = $user->getAuthPassword();
+        return $hashed_value == sha1(md5($plain));
+    }
 
 
     public function username()
