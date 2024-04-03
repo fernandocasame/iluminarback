@@ -213,4 +213,45 @@ class  CodigosRepository extends BaseRepository
         }
         return $estadoIngreso;
     }
+
+    //SAVE CODIGOS
+    public function save_Codigos($request,$item,$codigo,$prueba_diagnostica,$contador){
+        $contadorIngreso                            = 0;
+        $codigos_libros                             = new CodigosLibros();
+        $codigos_libros->serie                      = $item->serie;
+        $codigos_libros->libro                      = $item->libro;
+        $codigos_libros->anio                       = $item->anio;
+        $codigos_libros->libro_idlibro              = $item->libro_idlibro;
+        $codigos_libros->estado                     = 0;
+        $codigos_libros->idusuario                  = 0;
+        $codigos_libros->bc_estado                  = 1;
+        $codigos_libros->idusuario_creador_codigo   = $request->user_created;
+        $codigos_libros->prueba_diagnostica         = $prueba_diagnostica;
+        $codigo_verificar                           = $codigo;
+        $verificar_codigo = DB::SELECT("SELECT codigo from codigoslibros WHERE codigo = '$codigo_verificar'");
+        if( $verificar_codigo ){
+            $contadorIngreso = 0;
+        }else{
+            $codigos_libros->codigo = $codigo;
+            $codigos_libros->contador = ++$contador;
+            $codigos_libros->save();
+            if($codigos_libros){
+                $contadorIngreso = 1;
+            }else{
+                $contadorIngreso = 0;
+            }
+        }
+        if($contadorIngreso == 1){
+            return [
+                "contadorIngreso" => $contadorIngreso,
+                "contador"        => $codigos_libros->contador
+            ];
+        }else{
+            return [
+                "contadorIngreso" => $contadorIngreso,
+                "contador"        => 0
+            ];
+        }
+
+    }
 }

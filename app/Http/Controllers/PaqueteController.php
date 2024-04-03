@@ -2,19 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
+use DB;
 use App\Models\CodigoLibros;
+use Illuminate\Http\Request;
 use App\Models\CodigosLibros;
 use App\Models\CodigosPaquete;
 use App\Models\HistoricoPaquetes;
+use App\Http\Controllers\Controller;
+use App\Traits\Codigos\TraitCodigosGeneral;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Codigos\PaquetesRepository;
-use Illuminate\Http\Request;
-use DB;
-use App\Traits\Codigos\TraitCodigosGeneral;
 class PaqueteController extends Controller
 {
     use TraitCodigosGeneral;
+
     /**
      * Display a listing of the resource.
      *
@@ -653,6 +654,19 @@ class PaqueteController extends Controller
       if($request->eliminarPaquete) { return $this->eliminarPaquete($request); }
     }
     public function cleanPaquete($request){
+        $arrayCodigos       = json_decode($request->data_codigos);
+        $codigo             = CodigosPaquete::findOrFail($request->paquete);
+        $user_created       = $codigo->user_created;
+        $comentario         = $request->comentario;
+        $usuario_editor     = $request->user_created;
+        $periodo_id         = $request->periodo_id;
+        $institucion_id     = 0;
+        //historico codigos
+        foreach($arrayCodigos as $key => $item){
+            $oldvalues = [];
+            $oldvalues = CodigosLibros::where('codigo',$item->codigo)->get();
+            $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$item->codigo,$usuario_editor,$comentario,$oldvalues[0],null);
+        }
         codigoslibros::where('codigo_paquete',$request->paquete)
         ->update([
             'codigo_paquete'            => null,
@@ -663,14 +677,30 @@ class PaqueteController extends Controller
         ->update([
             'estado' => '1'
         ]);
+        //guardar en historico paquetes
+        $this->save_historico_paquetes([
+            "codigo_paquete"    => $codigo,
+            "user_created"      => $user_created,
+            "observacion"       => $comentario,
+            "old_values"        => json_encode($codigo)
+        ]);
         return ["status" => "1", "message" => "Se limpio el paquete"];
     }
     public function eliminarPaquete($request){
-        $codigo = CodigosPaquete::findOrFail($request->paquete);
+        $codigo             = CodigosPaquete::findOrFail($request->paquete);
+        $user_created       = $codigo->user_created;
+        $comentario         = $request->comentario;
         if($codigo->estado == 0){
             return ["status" => "1", "message" => "No se puede eliminar el paquete, ya fue utilizado"];
         }else{
             $codigo->delete();
+            //guardar en historico
+            $this->save_historico_paquetes([
+                "codigo_paquete"    => $request->paquete,
+                "user_created"      => $user_created,
+                "observacion"       => $comentario,
+                "old_values"        => json_encode($codigo)
+            ]);
             return ["status" => "1", "message" => "Se elimino el paquete"];
         }
     }

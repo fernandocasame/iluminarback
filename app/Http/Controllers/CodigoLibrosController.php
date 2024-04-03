@@ -1932,6 +1932,8 @@ class CodigoLibrosController extends Controller
         $anio              = $request->anio;
         $libro             = $request->libro;
         $serie             = $request->serie;
+        $comentario        = $request->comentario;
+        $periodo_id        = $request->periodo_id;
         $datos             = [];
         $NoIngresados      = [];
         $porcentaje        = 0;
@@ -1958,6 +1960,8 @@ class CodigoLibrosController extends Controller
                 $codigos_libros->save();
                 if($codigos_libros){
                     $porcentaje++;
+                    //ingresar en el historico
+                     $this->GuardarEnHistorico(0,null,$periodo_id,$item->codigo,$id_usuario,$comentario,null,null);
                 }else{
                     $NoIngresados[$contador] =[
                         "codigo" => $item->codigo

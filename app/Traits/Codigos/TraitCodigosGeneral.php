@@ -1,8 +1,8 @@
 <?php
 namespace App\Traits\Codigos;
 
-use App\Models\HistoricoCodigos;
 use DB;
+use App\Models\HistoricoCodigos;
 trait TraitCodigosGeneral{
     public function makeid($longitud){
         $characters = ['A','B','C','D','E','F','G','H','K','M','N','P','R','S','T','U','V','W','X','Y','Z','2','3','4','5','6','7','8','9'];
@@ -179,8 +179,8 @@ trait TraitCodigosGeneral{
                 "ventaEstado"                   => $item->ventaEstado,
                 "venta_estado"                  => $item->venta_estado,
                 "venta_lista_institucion"       => $item->venta_lista_institucion,
-                "codigo_union"                  => $item->codigo_union,
-                "codigo_paquete"                => $item->codigo_paquete,
+                "codigo_union"                  => strtoupper($item->codigo_union),
+                "codigo_paquete"                => strtoupper($item->codigo_paquete),
                 "fecha_registro_paquete"        => $item->fecha_registro_paquete,
                 "verificacion"                  => $item->verificacion,
                 "liquidado_regalado"            => $item->liquidado_regalado

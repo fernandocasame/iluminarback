@@ -557,6 +557,7 @@ Route::get('eliminar_evaluacion/{id}', 'EvaluacionController@eliminar_evaluacion
 
 Route::post('generarCodigos','CodigosLibrosGenerarController@generarCodigos');
 Route::post('generarCodigosUnicos','CodigosLibrosGenerarController@generarCodigosUnicos');
+Route::post('guardarCodigos2','CodigosLibrosGenerarController@guardarCodigos2');
 //apis codigos libros
 Route::apiResource('series', 'SeriesController');
 //api para cambiar el estado de seria basica

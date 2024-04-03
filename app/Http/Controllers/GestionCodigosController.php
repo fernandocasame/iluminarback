@@ -139,6 +139,7 @@ class GestionCodigosController extends Controller
             if($request->chkBc_Bc_institucion           == '1') $codigo->bc_institucion             = $request->bc_institucion;
             if($request->chkBc_Bc_periodo               == '1') $codigo->bc_periodo                 = $request->bc_periodo;
             if($request->chkBc_Venta_estado             == '1') $codigo->venta_estado               = $request->venta_estado;
+            if($request->chkBc_codigo_union             == '1') $codigo->codigo_union               = $request->codigo_union;
             $codigo->save();
             if($codigo){
                 $contador++;
