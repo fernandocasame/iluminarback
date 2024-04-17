@@ -46,6 +46,7 @@ Route::post('revisarUltimoHistoricoCodigo','CodigoLibrosController@revisarUltimo
 //bodega
 Route::post('codigos/bodega/devolver','CodigoLibrosController@devolucionBodega');
 Route::get('procesosbodega','CodigoLibrosController@procesosbodega');
+Route::post('procesosFacturador','CodigoLibrosController@procesosFacturador');
 //api para ver las devoluciones de un codigos
 Route::get('codigo/devoluciones/{codigo}','CodigoLibrosController@verDevoluciones');
 //get periodo individual
@@ -1389,3 +1390,5 @@ Route::group(['prefix' => 'pedidos2'], function () {
   Route::resource('pedidos', 'Pedidos2Controller');
 });
 ///FIN PEDIDOS UNIDO CON FACTURACION///
+//////codigo from historico
+Route::get('search_from_historic/{codigo}', 'CodigosLibrosController@codigos_from_historico');
