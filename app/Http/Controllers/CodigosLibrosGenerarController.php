@@ -13,12 +13,18 @@ use App\Models\Periodo;
 use DataTables;
 Use Exception;
 use App\Models\CodigosObservacion;
+use App\Repositories\Codigos\CodigosRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use GraphQL\Server\RequestError;
 
 class CodigosLibrosGenerarController extends Controller
 {
     use TraitCodigosGeneral;
+    protected $codigosRepository;
+    public function __construct(CodigosRepository $codigosRepository)
+    {
+        $this->codigosRepository = $codigosRepository;
+    }
     public function index(Request $request)
     {
         $codigos_libros = DB::SELECT("SELECT * from codigoslibros limit 100");
@@ -762,5 +768,49 @@ class CodigosLibrosGenerarController extends Controller
 
         return ['historico'=> $codigos, 'registro'=>$registro];
     }
-
+    public function guardarCodigos2(Request $request){
+        set_time_limit(600000);
+        ini_set('max_execution_time', 600000);
+        $codigos                    = json_decode($request->data_codigos);
+        $contador                   = $request->contador;
+        $codigosError               = [];
+        $codigosGuardados           = [];
+        $contadorError              = 0;
+        $porcentajeA                = 0;
+        $contadorUnion              = 0;
+        $prueba_diagnostica         = $request->prueba_diagnostica;
+        foreach($codigos as $key => $item){
+            $codigo                 = "";
+            $codigo                 = $item->codigo;
+            $statusIngreso          = 0;
+            $contadorCodigoA        = "";
+            $ingresoA               = $this->codigosRepository->save_Codigos($request,$item,$codigo,$prueba_diagnostica,$contador);
+            $statusIngreso          = $ingresoA["contadorIngreso"];
+            $contadorCodigoA        = $ingresoA["contador"];
+            //si ingresa el codigo de activacion y el codigo de diagnostico
+            if($statusIngreso == 1){
+                $contador++;
+                $porcentajeA++;
+                $codigosGuardados[$contadorUnion] = [
+                    "codigo"            => $codigo,
+                    "libro"              => $item->libro,
+                    "serie"              => $item->serie,
+                    "anio"               => $item->anio,
+                    "contadorCodigoA"    => $contadorCodigoA,
+                ];
+                $contadorUnion++;
+            }else{
+                $codigosError[$contadorError] = [
+                    "codigo"  => $codigo,
+                    "message"            => "Problemas no se ingresaron bien"
+                ];
+                $contadorError++;
+            }
+        }
+        return [
+            "porcentajeA"           => $porcentajeA ,
+            "codigosNoIngresados"   => $codigosError,
+            "codigosGuardados"      => $codigosGuardados,
+        ];
+    }
 }

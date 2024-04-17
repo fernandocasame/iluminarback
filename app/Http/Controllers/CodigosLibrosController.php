@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use App\Models\CodigosLibros;
+use App\Models\HistoricoCodigos;
 use DataTables;
 Use Exception;
 use Carbon\Carbon;
@@ -527,5 +528,16 @@ class CodigosLibrosController extends Controller
         AND c.estado <> '2'
         ");
         return $query;
+    }
+
+    public function codigos_from_historico($codigo)  {
+        $dato = DB::table('hist_codlibros as hc')
+        ->leftjoin('usuario as u','hc.idInstitucion','=','u.idusuario')
+        ->leftjoin('institucion as i','hc.usuario_editor','=','i.idInstitucion')
+        ->leftJoin('periodoescolar as p','hc.id_periodo','=','p.idperiodoescolar')
+        ->where('hc.codigo_libro','like','%'.$codigo.'%')
+        ->select('hc.*','u.idusuario','u.nombres','u.apellidos','i.nombreInstitucion','p.periodoescolar')
+        ->get();
+        return $dato;
     }
 }

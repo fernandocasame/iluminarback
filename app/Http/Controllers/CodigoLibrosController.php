@@ -2041,4 +2041,125 @@ class CodigoLibrosController extends Controller
             return $query;
         }
     }
+    //API:POST/procesosFacturador
+    public function procesosFacturador(Request $request){
+        if($request->mandarDevueltoRegalado){ return $this->mandarDevueltoRegalado($request); }
+        if($request->cambiarEstadoCodigos)  { return $this->cambiarEstadoCodigos($request); }
+    }
+    //API:POST/procesosFacturador/mandarDevueltoRegalado
+    public function mandarDevueltoRegalado($request){
+        //limpiar cache
+        Cache::flush();
+        $institucion_id             = $request->institucion_id;
+        $periodo_id                 = $request->periodo_id;
+        $id_usuario                 = $request->id_usuario;
+        $observacion                = $request->observacion;
+        $arrayCodigos               = json_decode($request->arrayCodigos);
+        $contador                   = 0;
+        foreach($arrayCodigos as $key => $item){
+            $verificacion_liquidada = $item->verificacion;
+            $contrato               = $item->contrato;
+            $getCodigoActivacion    = $this->getCodigos($item->codigo,0);
+            //codigo de union
+            $codigo_union           = $getCodigoActivacion[0]->codigo_union;
+            //si el codigo es diferente de nulo
+            if($codigo_union != null || $codigo_union != ""){
+                //devolucion
+                $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
+                //devolucion codigo normal
+                $this->moveToDevolucion($item->codigo);
+                //devolucion codigo union
+                $this->moveToDevolucion($codigo_union);
+                //si ingresa correctamente
+                //====CODIGO====
+                //ingresar en el historico codigo
+                $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$item->codigo,$id_usuario,$observacion,$getcodigoPrimero,null,$contrato,$verificacion_liquidada);
+                //====CODIGO UNION=====
+                $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigo_union,$id_usuario,$observacion,$getcodigoUnion,null,$contrato,$verificacion_liquidada);
+                $contador++;
+            }
+            else{
+                $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                //solo el codigo normal
+                $this->moveToDevolucion($item->codigo);
+                $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$item->codigo,$id_usuario,$observacion,$getcodigoPrimero,null,$contrato,$verificacion_liquidada);
+                $contador++;
+            }
+        }
+        return [
+            "cambiados"             => $contador,
+        ];
+    }
+    public function moveToDevolucion($codigo){
+        DB::table('codigoslibros')
+        ->where('codigo', '=', $codigo)
+        ->update([
+            'estado_liquidacion'    => '3',
+            'bc_estado'             => '1',
+        ]);
+    }
+    public function cambiarEstadoCodigos($request){
+        //limpiar cache
+        Cache::flush();
+        $institucion_id             = $request->institucion_id;
+        $periodo_id                 = $request->periodo_id;
+        $id_usuario                 = $request->id_usuario;
+        $observacion                = $request->observacion;
+        $arrayCodigos               = json_decode($request->arrayCodigos);
+        $tipo                       = $request->filtroTipo;
+        $contador                   = 0;
+        foreach($arrayCodigos as $key => $item){
+            $getCodigoActivacion    = $this->getCodigos($item->codigo,0);
+            //codigo de union
+            $codigo_union           = $getCodigoActivacion[0]->codigo_union;
+            //si el codigo es diferente de nulo
+            if($codigo_union != null || $codigo_union != ""){
+                //devolucion
+                $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
+                //devolucion codigo normal
+                $this->changeToEstado($item->codigo,$tipo);
+                //devolucion codigo union
+                $this->changeToEstado($codigo_union,$tipo);
+                //si ingresa correctamente
+                //====CODIGO====
+                //ingresar en el historico codigo
+                $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$item->codigo,$id_usuario,$observacion,$getcodigoPrimero,null,null,null);
+                //====CODIGO UNION=====
+                $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigo_union,$id_usuario,$observacion,$getcodigoUnion,null,null,null);
+                $contador++;
+            }
+            else{
+                $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                //solo el codigo normal
+                $this->changeToEstado($item->codigo,$tipo);
+                $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$item->codigo,$id_usuario,$observacion,$getcodigoPrimero,null,null,null);
+                $contador++;
+            }
+        }
+        return [
+            "cambiados"             => $contador,
+        ];
+    }
+    public function changeToEstado($codigo,$tipo){
+        $datos = [];
+        //cambiar a codigos liquidados Normales
+        if($tipo == 2){
+            $datos = [
+                'estado_liquidacion'    => '0',
+                'liquidado_regalado'    => '0',
+            ];
+        }
+        //cambiar a codigos liquidados regalados
+        if($tipo == 0){
+            $datos = [
+                'estado_liquidacion'    => '2',
+                'liquidado_regalado'    => '1',
+            ];
+        }
+        DB::table('codigoslibros')
+        ->where('codigo', '=', $codigo)
+        ->update($datos);
+    }
 }
