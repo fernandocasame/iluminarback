@@ -8,6 +8,7 @@ use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use DB;
 
 class ReporteCapacitacionController extends Controller
 {
@@ -47,48 +48,92 @@ class ReporteCapacitacionController extends Controller
     {
         try {
             $periodo = request()->query("periodo", null);
-            $time = $this->getTimeProps(request()->query("tiempo", null)); // today, week, month, by dates
-            $startDate = request()->query("filtro_fecha_ini", $time["startDate"]);
-            $endDate = request()->query("filtro_fecha_fin", $time["endDate"]);
-            $capacitador = request()->query("capacitador", null); // id del capacitador
-            $tipo = request()->query("tipo", null); // 0: presencial, 1: virtual
+            // $time = $this->getTimeProps(request()->query("tiempo", null)); // today, week, month, by dates
+            // $startDate = request()->query("filtro_fecha_ini", $time["startDate"]);
+            // $endDate = request()->query("filtro_fecha_fin", $time["endDate"]);
+            // $capacitador = request()->query("capacitador", null); // id del capacitador
+            // $tipo = request()->query("tipo", null); // 0: presencial, 1: virtual
 
-            $capacitaciones = Seminarios::with([
-                'institucion' => function ($query) {
-                    $query->with(['ciudad']);
-                },
-                'asesor',
-                'periodo',
-                'capacitadores'
-            ])
-            ->Where('estado','1')
-            ->Where('tipo_webinar','2')
-            ->whereHas('periodo', function ($query) {
-                $query->where('estado', '1');
-            })
-            ->when($periodo, function ($query) use ($periodo) {
-                $query->where('periodo_id', $periodo);
-            })
-            ->when($startDate, function ($query) use ($startDate) {
-                $query->where('fecha_inicio', '>=', $startDate);
-            })
-            ->when($endDate, function ($query) use ($endDate) {
-                $query->where('fecha_inicio', '<=', $endDate);
-            })
-            ->when($tipo != null, function ($query) use ($tipo) {
-                $query->where('tipo', $tipo);
-            })
-            ->when($capacitador, function ($query) use ($capacitador) {
-                $query->whereHas('capacitadores', function ($query) use ($capacitador) {
-                    $query->where('seminarios_capacitador.idusuario', $capacitador);
-                });
-            })
-            ->orderBy('fecha_inicio', 'desc')->get();
+            // $capacitaciones = Seminarios::with([
+            //     'institucion' => function ($query) {
+            //         $query->with(['ciudad']);
+            //     },
+            //     'asesor',
+            //     'periodo',
+            //     'capacitadores'
+            // ])
+            // ->Where('estado','1')
+            // ->Where('tipo_webinar','2')
+            // ->whereHas('periodo', function ($query) {
+            //     $query->where('estado', '1');
+            // })
+            // ->when($periodo, function ($query) use ($periodo) {
+            //     $query->where('periodo_id', $periodo);
+            // })
+            // ->when($startDate, function ($query) use ($startDate) {
+            //     $query->where('fecha_inicio', '>=', $startDate);
+            // })
+            // ->when($endDate, function ($query) use ($endDate) {
+            //     $query->where('fecha_inicio', '<=', $endDate);
+            // })
+            // ->when($tipo != null, function ($query) use ($tipo) {
+            //     $query->where('tipo', $tipo);
+            // })
+            // ->when($capacitador, function ($query) use ($capacitador) {
+            //     $query->whereHas('capacitadores', function ($query) use ($capacitador) {
+            //         $query->where('seminarios_capacitador.idusuario', $capacitador);
+            //     });
+            // })
+            // ->orderBy('fecha_inicio', 'desc')->get();
 
-            return response()->json($capacitaciones);
+            // return response()->json($capacitaciones);
+
+            $unirArrays                 = [];
+            $institucionesProlipa       = [];
+            $institucionesTemporales    = [];
+            $resultado                  = [];
+            //prolipa
+            $institucionesProlipa       = $this->getCapacitaciones(0,$periodo);
+            //temporales
+            $institucionesTemporales    = $this->getCapacitaciones(1,$periodo);
+            $unirArrays                 = array_merge(array($institucionesProlipa),array($institucionesTemporales));
+            $coleccionUnir              = collect($unirArrays);
+            $resultado                  = $coleccionUnir->flatten(10);
+            //ordenar de mayor a menor por id_seminario
+            $resultado                  = $resultado->sortByDesc('fecha_inicio')->values();
+            //traer capacitadores
+            foreach ($resultado as $key => $value) {
+                $capacitadores = DB::table('seminarios_capacitador as sc')
+                ->selectRaw("u.*")
+                ->leftJoin('usuario as u', 'sc.idusuario', '=', 'u.idusuario')
+                ->where('sc.seminario_id', '=', $value->id_seminario)
+                ->get();
+                $value->capacitadores = $capacitadores;
+            }
+            return response()->json($resultado);
+
         } catch (\Throwable $th) {
             return response()->json(["error" => $th->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    public function getCapacitaciones($tipo,$periodo){
+        $query = DB::table('seminarios as s')
+        ->selectRaw("CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+            s.*,
+            pe.descripcion AS cicloEscolar,
+            IF(s.estado_institucion_temporal = '1', 'Temporal', 'Prolipa') AS tipoInstitucion,
+            IF(s.estado_institucion_temporal = '1', s.nombre_institucion_temporal, i.nombreInstitucion) AS nombreInstitucion
+        ")
+        ->leftJoin('usuario as u', 's.id_usuario', '=', 'u.idusuario')
+        ->leftJoin('institucion as i', 's.id_institucion', '=', 'i.idInstitucion')
+        ->leftJoin('periodoescolar as pe', 's.periodo_id', '=', 'pe.idperiodoescolar')
+        ->where('s.periodo_id', '=', $periodo)
+        ->where('s.tipo_webinar', '=', '2')
+        ->where('s.estado',       '=', '1');
+        if($tipo == 0){ $resultado = $query->where('s.id_institucion', '>', 0); }
+        if($tipo == 1){ $resultado = $query->Where('s.institucion_id_temporal', '>', 0); }
+        return $resultado->get();
     }
 
     public function getCapacitadoresDisponibles(): JsonResponse
