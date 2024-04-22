@@ -20,7 +20,6 @@ class CapacitacionController extends Controller
     {
         $capacitacion = DB::SELECT("SELECT c.id_seminario as id,
         c.tema_id,
-        t.capacitador,
         c.label,
         c.nombre as title,
         c.classes,
@@ -38,7 +37,9 @@ class CapacitacionController extends Controller
         c.estado_institucion_temporal,
         c.tipo,
         c.cant_asistentes as personas,
-        p.idperiodoescolar, p.periodoescolar AS periodo, i.nombreInstitucion
+        p.idperiodoescolar, p.periodoescolar AS periodo, i.nombreInstitucion,
+        c.capacitador as capacitadores,
+        c.link_reunion
         FROM seminarios c
         LEFT JOIN periodoescolar p ON c.periodo_id = p.idperiodoescolar
         LEFT JOIN institucion i ON  c.id_institucion = i.idInstitucion
@@ -134,7 +135,7 @@ class CapacitacionController extends Controller
         $listado = DB::SELECT("SELECT  * FROM  capacitacion_solicitudes
         WHERE asesor_id = '$asesor'
         ORDER BY id DESC
-        LIMIT 50
+        LIMIT 200
         ");
         return $listado;
     }
@@ -195,6 +196,7 @@ class CapacitacionController extends Controller
             // $agenda->capacitador = $request->capacitador;
             $agenda->estado_institucion_temporal = $request->estado_institucion_temporal;
             $agenda->cant_asistentes = $request->asistentes;
+            $agenda->link_reunion   = $request->link_reunion ?? null;
             $agenda->save();
             return $agenda;
         } catch (\Throwable $th) {
