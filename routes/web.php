@@ -1397,3 +1397,5 @@ Route::group(['prefix' => 'pedidos2'], function () {
 Route::get('search_from_historic/{codigo}', 'CodigosLibrosController@codigos_from_historico');
 //INICIO PRODUCTO CLIENTE_INTITUCION
 Route::get('Get_Cliente_Institucionx3yearanterior', '_14ClienteInstitucionController@Get_Cliente_Institucionx3yearanterior');
+//FIN FACTURACION 10_10_1_4
+Route::resource('empresa','_14EmpresaController');

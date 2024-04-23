@@ -3,12 +3,15 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\f_tipo_documento;
 use Illuminate\Http\Request;
 use DB;
 use App\Models\PedidoGuiaDevolucion;
 use App\Models\PedidoGuiaDevolucionDetalle;
 use App\Models\PedidoHistoricoActas;
 use App\Models\PedidoGuiaTemp;
+use App\Models\Pedidos;
+use App\Traits\Pedidos\TraitGuiasGeneral;
 use Illuminate\Support\Facades\Http;
 class GuiasController extends Controller
 {
@@ -17,6 +20,7 @@ class GuiasController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+    use TraitGuiasGeneral;
     public function index(Request $request)
     {
         //listado de guias para devolver
@@ -41,6 +45,10 @@ class GuiasController extends Controller
         //stock de las
         if($request->verStockGuiasProlipa){
             return $this->verStockGuiasProlipa($request->id_pedido,$request->acta);
+        }
+        //dashboard guias bodega
+        if($request->datosGuias){
+            return $this->datosGuias();
         }
     }
     public function get_val_pedidoInfo($pedido){
@@ -124,6 +132,499 @@ class GuiasController extends Controller
 
     }
     public function verStock($id_pedido){
+        $data = '
+        [
+            {
+            "nombrelibro": "Manantial Lengua 2",
+            "stockAnterior": 1140,
+            "valorNew": 3,
+            "nuevoStock": 1137,
+            "codigoFact": "GSMLL2",
+            "codigo": "SMLL2"
+            },
+            {
+            "nombrelibro": "Manantial Matemática 2",
+            "stockAnterior": 1164,
+            "valorNew": 2,
+            "nuevoStock": 1162,
+            "codigoFact": "GSMM2",
+            "codigo": "SMM2"
+            },
+            {
+            "nombrelibro": "Manantial Lengua 3",
+            "stockAnterior": 1125,
+            "valorNew": 2,
+            "nuevoStock": 1123,
+            "codigoFact": "GSMLL3",
+            "codigo": "SMLL3"
+            },
+            {
+            "nombrelibro": "Manantial Matemática 3",
+            "stockAnterior": 1198,
+            "valorNew": 2,
+            "nuevoStock": 1196,
+            "codigoFact": "GSMM3",
+            "codigo": "SMM3"
+            },
+            {
+            "nombrelibro": "Manantial Lengua 4",
+            "stockAnterior": 1186,
+            "valorNew": 2,
+            "nuevoStock": 1184,
+            "codigoFact": "GSMLL4",
+            "codigo": "SMLL4"
+            },
+            {
+            "nombrelibro": "Manantial Matemática 4",
+            "stockAnterior": 1161,
+            "valorNew": 2,
+            "nuevoStock": 1159,
+            "codigoFact": "GSMM4",
+            "codigo": "SMM4"
+            },
+            {
+            "nombrelibro": "Manantial Lengua 5",
+            "stockAnterior": 1167,
+            "valorNew": 2,
+            "nuevoStock": 1165,
+            "codigoFact": "GSMLL5",
+            "codigo": "SMLL5"
+            },
+            {
+            "nombrelibro": "Manantial Matemática 5",
+            "stockAnterior": 1196,
+            "valorNew": 2,
+            "nuevoStock": 1194,
+            "codigoFact": "GSMM5",
+            "codigo": "SMM5"
+            },
+            {
+            "nombrelibro": "Manantial Lengua 6",
+            "stockAnterior": 1212,
+            "valorNew": 2,
+            "nuevoStock": 1210,
+            "codigoFact": "GSMLL6",
+            "codigo": "SMLL6"
+            },
+            {
+            "nombrelibro": "Manantial Matemática 6",
+            "stockAnterior": 1235,
+            "valorNew": 2,
+            "nuevoStock": 1233,
+            "codigoFact": "GSMM6",
+            "codigo": "SMM6"
+            },
+            {
+            "nombrelibro": "Manantial Lengua 7",
+            "stockAnterior": 1207,
+            "valorNew": 2,
+            "nuevoStock": 1205,
+            "codigoFact": "GSMLL7",
+            "codigo": "SMLL7"
+            },
+            {
+            "nombrelibro": "Manantial Matemática 7",
+            "stockAnterior": 600,
+            "valorNew": 3,
+            "nuevoStock": 597,
+            "codigoFact": "GSMM7",
+            "codigo": "SMM7"
+            },
+            {
+            "nombrelibro": "Manantial - Naturales 2",
+            "stockAnterior": 999,
+            "valorNew": 2,
+            "nuevoStock": 997,
+            "codigoFact": "GSMCN2",
+            "codigo": "SMCN2"
+            },
+            {
+            "nombrelibro": "Manantial - Sociales 2",
+            "stockAnterior": 987,
+            "valorNew": 2,
+            "nuevoStock": 985,
+            "codigoFact": "GSMES2",
+            "codigo": "SMES2"
+            },
+            {
+            "nombrelibro": "Manantial - Naturales 3",
+            "stockAnterior": 975,
+            "valorNew": 1,
+            "nuevoStock": 974,
+            "codigoFact": "GSMCN3",
+            "codigo": "SMCN3"
+            },
+            {
+            "nombrelibro": "Manantial - Sociales 3",
+            "stockAnterior": 992,
+            "valorNew": 2,
+            "nuevoStock": 990,
+            "codigoFact": "GSMES3",
+            "codigo": "SMES3"
+            },
+            {
+            "nombrelibro": "Manantial - Naturales 4",
+            "stockAnterior": 1061,
+            "valorNew": 1,
+            "nuevoStock": 1060,
+            "codigoFact": "GSMCN4",
+            "codigo": "SMCN4"
+            },
+            {
+            "nombrelibro": "Manantial - Sociales 4",
+            "stockAnterior": 1065,
+            "valorNew": 1,
+            "nuevoStock": 1064,
+            "codigoFact": "GSMES4",
+            "codigo": "SMES4"
+            },
+            {
+            "nombrelibro": "Manantial - Naturales 5",
+            "stockAnterior": 585,
+            "valorNew": 1,
+            "nuevoStock": 584,
+            "codigoFact": "GSMCN5",
+            "codigo": "SMCN5"
+            },
+            {
+            "nombrelibro": "Manantial - Sociales 5",
+            "stockAnterior": 1044,
+            "valorNew": 1,
+            "nuevoStock": 1043,
+            "codigoFact": "GSMES5",
+            "codigo": "SMES5"
+            },
+            {
+            "nombrelibro": "Manantial - Naturales 6",
+            "stockAnterior": 1029,
+            "valorNew": 1,
+            "nuevoStock": 1028,
+            "codigoFact": "GSMCN6",
+            "codigo": "SMCN6"
+            },
+            {
+            "nombrelibro": "Manantial - Sociales 6",
+            "stockAnterior": 1040,
+            "valorNew": 1,
+            "nuevoStock": 1039,
+            "codigoFact": "GSMES6",
+            "codigo": "SMES6"
+            },
+            {
+            "nombrelibro": "Manantial - Naturales 7",
+            "stockAnterior": 1033,
+            "valorNew": 1,
+            "nuevoStock": 1032,
+            "codigoFact": "GSMCN7",
+            "codigo": "SMCN7"
+            },
+            {
+            "nombrelibro": "Manantial - Sociales 7",
+            "stockAnterior": 1075,
+            "valorNew": 1,
+            "nuevoStock": 1074,
+            "codigoFact": "GSMES7",
+            "codigo": "SMES7"
+            },
+            {
+            "nombrelibro": "Manantial Lengua 8",
+            "stockAnterior": 485,
+            "valorNew": 1,
+            "nuevoStock": 484,
+            "codigoFact": "GSMLL8",
+            "codigo": "SMLL8"
+            },
+            {
+            "nombrelibro": "El arte de escribir 2",
+            "stockAnterior": 675,
+            "valorNew": 1,
+            "nuevoStock": 674,
+            "codigoFact": "GSEAE2",
+            "codigo": "SEAE2"
+            },
+            {
+            "nombrelibro": "Joyas Literarias 4",
+            "stockAnterior": 13,
+            "valorNew": 1,
+            "nuevoStock": 12,
+            "codigoFact": "GSPJL4",
+            "codigo": "SPJL4"
+            },
+            {
+            "nombrelibro": "Joyas Literarias 5",
+            "stockAnterior": 13,
+            "valorNew": 1,
+            "nuevoStock": 12,
+            "codigoFact": "GSPJL5",
+            "codigo": "SPJL5"
+            },
+            {
+            "nombrelibro": "Joyas Literarias 6",
+            "stockAnterior": 14,
+            "valorNew": 1,
+            "nuevoStock": 13,
+            "codigoFact": "GSPJL6",
+            "codigo": "SPJL6"
+            },
+            {
+            "nombrelibro": "Joyas Literarias 7",
+            "stockAnterior": 13,
+            "valorNew": 1,
+            "nuevoStock": 12,
+            "codigoFact": "GSPJL7",
+            "codigo": "SPJL7"
+            },
+            {
+            "nombrelibro": "Robótica 2",
+            "stockAnterior": 446,
+            "valorNew": 1,
+            "nuevoStock": 445,
+            "codigoFact": "GROB2",
+            "codigo": "ROB2"
+            },
+            {
+            "nombrelibro": "Robótica 3",
+            "stockAnterior": 252,
+            "valorNew": 1,
+            "nuevoStock": 251,
+            "codigoFact": "GROB3",
+            "codigo": "ROB3"
+            },
+            {
+            "nombrelibro": "Robótica 4",
+            "stockAnterior": 279,
+            "valorNew": 1,
+            "nuevoStock": 278,
+            "codigoFact": "GROB4",
+            "codigo": "ROB4"
+            },
+            {
+            "nombrelibro": "Robótica 5",
+            "stockAnterior": 364,
+            "valorNew": 1,
+            "nuevoStock": 363,
+            "codigoFact": "GROB5",
+            "codigo": "ROB5"
+            },
+            {
+            "nombrelibro": "Robótica 6",
+            "stockAnterior": 348,
+            "valorNew": 1,
+            "nuevoStock": 347,
+            "codigoFact": "GROB6",
+            "codigo": "ROB6"
+            },
+            {
+            "nombrelibro": "Robótica 7",
+            "stockAnterior": 277,
+            "valorNew": 1,
+            "nuevoStock": 276,
+            "codigoFact": "GROB7",
+            "codigo": "ROB7"
+            },
+            {
+            "nombrelibro": "Lengua 1 BGU",
+            "stockAnterior": 1360,
+            "valorNew": 1,
+            "nuevoStock": 1359,
+            "codigoFact": "GSMCLL1",
+            "codigo": "SMCLL1"
+            },
+            {
+            "nombrelibro": "Lengua 2 BGU",
+            "stockAnterior": 1104,
+            "valorNew": 1,
+            "nuevoStock": 1103,
+            "codigoFact": "GSMCLL2",
+            "codigo": "SMCLL2"
+            },
+            {
+            "nombrelibro": "Lengua 3 BGU",
+            "stockAnterior": 1394,
+            "valorNew": 1,
+            "nuevoStock": 1393,
+            "codigoFact": "GSMCLL3",
+            "codigo": "SMCLL3"
+            },
+            {
+            "nombrelibro": "Matemática 1 BGU",
+            "stockAnterior": 465,
+            "valorNew": 1,
+            "nuevoStock": 464,
+            "codigoFact": "GSMCM1",
+            "codigo": "SMCM1"
+            },
+            {
+            "nombrelibro": "Matemática 2 BGU",
+            "stockAnterior": 460,
+            "valorNew": 1,
+            "nuevoStock": 459,
+            "codigoFact": "GSMCM2",
+            "codigo": "SMCM2"
+            },
+            {
+            "nombrelibro": "Matemática 3 BGU",
+            "stockAnterior": 507,
+            "valorNew": 1,
+            "nuevoStock": 506,
+            "codigoFact": "GSMCM3",
+            "codigo": "SMCM3"
+            },
+            {
+            "nombrelibro": "Quimica 3 BGU",
+            "stockAnterior": 1449,
+            "valorNew": 1,
+            "nuevoStock": 1448,
+            "codigoFact": "GSMCQ3",
+            "codigo": "SMCQ3"
+            },
+            {
+            "nombrelibro": "Biología 3 BGU",
+            "stockAnterior": 1102,
+            "valorNew": 1,
+            "nuevoStock": 1101,
+            "codigoFact": "GSMCB3",
+            "codigo": "SMCB3"
+            },
+            {
+            "nombrelibro": "Física 3 BGU",
+            "stockAnterior": 579,
+            "valorNew": 1,
+            "nuevoStock": 578,
+            "codigoFact": "GSMFIS3",
+            "codigo": "SMFIS3"
+            },
+            {
+            "nombrelibro": "Quimica 2 BGU",
+            "stockAnterior": 1413,
+            "valorNew": 1,
+            "nuevoStock": 1412,
+            "codigoFact": "GSMCQ2",
+            "codigo": "SMCQ2"
+            },
+            {
+            "nombrelibro": "Biología 2 BGU",
+            "stockAnterior": 1105,
+            "valorNew": 1,
+            "nuevoStock": 1104,
+            "codigoFact": "GSMCB2",
+            "codigo": "SMCB2"
+            },
+            {
+            "nombrelibro": "Física 2 BGU",
+            "stockAnterior": 563,
+            "valorNew": 1,
+            "nuevoStock": 562,
+            "codigoFact": "GSMFIS2",
+            "codigo": "SMFIS2"
+            },
+            {
+            "nombrelibro": "Educación para la ciudadania 2 BGU",
+            "stockAnterior": 583,
+            "valorNew": 1,
+            "nuevoStock": 582,
+            "codigoFact": "GSMC2",
+            "codigo": "SMC2"
+            },
+            {
+            "nombrelibro": "Quimica 1 BGU",
+            "stockAnterior": 1408,
+            "valorNew": 1,
+            "nuevoStock": 1407,
+            "codigoFact": "GSMCQ1",
+            "codigo": "SMCQ1"
+            },
+            {
+            "nombrelibro": "Biología 1 BGU",
+            "stockAnterior": 1122,
+            "valorNew": 1,
+            "nuevoStock": 1121,
+            "codigoFact": "GSMCB1",
+            "codigo": "SMCB1"
+            },
+            {
+            "nombrelibro": "Física 1 BGU",
+            "stockAnterior": 558,
+            "valorNew": 1,
+            "nuevoStock": 557,
+            "codigoFact": "GSMFIS1",
+            "codigo": "SMFIS1"
+            },
+            {
+            "nombrelibro": "Educación para la ciudadania 1 BGU",
+            "stockAnterior": 575,
+            "valorNew": 1,
+            "nuevoStock": 574,
+            "codigoFact": "GSMC1",
+            "codigo": "SMC1"
+            },
+            {
+            "nombrelibro": "Filosofía 1 BGU",
+            "stockAnterior": 408,
+            "valorNew": 1,
+            "nuevoStock": 407,
+            "codigoFact": "GSMFILO1",
+            "codigo": "SMFILO1"
+            },
+            {
+            "nombrelibro": "Historia 1 BGU",
+            "stockAnterior": 1416,
+            "valorNew": 1,
+            "nuevoStock": 1415,
+            "codigoFact": "GSMCH1",
+            "codigo": "SMCH1"
+            },
+            {
+            "nombrelibro": "Emprendimiento y Gestión 1 BGU",
+            "stockAnterior": 567,
+            "valorNew": 1,
+            "nuevoStock": 566,
+            "codigoFact": "GSME1",
+            "codigo": "SME1"
+            },
+            {
+            "nombrelibro": "Filosofía 2 BGU",
+            "stockAnterior": 617,
+            "valorNew": 1,
+            "nuevoStock": 616,
+            "codigoFact": "GSMFILO2",
+            "codigo": "SMFILO2"
+            },
+            {
+            "nombrelibro": "Historia 2 BGU",
+            "stockAnterior": 1388,
+            "valorNew": 1,
+            "nuevoStock": 1387,
+            "codigoFact": "GSMCH2",
+            "codigo": "SMCH2"
+            },
+            {
+            "nombrelibro": "Emprendimiento y Gestión 2 BGU",
+            "stockAnterior": 581,
+            "valorNew": 1,
+            "nuevoStock": 580,
+            "codigoFact": "GSME2",
+            "codigo": "SME2"
+            },
+            {
+            "nombrelibro": "Historia 3 BGU",
+            "stockAnterior": 1395,
+            "valorNew": 1,
+            "nuevoStock": 1394,
+            "codigoFact": "GSMCH3",
+            "codigo": "SMCH3"
+            },
+            {
+            "nombrelibro": "Emprendimiento y Gestión 3 BGU",
+            "stockAnterior": 571,
+            "valorNew": 1,
+            "nuevoStock": 570,
+            "codigoFact": "GSME3",
+            "codigo": "SME3"
+            }
+            ]
+        ';
+        return json_decode($data,true);
         try {
             //consultar el stock
             $arregloCodigos = $this->get_val_pedidoInfo($id_pedido);
@@ -222,6 +723,25 @@ class GuiasController extends Controller
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
     }
+    //guias?datosGuias=yes
+    public function datosGuias(){
+        $guiasSinDespachar      = 0;
+        $guiasDespachadas       = 0;
+        $devueltasPendientes    = 0;
+        $devueltasAprobadas     = 0;
+        $query = Pedidos::Where("tipo","1")->where('estado','1')->select('id_pedido','estado_entrega')->get();
+        //guias
+        if(count($query) > 0){ $query->map(function($item) use (&$guiasSinDespachar,&$guiasDespachadas){ if($item->estado_entrega == 1){ $guiasSinDespachar++; } if($item->estado_entrega == 2){ $guiasDespachadas++; } }); }
+        //devoluciones de guias
+        $query2 = PedidoGuiaDevolucion::all();
+        if(count($query2) > 0){
+            $query2->map(function($item2) use (&$devueltasPendientes,&$devueltasAprobadas) {
+                if($item2->estado == 0){ $devueltasPendientes++; }
+                if($item2->estado == 1){ $devueltasAprobadas++; }
+            });
+         }
+        return [ "guiasSinDespachar" => $guiasSinDespachar, "guiasDespachadas" => $guiasDespachadas, "devueltasPendientes" => $devueltasPendientes,"devueltasAprobadas" => $devueltasAprobadas ];
+    }
     public function listadoGuias(){
         $query = DB::SELECT("SELECT pd.*,
         CONCAT(u.nombres,' ',u.apellidos) as asesor,
@@ -316,6 +836,10 @@ class GuiasController extends Controller
             $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
             $json_secuencia_guia = json_decode($secuencia, true);
             $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
+            ///====migrar
+            // $secuencia = $this->tr_obtenerSecuenciaGuia(2);
+            // if(empty($secuencia)){ return ["status" => "0", "message" => "No hay secuencia de guias"]; }
+            // $getSecuencia           = $secuencia[0]->tdo_secuencial;
             //VARIABLES
             $cod_institucion      = $query[0]->cli_ins_codigo;
             $secuencia = $getSecuencia;
@@ -395,6 +919,8 @@ class GuiasController extends Controller
             ];
             $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
             $json_secuencia = json_decode($post_Secuencia, true);
+            //MIGRAR
+            //f_tipo_documento::Where('tdo_id',2)->update(['tdo_secuencial' => $getSecuencia + 1]);
             //===ACTUALIZAR STOCK========
            return $this->actualizarStockFacturacion($detalleGuias,$codigo_ven);
             //return response()->json(['json_guias' => $json_guias, 'form_data' => $form_data]);

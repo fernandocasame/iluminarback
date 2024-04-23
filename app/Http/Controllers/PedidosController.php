@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pedidos;
 use App\Models\Beneficiarios;
+use App\Models\f_tipo_documento;
 use App\Models\Usuario;
 use App\Models\PedidosAsesores;
 use App\Models\User;
@@ -30,6 +31,7 @@ use App\Models\Periodo;
 use App\Models\Verificacion;
 use App\Repositories\PedidosPagosRepository;
 use App\Repositories\pedidos\ConvenioRepository;
+use App\Traits\Pedidos\TraitGuiasGeneral;
 use App\Traits\Pedidos\TraitPagosGeneral;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use App\Traits\Verificacion\TraitVerificacionGeneral;
@@ -43,6 +45,7 @@ use stdClass;
 class PedidosController extends Controller
 {
     use TraitPedidosGeneral;
+    use TraitGuiasGeneral;
     use TraitVerificacionGeneral;
     use TraitPagosGeneral;
     private $pagoRepository;
@@ -3800,8 +3803,13 @@ class PedidosController extends Controller
             $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
             $json_secuencia_guia = json_decode($secuencia, true);
             $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
+
+            //migrar
+            // $secuencia = $this->tr_obtenerSecuenciaGuia(2);
+            // if(empty($secuencia)){ return ["status" => "0", "message" => "No hay secuencia de guias"]; }
+            // $getSecuencia           = $secuencia[0]->tdo_secuencial;
             // //VARIABLES
-             $cod_institucion      = $getcli_ins_codigo;
+            $cod_institucion       = $getcli_ins_codigo;
             $secuencia = $getSecuencia;
             if( $secuencia < 10 ){
                 $format_id_pedido = '000000' . $secuencia;
@@ -3875,6 +3883,8 @@ class PedidosController extends Controller
             ];
             $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
             $json_secuencia = json_decode($post_Secuencia, true);
+            //migrar
+            //f_tipo_documento::Where('tdo_id',2)->update(['tdo_secuencial' => $getSecuencia + 1]);
             //===ACTUALIZAR STOCK========
            return $this->actualizarStockFacturacion($detalleGuias,$codigo_ven);
             //return response()->json(['json_guias' => $json_guias, 'form_data' => $form_data]);
