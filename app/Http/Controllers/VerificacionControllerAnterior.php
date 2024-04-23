@@ -256,21 +256,17 @@ class VerificacionControllerAnterior extends Controller
         return $query;
     }
     public function getVerificacionXcontrato($contrato){
-        $pagos = $this->getPagos($contrato);
         $query = DB::SELECT("SELECT
             v.* FROM verificaciones v
             WHERE v.contrato = '$contrato'
             AND v.nuevo = '1'
             ORDER BY v.id DESC
         ");
+        return $query;
         $datos = [];
         $contador = 0;
         foreach($query as $key => $item){
            $datos [$contador] = (Object)[
-            // "totalPagado"                   => $item->totalPagado,
-            "Pcliente"                      => $pagos["Pcliente"],
-            "PProlipaAumentar"              => $pagos["PProlipaAumentar"],
-            "PProlipaDisminuir"             => $pagos["PProlipaDisminuir"],
             "id"                            => $item->id,
             "num_verificacion"              => $item->num_verificacion,
             "fecha_inicio"                  => $item->fecha_inicio,
@@ -285,18 +281,35 @@ class VerificacionControllerAnterior extends Controller
             "cobro_venta_directa"           => $item->cobro_venta_directa,
             "tipoPago"                      => $item->tipoPago,
             "personalizado"                 => $item->personalizado,
-            "totalDescuento"                => $item->totalDescuento,
+            "totalDescuento"                => $item->totalDescuento == null ? 0 : $item->totalDescuento,
             "abonado"                       => $item->abonado,
             "estado_pago"                   => $item->estado_pago,
             "venta_real"                    => $item->venta_real,
             "venta_real_regalados"          => $item->venta_real_regalados,
             "valor_comision"                => $item->valor_comision,
+            "totalCobroVentaDirecta"        => $item->totalCobroVentaDirecta,
+            "TotalConvenio"                 => $item->TotalConvenio,
             "permiso_anticipo_deuda"        => $item->permiso_anticipo_deuda,
             "permiso_convenio"              => $item->permiso_convenio,
             "permiso_cobro_venta_directa"   => $item->permiso_cobro_venta_directa,
            ];
            $contador++;
         }
+        return $datos;
+    }
+    public function getDocumentosLiqSinContratos($institucion,$periodo){
+        $pagos = $this->getPagosXInstitucionXPeriodo($institucion,$periodo);
+        $datos = [];
+        $contador = 0;
+           $datos [$contador] = (Object)[
+            // "totalPagado"                   => $item->totalPagado,
+            "Pcliente"                      => $pagos["Pcliente"],
+            "PProlipaAumentar"              => $pagos["PProlipaAumentar"],
+            "PProlipaDisminuir"             => $pagos["PProlipaDisminuir"],
+            "estado"                        => 0,
+           ];
+           $contador++;
+
         return $datos;
     }
     public function saveVerificacion($num_verificacion,$contrato){
@@ -395,6 +408,10 @@ class VerificacionControllerAnterior extends Controller
          if($request->getVentaRealXVerificacion){
             return $this->getVentaRealXVerificacion($request);
          }
+         //para traer todos los codigos
+         if($request->getAllCodigosXContrato){
+            return $this->getAllCodigosXContrato($request);
+         }
           //para calcular la venta real x Tipo de venta
          if($request->getVentaRealXVerificacionXTipoVenta){
             return $this->obtenerVentaRealXVerificacionXTipoVenta($request);
@@ -479,12 +496,34 @@ class VerificacionControllerAnterior extends Controller
                 $verificacion_id =  $request->verificacion_id;
             }
             $columnaVerificacion = "verif".$request->num_verificacion;
-             $codigos = DB::table('codigoslibros')
-             ->select('codigo')
+             $codigos = DB::table('codigoslibros as c')
+            //  ->select('codigo','estado_liquidacion','venta_estado','factura')
+            ->select(DB::RAW('
+                c.codigo,c.estado_liquidacion,c.venta_estado,c.factura,c.contrato,
+                c.libro_idlibro, c.libro as nombre_libro,
+                (
+                    SELECT
+                        (case when (ci.verif1 > "0") then "verif1"
+                        when (ci.verif2 > 0) then "verif2"
+                        when (ci.verif3 > 0) then "verif3"
+                        when (ci.verif4 > 0) then "verif4"
+                        when (ci.verif5 > 0) then "verif5"
+                        when (ci.verif6 > 0) then "verif6"
+                        when (ci.verif7 > 0) then "verif7"
+                        when (ci.verif8 > 0) then "verif8"
+                        when (ci.verif9 > 0) then "verif9"
+                        when (ci.verif10 > 0) then "verif10"
+                        end) as verificacion
+                    FROM codigoslibros ci
+                    WHERE ci.codigo = c.codigo
+                ) AS verificacion,
+                c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10
+            '))
              ->where($columnaVerificacion, $verificacion_id)
              ->where('contrato', $request->contrato)
              ->where('prueba_diagnostica', '0')
              ->where('libro_idlibro', $request->libro_id)
+             ->where('estado_liquidacion', '<>', '3')
              ->get();
              return $codigos;
 
@@ -497,6 +536,82 @@ class VerificacionControllerAnterior extends Controller
         if($request->getVerificacionXcontrato){
             return $this->getVerificacionXcontrato($request->contrato);
         }
+        //obtener documentos pagos
+        if($request->getDocumentosLiqSinContratos){
+            return $this->getDocumentosLiqSinContratos($request->institucion_id,$request->periodo_id);
+        }
+     }
+     public function getAllCodigosXContrato($request){
+        //limpiar cache
+        Cache::flush();
+        $periodo        = $request->periodo_id;
+        $institucion    = $request->institucion_id;
+        $verif          = "verif".$request->verificacion_id;
+        $IdVerificacion = $request->IdVerificacion;
+        $contrato       = $request->contrato;
+        $detalles = DB::SELECT("SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
+            c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
+            c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion
+            FROM codigoslibros c
+            LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+            WHERE c.bc_periodo          = ?
+            AND c.prueba_diagnostica    = '0'
+            AND `$verif`                = '$IdVerificacion'
+            AND (c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
+            -- AND c.contrato           = '$contrato'
+            ",
+            [$periodo,$institucion]
+        );
+        $datos = [];
+        $contador = 0;
+        foreach($detalles as $key => $item){
+            //plan lector
+            $precio = 0;
+            $query = [];
+            if($item->id_serie == 6){
+                $query = DB::SELECT("SELECT f.pvp AS precio
+                FROM pedidos_formato f
+                WHERE f.id_serie    = '6'
+                AND f.id_area       = '69'
+                AND f.id_libro      = '$item->libro_idlibro'
+                AND f.id_periodo    = '$periodo'");
+            }else{
+                $query = DB::SELECT("SELECT f.pvp AS precio
+                FROM pedidos_formato f
+                WHERE f.id_serie    = '$item->id_serie'
+                AND f.id_area       = '$item->area_idarea'
+                AND f.id_periodo    = '$periodo'
+                ");
+            }
+            if(count($query) > 0){
+                $precio = $query[0]->precio;
+            }
+            $datos[$contador] = [
+                "codigo_libro"              => $item->codigo_libro,
+                "IdVerificacion"            => $IdVerificacion,
+                "verificacion_id"           => $request->verificacion_id,
+                "contrato"                  => $contrato,
+                "codigo"                    => $item->codigo,
+                "nombre_libro"              => $item->nombrelibro,
+                "libro_id"                  => $item->libro_idlibro,
+                "libro_idlibro"             => $item->libro_idlibro,
+                "id_serie"                  => $item->id_serie,
+                "id_periodo"                => $periodo,
+                "precio"                    => $precio,
+                "estado_liquidacion"        => $item->estado_liquidacion,
+                "estado"                    => $item->estado,
+                "bc_estado"                 => $item->bc_estado,
+                "venta_estado"              => $item->venta_estado,
+                "liquidado_regalado"        => $item->liquidado_regalado,
+                "bc_institucion"            => $item->bc_institucion,
+                "contrato"                  => $item->contrato,
+                "venta_lista_institucion"   => $item->venta_lista_institucion
+            ];
+            $contador++;
+        }
+        return $datos;
      }
      public function getVentaRealXVerificacion($request){
         $periodo        = $request->periodo_id;
@@ -949,21 +1064,51 @@ class VerificacionControllerAnterior extends Controller
         }
     }
     //api:get/notificacionesVerificaciones
-    public function notificacionesVerificaciones(){
-        $query = DB::SELECT("SELECT
-            CONCAT(u.nombres,' ',u.apellidos) as asesor,
-            i.nombreInstitucion,
-            pe.region_idregion, c.nombre AS ciudad,
-            p.contrato_generado,p.fecha_solicita_verificacion,p.tipo_venta
-            FROM pedidos p
-            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-            WHERE p.estado = '1'
-            AND p.estado_verificacion ='1'
-            order by p.fecha_solicita_verificacion desc
-        ");
+    public function notificacionesVerificaciones(Request $request){
+        $idFacturador = $request->input("idFacturador",0);
+        $query = DB::table('pedidos as p')
+            ->select(
+                DB::raw("CONCAT(u.nombres, ' ', u.apellidos) AS asesor"),
+                'p.id_asesor',
+                'i.nombreInstitucion',
+                'pe.region_idregion',
+                'c.nombre AS ciudad',
+                'p.contrato_generado',
+                'p.fecha_solicita_verificacion',
+                'p.tipo_venta'
+            )
+            ->leftJoin('periodoescolar as pe', 'p.id_periodo', '=', 'pe.idperiodoescolar')
+            ->leftJoin('usuario as u', 'p.id_asesor', '=', 'u.idusuario')
+            ->leftJoin('institucion as i', 'p.id_institucion', '=', 'i.idInstitucion')
+            ->leftJoin('ciudad as c', 'i.ciudad_id', '=', 'c.idciudad')
+            ->where('p.estado', '1')
+            ->where('p.estado_verificacion', '1')
+            ->when($idFacturador, function ($query) use ($idFacturador) {
+                $query->whereExists(function ($subquery) use ($idFacturador){
+                    $subquery->select(DB::raw(1))
+                        ->from('pedidos_asesores_facturador')
+                        ->whereColumn('pedidos_asesores_facturador.id_asesor', 'p.id_asesor')
+                        ->where('pedidos_asesores_facturador.id_facturador', $idFacturador);
+                });
+            })
+            ->orderBy('p.fecha_solicita_verificacion', 'desc')
+            ->get();
+
+        return $query;
+        // $query = DB::SELECT("SELECT
+        //     CONCAT(u.nombres,' ',u.apellidos) as asesor,
+        //     i.nombreInstitucion,
+        //     pe.region_idregion, c.nombre AS ciudad,
+        //     p.contrato_generado,p.fecha_solicita_verificacion,p.tipo_venta
+        //     FROM pedidos p
+        //     LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        //     LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        //     LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        //     LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        //     WHERE p.estado = '1'
+        //     AND p.estado_verificacion ='1'
+        //     order by p.fecha_solicita_verificacion desc
+        // ");
         return $query;
     }
     //api para traer la trazabilidad de las verificaciones
@@ -1121,32 +1266,32 @@ class VerificacionControllerAnterior extends Controller
                 //====PROCESO GUARDAR EN FACTURACION=======
                 //obtener la fecha actual
                 $fechaActual  = date('Y-m-d');
-                try {
-                    //GUARDAR EN BASE DE DATOS
-                    $url      = "f_DetalleVerificacion/GetxVenCodigo_Ultimodet_ver_verificacion?ven_codigo=$contrato";
-                    $datos    = $this->FacturacionGet($url);
-                    $numeroVerificacion = 1;
-                    if(isset($datos[0]["status"])){
-                        $numeroVerificacion = 1;
-                    }else{
-                        $getDatos = $datos["ultimaverificacion"]["detVerVerificacion"];
-                        $numeroVerificacion = $getDatos +1;
-                    }
-                    foreach($data as $key => $item){
-                        $formData = [
-                            "proCodigo"             => $item->codigo,
-                            "venCodigo"             => $contrato,
-                            "detVerCantidad"        => $item->cantidad,
-                            "detVerVerificacion"    => $numeroVerificacion,
-                            "detVerFecha"           => $fechaActual
-                        ];
-                        $url2 = "f_DetalleVerificacion/CreateOrUpdateDetalleVerificacion";
-                        $process = $this->FacturacionPost($url2,$formData);
-                    }
+                // try {
+                //     //GUARDAR EN BASE DE DATOS
+                //     $url      = "f_DetalleVerificacion/GetxVenCodigo_Ultimodet_ver_verificacion?ven_codigo=$contrato";
+                //     $datos    = $this->FacturacionGet($url);
+                //     $numeroVerificacion = 1;
+                //     if(isset($datos[0]["status"])){
+                //         $numeroVerificacion = 1;
+                //     }else{
+                //         $getDatos = $datos["ultimaverificacion"]["detVerVerificacion"];
+                //         $numeroVerificacion = $getDatos +1;
+                //     }
+                //     foreach($data as $key => $item){
+                //         $formData = [
+                //             "proCodigo"             => $item->codigo,
+                //             "venCodigo"             => $contrato,
+                //             "detVerCantidad"        => $item->cantidad,
+                //             "detVerVerificacion"    => $numeroVerificacion,
+                //             "detVerFecha"           => $fechaActual
+                //         ];
+                //         $url2 = "f_DetalleVerificacion/CreateOrUpdateDetalleVerificacion";
+                //         $process = $this->FacturacionPost($url2,$formData);
+                //     }
 
-                } catch (\Exception  $ex) {
-                return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-                }
+                // } catch (\Exception  $ex) {
+                // return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+                // }
                 //verificar si es el primer contrato
                 $vericacionContrato = $this->getVerificacionXcontrato($contrato);
                 //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
@@ -1208,6 +1353,8 @@ class VerificacionControllerAnterior extends Controller
                     $this->guardarLiquidacion($data,$traerNumeroVerificacionInicial,$contrato);
                     //Para generar la siguiente verificacion y quede abierta
                     $this->saveVerificacion($traerNumeroVerificacionInicial+1,$contrato);
+                    //COLOCAR EL CAMPO datos_verificacion_por_ingresar EN ESTADO 1 PARA QUE SE EJECUTE Y SE GUARDE LOS VALORES
+                    $this->updateDatosVerificacionPorIngresar($contrato,1);
                 }
                 if($finVerificacion =="yes"){
                     return [
@@ -1226,6 +1373,7 @@ class VerificacionControllerAnterior extends Controller
             }
         }
     }
+
     ///TEST
     public function liquidacionTest($contrato){
         set_time_limit(6000000);

@@ -245,18 +245,20 @@ trait TraitVerificacionGeneral
         }
         return $datos;
     }
-    public function getPagos($contrato){
+    public function getPagosXInstitucionXPeriodo($institucion,$periodo){
         $query = DB::SELECT("SELECT lq.*
         FROM 1_4_documento_liq lq
-        WHERE lq.ven_codigo = '$contrato'
+        WHERE lq.institucion_id = '$institucion'
+        AND lq.periodo_id       = '$periodo'
         AND (lq.doc_ci like '%ANT%' OR lq.doc_ci like '%LIQ%')
-        AND lq.tip_pag_codigo > 0
+        AND lq.forma_pago_id > 0
+        AND lq.estado = '1'
         ");
         $totalClientes          = 0;
         $totalProlipaAumentar   = 0;
         $totalProlipaDisminuir  = 0;
         foreach($query as $key => $item){
-            if($item->tipo_aplicar == 2){
+            if($item->tipo_pago_id == 2){
                 //aumentar
                 if($item->calculo == 1){
                     $totalProlipaAumentar  = $totalProlipaAumentar + $item->doc_valor;

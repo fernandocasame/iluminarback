@@ -107,7 +107,7 @@ class ObsequioController extends Controller
                 if(count($getPedido) == 0){
                     return ["status" => "0","message" => "No se encontro el contrato en pedidos"];
                 }
-                $pedido             = $this->getPedidoXID($getPedido[0]->id_pedido);
+                $pedido             = $this->getPedido(0,$getPedido[0]->id_pedido);
                 $ven_descuento      = $pedido[0]->descuento;
                 $ven_anticipo       = $pedido[0]->anticipo_aprobado;
                 $verificaciones     = $this->getVerificaciones($contrato);

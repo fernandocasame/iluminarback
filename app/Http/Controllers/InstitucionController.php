@@ -128,7 +128,8 @@ class InstitucionController extends Controller
      */
     //api:get/institucionActiva
     public function institucionActiva(Request $request){
-        $validar = DB::SELECT("SELECT i.estado_idEstado AS estado FROM institucion i
+        $validar = DB::SELECT("SELECT i.estado_idEstado AS estado,u.nombres,u.apellidos FROM institucion i
+        LEFT JOIN usuario u ON i.asesor_id = u.idusuario
         WHERE i.idInstitucion = '$request->idInstitucion'
         ");
         return $validar;
@@ -143,6 +144,7 @@ class InstitucionController extends Controller
             'region_idregion' => 'required',
             'solicitudInstitucion' => 'required',
             'ciudad_id' => 'required',
+            // 'zona_id' => 'required', se debe quitar cuando la zona sea obligatoria
             'tipo_institucion' => 'required',
         ]);
         if(!empty($request->idInstitucion)){
@@ -182,6 +184,7 @@ class InstitucionController extends Controller
         $cambio->nombreInstitucion              = $request->nombreInstitucion;
         $cambio->direccionInstitucion           = $request->direccionInstitucion;
         $cambio->telefonoInstitucion            = $request->telefonoInstitucion;
+        $cambio->email                          = $request->email;
         $cambio->solicitudInstitucion           = $request->solicitudInstitucion;
         $cambio->codigo_institucion_milton      = $request->codigo_institucion_milton;
         $cambio->vendedorInstitucion            = $request->vendedorInstitucion;
@@ -191,8 +194,11 @@ class InstitucionController extends Controller
         $cambio->estado_idEstado                = $request->estado;
         $cambio->aplica_matricula               = $request->aplica_matricula;
         $cambio->punto_venta                    = $request->punto_venta;
+        $cambio->zona_id                        = $request->zona_id;
         $cambio->asesor_id                      = $request->asesor_id;
         $cambio->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
+        $cambio->evaluacion_personalizada       = $request->evaluacion_personalizada;
+        $cambio->cantidad_cambio_ventana_evaluacion     = $request->cantidad_cambio_ventana_evaluacion;
         $cambio->save();
         return $cambio;
     }
@@ -496,7 +502,7 @@ class InstitucionController extends Controller
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
             ic.estado as EstadoConfiguracion, ic.periodo_configurado,i.codigo_mitlon_coincidencias,
-            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales
+            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion
             FROM institucion i
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN region r ON i.region_idregion = r.idregion
@@ -513,7 +519,7 @@ class InstitucionController extends Controller
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
             ic.estado as EstadoConfiguracion, ic.periodo_configurado,i.codigo_mitlon_coincidencias,
-            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales
+            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion
             FROM institucion i
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN region r ON i.region_idregion = r.idregion
@@ -567,7 +573,8 @@ class InstitucionController extends Controller
                         "codigo_mitlon_coincidencias" => $item->codigo_mitlon_coincidencias,
                         "vendedorInstitucion"   => $item->vendedorInstitucion,
                         "iniciales"             => $item->iniciales,
-                        "region"                => $item->region_idregion
+                        "region"                => $item->region_idregion,
+                        "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion
                     ];
                 }else{
                     $datos[$key]=[
@@ -592,7 +599,8 @@ class InstitucionController extends Controller
                         "codigo_mitlon_coincidencias" => $item->codigo_mitlon_coincidencias,
                         "vendedorInstitucion"   => $item->vendedorInstitucion,
                         "iniciales"             => $item->iniciales,
-                        "region"                => $item->region_idregion
+                        "region"                => $item->region_idregion,
+                        "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion
                     ];
                 }
             }
@@ -646,7 +654,34 @@ class InstitucionController extends Controller
            AND c.estado <> '2'
            ORDER BY c.id DESC
             ");
-            return $todoAgenda;
+            if(count($todoAgenda) == 0){
+               return [];
+            }else{
+                $query = collect($todoAgenda);
+                $data  = $query->each(function($item,$key){
+                    if($item->estado_institucion_temporal == '1'){
+                        $item->userAsesor = $item->asesor;
+                    }else{
+                        $getInstitucion = Institucion::Where('idInstitucion',$item->institucion_id)->with('asesor')->get();
+                        if(count($getInstitucion) > 0){
+                            $item->userAsesor = $getInstitucion[0]->asesor->nombres." ".$getInstitucion[0]->asesor->apellidos;
+                        }else{
+                            $item->userAsesor = "";
+                        }
+                    }
+                })->chunk(10)->flatten();
+                return $data;
+            }
+        }
+        if($request->todasInstituciones){
+            $lista = Institucion::select('institucion.idInstitucion','institucion.nombreInstitucion','institucion.aplica_matricula','institucion.solicitudInstitucion','estado.nombreestado as estado','ciudad.nombre as ciudad','usuario.idusuario as asesor_id','usuario.nombres as nombre_asesor', 'usuario.apellidos as apellido_asesor', 'institucion.fecha_registro', 'region.nombreregion' )
+            ->leftjoin('ciudad','institucion.ciudad_id','=','ciudad.idciudad')
+            ->leftjoin('region','institucion.region_idregion','=','region.idregion')
+            ->leftjoin('usuario','institucion.vendedorInstitucion','=','usuario.cedula')
+            ->join('estado','institucion.estado_idEstado','=','estado.idEstado')
+            ->where('institucion.nombreInstitucion','like','%'.$request->busqueda.'%')
+            ->orderBy('institucion.fecha_registro','desc')
+            ->get();
         }
         else{
 
@@ -738,4 +773,20 @@ class InstitucionController extends Controller
             return [ 'dato'=>$dato, 'mensaje'=>'Datos registrados'];
         }
     }
+    //se debe habilitar cuando la zona sea obligatoria
+    // public function institucion_zona(Request $request)
+    // {
+    //    if($request->idInstitucion){        
+    //     $zonas = Institucion::findOrFail($request->idInstitucion);
+    //     $zonas->zona_id = $request->zona_id;
+    //    }else{
+    //         return "No se pudo guardar/actualizar";
+    //    }
+    //     $zonas->save();
+    //     if($zonas){
+    //        return $zonas;
+    //    }else{
+    //        return "No se pudo guardar/actualizar";
+    //    }
+    // }
 }

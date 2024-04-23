@@ -1011,19 +1011,20 @@ Route::get('series_formato_periodo/{periodo}','SeriesController@series_formato_p
 Route::get('get_pvp_planes_periodo/{periodo}','PedidosController@get_pvp_planes_periodo');
 Route::post('save_niveles_area_formato','PedidosController@save_niveles_area_formato');
 //api para traer los periodos que tienen cargado formato pedidos
-Route::get('cargarPeriodoFormatoPedidos','PedidosController@cargarPeriodoFormatoPedidos');
-Route::get('getAllPedidos','PedidosController@getAllPedidos');
-Route::get('get_pedidos_periodo/{periodo}','PedidosController@get_pedidos_periodo');
-Route::get('get_pedidos_periodo_facturador/{periodo}/{id_facturador}','PedidosController@get_pedidos_periodo_facturador');
-Route::get('get_pedidos_periodoxContrato/{contrato}','PedidosController@get_pedidos_periodo_contrato');
-Route::get('get_pedidos_periodo_Only_contrato/{contrato}/{beneficiario}','PedidosController@get_pedidos_periodo_Only_contrato');
-Route::get('get_pedidos_periodo_Only_pedido/{contrato}/{beneficiario}','PedidosController@get_pedidos_periodo_Only_pedido');
-Route::get('get_pedidos_asesor/{periodo}/{asesor}','PedidosController@get_pedidos_asesor');
-Route::post('guardarPedidoGuias','PedidosController@guardarPedidoGuias');
-Route::get('get_pedidos_guias','PedidosController@get_pedidos_guias');
-Route::get('getPedidosXAsesorXPeriodo','PedidosController@getPedidosXAsesorXPeriodo');
+Route::get('cargarPeriodoFormatoPedidos', 'PedidosController@cargarPeriodoFormatoPedidos');
+Route::get('getAllPedidos', 'PedidosController@getAllPedidos');
+Route::get('get_pedidos_periodo/{periodo}/{rol}/{usuario}', 'PedidosController@get_pedidos_periodo');
+Route::get('get_pedidos_periodo_facturador/{periodo}/{id_facturador}', 'PedidosController@get_pedidos_periodo_facturador');
+Route::get('get_pedidos_periodoxContrato/{contrato}', 'PedidosController@get_pedidos_periodo_contrato');
+Route::get('get_pedidos_periodo_Only_contrato/{contrato}/{beneficiario}', 'PedidosController@get_pedidos_periodo_Only_contrato');
+Route::get('get_pedidos_periodo_Only_pedido/{contrato}/{beneficiario}', 'PedidosController@get_pedidos_periodo_Only_pedido');
+Route::get('get_pedidos_asesor/{periodo}/{asesor}', 'PedidosController@get_pedidos_asesor');
+Route::post('guardarPedidoGuias', 'PedidosController@guardarPedidoGuias');
+Route::get('get_pedidos_guias', 'PedidosController@get_pedidos_guias');
+Route::get('getPedidosXAsesorXPeriodo', 'PedidosController@getPedidosXAsesorXPeriodo');
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
 Route::post('guardarAnticipoAprobadoContrato','PedidosController@guardarAnticipoAprobadoContrato');
+Route::post('updateThePedido','PedidosController@updateThePedido');
 //api para traer el pedido x id
 Route::get('getPedidoXID/{pedido}/','PedidosController@getPedidoXID');
 Route::get('anular_pedido_asesor/{id_pedido}/{id_usuario}/{contrato}','PedidosController@anular_pedido_asesor');
@@ -1032,7 +1033,7 @@ Route::post('guardar_comentario','PedidosController@guardar_comentario');
 Route::get('get_instituciones_asesor/{cedula}','PedidosController@get_instituciones_asesor');
 Route::get('get_responsables_pedidos','PedidosController@get_responsables_pedidos');
 Route::post('guardar_responsable_pedido','PedidosController@guardar_responsable_pedido');
-Route::get('guardar_total_pedido/{id_pedido}/{total_usd}/{total_unid}/{total_guia}/{total_serie_basicas}','PedidosController@guardar_total_pedido');
+Route::get('guardar_total_pedido/{id_pedido}/{total_usd}/{total_unid}/{total_guia}/{total_serie_basicas}/{anticipoSugerido}', 'PedidosController@guardar_total_pedido');
 Route::get('cargar_codigos_vendedores','PedidosController@cargar_codigos_vendedores');
 Route::get('cargar_codigo_institucion1','PedidosController@cargar_codigo_institucion1');
 Route::get('cargar_codigo_institucion','PedidosController@cargar_codigo_institucion');
@@ -1378,7 +1379,9 @@ Route::get('limpiarCache','TemporadaController@limpiarCache');
 //****API PARA DISTRIBUIDOR */
 Route::resource('distribuidor','DistribuidorController');
 ////APIS PAGOS======
-Route::resource('pedigo_Pagos','PedidosPagosController');
+Route::resource('pedigo_Pagos', 'PedidosPagosController');
+Route::post('eliminarPagos', 'PedidosPagosController@eliminarPagos');
+Route::post('editarDocumentoLiq','PedidosPagosController@editarDocumentoLiq');
 //APIS PAGOS
 //====APIS DESCUENTOS-----
 Route::post('saveDescuentosVerificacion', 'Verificacion\VerificacionDescuentoController@saveDescuentosVerificacion');
@@ -1392,3 +1395,5 @@ Route::group(['prefix' => 'pedidos2'], function () {
 ///FIN PEDIDOS UNIDO CON FACTURACION///
 //////codigo from historico
 Route::get('search_from_historic/{codigo}', 'CodigosLibrosController@codigos_from_historico');
+//INICIO PRODUCTO CLIENTE_INTITUCION
+Route::get('Get_Cliente_Institucionx3yearanterior', '_14ClienteInstitucionController@Get_Cliente_Institucionx3yearanterior');

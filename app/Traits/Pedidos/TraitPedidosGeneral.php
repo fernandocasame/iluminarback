@@ -3,6 +3,7 @@
 namespace App\Traits\Pedidos;
 
 use App\Models\Models\Pedidos\PedidosDocumentosLiq;
+use App\Models\Pedidos;
 use DB;
 use Illuminate\Support\Facades\Http;
 trait TraitPedidosGeneral
@@ -16,26 +17,73 @@ trait TraitPedidosGeneral
         $dato = Http::post("http://186.4.218.168:9095/api/".$endpoint,$data);
         return $JsonContrato = json_decode($dato, true);
     }
-    public function getPedidoXID($id_pedido){
-        $pedido = DB::SELECT("SELECT p.*, pe.periodoescolar as periodo,
-        pe.region_idregion as region, CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
-        u.cedula as cedula_asesor,
-        u.iniciales, i.nombreInstitucion,i.telefonoInstitucion,
-        i.direccionInstitucion, i.ruc, i.tipo_descripcion,
-        i.nivel, c.nombre AS nombre_ciudad, uf.cod_usuario,
-        CONCAT(uf.apellidos, ' ',uf.nombres) as facturador, ph.fecha_generar_contrato,
-        pe.codigo_contrato
-        FROM pedidos p
-        INNER JOIN usuario u ON p.id_asesor = u.idusuario
-        LEFT JOIN usuario uf ON p.id_usuario_verif = uf.idusuario
-        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        LEFT JOIN pedidos_historico ph ON p.id_pedido = ph.id_pedido
-        WHERE p.id_pedido = '$id_pedido'
-        LIMIT 1
-        ");
-        return $pedido;
+
+    public function getPedido($filtro,$parametro1=null,$parametro2=null){
+        $resultado = DB::table('pedidos as p')
+        ->select(DB::RAW('p.*,
+        i.nombreInstitucion,i.zona_id,i.codigo_institucion_milton, c.nombre AS nombre_ciudad,
+        CONCAT(u.nombres," ",u.apellidos) as responsable, CONCAT(u.nombres," ",u.apellidos) as asesor, u.cedula as cedula_asesor,u.iniciales,
+        ph.estado as historicoEstado,ph.evidencia_cheque,ph.evidencia_pagare,
+        IF(p.estado = 2,"Anulado","Activo") AS estadoPedido,
+        (SELECT f.id_facturador from pedidos_asesores_facturador
+        f where f.id_asesor = p.id_asesor  LIMIT 1) as id_facturador,
+        i.ruc,i.nivel,i.tipo_descripcion,i.direccionInstitucion,i.telefonoInstitucion,
+        (
+            SELECT SUM(pa.venta_bruta) AS contador_alcance
+            FROM pedidos_alcance pa
+            WHERE pa.id_pedido = p.id_pedido
+            AND pa.estado_alcance = "1"
+            AND pa.venta_bruta > 0
+        ) AS contador_alcance,
+        (
+            SELECT SUM(pa.total_unidades)  AS alcanceUnidades
+            FROM pedidos_alcance pa
+            WHERE pa.id_pedido = p.id_pedido
+            AND pa.estado_alcance = "1"
+            AND pa.venta_bruta > 0
+        ) AS alcanceUnidades,
+        (SELECT COUNT(*) FROM verificaciones v WHERE v.contrato = p.contrato_generado AND v.nuevo = "1" AND v.estado = "0") as verificaciones,
+        (
+            SELECT COUNT(a.id) AS contadorAlcanceAbierto
+            FROM pedidos_alcance a
+            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+            WHERE  a.id_pedido = p.id_pedido
+            AND a.estado_alcance  = "0"
+            AND ped.estado = "1"
+            AND a.venta_bruta > 0
+        ) as contadorAlcanceAbierto,
+        (
+            SELECT COUNT(a.id) AS contadorAlcanceCerrado
+            FROM pedidos_alcance a
+            LEFT JOIN pedidos ped ON ped.id_pedido = a.id_pedido
+            WHERE  a.id_pedido = p.id_pedido
+            AND a.estado_alcance  = "1"
+            AND ped.estado = "1"
+        ) as contadorAlcanceCerrado,
+        pe.periodoescolar as periodo,pe.codigo_contrato,
+        CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
+        i.region_idregion as region,uf.cod_usuario,
+        ph.fecha_generar_contrato,
+        (p.TotalVentaReal - ((p.TotalVentaReal * p.descuento)/100)) AS ven_neta,
+        (p.TotalVentaReal * p.descuento)/100 as valorDescuento
+        '))
+        ->leftjoin('usuario as u',          'p.id_asesor',          'u.idusuario')
+        ->leftjoin('usuario as uf',         'p.id_usuario_verif',   'uf.idusuario')
+        ->leftjoin('institucion as i',      'p.id_institucion',     'i.idInstitucion')
+        ->leftjoin('ciudad as c',           'i.ciudad_id',          'c.idciudad')
+        ->leftjoin('periodoescolar as pe',  'pe.idperiodoescolar',  'p.id_periodo')
+        ->leftjoin('pedidos_historico as ph','p.id_pedido',         'ph.id_pedido')
+        ->where('p.tipo','=','0');
+        //fitlro por x id
+        if($filtro == 0) { $resultado->where('p.id_pedido', '=', $parametro1); }
+        //filtro x periodo
+        if($filtro == 1) { $resultado->where('p.id_periodo','=',$parametro1)->where('p.estado','<>','0')->OrderBy('p.id_pedido','DESC'); }
+        //filtro por asesor
+        if($filtro == 2) { $resultado->where('p.id_periodo','=', $parametro1)->where('p.id_asesor','=',$parametro2)->OrderBy('p.id_pedido','DESC'); }
+        //filtro facturador no admin
+        if($filtro == 3) { $resultado->where('p.id_periodo','=', $parametro1)->where('p.id_asesor','=',$parametro2)->where('p.estado','<>','0')->OrderBy('p.id_pedido','DESC'); }
+        $consulta = $resultado->get();
+        return $consulta;
     }
     public function getVerificaciones($contrato){
         $query = DB::SELECT("SELECT * FROM verificaciones
@@ -85,9 +133,33 @@ trait TraitPedidosGeneral
         return $datos;
     }
     //CONVENIOS
-    public function updatePedido($contrato,$convenio_anios,$pedidos_convenios_id){
-        DB::table('pedidos')
-        ->where('contrato_generado',$contrato)
-        ->update(["convenio_anios" => $convenio_anios,"pedidos_convenios_id" => $pedidos_convenios_id]);
+    public function obtenerConvenioInstitucionPeriodo($institucion,$periodo_id){
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios c
+        WHERE c.institucion_id  = '$institucion'
+        AND c.periodo_id        = '$periodo_id'
+        AND (c.estado = '0' OR c.estado = '1')
+        ");
+        return $query;
+    }
+    public function getConvenioInstitucion($institucion){
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios c
+        WHERE c.institucion_id = '$institucion'
+        AND c.estado = '1'
+        ");
+        return $query;
+    }
+    public function updateDatosVerificacionPorIngresar($contrato,$estado){
+        $query = Pedidos::Where('contrato_generado','=',$contrato)->update(['datos_verificacion_por_ingresar' => $estado]);
+    }
+    //asesores que tiene pedidos
+    public function getAsesoresPedidos(){
+        $query = DB::SELECT("SELECT DISTINCT p.id_asesor,
+        CONCAT(u.nombres,' ',u.apellidos) as asesor
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        WHERE p.estado = '1'
+        ORDER BY u.nombres ASC
+        ");
+        return $query;
     }
 }

@@ -35,4 +35,8 @@ class Institucion extends Model implements Auditable
     {
         return $this->belongsTo(Ciudad::class, 'ciudad_id');
     }
+    public function asesor(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'asesor_id','idusuario');
+    }
 }

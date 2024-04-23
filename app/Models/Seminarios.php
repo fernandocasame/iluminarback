@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Seminarios extends Model
 {
@@ -30,6 +31,10 @@ class Seminarios extends Model
     public function institucion(): BelongsTo
     {
         return $this->belongsTo(Institucion::class, 'id_institucion');
+    }
+    public function temporal(): BelongsTo
+    {
+        return $this->belongsTo(SeguimientoInstitucionTemporal::class, 'institucion_temporal_id','institucion_id_temporal');
     }
 
     public function asesor(): BelongsTo
