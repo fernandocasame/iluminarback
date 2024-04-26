@@ -29,5 +29,9 @@ class AppServiceProvider extends ServiceProvider
         Validator::extend('custom_password', function ($attribute, $value, $parameters, $validator) {
             return Hash::check(md5($value), Auth::user()->password);
         });
+
+        Hash::extend('sha1md5', function($value, $options = []) {
+            return sha1(md5($value));
+        });
     }
 }
