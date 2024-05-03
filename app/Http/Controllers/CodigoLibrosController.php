@@ -71,7 +71,8 @@ class CodigoLibrosController extends Controller
                 $preValidate         = false;
                 //VALIDACION
                 if($id_group == 11) { $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado != 0) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
-                else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+                else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado != 0) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+                // else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
                 //===PROCESO===========
                 if($preValidate){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
@@ -158,7 +159,7 @@ class CodigoLibrosController extends Controller
                 'bc_estado'             => 2,
                 'bc_periodo'            => $traerPeriodo,
                 'bc_fecha_ingreso'      => $todate,
-                'venta_estado'          => $venta_estado
+                // 'venta_estado'          => $venta_estado
             ];
         }
         //si hay codigo de union lo actualizo
@@ -186,7 +187,8 @@ class CodigoLibrosController extends Controller
             $preValidate        = false;
             //VALIDACIO N
             if($id_group == 11) { $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado != 0) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
-            else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+            else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado != 0) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
+            // else{                 $preValidate = (($ifid_periodo  == $traerPeriodo || $ifid_periodo == 0 ||  $ifid_periodo == null  ||  $ifid_periodo == "") && ($ifBc_Institucion  == $institucion || $ifBc_Institucion == 0) && ($ifbc_periodo  == $traerPeriodo || $ifbc_periodo == 0) && ($ifventa_estado == 0 || $ifventa_estado == $venta_estado) && $ifLeido == '1' && $ifLiquidado == '1' && $ifBloqueado !=2); }
             //===PROCESO===========
             if($preValidate){
                 $unionCorrecto = true;
