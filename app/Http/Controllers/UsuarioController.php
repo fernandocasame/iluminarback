@@ -1387,7 +1387,7 @@ class UsuarioController extends Controller
         $asesoresInstituciones = DB::SELECT("SELECT
         CONCAT(u.nombres, ' ',u.apellidos ) AS asesor,u.cedula,u.name_usuario,
         u.nombres,u.apellidos, u.cargo_id,u.fecha_nacimiento,u.id_group, u.email,u.estado_idEstado,
-        u.institucion_idInstitucion,u.telefono,u.iniciales,u.idusuario,u.foto_user,
+        u.institucion_idInstitucion,u.telefono,u.iniciales,u.idusuario,u.foto_user,u.cli_ins_codigo,
         (
             SELECT COUNT(i.idInstitucion)
             FROM institucion i
