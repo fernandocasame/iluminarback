@@ -33,6 +33,9 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Hash::extend('sha1md5', function($value, $options = []) {
+            if (!is_string($value)) {
+                throw new InvalidArgumentException("El valor pasado a la función make() debe ser una cadena.");
+            }
             return sha1(md5($value));
         });
     }
