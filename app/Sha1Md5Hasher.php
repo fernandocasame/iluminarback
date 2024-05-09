@@ -4,9 +4,9 @@
 
 namespace App;
 
-use Illuminate\Hashing\Hasher;
+use Illuminate\Contracts\Hashing\Hasher as HasherContract;
 
-class Sha1Md5Hasher extends Hasher
+class Sha1Md5Hasher implements HasherContract
 {
     public function make($value, array $options = [])
     {
@@ -15,7 +15,7 @@ class Sha1Md5Hasher extends Hasher
 
     public function check($value, $hashedValue, array $options = [])
     {
-        return $this->make($value) === $hashedValue;
+        return $hashedValue === sha1(md5($value));
     }
 
     public function needsRehash($hashedValue, array $options = [])
