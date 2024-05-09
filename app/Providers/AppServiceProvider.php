@@ -16,7 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        //
+        $this->app->singleton('hash', function () {
+            return new \App\Sha1Md5Hasher;
+        });
     }
 
     /**
