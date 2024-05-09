@@ -69,7 +69,7 @@ return [
         'users' => [
             'driver' => 'eloquent',
             'model' => App\Models\User::class,
-            'hash' => 'sha1md5',
+            'hash' => false,
         ],
 
         // 'users' => [
