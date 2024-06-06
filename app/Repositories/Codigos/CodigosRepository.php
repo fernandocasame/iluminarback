@@ -1,6 +1,7 @@
 <?php
 namespace App\Repositories\Codigos;
 
+use App\Models\CodigosDevolucion;
 use App\Models\CodigosLibros;
 use App\Repositories\BaseRepository;
 use DB;
@@ -213,7 +214,76 @@ class  CodigosRepository extends BaseRepository
         }
         return $estadoIngreso;
     }
-
+    public function updateDevolucion($codigo,$codigo_union,$objectCodigoUnion,$request){
+        $withCodigoUnion = 1;
+        $estadoIngreso   = 0;
+        $unionCorrecto   = false;
+        ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
+        if($codigo_union == '0') $withCodigoUnion = 0;
+        else                     $withCodigoUnion = 1;
+        //si hay codigo de union lo actualizo
+        if($withCodigoUnion == 1){
+            //VALIDO SI NO EXISTE EL CODIGO DE UNION LO MANDO COMO ERROR
+            if(count($objectCodigoUnion) == 0){
+                //no se ingreso
+                return 2;
+            }
+            //validar si el codigo se encuentra liquidado
+            $ifLiquidado                = $objectCodigoUnion[0]->estado_liquidacion;
+            //para ver si es codigo regalado no este liquidado
+            $ifliquidado_regalado       = $objectCodigoUnion[0]->liquidado_regalado;
+            if($request->dLiquidado ==  '1'){
+                //VALIDACION AUNQUE ESTE LIQUIDADO
+                if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4')    $unionCorrecto = true;
+                else                                                                                            $unionCorrecto = false;
+            }else{
+                //VALIDACION QUE NO SEA LIQUIDADO
+                if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0')                $unionCorrecto = true;
+                else                                                                                            $unionCorrecto = false;
+            }
+            //==PROCESO====
+            if($unionCorrecto){
+                $codigoU = DB::table('codigoslibros')
+                ->where('codigo', '=', $codigo_union)
+                ->update([
+                    'estado_liquidacion'    => '3',
+                    'bc_estado'             => '1',
+                ]);
+                //si el codigo de union se actualiza actualizo el codigo
+                if($codigoU){
+                    //actualizar el primer codigo
+                    $codigo = DB::table('codigoslibros')
+                    ->where('codigo', '=', $codigo)
+                    ->update([
+                        'estado_liquidacion'    => '3',
+                        'bc_estado'             => '1',
+                    ]);
+                }
+            }else{
+                //no se ingreso
+                return 2;
+            }
+        }else{
+            //actualizar el primer codigo
+            $codigo = DB::table('codigoslibros')
+            ->where('codigo', '=', $codigo)
+            ->update([
+                'estado_liquidacion'    => '3',
+                'bc_estado'             => '1',
+            ]);
+        }
+        //con codigo union
+        ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
+        if($withCodigoUnion == 1){
+            if($codigo && $codigoU)  $estadoIngreso = 1;
+            else                     $estadoIngreso = 2;
+        }
+        //si no existe el codigo de union
+        if($withCodigoUnion == 0){
+            if($codigo)              $estadoIngreso = 1;
+        }
+        return $estadoIngreso;
+    }
     //SAVE CODIGOS
     public function save_Codigos($request,$item,$codigo,$prueba_diagnostica,$contador){
         $contadorIngreso                            = 0;
@@ -253,5 +323,16 @@ class  CodigosRepository extends BaseRepository
             ];
         }
 
+    }
+    public function saveDevolucion($codigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario){
+        $devolucion                     = new CodigosDevolucion();
+        $devolucion->codigo             = $codigo;
+        $devolucion->cliente            = $cliente;
+        $devolucion->institucion_id     = $institucion_id;
+        $devolucion->periodo_id         = $periodo_id;
+        $devolucion->fecha_devolucion   = $fecha;
+        $devolucion->observacion        = $observacion;
+        $devolucion->usuario_editor     = $id_usuario;
+        $devolucion->save();
     }
 }
