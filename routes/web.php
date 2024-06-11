@@ -1337,6 +1337,8 @@ Route::group(['prefix' => 'paquetes'],function(){
     Route::post('devolucion_paquete','PaqueteController@devolucion_paquete');
     Route::post('ingreso','PaqueteController@importPaqueteIngreso');
     Route::post('eliminar','PaqueteController@ImporteliminarPaquete');
+    Route::post('limpiar','PaqueteController@ImportLimpiarPaquete');
+    Route::post('bloquear','PaqueteController@ImportBloquearPaquete');
 });
 //=======FIN CODIGOS PAQUTES========================================
 // ====== BIBLIOTECA ====== //

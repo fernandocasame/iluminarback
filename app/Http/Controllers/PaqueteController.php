@@ -9,6 +9,7 @@ use App\Models\CodigosLibros;
 use App\Models\CodigosPaquete;
 use App\Models\HistoricoPaquetes;
 use App\Http\Controllers\Controller;
+use App\Models\Rol;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Codigos\PaquetesRepository;
@@ -650,8 +651,9 @@ class PaqueteController extends Controller
         //
     }
     public function PaqueteModificar(Request $request){
-      if($request->cleanPaquete) { return $this->cleanPaquete($request); }
+      if($request->cleanPaquete)    { return $this->cleanPaquete($request); }
       if($request->eliminarPaquete) { return $this->eliminarPaquete($request); }
+      if($request->bloquearPaquete) { return $this->bloquearPaquete($request); }
     }
     public function cleanPaquete($request){
         $arrayCodigos       = json_decode($request->data_codigos);
@@ -661,6 +663,9 @@ class PaqueteController extends Controller
         $usuario_editor     = $request->user_created;
         $periodo_id         = $request->periodo_id;
         $institucion_id     = 0;
+        if($codigo->estado == 2){
+            return ["status" => "0", "message" => "El paquete esta bloqueado"];
+        }
         //historico codigos
         foreach($arrayCodigos as $key => $item){
             $oldvalues = [];
@@ -692,7 +697,8 @@ class PaqueteController extends Controller
         $comentario         = $request->comentario;
         if($codigo->estado == 0){
             return ["status" => "1", "message" => "No se puede eliminar el paquete, ya fue utilizado"];
-        }else{
+        }
+        else{
             $codigo->delete();
             //guardar en historico
             $this->save_historico_paquetes([
@@ -702,6 +708,25 @@ class PaqueteController extends Controller
                 "old_values"        => json_encode($codigo)
             ]);
             return ["status" => "1", "message" => "Se elimino el paquete"];
+        }
+    }
+    public function bloquearPaquete($request){
+        $codigo             = CodigosPaquete::findOrFail($request->paquete);
+        $user_created       = $codigo->user_created;
+        $comentario         = $request->comentario;
+        if($codigo->estado == 0){
+            return ["status" => "1", "message" => "No se puede eliminar el paquete, ya fue utilizado"];
+        }else{
+            $codigo->estado = 2;
+            $codigo->save();
+            //guardar en historico
+            $this->save_historico_paquetes([
+                "codigo_paquete"    => $request->paquete,
+                "user_created"      => $user_created,
+                "observacion"       => $comentario,
+                "old_values"        => json_encode($codigo)
+            ]);
+            return ["status" => "1", "message" => "Se bloqueo el paquete"];
         }
     }
 
@@ -1195,14 +1220,16 @@ class PaqueteController extends Controller
         $codigosNoExisten       = [];
         $contadorNoExisten      = 0;
         $contadorNoEliminados   = 0;
+        $institucion_id         = 0;
         $observacion            = $request->observacion;
+        $periodo_id             = $request->periodo_id;
         foreach($codigos as $key => $item){
             $consulta = $this->getExistsPaquete($item->codigo);
             //si ya existe el codigo lo mando a un array
             if(count($consulta) > 0){
                $estadoPaquete = $consulta[0]->estado;
                //estado 0 => paquete utilizado; 1 => paquete no utilizado
-                if($estadoPaquete == 1){
+                if($estadoPaquete == 1 || $estadoPaquete == 2){
                     $codigos_libros = CodigosPaquete::findOrFail($item->codigo);
                     $codigos_libros->delete();
                     $porcentaje++;
@@ -1238,6 +1265,158 @@ class PaqueteController extends Controller
             "NoEliminados"          => $NoEliminados,
             "contadorNoExisten"     => $contadorNoExisten,
             "contadorNoEliminados"  => $contadorNoEliminados,
+        ];
+        return $data;
+    }
+    //api:post/paquetes/limpiar
+    public function ImportLimpiarPaquete(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        try{
+            //transaccion
+            DB::beginTransaction();
+            $codigos                = json_decode($request->data_codigos);
+            $id_usuario             = $request->id_usuario;
+            $NoEliminados           = [];
+            $porcentaje             = 0;
+            $contador               = 0;
+            $codigosNoExisten       = [];
+            $codigosBloqueados      = [];
+            $contadorNoExisten      = 0;
+            $contadorNoEliminados   = 0;
+            $contadorBloqueados     = 0;
+            $observacion            = $request->observacion;
+            $periodo_id             = $request->periodo_id;
+            $institucion_id         = 0;
+            foreach($codigos as $key => $item){
+                $consulta = $this->getExistsPaquete($item->codigo);
+                //si ya existe el codigo lo mando a un array
+                if(count($consulta) > 0){
+                    $estadoPaquete = $consulta[0]->estado;
+                    //si el estado es 0 es que el paquete esta utilizado
+                    if($estadoPaquete != 2){
+                        //estado 0 => paquete utilizado; 1 => paquete no utilizado; 2 => paquete bloqueado
+                        $arrayCodigos = codigoslibros::where('codigo_paquete', $item->codigo)->get();
+                        //historico codigos
+                        foreach($arrayCodigos as $key2 => $item2){
+                            $oldvalues = [];
+                            $oldvalues = CodigosLibros::where('codigo', $item2->codigo)->get();
+                            $comentario = $observacion."_".$item->codigo;
+                            $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $item2->codigo, $id_usuario, $comentario, $oldvalues[0], null);
+                        }
+                        //limpiar el paquete de los codigos
+                        codigoslibros::where('codigo_paquete', $item->codigo)->update([
+                            'codigo_paquete'         => null,
+                            'fecha_registro_paquete' => null,
+                        ]);
+                        $porcentaje++;
+                        //dejamos el paquete en estado abierto
+                        CodigosPaquete::Where('codigo',$item->codigo)
+                        ->update([
+                            'estado' => '1'
+                        ]);
+                        //guardar en historico
+                        $this->save_historico_paquetes([
+                            "codigo_paquete"    => $item->codigo,
+                            "user_created"      => $id_usuario,
+                            "observacion"       => $observacion,
+                            "old_values"        => json_encode($consulta[0])
+                        ]);
+                    }
+                    //paquetes bloqueados
+                    else{
+                        $codigosBloqueados[$contadorBloqueados] =[
+                            "codigo" => $item->codigo,
+                            "problema" => "Paquete bloqueado"
+                        ];
+                        $contadorBloqueados++;
+                    }
+                }
+                //paquete no existen
+                else{
+                    $codigosNoExisten[$contadorNoExisten] =[
+                        "codigo" => $item->codigo,
+                        "problema" => "No existe"
+                    ];
+                    $contadorNoExisten++;
+                }
+            }
+            $data = [
+                "porcentaje"            => $porcentaje,
+                "codigosNoExisten"      => $codigosNoExisten,
+                "NoEliminados"          => $NoEliminados,
+                "contadorNoExisten"     => $contadorNoExisten,
+                "contadorNoEliminados"  => $contadorNoEliminados,
+                "contadorBloqueados"    => $contadorBloqueados,
+                "codigosBloqueados"     => $codigosBloqueados
+            ];
+            DB::commit();
+            return $data;
+        }
+        catch(\Exception $ex){
+            DB::rollback();
+            return ["status" => "0", "message" => "Error al limpiar paquete", "error" => "error".$ex];
+        }
+
+    }
+    //api:post/paquetes/bloquear
+    public function ImportBloquearPaquete(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos                = json_decode($request->data_codigos);
+        $id_usuario             = $request->id_usuario;
+        $noBloqueados           = [];
+        $porcentaje             = 0;
+        $contador               = 0;
+        $codigosNoExisten       = [];
+        $contadorNoExisten      = 0;
+        $contadorBloqueados     = 0;
+        $institucion_id         = 0;
+        $observacion            = $request->observacion;
+        $periodo_id             = $request->periodo_id;
+        foreach($codigos as $key => $item){
+            $consulta = $this->getExistsPaquete($item->codigo);
+            //si ya existe el codigo lo mando a un array
+            if(count($consulta) > 0){
+               $estadoPaquete = $consulta[0]->estado;
+               //estado 0 => paquete utilizado; 1 => paquete no utilizado
+                if($estadoPaquete == 1 || $estadoPaquete == 2){
+                    $codigos_libros         = CodigosPaquete::findOrFail($item->codigo);
+                    $codigos_libros->estado = 2;
+                    $codigos_libros->save();
+                    $porcentaje++;
+                    //guardar en historico
+                    $this->save_historico_paquetes([
+                        "codigo_paquete"    => $item->codigo,
+                        "user_created"      => $id_usuario,
+                        "observacion"       => $observacion,
+                        "old_values"        => json_encode($consulta[0])
+                    ]);
+                }
+                //paquetes utilizados
+                else{
+                    $noBloqueados[$contadorBloqueados] =[
+                        "codigo" => $item->codigo,
+                        "problema" => "Paquete utilizado"
+                    ];
+                    $contadorBloqueados++;
+                }
+            }
+            //paquete no existen
+            else{
+                $codigosNoExisten[$contadorNoExisten] =[
+                    "codigo" => $item->codigo,
+                    "problema" => "No existe"
+                ];
+                $contadorNoExisten++;
+            }
+        }
+        $data = [
+            "porcentaje"            => $porcentaje,
+            "codigosNoExisten"      => $codigosNoExisten,
+            "noBloqueados"          => $noBloqueados,
+            "contadorNoExisten"     => $contadorNoExisten,
+            "contadorBloqueados"    => $contadorBloqueados,
         ];
         return $data;
     }
