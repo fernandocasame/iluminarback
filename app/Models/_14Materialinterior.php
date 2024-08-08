@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class _14Materialinterior extends Model
 {
     use HasFactory;
-    protected $table  = "1_4_material_interior";
+    protected $table  = "1_4_cal_material_interior";
 
     protected $primaryKey = 'mat_in_codigo';
     public $timestamps = false;

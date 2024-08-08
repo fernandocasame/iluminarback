@@ -14,6 +14,9 @@ use App\Models\Verificacion;
 use App\Models\VerificacionHasInstitucion;
 use App\Models\CodigosLibros;
 use App\Models\Models\Verificacion\VerificacionDescuentoDetalle;
+use App\Models\Pedidos;
+use App\Models\VerificacionHistoricoCambios;
+use App\Traits\Pedidos\TraitPedidosGeneral;
 use App\Traits\Verificacion\TraitVerificacionGeneral;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
 class TemporadaController extends Controller
 {
     use TraitVerificacionGeneral;
+    use TraitPedidosGeneral;
     /**
      * Display a listing of the resource.
      *
@@ -115,15 +119,6 @@ class TemporadaController extends Controller
              }
 
      }
-
-
-
-    //api para un formulario de prueba para  milton
-    public function crearliquidacion(Request $request){
-    //    $user = Auth::user();
-    //     return $user;
-         return view('testearapis.apitemporada');
-    }
     public function eliminarTemporada(Request $request){
         $id = $request->get('id_temporada');
         $temp = Temporada::findOrFail($id);
@@ -582,82 +577,6 @@ class TemporadaController extends Controller
         return $docente;
     }
 
-    //APIS NUEVAS CON BARCODE
-
-    //api de liquidacion para el sistema
-
-     //api de milton liquidacion
-     public function bliquidacionSistema(Request $request){
-
-            $institucion = $request->institucion_id;
-            $periodo     = $request->periodo_id;
-            $data = DB::select("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
-            c.libro_idlibro,c.libro as nombrelibro, i.nombreInstitucion ,
-            CONCAT(u.nombres, ' ', u.apellidos) AS asesor
-               FROM codigoslibros c
-               LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-               LEFT JOIN institucion i ON i.idInstitucion = c.bc_institucion
-               LEFT JOIN usuario u ON u.cedula = i.vendedorInstitucion
-               WHERE c.bc_estado = '2'
-               AND c.estado <> 2
-               AND c.bc_periodo  = '$periodo'
-               AND c.bc_institucion = '$institucion'
-               AND ls.idLibro = c.libro_idlibro
-               GROUP BY ls.codigo_liquidacion,c.libro, c.serie,c.libro_idlibro, u.nombres,u.apellidos
-            ");
-            return $data;
-    }
-
-
-    //api de milton liquidacion
-    public function bliquidacion_milton($contrato){
-
-        set_time_limit(0);
-        $buscarInstitucion= DB::SELECT("SELECT  * from temporadas
-         WHERE contrato = '$contrato'
-         AND estado = '1'
-        ");
-
-        if(count($buscarInstitucion) == 0){
-            return ["status"=>"0", "message" => "No se encontro el contrato"];
-        }else{
-            $institucion = $buscarInstitucion[0]->idInstitucion;
-             //verificar que el periodo exista
-             $verificarPeriodo = DB::select("SELECT t.contrato, t.id_periodo, p.idperiodoescolar
-             FROM temporadas t, periodoescolar p
-             WHERE t.id_periodo = p.idperiodoescolar
-             AND contrato = '$contrato'
-             ");
-             if(empty($verificarPeriodo)){
-                return ["status"=>"0", "message" => "No se encontro el periodo"];
-             }
-
-            //traer la liquidacion
-            else{
-                //almancenar el periodo
-                $periodo =  $verificarPeriodo[0]->idperiodoescolar;
-                //traer temporadas
-                $temporadas= $buscarInstitucion;
-
-                $data = DB::select("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.libro as nombrelibro
-                FROM codigoslibros c , libros_series ls
-                WHERE c.bc_estado = '2'
-                AND c.estado <> 2
-                AND bc_periodo  = '$periodo'
-                AND bc_institucion = '$institucion'
-                AND ls.idLibro = c.libro_idlibro
-                GROUP BY ls.codigo_liquidacion,c.libro
-
-            ");
-                if(count($data) >0){
-                    return ['temporada'=>$temporadas,'codigos_libros' => $data];
-                }else{
-                    return ["status"=>"0", "message" => "No se pudo cargar la informacion"];
-                }
-
-            }
-        }
-    }
     //GET/getAllRegalados/{institucion,$periodo}
     public function getAllRegalados($institucion,$periodo){
         $key = "getAllRegalados".$institucion.$periodo;
@@ -765,13 +684,21 @@ class TemporadaController extends Controller
         if (Cache::has($key)) {
            $devueltos = Cache::get($key);
         } else {
-            $devueltos = DB::SELECT("SELECT h.codigo_libro,h.devueltos_liquidados,
-                h.verificacion_liquidada,h.observacion,h.created_at
-                FROM hist_codlibros h
-                LEFT JOIN codigoslibros c ON h.codigo_libro = c.codigo
-                WHERE h.devueltos_liquidados = ?
-                AND c.prueba_diagnostica = '0'
-            ",[$contrato]);
+            //jorge dice que solo hay que mostrar el historico de los codigos que se han devuelto
+            // $devueltos = DB::SELECT("SELECT h.codigo_libro,h.devueltos_liquidados,
+            //     h.verificacion_liquidada,h.observacion,h.created_at
+            //     FROM hist_codlibros h
+            //     LEFT JOIN codigoslibros c ON h.codigo_libro = c.codigo
+            //     WHERE h.devueltos_liquidados = ?
+            //     AND c.prueba_diagnostica = '0'
+            //     AND c.contrato = ?
+            // ",[$contrato, $contrato]);
+            $devueltos = DB::SELECT("SELECT h.codigo_libro,h.devueltos_liquidados, h.verificacion_liquidada,h.observacion,h.created_at
+            FROM hist_codlibros h
+            LEFT JOIN codigoslibros c ON h.codigo_libro = c.codigo
+            WHERE h.devueltos_liquidados = ?
+            AND c.prueba_diagnostica = '0'
+        ",[$contrato]);
             Cache::put($key,$devueltos);
         }
         return $devueltos;
@@ -780,54 +707,38 @@ class TemporadaController extends Controller
         Cache::flush();
     }
     public function updateVentaReal(Request $request){
-        $verificacion = Verificacion::findOrFail($request->verificacion_id);
-        $totalDescuentoVenta = $verificacion->totalDescuentoVenta;
-        $totalVentaReal      = $request->venta_real;
-        $resultadoReal       = $totalVentaReal - ( $request->venta_real_regalado + $totalDescuentoVenta);
+        $verificacion           = Verificacion::findOrFail($request->verificacion_id);
+        $contrato               = $verificacion->contrato;
+        $totalVentaReal         = $request->venta_real;
+        // $resultadoReal       = $totalVentaReal - ( $request->venta_real_regalado + $totalDescuentoVenta);
         DB::table('verificaciones')
         ->where('id', $request->verificacion_id)
         ->update([
-            'venta_real'            => $resultadoReal,
+            'venta_real'            => $totalVentaReal,
             'venta_real_regalados'  => $request->venta_real_regalados,
         ]);
+        //sumar el total de la venta real
+        $getPedido = Pedidos::Where('contrato_generado','=',$contrato)->get();
+        if(count($getPedido) > 0){
+            $ventaReal = 0;
+            $id_pedido          = $getPedido[0]->id_pedido;
+            $verificaciones     = $this->getVerificaciones($contrato);
+            if(sizeOf($verificaciones) > 0){
+                foreach($verificaciones as $key2 => $item2){
+                    $ventaReal      = $ventaReal + $item2->venta_real;
+                }
+                Pedidos::where('id_pedido','=',$id_pedido)
+                ->update([
+                    'TotalVentaReal' => $ventaReal
+                ]);
+            }
+        }
+        //COLOCAR EL CAMPO datos_verificacion_por_ingresar EN ESTADO 0 PARA QUE YA SE EJECUTO Y SE GUARDO LOS VALORES
+        $this->updateDatosVerificacionPorIngresar($contrato,0);
     }
     public function updateVerificacion(Request $request){
-        // $campo  = $request->campo;
-        // $campo2 = $request->campo2;
-        // $campo3 = $request->campo3;
-        // $valor  = $request->valor;
-        // $valor2 = $request->valor2;
-        // $valor3 = $request->valor3;
-        // if($request->actualizarDosCampo){
-        //     DB::table('verificaciones')
-        //     ->where('id', $request->verificacion_id)
-        //     ->update([
-        //         $campo => $valor,
-        //         $campo2 => $valor2,
-        //     ]);
-        //     return "Se guardo correctamente";
-        // }
-        // if($request->actualizarTresCampo){
-        //     DB::table('verificaciones')
-        //     ->where('id', $request->verificacion_id)
-        //     ->update([
-        //         $campo => $valor,
-        //         $campo2 => $valor2,
-        //         $campo3 => $valor3,
-        //     ]);
-        //     return "Se guardo correctamente";
-        // }
-        // else{
-        //     $campo = $request->campo;
-        //     $valor = $request->valor;
-        //     DB::table('verificaciones')
-        //     ->where('id', $request->verificacion_id)
-        //     ->update([
-        //         $campo => $valor,
-        //     ]);
-        // } $verificacionId = $request->verificacion_id;
-
         $verificacionId = $request->verificacion_id;
+        $user_created   = $request->user_created;
         //CAMPOS
         $campo          = $request->campo;
         $campo2         = $request->campo2;
@@ -836,6 +747,7 @@ class TemporadaController extends Controller
         $campo5         = $request->campo5;
         $campo6         = $request->campo6;
         $campo7         = $request->campo7;
+        $campo8         = $request->campo8;
         //VALUES
         $valor          = $request->valor;
         $valor2         = $request->valor2;
@@ -844,6 +756,7 @@ class TemporadaController extends Controller
         $valor5         = $request->valor5;
         $valor6         = $request->valor6;
         $valor7         = $request->valor7;
+        $valor8         = $request->valor8;
         //format
         $dataToUpdate   = [];
         //PROCESS====
@@ -859,11 +772,48 @@ class TemporadaController extends Controller
             $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4 ,$campo5 ,$campo6, $campo7];
             $valuesToUpdate = [$valor, $valor2, $valor3, $valor4, $valor5, $valor6, $valor7];
         }
+        if($request->actualizarOchoCampo){
+            $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4 ,$campo5 ,$campo6, $campo7, $campo8];
+            $valuesToUpdate = [$valor, $valor2, $valor3, $valor4, $valor5, $valor6, $valor7, $valor8];
+        }
         $dataToUpdate   = array_merge($dataToUpdate, array_combine($fieldsToUpdate, $valuesToUpdate));
+        //PROCESO HISTORICO POR TOTAL VENTA
+        //guardar el total de venta en el historico esto sirva para tener el control cuando cambiar el valor total venta del reporte por verificacion
+        // if($campo8 == "totalVenta"){ $this->registrarHistoricoVerificacion($verificacionId,$user_created,$valor8); }
         DB::table('verificaciones')
             ->where('id', $verificacionId)
             ->update($dataToUpdate);
         return "Se guardó correctamente";
     }
-
+    public function registrarHistoricoVerificacion($verificacion_id,$user_created,$valor){
+        $valor                                      = sprintf("%.2f", $valor);
+        $verificacion                               = Verificacion::findOrFail($verificacion_id);
+        $totalVenta                                 = $verificacion->totalVenta;
+        //guardo si es cero
+        if($totalVenta == 0 || ($totalVenta != $valor)) {
+            $historico                              = new VerificacionHistoricoCambios();
+            // $historico->user_created                = $user_created;
+            $historico->verificacion_id             = $verificacion_id;
+            $historico->valor_anterior              = $totalVenta;
+            $historico->valor_nuevo                 = $valor;
+            //estado 0 => no verificado ;1 => verificado;
+            //si es ventatotal 0 coloco en estado 1 verificado
+            if($totalVenta == 0)                    { $historico->estado = 1; $historico->observacion = "Valor inicial"; }
+            $historico->save();
+        }
+    }
+    //api:post/aceptarCambioVerificacion
+    public function aceptarCambioVerificacion(Request $request){
+        $id                         = $request->id;
+        $historico                  =  VerificacionHistoricoCambios::findOrFail($id);
+        $historico->user_created    = $request->user_created;
+        $historico->observacion     = $request->observacion;
+        $historico->estado          = 1;
+        $historico->save();
+        if($historico){
+            return ["status" => "1", "message" => "Se guardo correctamente"];
+        }else{
+            return ["status" => "0", "message" => "No se guardo"];
+        }
+    }
 }

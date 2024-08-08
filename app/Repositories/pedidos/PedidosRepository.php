@@ -131,7 +131,7 @@ class  PedidosRepository extends BaseRepository
             $valores = [];
             //plan lector
             if($item->plan_lector > 0 ){
-                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,
+                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro, pro.pro_reservar,
                 (
                     SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -142,11 +142,12 @@ class  PedidosRepository extends BaseRepository
                 )as precio, ls.codigo_liquidacion,ls.version,ls.year
                 FROM libro l
                 left join libros_series ls  on ls.idLibro = l.idlibro
+                inner join 1_4_cal_producto pro on ls.codigo_liquidacion=pro.pro_codigo
                 WHERE l.idlibro = '$item->plan_lector'
                 ");
                 $valores = $getPlanlector;
             }else{
-                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,
+                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro, pro.pro_reservar,
                 (
                     SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -157,6 +158,7 @@ class  PedidosRepository extends BaseRepository
                 FROM libros_series ls
                 LEFT JOIN libro l ON ls.idLibro = l.idlibro
                 LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                inner join 1_4_cal_producto pro on ls.codigo_liquidacion=pro.pro_codigo
                 WHERE ls.id_serie = '$item->id_serie'
                 AND a.area_idarea  = '$item->id_area'
                 AND l.Estado_idEstado = '1'
@@ -167,7 +169,7 @@ class  PedidosRepository extends BaseRepository
                 $valores = $getLibros;
             }
             $datos[$contador] = (Object)[
-                "id"                => $item->id,
+                // "id"                => $item->id,
                 "id_pedido"         => $item->id_pedido,
                 "valor"             => $item->valor,
                 "id_area"           => $item->id_area,
@@ -184,18 +186,43 @@ class  PedidosRepository extends BaseRepository
                 "idlibro"           => $valores[0]->idlibro,
                 "nombrelibro"       => $valores[0]->nombrelibro,
                 "precio"            => $valores[0]->precio,
-                "subtotal"          => $item->valor * $valores[0]->precio,
+                "stock"             => $valores[0]->pro_reservar,
+                // "subtotal"          => $item->valor * $valores[0]->precio,
                 "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
                 "alcance"           => $item->alcance,
             ];
             $contador++;
         }
-        return $datos;
+        //si el codigo de liquidacion se repite sumar en el valor
+        // Crear un array asociativo para agrupar por codigo_liquidacion
+        $grouped = [];
+
+        foreach ($datos as $item) {
+            $codigo = $item->codigo_liquidacion;
+
+            if (!isset($grouped[$codigo])) {
+                $grouped[$codigo] = $item;
+            } else {
+                $grouped[$codigo]->valor += $item->valor;
+            }
+        }
+
+        // Convertir el array asociativo de nuevo a un array indexado
+        $result = array_values($grouped);
+        //subtotal
+        foreach($result as $key => $item){
+            $result[$key]->subtotal = $item->valor * $item->precio;
+        }
+        return $result;
     }
     public function obtenerAlcanceAbiertoXId($id){
         $query = DB::SELECT("SELECT * FROM pedidos_alcance a
         WHERE a.id = '$id'
         AND a.estado_alcance = '1'");
+        return $query;
+    }
+    public function stockReservaProducto($pro_codigo){
+        $query = DB::SELECT("SELECT pro_codigo,pro_reservar FROM 1_4_cal_producto WHERE pro_codigo = '$pro_codigo' ");
         return $query;
     }
 }

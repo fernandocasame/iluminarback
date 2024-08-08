@@ -65,6 +65,8 @@ class  PedidosPagosRepository extends BaseRepository
         if($tipo == 4)     { $pagos->porInstitucionYPeriodo($institucion,$periodo)->where('doc_codigo', '<>',$parametro1)->where($parametro2,'=',$parametro3);  }
         //dinamico igual 2 campos
         if($tipo == 5)     { $pagos->where($parametro1, '=',$parametro2)->where($parametro3,'=',$parametro4);  }
+        //los pagos de tipo y estado
+        if($tipo == 6)     { $pagos->where('tipo_pago_id',$parametro1)->where('estado',$parametro2); }
         if($ifPrint == 1){ return $pagos;}
         $resultado = $pagos->get();
         return $resultado;
@@ -100,7 +102,7 @@ class  PedidosPagosRepository extends BaseRepository
         if($request->id_pedido)                         { $documento->id_pedido      = $request->id_pedido; }
         if(isset($request->estado))                     { $documento->estado         = $request->estado; }
         $documento->ifAntAprobado                        = $request->ifAntAprobado;
-        // if($request->ifAntAprobado)                     { $documento->ifAntAprobado  = $request->ifAntAprobado; }
+        if($request->tipo_pago_id == 7)                 { $documento->campo_dinamico = $request->campo_dinamico; }
         $documento->save();
         $nuevodocumento                                 = PedidosDocumentosLiq::findOrFail($documento->doc_codigo);
         if($request->tipo_pago_id == 6)                 {  $this->updateDeuda($request->id_pedido); }
@@ -161,7 +163,7 @@ class  PedidosPagosRepository extends BaseRepository
     }
     //api:get>>/pedigo_Pagos?getVentaRealXAsesor=1&idAsesor=1&idPeriodo=1
     public function getVentaRealXAsesor($idusuario,$periodo){
-        $query = DB::SELECT("SELECT p.id_pedido, p.contrato_generado, p.TotalVentaReal
+        $query = DB::SELECT("SELECT p.id_pedido, p.contrato_generado, p.TotalVentaReal,p.total_venta
         FROM pedidos p
         WHERE p.id_asesor = ?
         AND p.tipo ='0'

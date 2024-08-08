@@ -12,4 +12,13 @@ trait TraitGuiasGeneral
         WHERE d.tdo_id = ?",[$id]);
         return $secuencia;
     }
+    public function tr_guiasXEstado($estado_entrega){
+        $query = DB::SELECT("SELECT p.id_pedido,p.ven_codigo,p.fecha_entrega_bodega
+        FROM pedidos p
+        WHERE p.tipo = '1'
+        AND p.estado= '1'
+        AND p.estado_entrega = ?
+        ",[$estado_entrega]);
+        return $query;
+    }
 }

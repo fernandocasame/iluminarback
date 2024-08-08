@@ -1645,4 +1645,17 @@ class UsuarioController extends Controller
         $usuario->save();
         return $usuario;
     }
+    public function buscarXCedula($cedula){
+        $dato = DB::table('usuario as u')
+        ->where('u.cedula','=',$cedula)
+        ->leftjoin('sys_group_users as gr','u.id_group','=','gr.id')
+        ->select('u.*','gr.level','gr.deskripsi')
+        ->get();
+        return $dato;
+    }
+
+    public function GetUsuarios_PerfilLibrerias(){
+        $query = DB::SELECT("SELECT u.*, CONCAT(u.nombres, ' ',u.apellidos,' - ', u.cedula) datosbusqueda FROM usuario u WHERE id_group = 33");
+        return $query;
+    }
 }

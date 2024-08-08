@@ -16,7 +16,7 @@ class f_tipo_documento extends Model
     protected $fillable = [
         'tdo_id',
         'tdo_nombre',
-        'tdo_secuencial',
+        'tdo_secuencial_calmed',
         'tdo_letra',
         'tdo_estado',
         'created_at',

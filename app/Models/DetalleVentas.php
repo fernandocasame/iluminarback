@@ -13,11 +13,10 @@ class DetalleVentas extends Model
     protected $fillable = [
         'det_ven_codigo',
         'ven_codigo',
+        'id_empresa',
         'pro_codigo',
         'det_ven_cantidad',
         'det_ven_valor_u',
-        'det_ven_iva',
-        'det_ven_descontar',
         'det_ven_cantidad_real',
     ];
 	public $timestamps = false;

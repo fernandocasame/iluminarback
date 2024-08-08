@@ -2082,4 +2082,17 @@ class CodigoLibrosController extends Controller
         ->where('codigo', '=', $codigo)
         ->update($datos);
     }
+    public function getCodigosPlanlectorLiquidadoRegalado(Request $request){
+        $query = DB::SELECT("SELECT c.libro_idlibro, ls.codigo_liquidacion, ls.nombre,
+            SUM(CASE WHEN c.estado_liquidacion = '2' AND c.liquidado_regalado = '1' AND c.prueba_diagnostica = '0' THEN 1 ELSE 0 END) AS codigos_regalado_liquidado,
+            SUM(CASE WHEN c.estado_liquidacion = '2' AND c.liquidado_regalado = '0' AND c.prueba_diagnostica = '0' THEN 1 ELSE 0 END) AS codigos_regalado,
+            SUM(CASE WHEN c.estado_liquidacion = '0' AND c.prueba_diagnostica = '0' AND c.prueba_diagnostica = '0' THEN 1 ELSE 0 END) AS codigos_liquidados
+            FROM codigoslibros c
+            LEFT JOIN libros_series ls ON c.libro_idlibro = ls.idLibro
+            LEFT JOIN series s ON ls.id_serie = s.id_serie
+            WHERE c.bc_periodo = '$request->periodo'
+            AND ls.id_serie = '6'
+            GROUP BY c.libro_idlibro, ls.nombre, ls.codigo_liquidacion;");
+        return $query;
+    }
 }

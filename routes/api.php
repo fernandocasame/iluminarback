@@ -29,5 +29,7 @@ Route::post('j_guardar_calificacion', [J_juegosController::class, 'j_guardar_cal
 Route::post('calificacion_estudiante', [J_juegosController::class, 'calificacion_estudiante']);
 Route::get('estudiante_sopa/{id}', [EstudianteController::class, 'show']);
 
-
-
+///=======PERSEO=========
+require_once "others/perseo/PerseoRouter.php";
+////ACORTADORES==
+Route::get('verDataLink/{codigo}', 'LinkAcortadorController@verDataLink');

@@ -606,6 +606,16 @@ class LibroController extends Controller
         }
        return $libros;
     }
+    public function getLibroP(){
+        $libros = DB::SELECT("SELECT l.*, a.nombreasignatura as asignatura,
+        ls.iniciales, ls.codigo_liquidacion, ls.year, ls.version, s.id_serie, s.nombre_serie,ls.nombre
+        FROM libro l
+        LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
+        LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
+        LEFT JOIN series s ON s.id_serie = ls.id_serie
+        ORDER  BY l.nombrelibro  asc");
+        return $libros;
+    }
     //para traer los libros del docente
     public function getLibrosDocente($docente){
         $consulta = DB::SELECT("SELECT l.*, ad.periodo_id

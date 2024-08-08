@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class OrdenTrabajo extends Model
 {
     use HasFactory;
-    protected $table = '1_4_orden_trabajo';
+    protected $table = '1_1_orden_trabajo';
 	
 
     protected $primaryKey = 'or_codigo';
@@ -20,6 +20,10 @@ class OrdenTrabajo extends Model
         'or_fecha', 
         'prov_codigo',
         'or_estado',
-        'or_observacion',        
+        'or_empresa',        
+        'or_observacion',
+        'or_aprobacion',
+        'or_solicitado',
+        'or_elaborado',      
     ];
 }

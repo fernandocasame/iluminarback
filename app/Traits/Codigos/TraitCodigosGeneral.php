@@ -15,6 +15,17 @@ trait TraitCodigosGeneral{
         }
         return $randomString;
     }
+    public function makeidNumbers($longitud){
+        $characters = ['0','2','3','4','5','6','7','8','9'];
+        shuffle($characters);
+        $charactersLength = count($characters);
+        $randomString = '';
+        for ($i = 0; $i < $longitud; $i++) {
+            $pos_rand = rand(0, ($charactersLength-1));
+            $randomString .= $characters[$pos_rand];
+        }
+        return $randomString;
+    }
     public function getCodigosVerificaciones($codigo){
         $consulta = DB::SELECT("SELECT
         c.venta_lista_institucion,

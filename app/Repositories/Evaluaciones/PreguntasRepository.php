@@ -677,7 +677,28 @@ class  PreguntasRepository extends BaseRepository
         $preguntas = EvaluacionInstitucionAsignada::where('institucion_id', $institucion_id)->where('estado', '1')->get();
         return $preguntas;
     }
-    //====PREGUNTAS X INSTITUCION
+    public function preguntasInstitucionesAsignatura($institucion_id,$id_asignatura){
+        $preguntas      = [];
+        $preguntas = EvaluacionInstitucionAsignada::query()
+        ->select( DB::RAW("CONCAT(ed.nombres, ' ', ed.apellidos) as editor"),'pa.id AS idAsignado', 'pa.created_at', 'pa.pregunta_id',
+        'ti.nombre_tipo', 'ti.descripcion_tipo', 'p.id', 'p.id_tema', 'p.descripcion', 'p.img_pregunta',
+        'p.id_tipo_pregunta', 'p.puntaje_pregunta', 'te.nombre_tema', 'p.idusuario','te.unidad')
+        ->from('institucion_evaluacion_asignada as pa')
+        ->leftjoin('preguntas as p', 'pa.pregunta_id', '=', 'p.id')
+        ->leftjoin('tipos_preguntas as ti', 'p.id_tipo_pregunta', '=', 'ti.id_tipo_pregunta')
+        ->leftjoin('temas as te', 'p.id_tema', '=', 'te.id')
+        ->leftjoin('usuario as u', 'p.idusuario', '=', 'u.idusuario')
+        ->leftjoin('usuario as ed','pa.user_created','=','ed.idusuario')
+        ->where('pa.institucion_id', $institucion_id)
+        ->where('pa.estado', '1')
+        ->where('p.estado', 1)
+        ->where('u.id_group', 1)
+        ->where('te.id_asignatura', $id_asignatura)
+        ->orderByDesc('p.descripcion')
+        ->get();
+        return $preguntas;
+    }
+    //====PREGUNTAS X INSTITUCION y por asignatura
     public function preguntasInstitucionesAsignadas($request){
         $institucion_id = $request->institucion_id;
         $preguntas      = [];

@@ -13,6 +13,7 @@ class Institucion extends Model implements Auditable
     protected $table = "institucion";
     protected $primaryKey = 'idInstitucion';
     protected $fillable = [
+        'ruc',
         'nombreInstitucion',
         'telefonoInstitucion',
         'direccionInstitucion',
@@ -27,7 +28,8 @@ class Institucion extends Model implements Auditable
         'ideditor',
         'periodoescolar',
         'updated_at',
-        'created_at'
+        'created_at',
+        'email',
     ];
     public $timestamps = false;
 
@@ -38,5 +40,9 @@ class Institucion extends Model implements Auditable
     public function asesor(): BelongsTo
     {
         return $this->belongsTo(Usuario::class, 'asesor_id','idusuario');
+    }
+    public function representante(): BelongsTo
+    {
+        return $this->belongsTo(Usuario::class, 'idrepresentante','idusuario');
     }
 }

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class _14MaterialCubierta extends Model
 {
     use HasFactory;
-    protected $table  = "1_4_material_cubierta";
+    protected $table  = "1_4_cal_material_cubierta";
 
     protected $primaryKey = 'mat_cub_codigo';
     public $timestamps = false;

@@ -12,4 +12,7 @@ class Pedidos extends Model
     {
         return $query->where('id_pedido', $id_pedido)->update($datos);
     }
+    public function scopeUltimoConvenio($query,$idConvenio){
+        return $query->where('pedidos_convenios_id', $idConvenio)->orderBy('id_pedido', 'desc')->where('estado','1')->get();
+    }
 }

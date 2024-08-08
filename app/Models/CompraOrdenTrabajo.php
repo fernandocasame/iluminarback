@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class CompraOrdenTrabajo extends Model
 {
     use HasFactory;
-    protected $table = "1_4_compra";
+    protected $table = "1_4_cal_compra";
 
     protected $primaryKey = 'com_codigo';
     public $timestamps = false;
@@ -22,8 +22,11 @@ class CompraOrdenTrabajo extends Model
         'com_responsable',
         'com_observacion',
         'com_iva',
+        'com_empresa',
         'com_descuento',
-        'orden_trabajo'
+        'orden_trabajo',
+        'user_created',
+        'updated_at',
        
     ];
 }

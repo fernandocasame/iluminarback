@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class DetalleOrdenTrabajo extends Model
 {
     use HasFactory;
-     protected $table  ='1_4_detalle_orden_trabajo';
+     protected $table  ='1_1_detalle_orden_trabajo';
 
     protected $primaryKey = 'det_or_codigo';
     public $timestamps = false;

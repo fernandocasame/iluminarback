@@ -55,6 +55,8 @@ class _14EmpresaController extends Controller
         $dato->estado                   = $request->estado;
         $dato->tipo                     = $request->tipo;
         $dato->secuencial               = $request->secuencial;
+        $dato->facturas                 = $request->facturas;
+        $dato->notas                    = $request->notas;
         if($request->img_base64 != '' || $request->img_base64 != null){
             $dato->img_base64 = $request->img_base64;
         }

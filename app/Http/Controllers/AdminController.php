@@ -7,20 +7,26 @@ use App\Models\tipoJuegos;
 use App\Models\J_juegos;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use App\Models\_14Producto;
 use App\Models\CodigosLibros;
 use App\Models\CuotasPorCobrar;
 use App\Models\EstudianteMatriculado;
 use App\Models\HistoricoCodigos;
+use App\Models\Institucion;
 use App\Models\Libro;
+use App\Models\Models\Pedidos\PedidosDocumentosLiq;
 use App\Models\Models\Verificacion\VerificacionDescuento;
 use App\Models\Models\Verificacion\VerificacionDescuentoDetalle;
 use App\Models\PedidoAlcance;
 use App\Models\PedidoAlcanceHistorico;
+use App\Models\PedidoConvenio;
 use App\Models\PedidoDocumentoDocente;
+use App\Models\Pedidos;
 use App\Models\RepresentanteEconomico;
 use App\Models\RepresentanteLegal;
 use App\Models\SeminarioCapacitador;
 use App\Models\Temporada;
+use App\Models\User;
 use App\Models\Usuario;
 use App\Models\Verificacion;
 use DB;
@@ -31,6 +37,9 @@ use stdClass;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use App\Traits\Verificacion\TraitVerificacionGeneral;
+use PDO;
+use Symfony\Component\Process\Exception\ProcessFailedException;
+use Symfony\Component\Process\Process;
 
 class AdminController extends Controller
 {
@@ -110,8 +119,13 @@ class AdminController extends Controller
             set_time_limit(6000000);
             ini_set('max_execution_time', 6000000);
             $datos=[];
-            $periodo  = $request->periodo_id;
-            $anio = date("Y");
+            //anterior
+            $periodo                = $request->periodo_idUno;
+            //despues
+            $periodo2               = $request->periodo_idDos;
+            $codigosContrato        = $request->codigoC;
+            $codigoContratoComparar = $request->codigoC2;
+            if($codigosContrato == null || $codigoContratoComparar == null){ return ["status" => "0", "message" => "No hay codigo de periodo"]; }
             //obtener los vendedores que tienen pedidos
             $query = DB::SELECT("SELECT DISTINCT p.id_asesor ,
             CONCAT(u.nombres, ' ', u.apellidos) AS asesor, u.cedula,u.iniciales
@@ -121,162 +135,117 @@ class AdminController extends Controller
             AND p.id_asesor <> '6698'
             AND u.id_group = '11'
             ");
+            $datos = [];
             foreach($query as $keyP => $itemP){
                 //asesores
                 $teran = ["OT","OAT"];
                 $galo  = ["EZ","EZP"];
-                //buscar el codigo periodo
-                $search = DB::SELECT("SELECT * FROM periodoescolar pe
-                WHERE pe.idperiodoescolar = '$periodo'
-                ");
-                //buscar las iniciales asesor
-                $search2 = DB::SELECT("SELECT  u.iniciales FROM usuario  u
-                WHERE u.idusuario = '$itemP->id_asesor'
-                ");
-
-                if(empty($search) || empty($search2) ){
-                    return ["status" => "0","message" => "No hay codigo de periodo o no hay codigo de asesor"];
-                }
                 //VARIABLES
-                $codPeriodo = $search[0]->codigo_contrato;
-                $iniciales = $search2[0]->iniciales;
-                $region    = $search[0]->region_idregion;
-                //BUSCAR EL PERIODO ANTERIOR
-                $anio = date("Y");
-                $menosUno = "";
-                if($region == 1){
-                    $menosUno = "S".substr(($anio-1),-2);
-                }else{
-                    $menosUno = "C".substr(($anio-1),-2);
-                }
-
+                $iniciales  = $itemP->iniciales;
                 //ASESORES QUE TIENE MAS DE UNA INICIAL
-                $valores     = [];
-                $arrayAsesor = [];
-                $JsonEnviar  = [];
+                $valores            = [];
+                $valores2           = [];
+                $arrayAsesor        = [];
+                $JsonDespues        = [];
+                $JsonAntes          = [];
+                $contratosDespues   = [];
+                $arraySinContrato   = [];
+                $ventaBrutaActual   = 0;
+                $ven_neta_actual    = 0;
+                //==========CONTRATOS===================
                 if($iniciales == 'OT' || $iniciales == 'EZ'){
                     if($iniciales == 'OT') $arrayAsesor = $teran;
                     if($iniciales == 'EZ') $arrayAsesor = $galo;
                     foreach($arrayAsesor as $key => $item){
-                        $test = Http::get('http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$item.'&periodo=C-'.$codPeriodo);
-                        $json = json_decode($test, true);
-                    $valores[$key] = $json;
+                        //PERIODO DESPUES
+                        $json      = $this->getContratos($itemP->id_asesor,$item,$periodo2,$codigoContratoComparar);
+                        //PERIODO ANTES
+                        $json2      = $this->getContratos($itemP->id_asesor,$item,$periodo,$codigosContrato);
+                        $valores[$key]  = $json;
+                        $valores2[$key] = $json2;
                     }
-                    $setearArray =  array_merge(...$valores);
-                    $JsonEnviar = array_unique($setearArray,SORT_REGULAR);
+                    // return array_values($valores2);
+                    $JsonDespues         =  array_merge($valores[0], $valores[1]);
+                    $JsonAntes           =  array_merge($valores2[0], $valores2[1]);
                 }else{
-                    $test = Http::get('http://186.4.218.168:9095/api/f_ClienteInstitucion/Get_contratounificado?codasesor='.$iniciales.'&periodo=C-'.$codPeriodo);
-                    $json = json_decode($test, true);
-                    $JsonEnviar = $json;
+                     //PERIODO DESPUES
+                    $JsonDespues        = $this->getContratos($itemP->id_asesor,$iniciales,$periodo2,$codigoContratoComparar);
+                     //PERIODO ANTES
+                    $JsonAntes          = $this->getContratos($itemP->id_asesor,$iniciales,$periodo,$codigosContrato);
                 }
-                //Función para filtrar los no convertidos
-                $resultado = array_filter($JsonEnviar, function($p) {
-                    return $p["estVenCodigo"] != 3 && !str_starts_with($p["venConvertido"] , 'C');
-                    // print_r($p );
-                });
-                $renderSet = array_values($resultado);
-                //enviar valores
-                $dataFinally = array();
-                $contador = 0;
-                foreach($renderSet as $key => $item){
-                    //variables
-                    $venValor = $renderSet[$contador]["venValor"];
-                    $descuento = $renderSet[$contador]["venDescuento"];
-                    //proceso
-                    $obj = new stdClass();
-                    $obj->VEN_VALOR = $venValor;
-                    $obj->ven_neta =  ( $venValor - (($venValor * $descuento)/100));
-                    $obj->contrato = $renderSet[$contador]["venCodigo"];
-                    $obj->insNombre = $renderSet[$contador]["insNombre"];
-                    $obj->ciuNombre = $renderSet[$contador]["ciuNombre"];
-                    $obj->anticipo_aprobado =  $renderSet[$contador]["venAnticipo"];
-                    array_push($dataFinally,$obj);
-                    $contador++;
+                //==========SIN CONTRATOS===================
+                $getSinContrato = $this->getSinContratoProlipa($itemP->id_asesor,$periodo);
+                if(empty($getSinContrato)){
+                    $ventaBrutaActual = 0;
+                    $ven_neta_actual  = 0;
+                }else{
+                    $ventaBrutaActual = $getSinContrato[0]->ventaBrutaActual;
+                    $ven_neta_actual  = $getSinContrato[0]->ven_neta_actual;
                 }
-                //===SIN CONTRATOS ===
-                $query = DB::SELECT("SELECT SUM(p.total_venta)  as ventaBrutaActual,
-                SUM(( p.total_venta - ((p.total_venta * p.descuento)/100))) AS ven_neta_actual
-                FROM pedidos p
-                WHERE p.id_asesor = '$itemP->id_asesor'
-                AND p.id_periodo = '$periodo'
-                AND p.contrato_generado IS NULL
-                AND p.estado = '1'
-                ");
-                $arraySinContrato = [];
-                $ventaBrutaActual = $query[0]->ventaBrutaActual;
-                $ven_neta_actual  = $query[0]->ven_neta_actual;
                 $arraySinContrato[0] = [
                     "ventaBrutaActual"      => $ventaBrutaActual == null ? '0' :$ventaBrutaActual,
                     "ven_neta_actual"       => $ven_neta_actual  == null ? '0' :$ven_neta_actual,
                 ];
-                //traer la data de los pedidios en prolipa con facturacion
-                $datosContratos = [];
-                $contador = 0;
-                foreach($dataFinally as $key => $item){
-                    $pedido = DB::SELECT("SELECT p.*, ph.estado as historicoEstado
-                    FROM pedidos p
-                    LEFT JOIN pedidos_historico  ph ON p.id_pedido = ph.id_pedido
-                    WHERE p.contrato_generado = '$item->contrato'
-                    ");
-                    if(empty($pedido)){
-                        $datosContratos[$contador] = [
-                            "VEN_VALOR"         => $item->VEN_VALOR,
-                            "ven_neta"          => $item->ven_neta,
-                            "contrato"          => $item->contrato,
-                            "insNombre"         => $item->insNombre,
-                            "ciuNombre"         => $item->ciuNombre,
-                            "anticipo_aprobado" => $item->anticipo_aprobado,
-                            //prolipa
-                            "id_pedido"         => null,
-                        ];
-                    }else{
-                        $datosContratos[$contador] = [
-                            "VEN_VALOR"         => $item->VEN_VALOR,
-                            "ven_neta"          => $item->ven_neta,
-                            "contrato"          => $item->contrato,
-                            "insNombre"         => $item->insNombre,
-                            "ciuNombre"         => $item->ciuNombre,
-                            "anticipo_aprobado" => $item->anticipo_aprobado,
-                            "id_pedido"         => $pedido[0]->id_pedido,
-                            "id_periodo"        => $pedido[0]->id_periodo,
-                            "contrato_generado" => $pedido[0]->contrato_generado,
-                            "tipo_venta"        => $pedido[0]->tipo_venta,
-                            "estado"            => $pedido[0]->estado,
-                            "historicoEstado"   => $pedido[0]->historicoEstado,
-                        ];
-                    }
-                    $contador++;
-                }
-                $contratosEnviar = [
-                    "contratos"     => $datosContratos,
-                    "sin_contratos" => $arraySinContrato
+                //SEND ARRAY
+                $contratosDespues = [
+                    "contratos"             => $JsonDespues,
+                    "sin_contratos"         => $arraySinContrato
                 ];
-                //====VENTA ANTERIOR======/
-                //VENTA BRUTA ANTERIOR
-                    $queryMenosUno = DB::SELECT("SELECT   t.VEN_VALOR,t.PERIODO,
-                    ( t.VEN_VALOR - ((t.VEN_VALOR * t.VEN_DESCUENTO)/100)) AS ven_neta
-                    FROM temp_reporte t
-                    WHERE t.VEN_D_CI = '$itemP->cedula'
-                    AND t.PERIODO = '$menosUno'
-                ");
-                // return [
-                //     "contratos"     => $datosContratos,
-                //     "sin_contratos" => $arraySinContrato
-                // ];
                 $datos[$keyP] = [
                     "id_asesor"             => $itemP->id_asesor,
                     "asesor"                => $itemP->asesor,
                     "iniciales"             => $itemP->iniciales,
                     "cedula"                => $itemP->cedula,
-                    "contratosEnviar"       => $contratosEnviar,
-                    "MenosUno"              => $queryMenosUno,
-                ];
-
+                    "ContratosDespues"      => $contratosDespues,
+                    "ContratosAnterior"     => $JsonAntes,
+                 ];
             }//FIN FOR EACH ASESORES
             return $datos;
             } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex->getMessage()];
         }
+    }
+    public function getContratos($id_asesor,$iniciales,$periodo,$codigoContrato=null){
+        if($periodo > 21){  return $this->getContratosAsesorProlipa($id_asesor,$periodo); }
+        else             {  return $this->getContratosFueraProlipa($iniciales,$codigoContrato); }
+    }
+    public function getContratosAsesorProlipa($id_asesor,$periodo){
+        $query = DB::SELECT("SELECT p.TotalVentaReal as VEN_VALOR, pe.codigo_contrato as PERIODO,
+            (p.TotalVentaReal - ((p.TotalVentaReal * p.descuento)/100)) AS ven_neta,
+            p.contrato_generado as contrato,
+            NULL AS ven_convertido
+        FROM pedidos p
+        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        WHERE p.id_asesor = ?
+            AND p.tipo = '0'
+            AND p.estado = '1'
+            AND p.id_periodo = ?
+        ", [$id_asesor, $periodo]);
+        return $query;
+    }
+    public function getContratosFueraProlipa($iniciales,$periodo){
+        $query = DB::SELECT("SELECT l.ven_valor as VEN_VALOR,
+        ( l.ven_valor - ((l.ven_valor * l.ven_descuento)/100)) AS ven_neta,
+        l.ven_codigo,l.ven_convertido,
+        SUBSTRING(l.ven_codigo, 3, 3) AS PERIODO
+        FROM 1_4_venta l
+        WHERE l.ven_d_codigo = ?
+        AND l.ven_codigo LIKE CONCAT('%C-', ?, '%')
+        AND l.est_ven_codigo <> '3'
+        -- AND l.ven_convertido IS NULL
+        ", [$iniciales,$periodo]);
+        return $query;
+    }
+    public function getSinContratoProlipa($id_asesor,$periodo){
+        $getSinContrato = DB::SELECT("SELECT SUM(p.total_venta)  as ventaBrutaActual,
+        SUM(( p.total_venta - ((p.total_venta * p.descuento)/100))) AS ven_neta_actual
+        FROM pedidos p
+        WHERE p.id_asesor = ?
+        AND p.id_periodo = ?
+        AND p.contrato_generado IS NULL
+        AND p.estado = '1'
+        ", [$id_asesor, $periodo]);
+        return $getSinContrato;
     }
     public function UpdateCodigo($codigo,$union,$TipoVenta){
         if($TipoVenta == 1){
@@ -329,31 +298,78 @@ class AdminController extends Controller
         );
         return strtr($texto, $tildes);
     }
+    public function get_geolocation($apiKey, $ip, $lang = "en", $fields = "*", $excludes = "") {
+        $url = "https://api.ipgeolocation.io/ipgeo?apiKey=".$apiKey."&ip=".$ip."&lang=".$lang."&fields=".$fields."&excludes=".$excludes;
+        $cURL = curl_init();
+
+        curl_setopt($cURL, CURLOPT_URL, $url);
+        curl_setopt($cURL, CURLOPT_HTTPGET, true);
+        curl_setopt($cURL, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($cURL, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'User-Agent: '.$_SERVER['HTTP_USER_AGENT']
+        ));
+
+        return curl_exec($cURL);
+    }
     public function pruebaData(Request $request){
-        return "xd23222";
-        $query = DB::SELECT("SELECT DISTINCT v.*, t.id_periodo
-        FROM verificaciones v , temporadas t,pedidos_formato f
-        WHERE v.contrato = t.contrato
-        and  v.estado = '0'
-        AND v.venta_real = 0
-        AND t.id_periodo = f.id_periodo
-        LIMIT 100
-        ");
-        $contador = 0;
-        foreach($query as $key => $item){
-            $idVerificacion = 0;
-            $idVerificacion = $item->id;
-            $query2 = $this->FormatoLibrosLiquidados($item->num_verificacion,$item->contrato,$item->id_periodo);
-            $ventaReal = 0;
-            foreach($query2 as $key => $item){
-                $ventaReal = $ventaReal + $item->valor;
-            }
-            $verificacion = Verificacion::findOrFail($idVerificacion);
-            $verificacion->venta_real  = $ventaReal;
-            $verificacion->save();
-            if($verificacion){  $contador++; }
+
+
+
+        // $password                           = sha1(md5($request->cedula));
+        // $user                               = new User();
+        // $user->cedula                       = $request->cedula;
+        // $user->nombres                      = $request->nombres;
+        // $user->apellidos                    = $request->apellidos;
+        // $user->name_usuario                 = $request->email;
+        // $user->password                     = $password;
+        // $user->email                        = $request->email;
+        // $user->id_group                     = $request->id_grupo;
+        // $user->institucion_idInstitucion    = $request->institucion;
+        // $user->estado_idEstado              = 1;
+        // $user->idcreadorusuario             = $request->user_created;
+        // $user->telefono                     = $request->telefono;
+        // $user->save();
+        return;
+        // $clientIP = \Request::getClientIp(true);
+        // // $clientIP =  $request->ip();
+        // $apiKey = "aba8c348cd6d4d14af6af2294f04d356";
+        // // $ip = "186.4.218.168";
+        // $ip = $clientIP;
+        // $location = $this->get_geolocation($apiKey, $ip);
+        // $decodedLocation = json_decode($location, true);
+
+        // echo "<pre>";
+        // print_r($decodedLocation);
+        // echo "</pre>";
+
+        // return;
+        $formData = [
+            "api_key" => "RfVaC9hIMhn49J4jSq2_I_.QLazmDGrbZQ8o8ePUEcU-"
+        ];
+        $data           = Http::post('http://190.12.43.171:8181/api/consulta_provincias',$formData);
+        $datos          = json_decode($data, true);
+        return $datos;
+
+        // $tracerouteOutput = $this->runSystemCommand('traceroute 190.12.43.171');
+        // $telnetOutput = $this->runSystemCommand('telnet 190.12.43.171 443');
+
+        // return response()->json([
+        //     'traceroute' => $tracerouteOutput,
+        //     'telnet' => $telnetOutput,
+        // ]);
+    }
+    private function runSystemCommand($command)
+    {
+        $process = new Process(explode(' ', $command));
+        $process->run();
+
+        if (!$process->isSuccessful()) {
+            throw new ProcessFailedException($process);
         }
-        return "Se guardo $contador veces";
+
+        return $process->getOutput();
     }
     public function saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,$tipo){
         //vadidate that it's not exists
@@ -481,74 +497,116 @@ class AdminController extends Controller
 
     public function guardarData(Request $request){
         set_time_limit(6000);
-        ini_set('max_execution_time', 6000);
-        //pasar los capacitadores
-        $query = DB::SELECT("SELECT * FROM seminarios s
-        WHERE s.tipo_webinar = '2'
-        AND s.capacitador_id IS NOT NULL
-        and s.estado = '1'
-        ");
-        $contador = 0;
-        foreach($query as $key => $item){
-            //validar que el no este registrado
-            $validate = DB::SELECT("SELECT * FROM seminarios_capacitador
-            WHERE seminario_id = '$item->id_seminario'
-            AND idusuario = '$item->capacitador_id'");
-            if(empty($validate)){
-                $capacitador = new SeminarioCapacitador();
-                $capacitador->idusuario      = $item->capacitador_id;
-                $capacitador->seminario_id   = $item->id_seminario;
-                $capacitador->save();
-                $contador++;
-            }
+        ini_set('max_execution_time', 600000);
+        $contadorSolinfaGONZALEZ = 0;
+        $contadorSolinfaCOBACANGO= 0;
+        $resultsGonzales = DB::connection('mysql2')->select('SELECT * FROM product p
+         WHERE p.id_perseo_gonzales IS NULL
+        limit 90');
+        $resultsCobacango = DB::connection('mysql2')->select('SELECT * FROM product p
+        WHERE p.id_perseo_cobacango IS NULL
+        limit 90');
+        //GONZALES
+        foreach($resultsGonzales as $key => $item){
+                $formData = [
+                    "productocodigo"=> $item->barcode,
+                ];
+                $url                        = "productos_consulta";
+                $processSolinfa             = $this->tr_SolinfaPost($url, $formData,1);
+                $getContador                = $this->guardarIdProductoSolinfa($processSolinfa,$item->barcode,"id_perseo_gonzales");
+                $contadorSolinfaGONZALEZ    = $contadorSolinfaGONZALEZ + $getContador;
         }
-        return "Se guardo $contador";
-        // $query = DB::SELECT("SELECT * FROM temporadas t
-        // WHERE t.temporal_institucion IS NULL
-        // AND t.year = '2023'
-        // AND t.id_periodo <> '20'
-        // and t.estado  = '1'
-        // ");
-        // $contador = 0;
-        // foreach($query as $key => $item){
-        //     $contrato = $item->contrato;
-        //     //validar que el contrato exista en pedidos
-        //     $validate = DB::SELECT("SELECT p.id_periodo, p.id_institucion,p.id_asesor,
-        //     pe.periodoescolar as periodo,
-        //         CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
-        //         u.cedula AS cedulaAsesor,
-        //         CONCAT(ur.nombres, ' ', ur.apellidos) AS nombreDocente,
-        //         ur.cedula AS cedulaDocente,
-        //         i.nombreInstitucion, c.nombre AS ciudad,
-        //         SUBSTRING(pe.codigo_contrato, 1,1 ) AS temporada
-        //         FROM pedidos p
-        //         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-        //         LEFT JOIN usuario ur ON p.id_responsable = ur.idusuario
-        //         LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        //         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        //         LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        //         WHERE contrato_generado = '$contrato'
-        //         and p.estado = '1'
-        //         LIMIT 1
+        //COBACANGO
+        foreach($resultsCobacango as $key => $item){
+            $formData = [
+                "productocodigo"=> $item->barcode,
+            ];
+            $url                        = "productos_consulta";
+            $processSolinfa             = $this->tr_SolinfaPost($url, $formData,2);
+            $getContador                = $this->guardarIdProductoSolinfa($processSolinfa,$item->barcode,"id_perseo_cobacango");
+            $contadorSolinfaCOBACANGO    = $contadorSolinfaCOBACANGO + $getContador;
+        }
+        return ["contadorSolinfaGONZALEZ" => $contadorSolinfaGONZALEZ, "contadorSolinfaCOBACANGO" => $contadorSolinfaCOBACANGO];
+        // try {
+        //     $contadorProlipa = 0;
+        //     $contadorCalmed  = 0;
+        //     //PROLIPA
+        //     $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+        //     WHERE p.id_perseo_prolipa_produccion IS NULL
+        //     LIMIT 90
         //     ");
-        //     if(sizeOf($validate) > 0){
-
-        //         $id_institucion     = $validate[0]->id_institucion;
-        //         $asesor_id          = $validate[0]->id_asesor;
-        //         $temporada          = $validate[0]->temporada;
-        //         $periodo            = $validate[0]->id_periodo;
-        //         $ciudad             = $validate[0]->ciudad;
-        //         $asesor             = $validate[0]->asesor;
-        //         $cedulaAsesor       = $validate[0]->cedulaAsesor;
-        //         $nombreDocente      = $validate[0]->nombreDocente;
-        //         $cedulaDocente      = $validate[0]->cedulaDocente;
-        //         $nombreInstitucion  = $validate[0]->nombreInstitucion;
-        //         $this->guardarContratoTemporada($contrato,$id_institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
-        //         $contador ++;
+        //     foreach($queryProlipa as $key => $item){
+        //         $formData = [
+        //             "productocodigo"=> $item->pro_codigo,
+        //         ];
+        //         $url                = "productos_consulta";
+        //         $processProlipa     = $this->tr_PerseoPost($url, $formData,1);
+        //         $getContador        = $this->guardarIdProducto($processProlipa,$item->pro_codigo,"id_perseo_prolipa_produccion");
+        //         //contadorProlipa + getContador
+        //         $contadorProlipa    = $contadorProlipa + $getContador;
         //     }
-
+        //     //CALMED
+        //     $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+        //     WHERE p.id_perseo_calmed_produccion IS NULL
+        //     LIMIT 100
+        //     ");
+        //     foreach($queryCalmed as $key => $item){
+        //         $formData = [
+        //             "productocodigo"=> $item->pro_codigo,
+        //         ];
+        //         $url                = "productos_consulta";
+        //         $processCalmed      = $this->tr_PerseoPost($url, $formData,3);
+        //         $getContador        = $this->guardarIdProducto($processCalmed,$item->pro_codigo,"id_perseo_calmed_produccion");
+        //         //contadorCalmed + getContador
+        //         $contadorCalmed     = $contadorCalmed + $getContador;
+        //     }
+        //     return ["contadorProlipa" => $contadorProlipa,"contadorCalmed" => $contadorCalmed];
+        // } catch (\Exception $e) {
+        //     return response()->json([
+        //         'error' => $e->getMessage()
+        //     ], 500);
         // }
-        // return "se guardo $contador correctamente";
+    }
+    public function guardarIdProducto($process,$pro_codigo,$campoPerseo){
+        $contador = 0;
+        $datos    = [];
+        if(isset($process["productos"])){
+            $idPerseo = $process["productos"][0]["productosid"];
+            $datos = [ $campoPerseo => $idPerseo ];
+            $contador = 1;
+        }else{
+            $datos = [ $campoPerseo => 0 ];
+            $contador = 0;
+        }
+        DB::table('1_4_cal_producto')
+        ->where('pro_codigo',$pro_codigo)
+        ->update($datos);
+        return $contador;
+    }
+    public function guardarIdProductoSolinfa($process,$pro_codigo,$campoPerseo){
+        $contador = 0;
+        $datos    = [];
+        if(isset($process["productos"])){
+            $idPerseo = $process["productos"][0]["productosid"];
+            $datos = [ $campoPerseo => $idPerseo ];
+            $contador = 1;
+        }else{
+            $datos = [ $campoPerseo => 0 ];
+            $contador = 0;
+        }
+        DB::connection('mysql2')
+            ->table('product')
+            ->where('barcode', $pro_codigo)
+            ->update($datos);
+        return $contador;
+    }
+    public function hijosConvenio($idConvenio){
+        $query = DB::SELECT("SELECT * FROM 1_4_documento_liq l
+        WHERE l.pedidos_convenios_id = ?
+        AND l.estado = '1'
+        AND l.tipo_pago_id = '4'
+        ",[$idConvenio]);
+        return $query;
     }
     public function crearCapacitadores($request,$arreglo){
         $datos = json_decode($request->capacitadores);
@@ -744,7 +802,10 @@ class AdminController extends Controller
         $asesores = DB::SELECT("SELECT `idusuario`, CONCAT(`nombres`,' ',`apellidos`) AS nombres, `cedula` FROM `usuario` WHERE `estado_idEstado` = '1' AND `id_group` = '5';");
         return $asesores;
     }
-
+    public function get_asesor(){
+        $asesores = DB::SELECT("SELECT `idusuario`, `iniciales`, CONCAT(`nombres`,' ',`apellidos`) AS nombres, `cedula` FROM `usuario` WHERE `estado_idEstado` = '1' AND `id_group` = '11';");
+        return $asesores;
+    }
     public function reporte_asesores(){
 
         $fecha_fin    = date("Y-m-d");
@@ -858,6 +919,34 @@ class AdminController extends Controller
         return $visitas;
 
     }
+    //api:get/>>https://apitest.prolipadigital.com.ec/producto_reserva/SM1/5
+    public function producto_reserva($producto,$cantidad){
+        return $this->updateProducto($producto,$cantidad,"pro_reservar");
+    }
+    //api:get/>>https://apitest.prolipadigital.com.ec/producto_factura_prolipa/SM1/6
+    public function producto_factura_prolipa($producto,$cantidad){
+        return $this->updateProducto($producto,$cantidad,"pro_stock");
+    }
+    //api:get/>>https://apitest.prolipadigital.com.ec/producto_nota_prolipa/SM1/7
+    public function producto_nota_prolipa($producto,$cantidad){
+        return $this->updateProducto($producto,$cantidad,"pro_deposito");
+    }
+    //api:get/>>https://apitest.prolipadigital.com.ec/producto_factura_calmed/SM1/8
+    public function producto_factura_calmed($producto,$cantidad){
+        return $this->updateProducto($producto,$cantidad,"pro_stockCalmed");
+    }
+     //api:get/>>https://apitest.prolipadigital.com.ec/producto_nota_calmed/SM1/9
+     public function producto_nota_calmed($producto,$cantidad){
+        return $this->updateProducto($producto,$cantidad,"pro_depositoCalmed");
+    }
 
 
+
+    public function updateProducto($producto,$cantidad,$parametro1){
+        DB::table('1_4_cal_producto')
+        ->where("pro_codigo",$producto)
+        ->update([$parametro1 => $cantidad]);
+        $resultado =_14Producto::where('pro_codigo',$producto)->get();
+        return $resultado;
+    }
 }

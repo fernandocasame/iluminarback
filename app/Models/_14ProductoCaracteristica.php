@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class _14ProductoCaracteristica extends Model
 {
     use HasFactory;
-    protected $table = '1_4_producto_caracteristica';
+    protected $table = '1_4_cal_producto_caracteristica';
 
     protected $primaryKey = 'pro_car_codigo';
     public $timestamps = false;
