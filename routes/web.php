@@ -1093,6 +1093,7 @@ Route::get('anular_pedido_asesor/{id_pedido}/{id_usuario}/{contrato}','PedidosCo
 Route::get('get_comentarios_pedido/{pedido}','PedidosController@get_comentarios_pedido');
 Route::post('guardar_comentario','PedidosController@guardar_comentario');
 Route::get('get_instituciones_asesor/{cedula}','PedidosController@get_instituciones_asesor');
+Route::get('get_instituciones_asesorXId/{idinstitucion}','PedidosController@get_instituciones_asesorXId');
 Route::get('get_responsables_pedidos','PedidosController@get_responsables_pedidos');
 Route::post('guardar_responsable_pedido','PedidosController@guardar_responsable_pedido');
 Route::get('guardar_total_pedido/{id_pedido}/{total_usd}/{total_unid}/{total_guia}/{total_serie_basicas}/{anticipoSugerido}', 'PedidosController@guardar_total_pedido');
