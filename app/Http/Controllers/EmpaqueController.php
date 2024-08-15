@@ -68,7 +68,8 @@ class EmpaqueController extends Controller
         inner join empresas em on em.id=re.remi_idempresa
         LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
         where re.remi_estado=1 and e.empa_estado=1 and e.idempresa=re.remi_idempresa
-        group by re.remi_codigo, re.remi_idempresa, e.empa_codigo ");
+        group by re.remi_codigo, re.remi_idempresa, e.empa_codigo 
+        order by  e.empa_fecha");
         return $query;
     }
 
@@ -266,14 +267,12 @@ class EmpaqueController extends Controller
                 $remision->remi_pagado = $request->remi_pagado;
                 $remision->updated_at = now();
                 $remision->save();
-                echo $remision;
                 // VENTA ESTADO
                 $venta = Ventas::where('ven_codigo', $request->empa_facturas)
                 ->where('id_empresa', $request->remi_idempresa)
                 ->firstOrFail();
                 $venta->est_ven_codigo=$request->estado;
                 $venta->save();
-                echo $venta;
                 //EMPACADO
                 $emp                = _1_4_Empacado::where('empa_codigo',  $request->id_emp)
                 ->where('remi_codigo', $request->remi_codigo)
@@ -284,7 +283,6 @@ class EmpaqueController extends Controller
                 $emp->updated_at        = now();
                 // $emp->tipo              = $request->tipo;
                 $emp->save();
-                echo $emp;
                 EmpaqueDetalle::where('empa_codigo', $request->id_emp)
                 ->where('idempresa', $request->remi_idempresa)
                 ->delete();
@@ -305,9 +303,9 @@ class EmpaqueController extends Controller
                     }
                 }
             DB::commit();
-            return response()->json(['message' => 'Empaque creado con éxito',"data" => $remision], 200);
+            return response()->json(['message' => 'Empaque editado con éxito',"data" => $remision], 200);
         }catch(\Exception $e){
-            return response()->json(['message' => 'Error al crear el empaque'.$e], 500);
+            return response()->json(['message' => 'Error al editar el empaque'.$e], 500);
             DB::rollback();
         }
     }
@@ -324,7 +322,7 @@ class EmpaqueController extends Controller
                 $remision->updated_at = now();
                 $remision->remi_estado= 0;
                 $remision->save();
-                $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)->firstOrFail();
+                $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)->where('id_empresa', $request->remi_idempresa)->firstOrFail();
                 $emp->updated_at        = now();
                 $emp->empa_estado       = 0;
                 $emp->save();

@@ -1002,9 +1002,11 @@ Route::post('guardarValorPedidoLibrosObsequios', 'PedidosController@guardarValor
 Route::post('eliminarPedidoLibrosObsequios', 'PedidosController@eliminarPedidoLibrosObsequios');
 Route::post('eliminarRegistroDetallePedidoLibro', 'PedidosController@eliminarRegistroDetallePedidoLibro');
 Route::post('AceptarLibrosObsequios', 'PedidosController@AceptarLibrosObsequios');
+Route::post('AceptarLibrosObsequiosFacturador', 'PedidosController@AceptarLibrosObsequiosFacturador');
 Route::post('changeEstadoPedidoLibrosObsequios', 'PedidosController@changeEstadoPedidoLibrosObsequios');
 Route::post('CambiarEstadoLibrosObsequios', 'PedidosController@CambiarEstadoLibrosObsequios');
 Route::post('Acta_LibrosObsequios_Registrar_modificar', 'PedidosController@Acta_LibrosObsequios_Registrar_modificar');
+Route::post('AnularLibrosObsequios', 'PedidosController@AnularLibrosObsequios');
 
 //codigos plan lector liquidados y regalados
 Route::get('getCodigosPlanlectorLiquidadoRegalado', 'CodigoLibrosController@getCodigosPlanlectorLiquidadoRegalado');
@@ -1016,6 +1018,7 @@ Route::post('abono_registro', 'AbonoController@abono_registro');
 Route::post('eliminarAbono', 'AbonoController@eliminarAbono');
 Route::post('cobro_cheque_registro', 'AbonoController@cobro_cheque_registro');
 Route::get('get_facturasNotasxParametro', 'AbonoController@get_facturasNotasxParametro');
+Route::get('getClienteCobranzaxInstitucion', 'AbonoController@getClienteCobranzaxInstitucion');
 //FIN ABONO
 //CUENTA DE BANCO
 Route::post('cuenta_registro', 'BancoController@cuenta_registro');
@@ -1032,7 +1035,7 @@ Route::get('GetCuentasBanco', 'BancoController@GetCuentasBanco');
 Route::post('PostRegistrar_modificar_Banco', 'BancoController@PostRegistrar_modificar_Banco');
 //FIN BANCOS
 //COBRANZAS
-Route::get('InstitucionesXCobranzas', 'InstitucionController@InstitucionesXCobranzas');
+Route::get('InstitucionesXCobranzas', 'AbonoController@InstitucionesXCobranzas');
 Route::get('GetCuentasAll', 'BancoController@GetCuentasAll');
 //FIN COBRANZAS
 //CHEQUE

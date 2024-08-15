@@ -240,9 +240,9 @@ class PedidosController extends Controller
             if( !$asesor[0]->cli_ins_codigo ){
                 return response()->json(['pedido' => '', 'error' => 'Faltan el cli_ins_codigo para pedir guias en el asesor']);
             }
-            if( !$institucion[0]->codigo_institucion_milton ){
-                return response()->json(['pedido' => '', 'error' => 'Falta el código de la institución, revise si el codigo de la ciudad es correcto.']);
-            }
+            // if( !$institucion[0]->codigo_institucion_milton ){
+            //     return response()->json(['pedido' => '', 'error' => 'Falta el código de la institución, revise si el codigo de la ciudad es correcto.']);
+            // }
             if( $request->id_pedido ){
                 //validar que si el pedido ya se entrego no se pueda modificar o crear nuevos valores
                 $validate = DB::SELECT("SELECT * FROM pedidos p
@@ -3735,6 +3735,8 @@ class PedidosController extends Controller
     }
     //api:post/AceptarAlcance
     public function AceptarAlcance(Request $request){
+        //LIMPIAR CACHE cache::flush();
+        Cache::flush();
         $contrato       = $request->contrato;
         $id_pedido      = $request->id_pedido;
         $id_alcance     = $request->id_alcance;
@@ -3935,7 +3937,7 @@ class PedidosController extends Controller
             WHERE ped.id_periodo = '$request->periodo'
             AND ped.estado = '1'
             GROUP BY ped.contrato_generado, ins.nombreInstitucion;");
-        return $query;    
+        return $query;
         // foreach ($periodos as $key => $item) {
         //     // Obtener contador de alcances pendientes (estado_alcance = '0')
         //     $queryPendientes = DB::select("
@@ -3947,7 +3949,7 @@ class PedidosController extends Controller
         //         AND ped.id_periodo = '$item->idperiodoescolar'
         //     ");
         //     $periodos[$key]->contadorAlcancePendiente = $queryPendientes[0]->contadorAlcancePendiente;
-    
+
         //     // Obtener contador de alcances finalizados (estado_alcance = '1')
         //     $queryFinalizados = DB::select("
         //         SELECT COUNT(a.id) AS contadorAlcanceFinalizado
@@ -5291,6 +5293,7 @@ class PedidosController extends Controller
         return $val_pedido;
     }
     public function changeEstadoPedidoLibrosObsequios(Request $request){
+        Cache::flush();
         $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
         $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
         $pedidoLibroObsequio->save();
@@ -5312,6 +5315,84 @@ class PedidosController extends Controller
             return ["status" => "1", "message" => "Se envio correctamente"];
         }else{
             return ["status" => "0", "message" => "No se pudo enviar"];
+        }
+    }
+    public function AnularLibrosObsequios(Request $request) {
+        // Iniciar transacción
+        DB::beginTransaction();
+        
+        try {
+            // Encontrar el pedido de libro obsequio
+            $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
+            
+            // Actualizar el estado del pedido de libro obsequio
+            $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
+            $pedidoLibroObsequio->save();
+            
+            // Buscar todas las ventas asociadas en la tabla F_venta
+            $ventas = DB::table('f_venta')
+                        ->where('ven_p_libros_obsequios', $request->id)
+                        ->get();
+            
+            if ($ventas->isEmpty()) {
+                throw new \Exception('No se encontraron ventas asociadas');
+            }
+            
+            // Iterar sobre todas las ventas encontradas
+            foreach ($ventas as $venta) {
+                // Actualizar el estado de la venta
+                DB::table('f_venta')
+                    ->where('ven_codigo', $venta->ven_codigo)
+                    ->update(['est_ven_codigo' => 3]);
+                
+                // Obtener detalles de la venta
+                $detalles = DB::table('f_detalle_venta')
+                              ->where('ven_codigo', $venta->ven_codigo)
+                              ->get();
+                
+                // Iterar sobre los detalles y actualizar los productos
+                foreach ($detalles as $detalle) {
+                    $producto = DB::table('1_4_cal_producto')
+                                  ->where('pro_codigo', $detalle->pro_codigo)
+                                  ->first();
+                    
+                    if (!$producto) {
+                        // Deshacer la transacción en caso de error con un producto
+                        DB::rollBack();
+                        return ["status" => "0", "message" => "Producto no encontrado"];
+                    }
+        
+                    // Ajustar el stock según la empresa
+                    if ($venta->id_empresa == 1) {
+                        DB::table('1_4_cal_producto')
+                            ->where('pro_codigo', $detalle->pro_codigo)
+                            ->update([
+                                'pro_deposito' => $producto->pro_deposito + (int)$detalle->det_ven_cantidad,
+                                'pro_reservar' => $producto->pro_reservar + (int)$detalle->det_ven_cantidad
+                            ]);
+                    } else if ($venta->id_empresa == 3) {
+                        DB::table('1_4_cal_producto')
+                            ->where('pro_codigo', $detalle->pro_codigo)
+                            ->update([
+                                'pro_depositoCalmed' => $producto->pro_depositoCalmed + (int)$detalle->det_ven_cantidad,
+                                'pro_reservar' => $producto->pro_reservar + (int)$detalle->det_ven_cantidad
+                            ]);
+                    }
+                }
+            }
+            
+            // Confirmar la transacción
+            DB::commit();
+            
+            return ["status" => "1", "message" => "Se anuló correctamente"];
+        } catch (\Exception $e) {
+            // Deshacer la transacción en caso de error
+            DB::rollBack();
+            
+            // Opcional: Loguear el error
+            Log::error('Error al anular libros obsequios: ' . $e->getMessage());
+            
+            return ["status" => "0", "message" => "No se pudo anular"];
         }
     }
     public function eliminarPedidoLibrosObsequios(Request $request){
@@ -5386,6 +5467,8 @@ class PedidosController extends Controller
                     $pedido->estado_libros_obsequios = 5;
                     $pedido->estado_libros_obsequios = $descuento;
                 }
+                $pedido->usuario_aprobacion_id = $request->usuario_aprobacion_id;
+                $pedido->usuario_aprobacion = $request->usuario_aprobacion;
                 $pedido->save();
                 $pedidoGeneral = Pedidos::findOrFail($pedido->id_pedido);
                 $pedidoGeneral->estado_librosObsequios = 4;
@@ -5396,6 +5479,21 @@ class PedidosController extends Controller
             }
         } catch (\Exception $ex) {
             return response()->json(["status" => "0", "message" => "Hubo problemas con la conexión al servidor"], 500);
+        }
+    }
+    public function AceptarLibrosObsequiosFacturador(Request $request){
+        $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
+        $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
+        $pedidoLibroObsequio->usuario_aprobacion = $request->user_created_name;
+        $pedidoLibroObsequio->usuario_aprobacion_id = $request->user_created;
+        $pedidoLibroObsequio->save();
+        $pedido = Pedidos::findOrFail($pedidoLibroObsequio->id_pedido);
+        $pedido->estado_librosObsequios = 4;
+        $pedido->save();
+        if($pedidoLibroObsequio){
+            return ["status" => "1", "message" => "Se envio correctamente"];
+        }else{
+            return ["status" => "0", "message" => "No se pudo enviar"];
         }
     }
 
@@ -5523,6 +5621,8 @@ class PedidosController extends Controller
 
             $pedido->estado_libros_obsequios = $estadoPedidoLibrosObsequios;
             $pedido->observacion_facturador = $request->ven_observacion;
+            $pedido->usuario_aprobacion = $request->usuario_aprobacion;
+            $pedido->usuario_aprobacion_id = $request->usuario_aprobacion_id;
             $pedido->save();
 
             $pedidoGeneral->estado_librosObsequios = $estadoPedidoGeneral;
@@ -5572,7 +5672,7 @@ class PedidosController extends Controller
             LEFT JOIN ciudad c ON i.ciudad_id  = c.idciudad
             -- INNER JOIN f_venta fv ON pa.id = fv.ven_p_libros_obsequios
             WHERE pa.id_pedido = '$request->id_pedido'
-            AND pa.estado_libros_obsequios != 0
+            -- AND pa.estado_libros_obsequios != 0
             ORDER BY id DESC
             ");
             return $query;

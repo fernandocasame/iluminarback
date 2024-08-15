@@ -66,6 +66,8 @@ class PedidosPagosController extends Controller
         if($request->updateValuesVariasEvidencias)  { return $this->updateValuesVariasEvidencias($request->idPago); }
         //Venta real por asesor
         if($request->getVentaRealXAsesor)           { return $this->pagoRepository->getVentaRealXAsesor($request->idAsesor,$request->idPeriodo); }
+        //venta total directa y lista
+        if($request->getVentaTotalListaDirecta)     { return $this->pagoRepository->getVentaTotalListaDirecta($request); }
         //actualizar venta real
         if($request->updateVentaReal)               { return $this->pagoRepository->updateVentaReal($request); }
         //===ANTICIPO APROBADO====
@@ -375,6 +377,15 @@ class PedidosPagosController extends Controller
                 if(count($query) > 0)   { return ["status" => "0", "message" => "Ya existe un anticipo del pedido registrado"]; }
             }
         }
+        //Pago Tipo “otros valores para cancelar”
+        /*
+            •	Este pago aparecer en el reporte
+            •	Solo puede haber un solo pago de otro valor para cancelar
+        */
+        if($tipo_pago_id == 7){
+            $query = $this->pagoRepository->getPagosInstitucion($institucion_id,$periodo_id,6,7,1);
+            if(count($query) > 0)   { return ["status" => "0", "message" => "Ya existe un pago de otros valores por cancelar, solo puede existir uno"]; }
+        }
         if($request->id > 0){
             $mensaje = "Se edito el pago";
             $info = PedidosDocumentosLiq::findOrFail($request->id);
@@ -401,10 +412,20 @@ class PedidosPagosController extends Controller
         $institucion_id         = $request->institucion_id;
         $id_pedido              = $request->id_pedido;
         $valor                  = $request->valor;
-        // $tipo_pago              = $request->tipo_pago;
+        $tipo_pago_id           = $request->tipo_pago_id;
+        //Pago Tipo “otros valores para cancelar”
+        /*
+            •	Este pago aparecer en el reporte
+            •	Solo puede haber un solo pago de otro valor para cancelar
+        */
+        if($tipo_pago_id == 7){
+            $query = $this->pagoRepository->getPagosInstitucion($institucion_id,$periodo_id,6,7,1);
+            if(count($query) > 0)   { return ["status" => "0", "message" => "Ya existe un pago aprobado de tipo otro valores para cancelar solo puede haber uno"]; }
+        }
+        // $tipo_pago           = $request->tipo_pago;
         $observacion            = "Aprobación de pago";
         $doc_codigo             = $request->doc_codigo;
-        $info = PedidosDocumentosLiq::findOrFail($doc_codigo);
+        $info                   = PedidosDocumentosLiq::findOrFail($doc_codigo);
         //0 => sin pagar ; 1 => pagado
         $EstadoPago             = $info->estado;
         if($EstadoPago == 1) { return ["status" => "0", "message" => "El pago ya ha sido aprobado anteriormente"]; }
@@ -427,7 +448,21 @@ class PedidosPagosController extends Controller
             if($request->tipo_pago_id == 6)  { $this->pagoRepository->updateDeuda($request->id_pedido); }
             //SI EL PAGO ES UNA DEUDA PROXIMA SUMO LAS DEUDAS PROXIMAS
             if($request->tipo_pago_id == 3)  { $this->pagoRepository->updateDeudaProxima($request->id_pedido); }
-            if($info)                        { return ["status" => "1", "message" => "Se guardo correctamente"]; }
+            //actualizar movimientos convenio
+            if ($info->tipo_pago_id == 4) {
+                $old_values = PedidosDocumentosLiq::findOrFail($request->doc_codigo);
+                $convenio   = PedidoConvenio::where('id', $old_values->pedidos_convenios_id)->first();
+                //si no existe el convenio no se puede guardar
+                if(!$convenio) { return ["status" => "0", "message" => "No existe convenio activo para crear el pago"]; }
+                //si el convenio ya esta cerrado donde esta el pago de convenio no se pueda reabrir
+                $estadoConvenio = $convenio->estado;
+                if($estadoConvenio == 2){
+                    return ["status" => "0", "message" => "No se puede reabrir el pago porque el convenio ya esta cerrado"];
+                }
+                $convenio = PedidoConvenio::where('id', $info->pedidos_convenios_id)->first();
+                if ($convenio) { $this->convenioRepository->saveMovimientosConvenio($info->pedidos_convenios_id); }
+            }
+            if($info) { return ["status" => "1", "message" => "Se guardo correctamente"]; }
         }
     }
     public function saveVariasEvidencias($request){
@@ -475,9 +510,19 @@ class PedidosPagosController extends Controller
             }
             //si son deudas proximas  cuando se reabren se cambio a estado 0 de  pendiente por lo tanto vuelvo a sumar las deudas proximas activas
             if($old_values->tipo_pago_id == 3)  { $this->pagoRepository->updateDeudaProxima($old_values->id_pedido); }
+            //actualizar movimientos convenio
+            if ($old_values->tipo_pago_id == 4) {
+                $convenio = PedidoConvenio::where('id', $old_values->pedidos_convenios_id)->first();
+                //si el convenio ya esta cerrado donde esta el pago de convenio no se pueda reabrir
+                $estadoConvenio = $convenio->estado;
+                if($estadoConvenio == 2){
+                    return ["status" => "0", "message" => "No se puede reabrir el pago porque el convenio ya esta cerrado"];
+                }
+                if ($convenio) { $this->convenioRepository->saveMovimientosConvenio($old_values->pedidos_convenios_id); }
+            }
             return ["status" => "1", "message" => "Se guardo correctamente"];
-        }catch(\Exception $e){
-            return ["status" => "0", "message" => "No se pudo guardar"];
+        }catch(\Exception $ex){
+            return ["status" => "0", "message" => "No se pudo guardar", "error" =>"error: ".$ex];
         }
     }
     //API:POST/pedigo_Pagos/RegistroDeudaAutomatica

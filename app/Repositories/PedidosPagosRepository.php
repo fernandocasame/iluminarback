@@ -66,7 +66,9 @@ class  PedidosPagosRepository extends BaseRepository
         //dinamico igual 2 campos
         if($tipo == 5)     { $pagos->where($parametro1, '=',$parametro2)->where($parametro3,'=',$parametro4);  }
         //los pagos de tipo y estado
-        if($tipo == 6)     { $pagos->where('tipo_pago_id',$parametro1)->where('estado',$parametro2); }
+        if($tipo == 6)     {
+            $pagos->porInstitucionYPeriodo($institucion,$periodo)->where('tipo_pago_id',$parametro1)->where('estado',$parametro2);
+         }
         if($ifPrint == 1){ return $pagos;}
         $resultado = $pagos->get();
         return $resultado;
@@ -171,6 +173,56 @@ class  PedidosPagosRepository extends BaseRepository
         AND p.id_periodo = ?
         AND p.contrato_generado IS NOT NULL
         ",[$idusuario,$periodo]);
+        return $query;
+    }
+    //api:get/pedigo_Pagos?getVentaTotalListaDirecta=1&idPeriodo=22
+    public function getVentaTotalListaDirecta($request){
+        $query = DB::SELECT("SELECT
+                ROUND(SUM(TotalVentaDirecta), 2) AS TotalVentaDirecta,
+                ROUND(SUM(TotalVentaLista), 2) AS TotalVentaLista,
+                ROUND(SUM(SinVerificacionesDirecta), 2) AS SinVerificacionesDirecta,
+                ROUND(SUM(SinVerificacionesLista), 2) AS SinVerificacionesLista,
+                ROUND(SUM(totalVentaBruta), 2) AS TotalVentaBruta,
+                ROUND(SUM(total_ventaSinVerificaciones), 2) AS TotalVentaSinVerificaciones
+            FROM (
+                SELECT
+                    p.id_pedido,
+                    p.contrato_generado,
+                    CASE
+                        WHEN p.TotalVentaReal > 0 THEN p.TotalVentaReal
+                        ELSE 0
+                    END AS totalVentaBruta,
+                    CASE
+                        WHEN p.total_venta > 0 AND p.TotalVentaReal = 0 THEN p.total_venta
+                        ELSE 0
+                    END AS total_ventaSinVerificaciones,
+                    CASE
+                        WHEN p.TotalVentaReal > 0 AND p.tipo_venta = 1 THEN p.TotalVentaReal
+                        ELSE 0
+                    END AS TotalVentaDirecta,
+                    CASE
+                        WHEN p.TotalVentaReal > 0 AND p.tipo_venta = 2 THEN p.TotalVentaReal
+                        ELSE 0
+                    END AS TotalVentaLista,
+                    CASE
+                        WHEN p.TotalVentaReal = 0 AND p.tipo_venta = 1 THEN p.total_venta
+                        ELSE 0
+                    END AS SinVerificacionesDirecta,
+                    CASE
+                        WHEN p.TotalVentaReal = 0 AND p.tipo_venta = 2 THEN p.total_venta
+                        ELSE 0
+                    END AS SinVerificacionesLista
+                FROM
+                    pedidos p
+                LEFT JOIN
+                    usuario u ON u.idusuario = p.id_asesor
+                WHERE
+                    p.tipo = '0'
+                    AND p.estado = '1'
+                    AND p.id_periodo = ?
+                    AND p.contrato_generado IS NOT NULL
+            ) AS subquery;
+        ",[$request->idPeriodo]);
         return $query;
     }
     //api/get>>pedigo_Pagos?updateVentaReal=1&idAsesor=1&idPeriodo=1

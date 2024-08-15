@@ -361,9 +361,12 @@ class ProformaController extends Controller
             return $array;
     }
     public function getNumeroDocumento($empresa){
+        $letra ="";
         if($empresa == 1){
+            $letra = "P";
             $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_Prolipa as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
         }else if ($empresa==3){
+            $letra = "C";
             $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_calmed as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
         }
         $getSecuencia = 1;
@@ -388,7 +391,7 @@ class ProformaController extends Controller
                 }
             }
 
-            return $secuencia;
+            return $letra."-".$secuencia;
     }
     //registro y edicion de datos de la proforma y detalles de proforma
     public function Proforma_Registrar_modificar(Request $request)

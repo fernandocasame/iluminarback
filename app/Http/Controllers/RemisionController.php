@@ -168,7 +168,7 @@ class RemisionController extends Controller
     // SOLO ES PARA REALIZAR EL REPORTE DE CALMED
     public function GetRemisionCALMED_FECHA_TRANSPORTE(Request $request){
         $query = DB::SELECT("SELECT r.*, t.trans_nombre, (select i.telefonoInstitucion from f_venta f 
-        inner join institucion i on i.idInstitucion=f.institucion_id where f.ven_codigo=r.remi_num_factura) as telefono
+        inner join institucion i on i.idInstitucion=f.institucion_id where f.ven_codigo=r.remi_num_factura and f.id_empresa=r.remi_idempresa) as telefono
          FROM remision_copy r
         LEFT JOIN 1_4_transporte t ON r.trans_codigo = t.trans_codigo
         WHERE DATE(REMI_FECHA_INICIO) = '$request->fecha_filtro' and remi_ci_transportista = '$request->cedula'
@@ -179,14 +179,14 @@ class RemisionController extends Controller
     public function GetRemisionCALMED_FECHA(Request $request){
         if($request->op==0){
             $query = DB::SELECT("SELECT r.*, t.trans_nombre, (select i.telefonoInstitucion from f_venta f 
-        inner join institucion i on i.idInstitucion=f.institucion_id where f.ven_codigo=r.remi_num_factura) as telefono
+        inner join institucion i on i.idInstitucion=f.institucion_id where f.ven_codigo=r.remi_num_factura and f.id_empresa=r.remi_idempresa) as telefono
             FROM remision_copy r
             LEFT JOIN 1_4_transporte t ON r.trans_codigo = t.trans_codigo
             WHERE DATE(REMI_FECHA_INICIO) = '$request->fecha_filtro'
             ORDER BY t.trans_nombre ASC");
         }else if($request->op==1){
             $query = DB::select("SELECT r.*, t.trans_nombre, (select i.telefonoInstitucion from f_venta f 
-        inner join institucion i on i.idInstitucion=f.institucion_id where f.ven_codigo=r.remi_num_factura) as telefono
+        inner join institucion i on i.idInstitucion=f.institucion_id where f.ven_codigo=r.remi_num_factura and f.id_empresa=r.remi_idempresa) as telefono
             FROM remision_copy r
             LEFT JOIN 1_4_transporte t ON r.trans_codigo = t.trans_codigo
             WHERE DATE(r.REMI_FECHA_INICIO) = CURDATE()

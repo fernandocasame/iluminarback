@@ -101,6 +101,14 @@ trait TraitPedidosGeneral
             AND a.estado_alcance  = "1"
             AND ped.estado = "1"
         ) as contadorAlcanceCerrado,
+        (
+            SELECT  COUNT(o.id) FROM p_libros_obsequios o
+            WHERE o.id_pedido = p.id_pedido
+            AND (
+            o.estado_libros_obsequios = "0"
+            OR o.estado_libros_obsequios  = "3"
+            )
+        ) as contadorObsequiosAbiertosEnviados,
         pe.periodoescolar as periodo,pe.codigo_contrato,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
         i.region_idregion as region,uf.cod_usuario,

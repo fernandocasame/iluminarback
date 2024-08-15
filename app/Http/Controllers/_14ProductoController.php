@@ -136,7 +136,7 @@ class _14ProductoController extends Controller {
             $libro = Libro::updateOrCreate(
                 ['nombrelibro' => $request->nombrelibro],
                 [
-                    'nombre_imprimir' => $request->nombrelibro??$request->nombre_imprimir,
+                    'nombre_imprimir' => $request->nombrelibro,
                     'descripcionlibro' => $request->descripcionlibro,
                     'serie' => $request->serie,
                     'titulo' => $request->titulo,
@@ -206,33 +206,16 @@ class _14ProductoController extends Controller {
         }
     }
     
-
+    
+    
     public function Registrar_modificar_producto(Request $request) {
         try {
             DB::beginTransaction();
-    
+        
             // Buscar el producto por su código antiguo
             $producto = _14Producto::where('pro_codigo', $request->pro_codigo_antiguo)->first();
-    
-            if ($producto) {
-                // Actualizar el producto existente
-                $producto->pro_codigo = $request->pro_codigo; // Asegúrate de que pro_codigo no sea nulo
-                $producto->gru_pro_codigo = $request->gru_pro_codigo;
-                $producto->pro_nombre = $request->pro_nombre;
-                $producto->pro_descripcion = $request->pro_descripcion;
-                $producto->pro_iva = $request->pro_iva;
-                $producto->pro_valor = $request->pro_valor;
-                $producto->pro_descuento = $request->pro_descuento;
-                $producto->pro_deposito = $request->pro_deposito;
-                $producto->pro_reservar = $request->pro_reservar;
-                $producto->pro_stock = $request->pro_stock;
-                $producto->pro_costo = $request->pro_costo;
-                $producto->pro_peso = $request->pro_peso;
-                $producto->pro_depositoCalmed = $request->pro_depositoCalmed;
-                $producto->pro_stockCalmed = $request->pro_stockCalmed;
-                $producto->updated_at = now();
-                $producto->save();
-            } else {
+        
+            if (!$producto) {
                 // Crear un nuevo producto si no existe
                 $producto = _14Producto::create([
                     'pro_codigo' => $request->pro_codigo,
@@ -253,67 +236,81 @@ class _14ProductoController extends Controller {
                     'created_at' => now(),
                     'updated_at' => now()
                 ]);
+            } else {
+                // Actualizar el producto existente
+                $producto->update([
+                    'pro_codigo' => $request->pro_codigo,
+                    'gru_pro_codigo' => $request->gru_pro_codigo,
+                    'pro_nombre' => $request->pro_nombre,
+                    'pro_descripcion' => $request->pro_descripcion,
+                    'pro_iva' => $request->pro_iva,
+                    'pro_valor' => $request->pro_valor,
+                    'pro_descuento' => $request->pro_descuento,
+                    'pro_deposito' => $request->pro_deposito,
+                    'pro_reservar' => $request->pro_reservar,
+                    'pro_stock' => $request->pro_stock,
+                    'pro_costo' => $request->pro_costo,
+                    'pro_peso' => $request->pro_peso,
+                    'pro_depositoCalmed' => $request->pro_depositoCalmed,
+                    'pro_stockCalmed' => $request->pro_stockCalmed,
+                    'updated_at' => now()
+                ]);
             }
-    
-            // Verificar si se debe crear o actualizar un libro y serie
-            if ($request->gru_pro_codigo == 1 || $request->gru_pro_codigo == 3 || $request->gru_pro_codigo == 6) {
-                if ($request->idlibro) {
-                    // Buscar el libro por ID
-                    $libro = Libro::find($request->idlibro);
+        
+            if (in_array($request->gru_pro_codigo, [1, 3, 6])) {
+                $librosSerie = LibroSerie::where('codigo_liquidacion', $producto->pro_codigo)->first();
+                
+                if ($librosSerie) {
+                    // Libro y serie del libro ya existen
+                    $libro = Libro::find($librosSerie->idLibro);
     
                     if ($libro) {
                         // Actualizar el libro existente
-                        $libro->update([
+                        DB::table('libro')->where('idLibro', $libro->idLibro)->update([
                             'nombrelibro' => $request->pro_nombre,
                             'nombre_imprimir' => $request->pro_nombre,
                             'descripcionlibro' => $request->pro_nombre,
-                            // Puedes agregar más campos si es necesario
+                        ]);
+    
+                        // Actualizar la serie del libro existente
+                        DB::table('libros_series')->where('idLibro', $librosSerie->idLibro)->update([
+                            'id_serie' => $request->id_serie,
+                            'year' => $request->year,
+                            'version' => $request->version2,
+                            'nombre' => $request->pro_nombre,
+                            'iniciales' => $request->codigo_liquidacion,
                         ]);
                     } else {
-                        // Crear un nuevo libro si no existe
-                        $libro = Libro::create([
-                            'idLibro' => $request->idlibro,
-                            'nombrelibro' => $request->pro_nombre,
-                            'nombre_imprimir' => $request->pro_nombre,
-                            'descripcionlibro' => $request->pro_nombre,
-                            // Puedes agregar más campos si es necesario
-                        ]);
+                        // El libro asociado a la serie no existe, manejar el error
+                        throw new \Exception('Libro asociado a la serie no encontrado');
                     }
                 } else {
-                    // Crear un nuevo libro si no se proporcionó idlibro
-                    $libro = Libro::create([
+                    // Crear un nuevo libro
+                    $libroId = DB::table('libro')->insertGetId([
                         'nombrelibro' => $request->pro_nombre,
                         'nombre_imprimir' => $request->pro_nombre,
                         'descripcionlibro' => $request->pro_nombre,
-                        // Puedes agregar más campos si es necesario
                     ]);
-                }
     
-                // Manejo de la serie del libro
-                $librosSerie = LibroSerie::where('codigo_liquidacion', $request->pro_codigo_antiguo)
-                    ->where('idLibro', $libro->idLibro)
-                    ->first();
+                    if (!$libroId) {
+                        throw new \Exception('No se pudo crear el libro');
+                    }
     
-                if ($librosSerie) {
-                    // Actualizar la serie del libro existente
-                    $librosSerie->update([
+                    // Crear la serie del libro
+                    $serieCreated = DB::table('libros_series')->insert([
+                        'idLibro' => $libroId,  // Usa el ID del nuevo libro
+                        'codigo_liquidacion' => $request->pro_codigo,
                         'id_serie' => $request->id_serie,
                         'year' => $request->year,
                         'version' => $request->version2,
-                        'nombre' => $libro->nombrelibro,
+                        'nombre' => $request->pro_nombre,
                         'iniciales' => $request->codigo_liquidacion,
+                        'boton' => 'success',
                     ]);
-                } else {
-                    // Crear una nueva serie del libro si no existe
-                    LibroSerie::create([
-                        'idLibro' => $libro->idLibro,
-                        'codigo_liquidacion' => $request->pro_codigo_antiguo,
-                        'id_serie' => $request->id_serie,
-                        'year' => $request->year,
-                        'version' => $request->version2,
-                        'nombre' => $libro->nombrelibro,
-                        'iniciales' => $request->codigo_liquidacion,
-                    ]);
+    
+                    if (!$serieCreated) {
+                        throw new \Exception('No se pudo crear la serie del libro');
+                    }
                 }
             }
     
@@ -331,8 +328,222 @@ class _14ProductoController extends Controller {
         }
     }
     
-
     
+    
+    
+    
+    
+    
+    
+    // public function Registrar_modificar_producto(Request $request) {
+    //     try {
+    //         DB::beginTransaction();
+    
+    //         // Buscar el producto por su código antiguo
+    //         $producto = _14Producto::where('pro_codigo', $request->pro_codigo_antiguo)->first();
+    
+    //         if ($producto) {
+    //             // Actualizar el producto existente
+    //             $producto->pro_codigo = $request->pro_codigo; // Asegúrate de que pro_codigo no sea nulo
+    //             $producto->gru_pro_codigo = $request->gru_pro_codigo;
+    //             $producto->pro_nombre = $request->pro_nombre;
+    //             $producto->pro_descripcion = $request->pro_descripcion;
+    //             $producto->pro_iva = $request->pro_iva;
+    //             $producto->pro_valor = $request->pro_valor;
+    //             $producto->pro_descuento = $request->pro_descuento;
+    //             $producto->pro_deposito = $request->pro_deposito;
+    //             $producto->pro_reservar = $request->pro_reservar;
+    //             $producto->pro_stock = $request->pro_stock;
+    //             $producto->pro_costo = $request->pro_costo;
+    //             $producto->pro_peso = $request->pro_peso;
+    //             $producto->pro_depositoCalmed = $request->pro_depositoCalmed;
+    //             $producto->pro_stockCalmed = $request->pro_stockCalmed;
+    //             $producto->updated_at = now();
+    //             $producto->save();
+
+    //             if ($request->gru_pro_codigo == 1 || $request->gru_pro_codigo == 3 || $request->gru_pro_codigo == 6) {
+    //                 $librosSerie = LibroSerie::where('codigo_liquidacion', $producto->pro_codigo)
+    //                 ->first();
+
+    //                 $libro = $librosSerie ? Libro::find($librosSerie->idlibro) : null;
+        
+    //                 if ($libro) {
+    //                     // Actualizar el libro existente
+    //                     $libro->update([
+    //                         'nombrelibro' => $request->pro_nombre,
+    //                         'nombre_imprimir' => $request->pro_nombre,
+    //                         'descripcionlibro' => $request->pro_nombre,
+    //                         // Puedes agregar más campos si es necesario
+    //                     ]);
+    //                     $librosSerie = LibroSerie::where('idLibro', $libro->idLibro)
+    //                     ->first();
+    //                     if ($librosSerie) {
+    //                         // Actualizar la serie del libro existente
+    //                         $librosSerie->update([
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     } else {
+    //                         return $libro + 'con libro existente';
+    //                     // Crear una nueva serie del libro si no existe
+    //                         LibroSerie::create([
+    //                             'idLibro' => $libro->idLibro,
+    //                             'codigo_liquidacion' => $request->pro_codigo_antiguo,
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     }
+    //                 } else {
+    //                     // Crear un nuevo libro si no existe
+    //                     $libro = Libro::create([
+    //                         'idLibro' => $request->idlibro,
+    //                         'nombrelibro' => $request->pro_nombre,
+    //                         'nombre_imprimir' => $request->pro_nombre,
+    //                         'descripcionlibro' => $request->pro_nombre,
+    //                         // Puedes agregar más campos si es necesario
+    //                     ]);
+    //                     return $libro;
+    //                     $librosSerie = LibroSerie::where('idLibro', $libro->idLibro)
+    //                     ->first();
+    //                     if ($librosSerie) {
+    //                         $librosSerie->update([
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     } else {
+    //                         LibroSerie::create([
+    //                             'idLibro' => $libro->idLibro,
+    //                             'codigo_liquidacion' => $request->pro_codigo_antiguo,
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     }
+    //                 }
+    //             }
+                
+
+    //         } else {
+    //             // Crear un nuevo producto si no existe
+    //             $producto = _14Producto::create([
+    //                 'pro_codigo' => $request->pro_codigo,
+    //                 'gru_pro_codigo' => $request->gru_pro_codigo,
+    //                 'pro_nombre' => $request->pro_nombre,
+    //                 'pro_descripcion' => $request->pro_descripcion,
+    //                 'pro_iva' => $request->pro_iva,
+    //                 'pro_valor' => $request->pro_valor,
+    //                 'pro_descuento' => $request->pro_descuento,
+    //                 'pro_deposito' => $request->pro_deposito,
+    //                 'pro_reservar' => $request->pro_reservar,
+    //                 'pro_stock' => $request->pro_stock,
+    //                 'pro_costo' => $request->pro_costo,
+    //                 'pro_peso' => $request->pro_peso,
+    //                 'user_created' => $request->user_created,
+    //                 'pro_depositoCalmed' => $request->pro_depositoCalmed,
+    //                 'pro_stockCalmed' => $request->pro_stockCalmed,
+    //                 'created_at' => now(),
+    //                 'updated_at' => now()
+    //             ]);
+    //             if ($request->gru_pro_codigo == 1 || $request->gru_pro_codigo == 3 || $request->gru_pro_codigo == 6) {
+    //                 $librosSerie = LibroSerie::where('codigo_liquidacion', $producto->pro_codigo)
+    //                 ->first();
+
+    //                 $libro = $librosSerie ? Libro::find($librosSerie->idlibro) : null;
+        
+    //                 if ($libro) {
+    //                     // Actualizar el libro existente
+    //                     $libro->update([
+    //                         'nombrelibro' => $request->pro_nombre,
+    //                         'nombre_imprimir' => $request->pro_nombre,
+    //                         'descripcionlibro' => $request->pro_nombre,
+    //                     ]);
+
+    //                     $librosSerie = LibroSerie::where('idLibro', $libro->idLibro)
+    //                     ->first();
+                        
+    //                     if ($librosSerie) {
+    //                         // Actualizar la serie del libro existente
+    //                         $librosSerie->update([
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     } else {
+    //                         // Crear una nueva serie del libro si no existe
+    //                         LibroSerie::create([
+    //                             'idLibro' => $libro->idLibro,
+    //                             'codigo_liquidacion' => $request->pro_codigo_antiguo,
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     }
+    //                 } else {
+    //                     // Crear un nuevo libro si no existe
+    //                     $libro = Libro::create([
+    //                         'idLibro' => $request->idlibro,
+    //                         'nombrelibro' => $request->pro_nombre,
+    //                         'nombre_imprimir' => $request->pro_nombre,
+    //                         'descripcionlibro' => $request->pro_nombre,
+    //                         // Puedes agregar más campos si es necesario
+    //                     ]);
+                        
+    //                     $librosSerie = LibroSerie::where('idLibro', $libro->idLibro)
+    //                     ->first();
+    //                     if ($librosSerie) {
+    //                         // Actualizar la serie del libro existente
+    //                         $librosSerie->update([
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     } else {
+    //                         // Crear una nueva serie del libro si no existe
+    //                         LibroSerie::create([
+    //                             'idLibro' => $libro->idLibro,
+    //                             'codigo_liquidacion' => $request->pro_codigo_antiguo,
+    //                             'id_serie' => $request->id_serie,
+    //                             'year' => $request->year,
+    //                             'version' => $request->version2,
+    //                             'nombre' => $libro->nombrelibro,
+    //                             'iniciales' => $request->codigo_liquidacion,
+    //                         ]);
+    //                     }
+    //                 }
+    //             }
+    //         } 
+    
+    //         // Confirmar la transacción
+    //         DB::commit();
+    //         return response()->json(['message' => 'Se guardó correctamente']);
+    //     } catch (\Exception $e) {
+    //         // Revertir la transacción en caso de error
+    //         DB::rollback();
+    //         return response()->json([
+    //             'error' => 'No se pudo actualizar/guardar',
+    //             'message' => $e->getMessage(),
+    //             'line' => $e->getLine()
+    //         ]);
+    //     }
+    // }
+
     public function Registrar_modificar_producto_backup(Request $request) {
         try {
             DB:: beginTransaction();
@@ -348,6 +559,8 @@ class _14ProductoController extends Controller {
             $producto -> pro_stock = $request -> pro_stock;
             $producto -> pro_costo = $request -> pro_costo;
             $producto -> pro_peso = $request -> pro_peso;
+            $producto->pro_depositoCalmed = $request->pro_depositoCalmed;
+            $producto->pro_stockCalmed = $request->pro_stockCalmed;
             // return 'antiguo codigo ' . $request->pro_codigo_antiguo . ' nuevo codigo ' . $request->pro_codigo;
             // Verificar si es un nuevo registro o una actualización ->exists
             if ($producto -> exists) {
@@ -365,6 +578,8 @@ class _14ProductoController extends Controller {
                 $producto -> pro_deposito = $request -> pro_deposito;
                 $producto -> pro_reservar = $request -> pro_reservar;
                 $producto -> pro_stock = $request -> pro_stock;
+                $producto->pro_depositoCalmed = $request->pro_depositoCalmed;
+                $producto->pro_stockCalmed = $request->pro_stockCalmed; 
                 $producto -> pro_costo = $request -> pro_costo;
                 $producto -> pro_peso = $request -> pro_peso;
                 $producto -> user_created = $request -> user_created;
@@ -441,6 +656,8 @@ class _14ProductoController extends Controller {
                         $producto -> pro_reservar = $request -> pro_reservar;
                         $producto -> pro_stock = $request -> pro_stock;
                         $producto -> pro_costo = $request -> pro_costo;
+                        $producto->pro_depositoCalmed = $request->pro_depositoCalmed;
+                        $producto->pro_stockCalmed = $request->pro_stockCalmed;
                         $producto -> pro_peso = $request -> pro_peso;
                         $producto -> user_created = $request -> user_created;
                         $producto -> updated_at = now();
@@ -462,6 +679,8 @@ class _14ProductoController extends Controller {
                 $producto -> pro_reservar = $request -> pro_reservar;
                 $producto -> pro_stock = $request -> pro_stock;
                 $producto -> pro_costo = $request -> pro_costo;
+                $producto->pro_depositoCalmed = $request->pro_depositoCalmed;
+                $producto->pro_stockCalmed = $request->pro_stockCalmed;
                 $producto -> pro_peso = $request -> pro_peso;
                 $producto -> updated_at = now();
                 // Guardar el producto
