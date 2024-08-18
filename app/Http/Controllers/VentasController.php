@@ -48,7 +48,8 @@ class VentasController extends Controller
     }
     // listar las facturas
     public function GetFacturasX(Request $request){
-        $query = DB::SELECT("SELECT fv.*, ins.nombreInstitucion,ins.direccionInstitucion, ins.telefonoInstitucion, ins.asesor_id, concat(u.nombres,' ',u.apellidos) as asesor, em.img_base64, 
+        $query = DB::SELECT("SELECT ins.ruc as rucPuntoVenta, em.nombre as empresa,
+          CONCAT(usa.nombres, ' ',usa.apellidos) as cliente, fv.*, ins.nombreInstitucion,ins.direccionInstitucion, ins.telefonoInstitucion, ins.asesor_id, concat(u.nombres,' ',u.apellidos) as asesor, 
         usa.nombres, usa.apellidos, fpr.prof_observacion, fpr.idPuntoventa,
         COUNT(DISTINCT dfv.pro_codigo) AS item, CONCAT(us.nombres,' ',us.apellidos) AS responsable,
         (SELECT SUM(det_ven_cantidad)
@@ -64,7 +65,7 @@ class VentasController extends Controller
         LEFT JOIN usuario u ON ins.asesor_id = u.idusuario
         LEFT JOIN f_detalle_venta dfv ON fv.ven_codigo = dfv.ven_codigo
         WHERE fpr.idPuntoventa = '$request->prof_id' and fv.periodo_id=$request->periodo and (fv.idtipodoc=1 or fv.idtipodoc=3 or fv.idtipodoc=4)
-        GROUP BY fv.ven_codigo, em.img_base64, usa.nombres, usa.apellidos, fpr.prof_observacion order by ven_fecha desc
+        GROUP BY fv.ven_codigo,  usa.nombres, usa.apellidos, fpr.prof_observacion order by ven_fecha desc
         ");
         return $query;
     }
@@ -91,7 +92,6 @@ class VentasController extends Controller
             usa.email,
             usa.telefono,
             em.nombre,
-            em.img_base64,
             COUNT(DISTINCT dfv.pro_codigo) AS item,
             SUM(dfv.det_ven_cantidad) AS libros,
             SUM(dfv.det_ven_dev) AS devuelto
@@ -148,7 +148,7 @@ class VentasController extends Controller
             usa.email,
             usa.telefono,
             em.nombre,
-            em.img_base64,
+            
             COUNT(DISTINCT dfv.pro_codigo) AS item,
             SUM(dfv.det_ven_cantidad) AS libros
         FROM
@@ -223,26 +223,13 @@ class VentasController extends Controller
     //         return $query;
     //     }
     // }
-    // public function GetVuser(Request $request){
-    //     $query1 = DB::SELECT("SELECT  us.nombres as nombre, us.apellidos as apellido FROM f_venta as ven
-    //     inner join usuario as us on ven.user_created = us.idusuario
-    //     where ven.ven_codigo='$request->ven_codigo'");
-    //      $pre=$request->ven_codigo;
-    //     $getSecuencia = 1;
-    //          if(!empty($query1)){
-    //             $cod= $query1[0]->nombre;
-    //             $codi= $query1[0]->apellido;
-    //             $user=$cod." ".$codi;
-    //          }
-
-    //          return $user;
-    // }
     public function GetVuser(Request $request){
         $query1 = DB::SELECT("SELECT  img_base64 as img FROM empresas
         where id=$request->id");
         $img=$query1[0]->img;
              return $img;
     }
+
     public function Get_CodVenta(Request $request){
         if($request->id==1){
             $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_Prolipa as cod from  f_tipo_documento where tdo_letra='$request->letra'");
@@ -637,11 +624,10 @@ class VentasController extends Controller
            i.asesor_id,
            concat(usa.nombres,' ',usa.apellidos) as asesor,
            em.nombre,
-           em.img_base64,
+           
            pe.periodoescolar,
            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
            CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-           CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
            pr.pedido_id,
            pr.idPuntoventa,
            pr.prof_observacion,
@@ -654,8 +640,6 @@ class VentasController extends Controller
           INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
           INNER JOIN usuario u ON f.user_created = u.idusuario
           LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-          LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-          LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
           INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo
           LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
           LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
@@ -672,11 +656,9 @@ class VentasController extends Controller
            i.asesor_id,
            concat(usa.nombres,' ',usa.apellidos) as asesor,
            em.nombre,
-           em.img_base64,
            pe.periodoescolar,
            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
            CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-           CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
            pr.pedido_id,
            pr.idPuntoventa,
            pr.prof_observacion,
@@ -689,8 +671,6 @@ class VentasController extends Controller
           INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
           INNER JOIN usuario u ON f.user_created = u.idusuario
           LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-          LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-          LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
           INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo
           LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
           LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
@@ -708,11 +688,10 @@ class VentasController extends Controller
            i.asesor_id,
            concat(usa.nombres,' ',usa.apellidos) as asesor,
            em.nombre,
-           em.img_base64,
+           
            pe.periodoescolar,
            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
            CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-           CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
            pr.pedido_id,
            pr.idPuntoventa,
            pr.prof_observacion,
@@ -725,8 +704,6 @@ class VentasController extends Controller
           INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
           INNER JOIN usuario u ON f.user_created = u.idusuario
           LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-          LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-          LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
           INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo
           LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
           LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
@@ -745,11 +722,10 @@ class VentasController extends Controller
            i.asesor_id,
            concat(usa.nombres,' ',usa.apellidos) as asesor,
            em.nombre,
-           em.img_base64,
+          
            pe.periodoescolar,
            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
            CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-           CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
            pr.pedido_id,
            pr.idPuntoventa,
            pr.prof_observacion,
@@ -762,8 +738,6 @@ class VentasController extends Controller
           INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
           INNER JOIN usuario u ON f.user_created = u.idusuario
           LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-          LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-          LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
           INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo
           LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
           LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
@@ -839,10 +813,11 @@ class VentasController extends Controller
            us.email,
            i.telefonoInstitucion,
            i.direccionInstitucion,
+           em.nombre,
+           
            pe.periodoescolar,
            CONCAT(u.nombres,' ',u.apellidos) AS responsable,
            CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-           CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
            pr.pedido_id,
            pr.idPuntoventa,
            pl.id_pedido AS pedido_id,
@@ -853,14 +828,12 @@ class VentasController extends Controller
           INNER JOIN empresas em ON f.id_empresa = em.id
           INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
           INNER JOIN usuario u ON f.user_created = u.idusuario
-          LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-          LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-          LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
+          INNER JOIN usuario us ON f.ven_cliente = us.idusuario
           INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo
           LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
           LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
           WHERE f.est_ven_codigo = 1 AND f.id_empresa = dv.id_empresa
-          AND (f.ven_codigo like'%$request->parte_documento%' or f.ven_cliente like'%$request->parte_documento%' 
+          AND (f.ven_codigo like'%$request->parte_documento%' or f.ven_cliente like'%$request->parte_documento%'
           or i.nombreInstitucion like'%$request->parte_documento%')
           group by f.ven_codigo order by f.ven_fecha");
         // $query1 = DB::table('f_venta as f')

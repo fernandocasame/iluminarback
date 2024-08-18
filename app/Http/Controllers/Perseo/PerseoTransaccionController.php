@@ -36,8 +36,8 @@ class PerseoTransaccionController extends Controller
             DB::beginTransaction();
             $factura        = $request->ven_codigo; //F-S23-ER-0000073
             //$factura        = "PF-C23-MFACT-0000095";
-            $concepto       = "Proforma de prueba";
-            $observacion    = "Proforma de prueba"; //observacion
+            $concepto       = "Proforma";
+            $observacion    = "Proforma"; //observacion
             $getFactura     = Ventas::where('ven_codigo',$factura)->first();
             //validar que exista la factura
             if(!$getFactura)                        { return ["status" => "0", "message" => "La factura no existe"]; }
@@ -86,12 +86,17 @@ class PerseoTransaccionController extends Controller
                 ->leftJoin('1_4_cal_producto as p', 'vd.pro_codigo', '=', 'p.pro_codigo')
                 ->where('vd.ven_codigo', $factura)
                 ->get();
-
+            if(empty($detalle)) { return ["status" => "0", "message" => "La factura no tiene detalle"]; }
             foreach( $detalle as $d){ $totalFactura += $d->valorTotal; }
             //con 2 decimales
             $totalFactura   = number_format($totalFactura, 2, '.', '');
             $detalles = [];
             foreach($detalle as $d){
+                $pro_codigo = $d->pro_codigo;
+                $id_perseo = $d->idPerseoProducto;
+                if($id_perseo == 0 || $id_perseo == null || $id_perseo == ""){
+                    return ["status" => "0", "message" => "El codigo $pro_codigo no se encuentra en perseo"];
+                }
                 $detalles[] = [
                     "proformasid"               => 1,
                     "centros_costosid"          => 1,
@@ -172,8 +177,8 @@ class PerseoTransaccionController extends Controller
             DB::beginTransaction();
             $factura     = $request->ven_codigo; //F-C23-ER-0000076
             // $factura        = "F-C23-ER-0000076";
-            $observacion    = "Factura de prueba"; //observacion
-            $concepto       = "Pedido de prueba";
+            $observacion    = "Factura"; //observacion
+            $concepto       = "Pedido";
             $getFactura = VentasF::where('id_factura',$factura)->first();
             //validar que exista la factura
             if(!$getFactura)                        { return ["status" => "0", "message" => "La factura no existe"]; }

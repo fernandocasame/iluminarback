@@ -76,7 +76,7 @@ class EmpaqueController extends Controller
     public function getchofer()
     {
         $query = DB::SELECT("SELECT cedula, CONCAT(nombres,' ',apellidos) AS responsable  FROM usuario
-        where id_group=34 OR id_group=17 OR id_group=27");
+        where (id_group=34 OR id_group=17 OR id_group=27 or id_group=7) and estado_idEstado=1");
         return $query;
     }
     public function getDetalleEmpaque(Request $request)

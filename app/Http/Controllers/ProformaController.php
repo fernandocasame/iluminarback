@@ -315,12 +315,14 @@ class ProformaController extends Controller
             if($tipo ==1){
                 $query = DB::SELECT("SELECT fpr.*,  em.nombre, em.img_base64,
                 us.nombres as username, us.apellidos as lastname, COUNT(dpr.pro_codigo) AS item, SUM(dpr.det_prof_cantidad) AS libros,
-                CONCAT(usa.nombres, ' ',usa.apellidos) as cliente
+                CONCAT(usa.nombres, ' ',usa.apellidos) as cliente,
+                i.nombreInstitucion,i.ruc as rucPuntoVenta
                 FROM f_proforma fpr
                 LEFT JOIN usuario us ON fpr.user_editor = us.idusuario
                 LEFT JOIN empresas em ON fpr.emp_id =em.id
                 INNER JOIN f_detalle_proforma dpr ON dpr.prof_id=fpr.id
                 left join usuario usa on fpr.ven_cliente = usa.idusuario
+                LEFT JOIN institucion i ON fpr.id_ins_depacho = i.idInstitucion
                 WHERE fpr.idPuntoventa= '$request->prof_id'
                 GROUP BY fpr.id, fpr.prof_id,fpr.prof_observacion,em.nombre, em.img_base64
                 order by fpr.created_at desc");

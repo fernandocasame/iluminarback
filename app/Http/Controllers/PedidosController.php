@@ -1219,6 +1219,20 @@ class PedidosController extends Controller
         return $datos;
 
     }
+    public function get_val_pedidoLibrosObsequiosInfoTodoSinPedido(Request $request){
+        $datos = DB::SELECT("SELECT ls.*, l.nombrelibro, l.demo,  l.idlibro, l.asignatura_idasignatura, a.area_idarea, l.portada, s.nombre_serie, ar.nombrearea,
+            (SELECT f.pvp FROM pedidos_formato f WHERE f.id_serie = ls.id_serie AND f.id_area = a.area_idarea AND f.id_periodo = '$request->periodo' LIMIT 1 ) AS precio , cp.*
+            FROM libros_series ls
+            LEFT JOIN series s ON ls.id_serie = s.id_serie
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+            LEFT JOIN area ar ON a.area_idarea = ar.idarea
+            INNER JOIN 1_4_cal_producto cp ON ls.codigo_liquidacion = cp.pro_codigo
+            WHERE l.Estado_idEstado = '1'
+            AND a.estado = '1';");
+        return $datos;
+
+    }
     public function getAlcanceAbiertoXId($id){
         $query = DB::SELECT("SELECT * FROM pedidos_alcance a
         WHERE a.id = '$id'
@@ -5448,6 +5462,8 @@ class PedidosController extends Controller
             $id_pedidoLibrosObsequios = $request->id_pedidoLibrosObsequios;
             $user_created = $request->user_created;
             $descuento = $request->descuento;
+            $usuario_creador_id = $request->usuario_aprobacion_id;
+            $usuario_creador_nombre = $request->usuario_aprobacion;
 
             // Validar que el pedido libros Obsequios está abierto
             $validateAbierto = DB::select("SELECT * FROM p_libros_obsequios pa WHERE pa.id = ? AND pa.estado_libros_obsequios = ?", [$id_pedidoLibrosObsequios, '3']);
