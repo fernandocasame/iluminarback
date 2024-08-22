@@ -64,9 +64,7 @@ class PaqueteController extends Controller
         return $query;
     }
     public function getExistsPaquete($paquete){
-        $query = DB::SELECT("SELECT * FROM codigos_paquetes p
-        WHERE p.codigo = '$paquete'
-        ");
+        $query = DB::SELECT("SELECT * FROM codigos_paquetes p WHERE p.codigo = '$paquete'");
         return $query;
     }
     //paquetes/guadarPaquete
@@ -384,14 +382,15 @@ class PaqueteController extends Controller
             $contadorD                  = 0;
             $noExisteA                  = 0;
             $noExisteD                  = 0;
-            //estadoPaquete => 0 utilizado; 1 => abierto;
-            $estadoPaquete              = 0;
-            //VALIDAR QUE EL CODIGO DE PAQUETE ESTE UTILIZADO
-            $ExistsPaquete      = $this->getPaquete($item->codigoPaquete);
-            if(empty($ExistsPaquete)) { $estadoPaquete = 0; }
+
             //validar
             $getExistsPaquete   = $this->getExistsPaquete($item->codigoPaquete);
             if(!empty($getExistsPaquete)){
+                //estadoPaquete => 0 utilizado; 1 => abierto;
+                $estadoPaquete              = 0;
+                //VALIDAR QUE EL CODIGO DE PAQUETE ESTE UTILIZADO
+                $ExistsPaquete      = $this->getPaquete($item->codigoPaquete);
+                if(empty($ExistsPaquete)) { $estadoPaquete = 0; }
                 //codigos hijos del paquete
                 $codigosHijos =  $this->getCodigos($item->codigoPaquete,0,3);
                 foreach($codigosHijos as $key2 => $tr){
@@ -1113,10 +1112,16 @@ class PaqueteController extends Controller
                             //OMITIR CUANDO SEA REGALADO ; BLOQUEADO; GUIA
                             $ifOmitirA = false;
                             $ifOmitirD = false;
+
                             //si el codigo de activacion esta  regalado  GUIA o bloqueado
                             if( $ifDevueltoA == '2' || $ifDevueltoA == '4' || $estadoA == '2' ) { $ifOmitirA = true; }
                             //si el codigo de diagnostico esta regalado GUIA o bloqueado
                             if( $ifDevueltoD == '2' || $ifDevueltoD == '4' || $estadoD == '2' ) { $ifOmitirD = true; }
+                            //1 => permitir omitir los bloqueados 2 => no permitir bloqueados
+                            if($request->permitirOmitirBloqueado == 2){
+                                if($estadoA == '2') { $ifOmitirA = false; }
+                                if($estadoD == '2') { $ifOmitirD = false; }
+                            }
                             //===========VALIDACION====
                             if($ifOmitirA){
                                 $mensajeFront   = "_(No esta bloqueado o regalado o no tiene guia)";

@@ -10,6 +10,7 @@ use App\Repositories\perseo\PerseoConsultasRepository;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class PerseoTransaccionController extends Controller
 {
@@ -48,6 +49,7 @@ class PerseoTransaccionController extends Controller
             $ven_descuento   = $getFactura->ven_descuento;
             $id_empresa      = $getFactura->id_empresa;
             $clientesidPerseo = $getFactura->clientesidPerseo;
+            $discount        = $getFactura->ven_desc_por;
             $totalFactura    = 0;
             $detalle         = [];
             //prolipa
@@ -177,7 +179,7 @@ class PerseoTransaccionController extends Controller
             DB::beginTransaction();
             $factura     = $request->ven_codigo; //F-C23-ER-0000076
             // $factura        = "F-C23-ER-0000076";
-            $observacion    = "Factura"; //observacion
+            $observacion    = "Pedido"; //observacion
             $concepto       = "Pedido";
             $getFactura = VentasF::where('id_factura',$factura)->first();
             //validar que exista la factura
@@ -412,7 +414,9 @@ class PerseoTransaccionController extends Controller
             if(!$getAbono) { return ["status" => "0", "message" => "El abono no existe"]; }
             $importe = 0;
             $tipoPago = 0;
+            $tipoPago = 0;
             $banco = 1;
+            $fecha = Carbon::parse($getAbono->abono_fecha)->format('Ymd');
             $cliente = $getAbono->idClientePerseo;
             $empresa = $getAbono->abono_empresa;
             $documento = $getAbono->abono_documento;
@@ -427,7 +431,7 @@ class PerseoTransaccionController extends Controller
                 $tipoPago = 3;
                 $banco = $getAbono->abono_cheque_banco;
             }
-            $observacion = "Cobro de prueba";
+            $observacion = "Cobro";
             $detalles    = [];
             $detalles[0] = [
                 "bancoid"           => $banco,
@@ -437,9 +441,9 @@ class PerseoTransaccionController extends Controller
                 "documentosid"      => 0,//Id de la facture que se está afectando en el cobro.
                 "formapago"         => $tipoPago,
                 "saldo"             => 0,//Consulta,
-                "fechaemision"      => date('Y-m-d H:i:s'),
-                "fecharecepcion"    => date('Y-m-d H:i:s'),
-                "fechavence"        => date('Y-m-d H:i:s'),
+                "fechaemision"      => $fecha,
+                "fecharecepcion"    => $fecha,
+                "fechavence"        => $fecha,
                 "secuencia"         => "000000001"//Consultar
             ];
             $formData = [
@@ -452,12 +456,12 @@ class PerseoTransaccionController extends Controller
                             "cobradoresid"             => 3,//Id del cobrador
                             "tipo"                     => "AB",
                             "movimientos_conceptosid"  => 3,//	Indica el grupo de transacción a la que corresponde, valor predeterminado: 3
-                            "forma_pago_empresaid"     => 3,
+                            "forma_pago_empresaid"     => $tipoPago,
                             "concepto"                 => $observacion,
                             "reciboId"                 => 0, //Corresponde al id del recibo personalizado si se ha configurado en el agente de venta. Valor predeterminado: 0
-                            "fechaemision"             => date('Y-m-d H:i:s'),
-                            "fecharecepcion"           => date('Y-m-d H:i:s'),
-                            "fechavencimiento"         => date('Y-m-d H:i:s'),
+                            "fechaemision"             => $fecha,
+                            "fecharecepcion"           => $fecha,
+                            "fechavencimiento"         => $fecha,
                             "importe"                  => $importe,
                             "cajasid"                  => 1,//Id de la caja que va afectar esta factura
                             "bancosid"                 => 1,//Consultar

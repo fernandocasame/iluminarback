@@ -42,12 +42,11 @@ class ReporteCapacitacionController extends Controller
             "endDate" => $endDate
         ];
     }
-
+    //api:get/reporte/capacitaciones?estadoCapacitacion=1
     // public function index(): JsonResponse
     public function index()
     {
         try {
-            $periodo = request()->query("periodo", null);
             // $time = $this->getTimeProps(request()->query("tiempo", null)); // today, week, month, by dates
             // $startDate = request()->query("filtro_fecha_ini", $time["startDate"]);
             // $endDate = request()->query("filtro_fecha_fin", $time["endDate"]);
@@ -85,17 +84,18 @@ class ReporteCapacitacionController extends Controller
             //     });
             // })
             // ->orderBy('fecha_inicio', 'desc')->get();
-
             // return response()->json($capacitaciones);
-
+            $fecha_from                 = request()->query("fecha_from",null);
+            $fecha_to                   = request()->query("fecha_to",null);
+            $estadoCapacitacion         = request()->query("estadoCapacitacion",null);
             $unirArrays                 = [];
             $institucionesProlipa       = [];
             $institucionesTemporales    = [];
             $resultado                  = [];
             //prolipa
-            $institucionesProlipa       = $this->getCapacitaciones(0,$periodo);
+            $institucionesProlipa       = $this->getCapacitaciones(0,$estadoCapacitacion,$fecha_from,$fecha_to);
             //temporales
-            $institucionesTemporales    = $this->getCapacitaciones(1,$periodo);
+            $institucionesTemporales    = $this->getCapacitaciones(1,$estadoCapacitacion,$fecha_from,$fecha_to);
             $unirArrays                 = array_merge(array($institucionesProlipa),array($institucionesTemporales));
             $coleccionUnir              = collect($unirArrays);
             $resultado                  = $coleccionUnir->flatten(10);
@@ -117,7 +117,7 @@ class ReporteCapacitacionController extends Controller
         }
     }
 
-    public function getCapacitaciones($tipo,$periodo){
+    public function getCapacitaciones($tipo,$estadoCapacitacion,$fecha_from,$fecha_to){
         $query = DB::table('seminarios as s')
         ->selectRaw("CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
             s.*,
@@ -128,11 +128,16 @@ class ReporteCapacitacionController extends Controller
         ->leftJoin('usuario as u', 's.id_usuario', '=', 'u.idusuario')
         ->leftJoin('institucion as i', 's.id_institucion', '=', 'i.idInstitucion')
         ->leftJoin('periodoescolar as pe', 's.periodo_id', '=', 'pe.idperiodoescolar')
-        ->where('s.periodo_id', '=', $periodo)
+        ->where('estado_capacitacion','=',$estadoCapacitacion)
+        // ->where('s.periodo_id', '=', $periodo)
         ->where('s.tipo_webinar', '=', '2')
         ->where('s.estado',       '=', '1');
         if($tipo == 0){ $resultado = $query->where('s.id_institucion', '>', 0); }
         if($tipo == 1){ $resultado = $query->Where('s.institucion_id_temporal', '>', 0); }
+        //filtro por fechas si envia nulo traigo todo
+        if($fecha_from == null || $fecha_from == "null"){ }
+        //filtrar between del campo fecha_inicio de la tabla seminarios fecha_from y fecha_to
+        else{ $resultado = $resultado->whereBetween('s.fecha_inicio', [$fecha_from, $fecha_to]); }
         return $resultado->get();
     }
 

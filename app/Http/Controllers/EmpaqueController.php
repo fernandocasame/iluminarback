@@ -34,6 +34,7 @@ class EmpaqueController extends Controller
         if($request->getDetalleEmpaque)     { return $this->getDetalleEmpaque($request); }
         if($request->pendientes)    { return $this->pendientes(); }
         if($request->getchofer){ return $this->getchofer(); }
+        if($request->getventa)     { return $this->getventa($request); }
     }
 
     //API:GET/empaqueBodega?getListadoEmpaqueFecha=1&fecha=2024-0
@@ -50,7 +51,7 @@ class EmpaqueController extends Controller
         LEFT join usuario u on fv.ven_cliente = u.idusuario
         inner join empresas em on em.id=re.remi_idempresa
         WHERE DATE(e.empa_fecha) = ?
-        and e.idempresa=re.remi_idempresa
+        and e.idempresa=re.remi_idempresa and (e.empa_estado=2 or e.empa_estado=0) and (re.remi_estado=2 or re.remi_estado=0)
         group by re.remi_codigo, re.remi_idempresa, e.empa_codigo 
         ",[$fecha]);
         return $query;
@@ -77,6 +78,12 @@ class EmpaqueController extends Controller
     {
         $query = DB::SELECT("SELECT cedula, CONCAT(nombres,' ',apellidos) AS responsable  FROM usuario
         where (id_group=34 OR id_group=17 OR id_group=27 or id_group=7) and estado_idEstado=1");
+        return $query;
+    }
+    public function getventa(Request $request)
+    {
+        $query = DB::SELECT("SELECT sum(fv.det_ven_cantidad) AS cant,  sum(fv.det_ven_cantidad_despacho) AS desp FROM f_detalle_venta fv
+        where fv.ven_codigo='$request->ven_codigo' and fv.id_empresa=$request->id ");
         return $query;
     }
     public function getDetalleEmpaque(Request $request)
@@ -322,7 +329,7 @@ class EmpaqueController extends Controller
                 $remision->updated_at = now();
                 $remision->remi_estado= 0;
                 $remision->save();
-                $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)->where('id_empresa', $request->remi_idempresa)->firstOrFail();
+                $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)->where('idempresa', $request->remi_idempresa)->firstOrFail();
                 $emp->updated_at        = now();
                 $emp->empa_estado       = 0;
                 $emp->save();
@@ -331,7 +338,7 @@ class EmpaqueController extends Controller
                 ->firstOrFail();
                 $query=DB::SELECT("SELECT count(pro_codigo) as cont FROM f_detalle_venta dv 
                 WHERE dv.ven_codigo='$request->factura'
-                AND dv.id_empresa='$request->remi_idempresa'");
+                AND dv.id_empresa=$request->remi_idempresa");
                 $total = $query[0]->cont;
                 if($total==$request->cantidad){
                     $venta->est_ven_codigo=2;
@@ -353,8 +360,7 @@ class EmpaqueController extends Controller
                         $dventa->save();
                     }
                 }
-
-            // DB::commit();
+            DB::commit();
             return response()->json(['message' => 'Empaque anulado con éxito',"data" => $venta], 200);
         }catch(\Exception $e){
             return response()->json(['message' => 'Error al anular el empaque'.$e], 500);
@@ -362,38 +368,78 @@ class EmpaqueController extends Controller
         }
     }
     public function despacharEmpaque($request){
-        try{
-            set_time_limit(6000000);
-            ini_set('max_execution_time', 6000000);
-
-            DB::beginTransaction();
-                $remision = Remision::where('remi_codigo', $request->remi_codigo)
-                ->where('remi_idempresa', $request->remi_idempresa)
-                ->where('remi_num_factura', $request->factura)
-                ->firstOrFail();
-                $remision->remi_guia_remision =  $request->guiaremision;
-                $remision->remi_fecha_final = now();
-                $remision->updated_at = now();
-                $remision->remi_estado= 2;
-                $remision->save();
-                $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)
-                ->where('empa_codigo', $request->empa_codigo)
-                ->where('empa_facturas', $request->factura)->firstOrFail();
-                $emp->updated_at        = now();
-                $emp->empa_estado       = 2;
-                $emp->save();
-                $venta =  Ventas::where('ven_codigo', $request->factura)
-                ->where('id_empresa', $request->remi_idempresa)
-                ->firstOrFail();
-                $venta->est_ven_codigo=1;
-                $venta->updated_at = now();
-                $venta->save();
-                
-            DB::commit();
-            return response()->json(['message' => 'Empaque finalizado con éxito',"data" => $emp], 200);
-        }catch(\Exception $e){
-            return response()->json(['message' => 'Error al anular el empaque'.$e], 500);
-            DB::rollback();
+        if($request->op==0){
+            try{
+                set_time_limit(6000000);
+                ini_set('max_execution_time', 6000000);
+    
+                DB::beginTransaction();
+                    $remision = Remision::where('remi_codigo', $request->remi_codigo)
+                    ->where('remi_idempresa', $request->remi_idempresa)
+                    ->where('remi_num_factura', $request->factura)
+                    ->firstOrFail();
+                    $remision->remi_guia_remision =  $request->guiaremision;
+                    if($request->archivo)           { $remision->archivo = null; }
+                    if($request->url)               { $remision->url     = null; }
+                    
+                    $remision->remi_fecha_final = now();
+                    $remision->updated_at = now();
+                    $remision->remi_estado= 2;
+                    $remision->save();
+                    $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)
+                    ->where('empa_codigo', $request->empa_codigo)
+                    ->where('empa_facturas', $request->factura)->firstOrFail();
+                    $emp->updated_at        = now();
+                    $emp->empa_estado       = 2;
+                    $emp->save();
+                    $venta =  Ventas::where('ven_codigo', $request->factura)
+                    ->where('id_empresa', $request->remi_idempresa)
+                    ->firstOrFail();
+                    if($request->estado==1){
+                        $venta->est_ven_codigo=1;
+                    }
+                    $venta->updated_at = now();
+                    $venta->save();
+                DB::commit();
+                return response()->json(['message' => 'Empaque finalizado con éxito',"data" => $remision], 200);
+            }catch(\Exception $e){
+                return response()->json(['message' => 'Error al anular el empaque'.$e], 500);
+                DB::rollback();
+            }
+        } else if($request->op==1){
+            try{
+                set_time_limit(6000000);
+                ini_set('max_execution_time', 6000000);
+    
+                DB::beginTransaction();
+                    $remision = Remision::where('remi_codigo', $request->remi_codigo)
+                    ->where('remi_idempresa', $request->remi_idempresa)
+                    ->where('remi_num_factura', $request->factura)
+                    ->firstOrFail();
+                    $remision->remi_fecha_final = now();
+                    $remision->updated_at = now();
+                    $remision->remi_estado= 2;
+                    $remision->save();
+                    $emp                = _1_4_Empacado::where('remi_codigo', $request->remi_codigo)
+                    ->where('empa_codigo', $request->empa_codigo)
+                    ->where('empa_facturas', $request->factura)->firstOrFail();
+                    $emp->updated_at        = now();
+                    $emp->empa_estado       = 2;
+                    $emp->save();
+                    $venta =  Ventas::where('ven_codigo', $request->factura)
+                    ->where('id_empresa', $request->remi_idempresa)
+                    ->firstOrFail();
+                    if($request->estado==1){
+                        $venta->est_ven_codigo=$request->estado;
+                    }
+                    $venta->updated_at = now();
+                    $venta->save();
+                DB::commit();
+                return response()->json(['message' => 'Empaque finalizado con éxito',"data" => $remision], 200);
+            }catch(\Exception $e){
+                return response()->json(['message' => 'Error al finalizar el empaque'.$e], 500);
+                DB::rollback();
+            }
         }
     }
     /**

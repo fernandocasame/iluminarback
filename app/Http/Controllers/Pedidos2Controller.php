@@ -32,6 +32,7 @@ class Pedidos2Controller extends Controller
         ini_set('max_execution_time', 6000000);
         if($request->getLibrosFormato)              { return $this->getLibrosFormato($request->periodo_id); }
         if($request->geAllLibrosxAsesor)            { return $this->geAllLibrosxAsesor($request->asesor_id,$request->periodo_id); }
+        if($request->getLibrosXAreaXSerieUsados)    { return $this->getLibrosXAreaXSerieUsados($request->periodo_id,$request->area,$request->serie); }
         //api:get/pedidos2/pedidos?getAsesoresPedidos=1
         if($request->getAsesoresPedidos)            { return $this->getAsesoresPedidos(); }
         if($request->getInstitucionesDespacho)      { return $this->getInstitucionesDespacho($request); }
@@ -103,6 +104,7 @@ class Pedidos2Controller extends Controller
         $query = $this->geAllLibrosxAsesor(0,$request->id_periodo,1,$request->id_pedidos);
         return $query;
     }
+
     //API:GET/pedidos2/pedidos?getLibrosXInstituciones=yes&id_periodo=23&tipo_venta=1
     public function getLibrosXInstituciones($id_periodo,$tipo_venta){
         $query = $this->tr_getInstitucionesVentaXTipoVenta($id_periodo,$tipo_venta);
@@ -285,7 +287,7 @@ class Pedidos2Controller extends Controller
             $valores = [];
             //plan lector
             if($item->plan_lector > 0 ){
-                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,pro.pro_reservar,
+                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,pro.pro_reservar, l.descripcionlibro,
                 (
                     SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -301,7 +303,7 @@ class Pedidos2Controller extends Controller
                 ");
                 $valores = $getPlanlector;
             }else{
-                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,pro.pro_reservar,
+                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,pro.pro_reservar, l.descripcionlibro,
                 (
                     SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -338,6 +340,7 @@ class Pedidos2Controller extends Controller
                 "precio"            => $valores[0]->precio,
                 "codigo"            => $valores[0]->codigo_liquidacion,
                 "stock"             => $valores[0]->pro_reservar,
+                "descripcion"       => $valores[0]->descripcionlibro,
             ];
             $contador++;
         }
@@ -367,6 +370,27 @@ class Pedidos2Controller extends Controller
         // $resultado  = array_unique($datos, SORT_REGULAR);
         // $coleccion  = collect($resultado);
         // return $coleccion->values();
+    }
+    //API:GET/pedidos2/pedidos?getLibrosXAreaXSerieUsados=yes&periodo_id=24&area=19&serie=169
+    public function getLibrosXAreaXSerieUsados($periodo,$area,$serie){
+        $query = DB::SELECT("SELECT DISTINCT pv.valor,
+        pv.id_area, pv.tipo_val, pv.id_serie, pv.year,pv.plan_lector,pv.alcance,
+        p.id_periodo,
+        CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
+        se.nombre_serie,p.id_pedido
+        FROM pedidos_val_area pv
+        LEFT JOIN area ar ON  pv.id_area = ar.idarea
+        LEFT JOIN series se ON pv.id_serie = se.id_serie
+        LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        WHERE  p.id_periodo  = '$periodo'
+        AND p.tipo        = '0'
+        AND p.estado      = '1'
+        AND ar.idarea     = '$area'
+        AND se.id_serie   = '$serie'
+        GROUP BY pv.id
+        ");
+        return $query;
     }
     public function getAlcanceAbiertoXId($id){
         $query = DB::SELECT("SELECT * FROM pedidos_alcance a
@@ -607,7 +631,9 @@ class Pedidos2Controller extends Controller
                 "libro_id"           => $item->libro_id,
                 "valor"              => $total,
                 "stock"              => $item->stock,
-                "cantidad"           => 0
+                "cantidad"           => 0,
+                "id_serie"           => $item->id_serie,
+                "descripcion"        => $item->descripcion,
             ];
         }
         return $resultado;

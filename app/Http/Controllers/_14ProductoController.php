@@ -799,4 +799,15 @@ class _14ProductoController extends Controller {
         $query = DB:: SELECT("SELECT * FROM configuracion_general c WHERE c.nombre LIKE '%notas%'");
         return $query;
     }
+    public function getProductosSuma() {
+        $query = DB:: SELECT("SELECT 
+            SUM(pro_reservar) AS total_reservar,
+            SUM(pro_stock) AS total_stock,
+            SUM(pro_deposito) AS total_deposito,
+            SUM(pro_stockCalmed) AS total_stockCalmed,
+            SUM(pro_depositoCalmed) AS total_depositoCalmed
+            FROM 
+            1_4_cal_producto;");
+        return $query;
+    }
 }

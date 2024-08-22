@@ -314,10 +314,15 @@ trait TraitPedidosGeneral
         return $query;
     }
     public function tr_getDespachoProforma($id_profroma){
-        $proforma = DB::SELECT("SELECT p.*, i.nombreInstitucion, i.direccionInstitucion,
-            i.ruc,i.telefonoInstitucion,i.email,
-            CONCAT(u.nombres, ' ', u.apellidos) AS cliente,
-            u.cedula, c.nombre AS ciudad
+        $proforma = DB::SELECT("SELECT p.*,
+                i.nombreInstitucion,
+                i.direccionInstitucion,
+                i.ruc,
+                i.telefonoInstitucion,
+                i.email,
+                CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidos, '')) AS cliente,
+                u.cedula,
+                c.nombre AS ciudad
             FROM f_proforma p
             LEFT JOIN institucion i ON p.id_ins_depacho = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad

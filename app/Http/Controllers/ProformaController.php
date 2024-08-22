@@ -111,12 +111,13 @@ class ProformaController extends Controller
         $datos = [];
         $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
             ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock  as facturas,
-             p.pro_deposito as bodega,p.pro_reservar
+             p.pro_deposito as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie
               FROM f_detalle_proforma as dpr
             INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
             INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
             INNER JOIN 1_4_cal_producto as p on dpr.pro_codigo=p.pro_codigo
             INNER JOIN series as s ON ls.id_serie=s.id_serie
+            INNER JOIN libro l ON ls.idLibro = l.idlibro
             WHERe dpr.prof_id='$request->prof_id'
         ");
         foreach($array1 as $key => $item){
@@ -143,6 +144,8 @@ class ProformaController extends Controller
                 'bodega' => $item->bodega,
                 'cant'   => (int)$cantidad,
                 'pro_reservar' => $item->pro_reservar,
+                'descripcion' => $item->descripcionlibro,
+                'id_serie' => $item->id_serie,
             );
 
         }
@@ -315,7 +318,7 @@ class ProformaController extends Controller
             if($tipo ==1){
                 $query = DB::SELECT("SELECT fpr.*,  em.nombre, em.img_base64,
                 us.nombres as username, us.apellidos as lastname, COUNT(dpr.pro_codigo) AS item, SUM(dpr.det_prof_cantidad) AS libros,
-                CONCAT(usa.nombres, ' ',usa.apellidos) as cliente,
+                CONCAT(COALESCE(usa.nombres, ''), ' ', COALESCE(usa.apellidos, '')) AS cliente,
                 i.nombreInstitucion,i.ruc as rucPuntoVenta
                 FROM f_proforma fpr
                 LEFT JOIN usuario us ON fpr.user_editor = us.idusuario

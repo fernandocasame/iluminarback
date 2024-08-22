@@ -1152,7 +1152,7 @@ class PedidosController extends Controller
             $valores = [];
             //plan lector
             if($item->plan_lector > 0 ){
-                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro, pro.pro_reservar,pro.pro_stock, pro.pro_deposito,
+                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro, pro.pro_reservar,pro.pro_stock, pro.pro_deposito,l.descripcionlibro,
                 (
                     SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -1168,7 +1168,7 @@ class PedidosController extends Controller
                 ");
                 $valores = $getPlanlector;
             }else{
-                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro, pro.pro_reservar, pro.pro_stock, pro.pro_deposito,
+                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro, pro.pro_reservar, pro.pro_stock, pro.pro_deposito,l.descripcionlibro,
                 (
                     SELECT f.pvp AS precio
                     FROM pedidos_formato f
@@ -1213,6 +1213,7 @@ class PedidosController extends Controller
                 "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
                 "alcance"           => $item->alcance,
                 "cantidad"          => $tr->cantidad,
+                "descripcion"       => $valores[0]->descripcionlibro,
             ];
             $contador++;
         }
@@ -1220,7 +1221,7 @@ class PedidosController extends Controller
 
     }
     public function get_val_pedidoLibrosObsequiosInfoTodoSinPedido(Request $request){
-        $datos = DB::SELECT("SELECT ls.*, l.nombrelibro, l.demo,  l.idlibro, l.asignatura_idasignatura, a.area_idarea, l.portada, s.nombre_serie, ar.nombrearea,
+        $datos = DB::SELECT("SELECT ls.*, l.nombrelibro, l.demo,  l.idlibro, l.descripcionlibro as descripcion, l.asignatura_idasignatura, a.area_idarea, l.portada, s.nombre_serie, ar.nombrearea,
             (SELECT f.pvp FROM pedidos_formato f WHERE f.id_serie = ls.id_serie AND f.id_area = a.area_idarea AND f.id_periodo = '$request->periodo' LIMIT 1 ) AS precio , cp.*
             FROM libros_series ls
             LEFT JOIN series s ON ls.id_serie = s.id_serie
@@ -2988,7 +2989,7 @@ class PedidosController extends Controller
             p.contrato_generado,
             CONCAT(u.nombres,' ',u.apellidos) as asesor,
             CONCAT(uc.nombres,' ',uc.apellidos) as creador,
-            i.maximo_porcentaje_autorizado as procentaje_institucion,
+            p.descuento as procentaje_institucion,
             u.nombres, u.apellidos, pe.periodoescolar as periodo, p.TotalVentaReal,p.total_series_basicas,
             i.nombreInstitucion,3 as TipoPendiente,p.descuento, pa.created_at as fechaCreacionPedido, pa.observacion_asesor as observacion,
             p.id_pedido as pedido_id
@@ -5334,48 +5335,48 @@ class PedidosController extends Controller
     public function AnularLibrosObsequios(Request $request) {
         // Iniciar transacción
         DB::beginTransaction();
-        
+
         try {
             // Encontrar el pedido de libro obsequio
             $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
-            
+
             // Actualizar el estado del pedido de libro obsequio
             $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
             $pedidoLibroObsequio->save();
-            
+
             // Buscar todas las ventas asociadas en la tabla F_venta
             $ventas = DB::table('f_venta')
                         ->where('ven_p_libros_obsequios', $request->id)
                         ->get();
-            
+
             if ($ventas->isEmpty()) {
                 throw new \Exception('No se encontraron ventas asociadas');
             }
-            
+
             // Iterar sobre todas las ventas encontradas
             foreach ($ventas as $venta) {
                 // Actualizar el estado de la venta
                 DB::table('f_venta')
                     ->where('ven_codigo', $venta->ven_codigo)
                     ->update(['est_ven_codigo' => 3]);
-                
+
                 // Obtener detalles de la venta
                 $detalles = DB::table('f_detalle_venta')
                               ->where('ven_codigo', $venta->ven_codigo)
                               ->get();
-                
+
                 // Iterar sobre los detalles y actualizar los productos
                 foreach ($detalles as $detalle) {
                     $producto = DB::table('1_4_cal_producto')
                                   ->where('pro_codigo', $detalle->pro_codigo)
                                   ->first();
-                    
+
                     if (!$producto) {
                         // Deshacer la transacción en caso de error con un producto
                         DB::rollBack();
                         return ["status" => "0", "message" => "Producto no encontrado"];
                     }
-        
+
                     // Ajustar el stock según la empresa
                     if ($venta->id_empresa == 1) {
                         DB::table('1_4_cal_producto')
@@ -5394,18 +5395,18 @@ class PedidosController extends Controller
                     }
                 }
             }
-            
+
             // Confirmar la transacción
             DB::commit();
-            
+
             return ["status" => "1", "message" => "Se anuló correctamente"];
         } catch (\Exception $e) {
             // Deshacer la transacción en caso de error
             DB::rollBack();
-            
+
             // Opcional: Loguear el error
             Log::error('Error al anular libros obsequios: ' . $e->getMessage());
-            
+
             return ["status" => "0", "message" => "No se pudo anular"];
         }
     }
@@ -5657,15 +5658,25 @@ class PedidosController extends Controller
     //listar pedido libros obsequios
     public function getLibrosObsequios(Request $request){
         if($request->usuario == 11){
-            $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad,
-            p.contrato_generado,
-            CONCAT(u.nombres,' ',u.apellidos) as asesor,
-            CONCAT(uf.apellidos, ' ',uf.nombres) as facturador
-            -- fv.ven_observacion
+            $query = DB::SELECT("SELECT pa.*, i.nombreInstitucion, c.nombre AS ciudad, p.contrato_generado,
+            CONCAT(u.nombres,' ',u.apellidos) AS asesor,
+            CONCAT(uf.apellidos, ' ',uf.nombres) AS facturador,
+            CONCAT(uc.apellidos, ' ',uc.nombres) AS creador, uc.id_group AS grupo_creador,
+            CASE uc.id_group
+            WHEN 0 THEN 'ROOT'
+            WHEN 1 THEN 'ADMIN'
+            WHEN 11 THEN 'ASESOR'
+            WHEN 22 THEN 'FACTURADOR'
+            WHEN 23 THEN 'ADMIN FACTURADOR'
+            ELSE 'OTRO PERFIL'
+            END AS tipo_creador,
+            CONCAT(ua.apellidos, ' ',ua.nombres) AS aprobador, ua.id_group AS grupo_aprobador
             FROM p_libros_obsequios pa
             LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
             LEFT JOIN usuario u ON p.id_asesor = u.idusuario
             LEFT JOIN usuario uf ON p.id_usuario_verif = uf.idusuario
+            LEFT JOIN usuario uc ON pa.user_created = uc.idusuario
+            LEFT JOIN usuario ua ON pa.usuario_aprobacion_id = ua.idusuario
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id  = c.idciudad
             -- INNER JOIN f_venta fv ON pa.id = fv.ven_p_libros_obsequios
@@ -5675,15 +5686,25 @@ class PedidosController extends Controller
             return $query;
         }
         if($request->usuario == 22 ||  $request->usuario == 23 ||  $request->usuario == 25 || $request->usuario == 0 || $request->usuario == 1){
-            $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad,
-            p.contrato_generado,
-            CONCAT(u.nombres,' ',u.apellidos) as asesor,
-            CONCAT(uf.apellidos, ' ',uf.nombres) as facturador
-            -- fv.ven_observacion
+            $query = DB::SELECT("SELECT pa.*, i.nombreInstitucion, c.nombre AS ciudad, p.contrato_generado,
+            CONCAT(u.nombres,' ',u.apellidos) AS asesor,
+            CONCAT(uf.apellidos, ' ',uf.nombres) AS facturador,
+            CONCAT(uc.apellidos, ' ',uc.nombres) AS creador, uc.id_group AS grupo_creador,
+            CASE uc.id_group
+            WHEN 0 THEN 'ROOT'
+            WHEN 1 THEN 'ADMIN'
+            WHEN 11 THEN 'ASESOR'
+            WHEN 22 THEN 'FACTURADOR'
+            WHEN 23 THEN 'ADMIN FACTURADOR'
+            ELSE 'OTRO PERFIL'
+            END AS tipo_creador,
+            CONCAT(ua.apellidos, ' ',ua.nombres) AS aprobador, ua.id_group AS grupo_aprobador
             FROM p_libros_obsequios pa
             LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
             LEFT JOIN usuario u ON p.id_asesor = u.idusuario
             LEFT JOIN usuario uf ON p.id_usuario_verif = uf.idusuario
+            LEFT JOIN usuario uc ON pa.user_created = uc.idusuario
+            LEFT JOIN usuario ua ON pa.usuario_aprobacion_id = ua.idusuario
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id  = c.idciudad
             -- INNER JOIN f_venta fv ON pa.id = fv.ven_p_libros_obsequios
@@ -5700,7 +5721,7 @@ class PedidosController extends Controller
             p.contrato_generado,
             CONCAT(u.nombres,' ',u.apellidos) as asesor,
             CONCAT(uc.nombres,' ',uc.apellidos) as creador,
-            i.maximo_porcentaje_autorizado as procentaje_institucion
+            p.descuento as procentaje_institucion
             FROM p_libros_obsequios pa
             LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
             LEFT JOIN usuario u ON p.id_asesor = u.idusuario
@@ -5720,7 +5741,7 @@ class PedidosController extends Controller
         CONCAT(uc.nombres,' ',uc.apellidos) as creador,
         i.telefonoInstitucion,u.cedula AS cedulaAsesor,
         i.direccionInstitucion, pe.codigo_contrato AS nombrePeriodo,
-        i.idInstitucion as institucion, i.maximo_porcentaje_autorizado as porcentaje
+        i.idInstitucion as institucion, p.descuento as porcentaje
         FROM p_libros_obsequios pa
         LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
@@ -5872,12 +5893,12 @@ class PedidosController extends Controller
 
     public function getDescuentoInstitucion($pedido){
         $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad,
-        p.contrato_generado, p.tipo_venta,
+        p.contrato_generado, p.tipo_venta, p.descuento,
         CONCAT(u.nombres,' ',u.apellidos) as asesor,
         CONCAT(uc.nombres,' ',uc.apellidos) as creador,
         i.telefonoInstitucion,u.cedula AS cedulaAsesor,
         i.direccionInstitucion, pe.codigo_contrato AS nombrePeriodo,
-        i.idInstitucion as institucion, i.maximo_porcentaje_autorizado as porcentaje
+        i.idInstitucion as institucion, p.descuento as porcentaje
         FROM p_libros_obsequios pa
         LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
@@ -5891,11 +5912,12 @@ class PedidosController extends Controller
     }
 
     public function obtenerDatosDetalleLibros($pedido){
-        $query = DB::SELECT("SELECT plo.*, ls.nombre AS pro_nombre, pl.porcentaje_descuento, pro.pro_deposito, pro.pro_depositoCalmed
+        $query = DB::SELECT("SELECT plo.*, ls.nombre AS pro_nombre, pl.porcentaje_descuento, pro.pro_deposito, pro.pro_depositoCalmed, l.descripcionlibro, ls.id_serie
         FROM p_detalle_libros_obsequios plo
         INNER JOIN 1_4_cal_producto  pro ON pro.pro_codigo = plo.pro_codigo
         INNER JOIN p_libros_obsequios pl ON pl.id = plo.p_libros_obsequios_id
         INNER JOIN libros_series ls ON ls.codigo_liquidacion = pro.pro_codigo
+        INNER JOIN libro l ON ls.idLibro = l.idlibro
         WHERE plo.p_libros_obsequios_id =  $pedido");
         return $query;
     }
@@ -5926,12 +5948,14 @@ class PedidosController extends Controller
         return $query;
     }
     public function obtenerDetalleDocumentosLibrosObsequios(Request $request){
-        $query = DB::SELECT("SELECT fdv.*, ls.nombre AS pro_nombre, fv.user_created, CONCAT(us.nombres , ' ' , us.apellidos) AS facturador , cp.pro_nombre AS nombreproducto
+        $query = DB::SELECT("SELECT fdv.*, ls.nombre AS pro_nombre, fv.user_created, CONCAT(us.nombres , ' ' , us.apellidos) AS facturador , cp.pro_nombre AS nombreproducto,
+        l.descripcionlibro, ls.id_serie
         FROM f_detalle_venta fdv
         INNER JOIN f_venta fv ON fdv.ven_codigo = fv.ven_codigo
         INNER JOIN libros_series ls ON ls.codigo_liquidacion = fdv.pro_codigo
         INNER JOIN usuario us ON us.idusuario = fv.user_created
         INNER JOIN 1_4_cal_producto cp ON cp.pro_codigo = fdv.pro_codigo
+        INNER JOIN libro l ON ls.idLibro = l.idlibro
         WHERE fv.ven_codigo = '$request->ven_codigo'");
         return $query;
     }
