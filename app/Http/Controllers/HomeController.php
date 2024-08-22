@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class HomeController extends Controller
 {
@@ -24,5 +25,18 @@ class HomeController extends Controller
     public function index()
     {
         return Auth::user();
+    }
+    public function userInfo()
+    {
+        Cache::flush();
+        return Auth::user();
+        // $key = "userInfo";
+        // if (Cache::has($key)) {
+        //     $query = Cache::get($key);
+        // } else {
+        //     $query = Auth::user();
+        //     Cache::put($key,$query);
+        // }
+        // return $query;
     }
 }

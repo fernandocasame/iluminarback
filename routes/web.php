@@ -305,6 +305,7 @@ Route::get('contratosAsesor','UsuarioController@contratosAsesor');
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 Route::get('user', 'HomeController@index');
+Route::get('userInfo', 'HomeController@userInfo');
 Route::post('addContenidopost', 'CursoController@addContenidoD');
 // Route::post('/login', 'AuthController@login');
 
