@@ -772,6 +772,8 @@ Route::get('validar_puntajes','SallePreguntasController@validar_puntajes');
 // evaluaciones salle
 Route::get('generar_evaluacion_salle/{id_docente}/{id_institucion}/{n_evaluacion}/{admin}', 'SallePreguntasController@generar_evaluacion_salle');
 Route::get('salle_getConfiguracion/{id_institucion}/{n_evaluacion}','SallePreguntasController@salle_getConfiguracion');
+Route::get('obtenerCalificacion_salle/{id_docente}/', 'SallePreguntasController@obtenerCalificacion_salle');
+Route::get('f_estadoPreguntas/{id_evaluacion}/', 'SallePreguntasController@f_estadoPreguntas');
 Route::get('obtener_evaluacion_salle/{id_docente}/{id_evaluacion}/{n_evaluacion}','SallePreguntasController@obtener_evaluacion_salle');
 Route::post('salle_finalizarEvaluacion','SallePreguntasController@salle_finalizarEvaluacion');
 Route::get('evaluaciones_resueltas_salle/{id_docente}/{n_evaluacion}','SallePreguntasController@evaluaciones_resueltas_salle');
@@ -779,6 +781,7 @@ Route::get('reporte_evaluaciones_institucion/{fecha}','SallePreguntasController@
 Route::post('salle_guardarSeleccion','SallePreguntasController@salle_guardarSeleccion');
 Route::post('salle_intento_eval','SallePreguntasController@salle_intento_eval');
 Route::post('save_finalizar_evalIntentos','SallePreguntasController@save_finalizar_evalIntentos');
+Route::post('obtenerCalificacionSalle','SallePreguntasController@obtenerCalificacionSalle');
 //salle reportes
 Route::get('reporte_evaluaciones_institucion/{fecha}','SalleReportesController@reporte_evaluaciones_institucion');
 Route::get('salle_promedio_areas/{periodo}/{institucion}','SalleReportesController@salle_promedio_areas');
@@ -1019,7 +1022,15 @@ Route::post('abono_registro', 'AbonoController@abono_registro');
 Route::post('eliminarAbono', 'AbonoController@eliminarAbono');
 Route::post('cobro_cheque_registro', 'AbonoController@cobro_cheque_registro');
 Route::get('get_facturasNotasxParametro', 'AbonoController@get_facturasNotasxParametro');
+Route::get('get_facturasNotasAll', 'AbonoController@get_facturasNotasAll');
 Route::get('getClienteCobranzaxInstitucion', 'AbonoController@getClienteCobranzaxInstitucion');
+Route::get('traerCobros', 'AbonoController@traerCobros');
+Route::get('getClienteLocalDocumentos', 'AbonoController@getClienteLocalDocumentos');
+Route::get('getClienteLocal', 'AbonoController@getClienteLocal');
+Route::post('modificarAbono', 'AbonoController@modificarAbono');
+Route::post('modificarAbonoNotas', 'AbonoController@modificarAbonoNotas');
+Route::post('anularAbono', 'AbonoController@anularAbono');
+Route::get('reporteAbonoVentas', 'AbonoController@reporteAbonoVentas');
 //FIN ABONO
 //CUENTA DE BANCO
 Route::post('cuenta_registro', 'BancoController@cuenta_registro');
@@ -1751,6 +1762,7 @@ Route::get('GetVentasPendientes','VentasController@GetVentasPendientes');
 Route::get('GetDetalleVentaxNumeroDocumentoParametro','VentasController@GetDetalleVentaxNumeroDocumentoParametro');
 Route::get('GetVentasDespachadasxParametro','VentasController@GetVentasDespachadasxParametro');
 Route::get('GetFacturasX','VentasController@GetFacturasX');
+Route::get('GetFacturasTodas','VentasController@GetFacturasTodas');
 Route::get('GetAllFacturas','VentasController@GetAllFacturas');
 Route::get('GetAllNotas','VentasController@GetAllNotas');
 Route::get('GetNotas','VentasController@GetNotas');
@@ -1758,11 +1770,14 @@ Route::get('GetVentas','VentasController@GetVentas');
 Route::get('Get_DFactura','VentasController@Get_DFactura');
 Route::get('GetVuser','VentasController@GetVuser');
 Route::get('Verificarventa','VentasController@Verificarventa');
+Route::get('VerificacionDVenta','VentasController@VerificacionDVenta');
 Route::get('InstitucionesDesp','VentasController@InstitucionesDesp');
 Route::get('GetVentasP','VentasController@GetVentasP');
+Route::post('imprimirDVenta','VentasController@imprimirDVenta');
 Route::get('GetPreFacturasxAgrupa','VentasController@GetPreFacturasxAgrupa');
 Route::get('GetFacturasxAgrupa','VentasController@GetFacturasxAgrupa');
 Route::get('getDventas','VentasController@getDventas');
+Route::get('Get_DatoFactura','VentasController@Get_DatoFactura');
 Route::post('Postventa_Registra','VentasController@Postventa_Registra');
 Route::post('Postventa_factura','VentasController@Postventa_factura');
 Route::post('despachar','VentasController@despachar');
@@ -1845,4 +1860,5 @@ Route::group([], function () {
     // Definición manual de rutas para el controlador EvaluacionEstudianteController
     Route::resource('/solinfa', 'SolinfaController');
 });
+Route::get('metodosGetCodigos','CodigoLibrosController@metodosGetCodigos');
 

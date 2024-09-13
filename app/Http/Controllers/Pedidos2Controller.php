@@ -7,10 +7,12 @@ use App\Models\Models\Pedidos\PedidosDocumentosLiq;
 use App\Models\Institucion;
 use App\Models\User;
 use App\Models\Usuario;
+use App\Models\Ventas;
 use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class Pedidos2Controller extends Controller
 {
@@ -40,6 +42,8 @@ class Pedidos2Controller extends Controller
         if($request->getLibrosXInstituciones)       { return $this->getLibrosXInstituciones($request->id_periodo,$request->tipo_venta); }
         if($request->getLibrosXInstitucionesAsesor) { return $this->getLibrosXInstitucionesAsesor($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
         if($request->getproStockReserva)            { return $this->getproStockReserva($request); }
+        if($request->getPuntosVentaDespachados)     { return $this->getPuntosVentaDespachados($request); }
+        if($request->getDatosPuntosAllVenta)        { return $this->getDatosPuntosAllVenta($request); }
         if($request->getDatosPuntosVenta)           { return $this->getDatosPuntosVenta($request); }
         if($request->getDatosClient)                { return $this->getDatosClient($request); }
         if($request->getDatosClientes)              { return $this->getDatosClientes($request); }
@@ -77,6 +81,7 @@ class Pedidos2Controller extends Controller
                 'id_periodo'        => $item->id_periodo,
                 'codigo_contrato'   => $item->codigo_contrato,
                 'pedidos'           => $this->tr_pedidosXDespacho($item->ca_codigo_agrupado,$id_periodo),
+                'preproformas'      => $this->tr_getPreproformas($item->ca_codigo_agrupado),
                 'ca_descripcion'    => $item->ca_descripcion,
                 'ca_tipo_pedido'    => $item->ca_tipo_pedido,
                 'ca_id'             => $item->ca_id,
@@ -97,6 +102,31 @@ class Pedidos2Controller extends Controller
             return "Se guardó correctamente";
         } else {
             return "No se pudo guardar/actualizar";
+        }
+    }
+    //api:post/marcarComoAnuladoPerseoPrefactura
+    public function marcarComoAnuladoPerseoPrefactura(Request $request){
+        try {
+            // Obtener datos del request
+            $ven_codigo = $request->ven_codigo;
+            $id_empresa = $request->id_empresa;
+
+            // Realizar la actualización
+            Ventas::where('ven_codigo', $ven_codigo)
+                ->where('id_empresa', $id_empresa)
+                ->update(['anuladoEnPerseo' => '1']);
+
+            // Devolver una respuesta de éxito
+            return response()->json([
+                "status" => "1",
+                "message" => "Se marcó como anulado correctamente"
+            ]);
+        } catch (\Exception $e) {
+            // Manejar cualquier otra excepción
+            return response()->json([
+                "status" => "0",
+                "message" => "Error inesperado: " . $e->getMessage()
+            ], 200);
         }
     }
     //API:GET/pedidos2/pedidos?getLibrosXDespacho=yes&id_pedidos=1,2,3
@@ -132,11 +162,36 @@ class Pedidos2Controller extends Controller
         $query = DB::SELECT("SELECT pro_codigo,pro_reservar FROM 1_4_cal_producto WHERE pro_codigo = '$pro_codigo' ");
         return $query;
     }
+    //API:GET/pedidos2/pedidos?getPuntosVentaDespachados=1&periodo=25&idusuario=1
+    public function getPuntosVentaDespachados($request){
+        $periodo   = $request->periodo;
+        $idusuario = $request->idusuario;
+
+        $clave = "getPuntosVentaDespachados".$periodo.$idusuario;
+        if (Cache::has($clave)) {
+            $response = Cache::get($clave);
+        } else {
+            $query     = $this->tr_getPuntosVentasDespachos($periodo);
+            $response = $query;
+            Cache::put($clave,$response);
+        }
+        return $response;
+    }
+    //API:GET/pedidos2/pedidos?getDatosPuntosAllVenta=1&busqueda=prolipa
+    public function getDatosPuntosAllVenta($request){
+        $busqueda   = $request->busqueda;
+        $query      = $this->tr_getPuntosVenta($busqueda);
+        return $query;
+    }
     //API:GET/pedidos2/pedidos?getDatosPuntosVenta=1&busqueda=prolipa&id_periodo=22
     public function getDatosPuntosVenta($request){
         $busqueda   = $request->busqueda;
         $id_periodo = $request->id_periodo;
-        $query = $this->tr_getPuntosVenta($busqueda);
+        $getPeriodo = DB::table("periodoescolar")
+        ->where('idperiodoescolar',$id_periodo)
+        ->get();
+        $region = $getPeriodo[0]->region_idregion;
+        $query = $this->tr_getPuntosVentaRegion($busqueda,$region);
         //traer datos de la tabla f_formulario_proforma por id_periodo
         foreach($query as $key => $item){ $query[$key]->datosInstitucion = DB::SELECT("SELECT * FROM f_formulario_proforma fp WHERE fp.idInstitucion = '$item->idInstitucion' AND fp.idperiodoescolar = '$id_periodo'"); }
         return $query;

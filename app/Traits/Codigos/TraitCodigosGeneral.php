@@ -116,13 +116,15 @@ trait TraitCodigosGeneral{
         ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
         p.periodoescolar as periodo,
         pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
-        c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa'))
+        c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma, ls.codigo_liquidacion'
+        ))
         ->leftJoin('usuario as  u',         'c.idusuario',                  'u.idusuario')
         ->leftJoin('institucion  as ib',    'c.bc_institucion',             'ib.idInstitucion')
         ->leftJoin('institucion as  i',     'u.institucion_idInstitucion',  'i.idInstitucion')
         ->leftJoin('institucion  as ivl',   'c.venta_lista_institucion',    'ivl.idInstitucion')
         ->leftJoin('periodoescolar as  p',  'c.id_periodo',                 'p.idperiodoescolar')
-        ->leftJoin('periodoescolar as pb',  'c.bc_periodo',                 'pb.idperiodoescolar');
+        ->leftJoin('periodoescolar as pb',  'c.bc_periodo',                 'pb.idperiodoescolar')
+        ->leftJoin('libros_series as ls',   'ls.idLibro',                   'c.libro_idlibro');
         //por codigo
         if ($busqueda == 0) {  $resultado->where('c.codigo', '=', $codigo); }
         //por like codigo
@@ -196,7 +198,9 @@ trait TraitCodigosGeneral{
                 "verificacion"                  => $item->verificacion,
                 "liquidado_regalado"            => $item->liquidado_regalado,
                 "codigo_proforma"               => $item->codigo_proforma,
-                "proforma_empresa"              => $item->proforma_empresa
+                "proforma_empresa"              => $item->proforma_empresa,
+                "codigo_liquidacion"            => $item->codigo_liquidacion,
+                'devuelto_proforma'             => $item->devuelto_proforma,
             ];
         }
         return $datos;

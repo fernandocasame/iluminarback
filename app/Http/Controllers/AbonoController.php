@@ -5,30 +5,35 @@ namespace App\Http\Controllers;
 use App\Models\Abono;
 use App\Models\AbonoHistorico;
 use App\Models\Cheque;
+use App\Rules\UniqueAbonoDocument;
 
 use DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class AbonoController extends Controller
 {
     public function abono_registro(Request $request)
     {
-        $validator = Validator::make($request->all(), [
+        $validator = \Validator::make($request->all(), [
             'notasOfactura' => 'required|in:0,1',
             'abono_valor' => 'required|numeric',
             'abono_totalNotas' => 'required|numeric',
             'abono_totalFacturas' => 'required|numeric',
             'user_created' => 'required',
-            // 'institucion' => 'required',
             'periodo' => 'required',
             'abono_tipo' => 'required',
-            'abono_documento' => 'required|unique:abono,abono_documento,' . $request->abono_id . ',abono_id',
+            'abono_documento' => 'required',
             'abono_cuenta' => 'required',
             'abono_fecha' => 'required|date',
             'abono_empresa' => 'required',
+            'abono_concepto' => 'required',
+            'abono_ruc_cliente' => 'required',
         ]);
+
+        // 'abono_documento' => 'required|unique:abono,abono_documento,' . $request->abono_id . ',abono_id',
 
         if ($validator->fails()) {
             $errors = $validator->errors();
@@ -43,6 +48,33 @@ class AbonoController extends Controller
             ]);
         }
 
+        // Validación personalizada para el número de documento
+        $existingAbono = DB::table('abono')
+            ->where('abono_documento', $request->abono_documento)
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($existingAbono) {
+            // Si el estado del abono existente es 0, no se permite guardar
+            if ($existingAbono->abono_estado == 0) {
+                // Obtener información del cliente para el mensaje de error
+                $usuario = DB::table('usuario')
+                    ->where('cedula', $existingAbono->abono_ruc_cliente)
+                    ->select('nombres', 'apellidos')
+                    ->first();
+
+                $fullName = $usuario ? $usuario->nombres . ' ' . $usuario->apellidos : 'desconocido';
+
+                return response()->json([
+                    'status' => 0,
+                    'message' => "El valor del campo documento ya está en uso con el Cliente $fullName.",
+                ]);
+            }
+            // else{
+            //     return ['si existe', $existingAbono];
+            // }
+        }
+
         \DB::beginTransaction();
 
         try {
@@ -52,16 +84,17 @@ class AbonoController extends Controller
             $abono->abono_totalNotas = round($request->abono_totalNotas, 2);
             $abono->abono_totalFacturas = round($request->abono_totalFacturas, 2);
             $abono->user_created = $request->user_created;
-            // $abono->abono_institucion = $request->institucion;
             $abono->abono_periodo = $request->periodo;
             $abono->abono_tipo = $request->abono_tipo;
             $abono->abono_documento = $request->abono_documento;
             $abono->abono_cuenta = $request->abono_cuenta;
             $abono->abono_fecha = $request->abono_fecha;
             $abono->abono_empresa = $request->abono_empresa;
+            $abono->abono_concepto = $request->abono_concepto;
+            $abono->abono_ruc_cliente = $request->abono_ruc_cliente;
             $abono->idClientePerseo = $request->idClientePerseo;
             $abono->clienteCodigoPerseo = $request->clienteCodigoPerseo;
-            // $abono->tipo = $request->tipo;
+
             if (!$abono->save()) {
                 \DB::rollBack();
                 return response()->json([
@@ -69,7 +102,7 @@ class AbonoController extends Controller
                     'message' => 'Error al guardar el abono',
                 ]);
             }
-            $this->guardarAbonoHistorico($abono, 0);
+            $this->guardarAbonoHistorico($abono, 0, $request->user_created);
 
             \DB::commit();
 
@@ -79,7 +112,7 @@ class AbonoController extends Controller
                 'message' => 'Se guardó correctamente',
             ]);
         } catch (\Exception $e) {
-            \DB::rollBack(); // Revertir la transacción en caso de excepción
+            \DB::rollBack();
             return response()->json([
                 'status' => 0,
                 'message' => 'Error al guardar el abono: ' . $e->getMessage(),
@@ -87,22 +120,23 @@ class AbonoController extends Controller
         }
     }
     public function abono_pedido(Request $request){
-        $query = DB::SELECT("SELECT SUM(CASE WHEN ab.abono_facturas <> 0.00 THEN ab.abono_facturas ELSE 0 END) AS abonofacturas,
+        $query = DB::SELECT("SELECT SUM(CASE WHEN ab.abono_facturas <> 0.00 AND ab.abono_estado = 0 THEN ab.abono_facturas ELSE 0 END) AS abonofacturas,
             COUNT(CASE WHEN ab.abono_facturas <> 0.00 THEN 1 ELSE NULL END) AS totalAbonoFacturas,
-            SUM(CASE WHEN ab.abono_notas <> 0.00 THEN ab.abono_notas ELSE 0 END) AS abononotas,
+            SUM(CASE WHEN ab.abono_notas <> 0.00 AND ab.abono_estado = 0 THEN ab.abono_notas ELSE 0 END) AS abononotas,
             COUNT(CASE WHEN ab.abono_notas <> 0.00 THEN 1 ELSE NULL END) AS totalAbonoNotas
             -- FROM abono ab WHERE ab.abono_institucion = '$request->institucion'
             FROM abono ab WHERE ab.abono_periodo = '$request->periodo'
             AND ab.abono_empresa = '$request->empresa'
-            AND ab.idClientePerseo ='$request->cliente'
-            GROUP BY ab.idClientePerseo
+            AND ab.abono_ruc_cliente ='$request->cliente'
+            GROUP BY ab.abono_ruc_cliente
             HAVING SUM(ab.abono_facturas) <> 0 OR SUM(ab.abono_notas) <> 0;");
         return $query;
     }
 
     public function obtenerAbonos(Request $request)
     {
-        $abonoNotas = DB::SELECT("SELECT * FROM abono bn
+        $abonoNotas = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
+            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta  
             WHERE bn.abono_notas > 0
             AND bn.abono_facturas = 0
             AND bn.idClientePerseo ='$request->cliente'
@@ -111,7 +145,8 @@ class AbonoController extends Controller
             AND bn.abono_empresa = '$request->empresa'");
         $abonosConNotas = $abonoNotas;
 
-        $abonoFacturas = DB::SELECT("SELECT * FROM abono bn
+        $abonoFacturas = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
+            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta  
             WHERE bn.abono_facturas > 0
             AND bn.abono_notas = 0
             AND bn.idClientePerseo ='$request->cliente'
@@ -119,6 +154,13 @@ class AbonoController extends Controller
             AND bn.abono_periodo = $request->periodo
             AND bn.abono_empresa = $request->empresa");
         $abonosConFacturas = $abonoFacturas;
+
+        $abonosAll = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
+            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta  
+            WHERE bn.idClientePerseo ='$request->cliente'
+            -- AND bn.abono_institucion = $request->institucion
+            AND bn.abono_periodo = $request->periodo
+            AND bn.abono_empresa = $request->empresa");
         
         // abonos con abono_facturas > 0 y abono_notas = 0
         // $abonosConFacturas = Abono::where('abono_facturas', '>', 0)
@@ -136,69 +178,40 @@ class AbonoController extends Controller
 
         return [
             'abonos_con_facturas' => $abonosConFacturas,
-            'abonos_con_notas' => $abonosConNotas
+            'abonos_con_notas' => $abonosConNotas,
+            'abonos_all' => $abonosAll
         ];
     }
-    private function guardarAbonoHistorico($abono, $tipo)
+    private function guardarAbonoHistorico($abono, $tipo, $usuario)
     {
+        $tipoAbono = '';
         if ($tipo == 3) {
-            $abonoHistorico = new AbonoHistorico();
-            $abonoHistorico->abono_id = $abono->abono_id;
-            $abonoHistorico->ab_histotico_tipo = $tipo;
-            $abonoHistorico->ab_historico_values = json_encode([
-                'abono_fecha' => $abono->abono_fecha,
-                'abono_porcentaje' => $abono->abono_porcentaje,
-                'abono_documento' => $abono->abono_documento,
-                'abono_valor_retencion' => $abono->abono_valor_retencion,
-                'abono_tipo' => $abono->abono_tipo,
-                // 'institucion' => $abono->abono_institucion,
-                'cliente' => $abono->idClientePerseo,
-                'periodo' => $abono->abono_periodo,
-                'empresa' => $abono->abono_empresa,
-                'user_created' => $abono->user_created,
-            ]);
-            $abonoHistorico->user_created = $abono->user_created;
-        }else if ($tipo == 2) {
-            $abonoHistorico = new AbonoHistorico();
-            $abonoHistorico->abono_id = $abono->abono_id;
-            $abonoHistorico->ab_histotico_tipo = $tipo;
-            $abonoHistorico->ab_historico_values = json_encode([
-                'abono_id' => $abono->abono_id,
-                'notasOfactura' => $abono->abono_notas > 0 ? 'nota' : 'factura',
-                'abono_valor' => $abono->abono_facturas + $abono->abono_notas,
-                'abono_cheque_numero' => $abono->abono_cheque_numero,
-                'abono_tipo' => $abono->abono_tipo,
-                'abono_cheque_cuenta' => $abono->abono_cheque_cuenta,
-                // 'institucion' => $abono->abono_institucion,
-                'cliente' => $abono->idClientePerseo,
-                'periodo' => $abono->abono_periodo,
-                'empresa' => $abono->abono_empresa,
-                'user_created' => $abono->user_created,
-                // 'pedido' => $abono->abono_pedido,
-            ]);
-            $abonoHistorico->user_created = $abono->user_created;
-        }else if($tipo == 0 || $tipo == 1){
-            $abonoHistorico = new AbonoHistorico();
-            $abonoHistorico->abono_id = $abono->abono_id;
-            $abonoHistorico->ab_histotico_tipo = $tipo;
-            $abonoHistorico->ab_historico_values = json_encode([
-                'abono_id' => $abono->abono_id,
-                'notasOfactura' => $abono->abono_notas > 0 ? 'nota' : 'factura',
-                'abono_valor' => $abono->abono_facturas + $abono->abono_notas,
-                'abono_totalNotas' => $abono->abono_totalNotas,
-                'abono_tipo' => $abono->abono_tipo,
-                'abono_totalFacturas' => $abono->abono_totalFacturas,
-                // 'institucion' => $abono->abono_institucion,
-                'cliente' => $abono->idClientePerseo,
-                'periodo' => $abono->abono_periodo,
-                'empresa' => $abono->abono_empresa,
-                'user_created' => $abono->user_created,
-                // 'pedido' => $abono->abono_pedido,
-            ]);
-            $abonoHistorico->user_created = $abono->user_created;
+            $tipoAbono = 'retencion';
+        } elseif ($tipo == 2) {
+            $tipoAbono = 'Create Abono Cheque';
+        } elseif ($tipo == 0) {
+            $tipoAbono = 'Create Abono';
+        } elseif ($tipo == 1) {
+            $tipoAbono = 'Delete Abono';
+        } elseif ($tipo == 4) {
+            $tipoAbono = 'Edit Abono';
+        } elseif ($tipo == 5) {
+            $tipoAbono = 'Cancellation Abono';
         }
-       
-
+    
+        $datosAbono = [
+            'notasOfactura' => $abono->abono_notas > 0 ? 'nota' : 'factura',
+            'tipo' => $tipoAbono,
+            'responsable' => $usuario,
+            ...[$abono]
+        ];
+    
+        $abonoHistorico = new AbonoHistorico();
+        $abonoHistorico->abono_id = $abono->abono_id;
+        $abonoHistorico->ab_histotico_tipo = $tipo;
+        $abonoHistorico->ab_historico_values = json_encode($datosAbono);
+        $abonoHistorico->user_created = $abono->user_created;
+    
         if (!$abonoHistorico->save()) {
             throw new \Exception('Error al guardar el registro histórico');
         }
@@ -218,7 +231,7 @@ class AbonoController extends Controller
                 $cheque->chq_estado = 2;
             }
 
-            $this->guardarAbonoHistorico($abono, 1);
+            $this->guardarAbonoHistorico($abono, 1,$request->usuario);
             $abono->delete();
 
             \DB::commit();
@@ -229,8 +242,51 @@ class AbonoController extends Controller
             return response()->json(['error' => 'Error al eliminar el abono: ' . $e->getMessage()], 500);
         }
     }
+    public function anularAbono(Request $request)
+    {
+        // Validar los datos de entrada
+        $validatedData = $request->validate([
+            'abono_id' => 'required',
+            'usuario' => 'required',
+        ]);
+
+        \DB::beginTransaction();
+
+        try {
+            // Buscar el abono en la base de datos
+            $abono = Abono::findOrFail($validatedData['abono_id']);
+
+            // Cambiar el estado del abono a anulado (asumiendo que 1 es el estado "anulado")
+            $abono->abono_estado = 1;
+
+            // Guardar en histórico (aquí asumimos que este método existe y funciona correctamente)
+            $this->guardarAbonoHistorico($abono, 5, $validatedData['usuario']);
+            
+            // Guardar los cambios en la base de datos
+            $abono->save();
+
+            // Confirmar la transacción
+            \DB::commit();
+
+            // Responder con éxito
+            return response()->json(['message' => 'Abono anulado correctamente'], 200);
+        } catch (\Exception $e) {
+            // Revertir la transacción en caso de error
+            \DB::rollBack();
+
+            // Registrar el error (opcional, para depuración)
+            \Log::error('Error al anular el abono: ' . $e->getMessage());
+
+            // Responder con un mensaje de error genérico
+            return response()->json(['error' => 'Error al anular el abono'], 500);
+        }
+    }
+    
+    
+
     public function retencion_registro(Request $request)
     {
+        return 'ESTA EN PRUEBAS';
         $validator = Validator::make($request->all(), [
             'abono_fecha' => 'required|date',
             'abono_porcentaje' => 'required',
@@ -294,6 +350,7 @@ class AbonoController extends Controller
             'abono_fecha' => 'required|date',
             'abono_tipo' => 'required',
             'abono_cuenta' => 'required',
+            'abono_concepto' => 'required',
             'abono_documento' => 'required|unique:abono,abono_documento,' . $request->abono_id . ',abono_id',
             'abono_valor' => 'required|numeric',
             'abono_cheque_numero' => 'required|numeric',
@@ -303,6 +360,7 @@ class AbonoController extends Controller
             'periodo' => 'required',
             'user_created' => 'required',
             'estado' => 'required',
+            'abono_ruc_cliente' => 'required',
         ]);
     
         if ($validator->fails()) {
@@ -335,9 +393,11 @@ class AbonoController extends Controller
             $abono->abono_cuenta = $request->abono_cuenta;
             $abono->abono_cheque_numero = $request->abono_cheque_numero;
             $abono->abono_cheque_cuenta = $request->abono_cheque_cuenta;
-            $abono->abono_cheque_banco = $request->abono_cheque_banco;            
+            $abono->abono_cheque_banco = $request->abono_cheque_banco;
+            $abono->abono_concepto = $request->abono_concepto;         
             $abono->idClientePerseo = $request->idClientePerseo;
             $abono->clienteCodigoPerseo = $request->clienteCodigoPerseo;
+            $abono->abono_ruc_cliente = $request->abono_ruc_cliente;
 
             $cheque = Cheque::where('chq_numero', $request->abono_cheque_numero)
                             ->where('chq_cuenta', $request->abono_cheque_cuenta)
@@ -366,7 +426,7 @@ class AbonoController extends Controller
             $cheque->save();
     
             // Guardar historial de abono
-            $this->guardarAbonoHistorico($abono, 2);
+            $this->guardarAbonoHistorico($abono, 2,$request->user_created);
     
             \DB::commit();
     
@@ -427,8 +487,21 @@ class AbonoController extends Controller
         $query = DB::SELECT("SELECT fv.* FROM f_venta fv
         WHERE fv.periodo_id='$request->periodo'
         AND fv.id_empresa='$request->empresa'
-        AND fv.estadoPerseo = 1
-        AND fv.clientesidPerseo ='$request->cliente'
+        AND fv.ruc_cliente ='$request->cliente'
+        AND fv.est_ven_codigo <> 3");
+        return $query;
+    }
+    public function get_facturasNotasAll(Request $request){
+        // $query = DB::SELECT("SELECT fv.* FROM f_venta fv
+        // WHERE fv.institucion_id='$request->institucion'
+        // AND fv.periodo_id='$request->periodo'
+        // AND fv.id_empresa='$request->empresa'
+        // AND fv.clientesidPerseo ='$request->cliente'
+        // AND fv.est_ven_codigo <> 3");
+        $query = DB::SELECT("SELECT fv.*, ep.descripcion_corta 
+        FROM f_venta fv
+        LEFT JOIN empresas ep ON ep.id = fv.id_empresa
+        WHERE fv.periodo_id='$request->periodo'
         AND fv.est_ven_codigo <> 3");
         return $query;
     }
@@ -480,4 +553,286 @@ class AbonoController extends Controller
         WHERE i.nombreInstitucion LIKE '%$busqueda%'");
         return $query;
     }
+    public function traerCobros(Request $request){
+        $cobros = DB::SELECT("SELECT * FROM abono ab 
+        WHERE ab.abono_periodo = $request->periodo");
+        $totalCobros = DB::SELECT("SELECT SUM(ab.abono_facturas) AS total_facturas, SUM(ab.abono_notas) AS total_notas,
+        COUNT(CASE WHEN ab.abono_notas <> '0.00' THEN 1 END) AS numero_notas, COUNT(CASE WHEN ab.abono_facturas <> '0.00' THEN 1 END) AS numero_facturas
+        FROM abono ab WHERE ab.abono_periodo = $request->periodo");
+        return [
+            'datosCobros' => $cobros, 
+            'totalCobros' => $totalCobros
+        ];
+    }
+
+    public function getClienteLocalDocumentos(Request $request)
+    {
+        // Validar el request
+        $request->validate([
+            'cedula' => 'required|string',
+        ]);
+
+        // Obtener el valor de 'cedula'
+        $cedula = $request->cedula;
+        $periodo = $request->periodo;
+        $empresa = $request->empresa;
+
+        // Realizar las consultas
+        $resultados = \DB::table('f_venta')
+            ->where('est_ven_codigo', '<>', 3)
+            ->whereIn('idtipodoc', [2, 4])
+            ->where('ruc_cliente', $cedula)
+            ->where('periodo_id', $periodo)
+            ->where('id_empresa', $empresa)
+            ->get();
+
+        // Retornar los resultados como JSON
+        return response()->json($resultados);
+    }
+    public function getClienteLocal(Request $request)
+    {
+        // Validar el request
+        $request->validate([
+            'cedula' => 'required|string',
+        ]);
+    
+        // Obtener el valor de 'cedula'
+        $cedula = $request->input('cedula');
+    
+        // Realizar las consultas
+        $resultados = DB::table('usuario')
+            ->where('cedula', $cedula)
+            ->first(); // Si esperas solo un resultado, usa ->first()
+    
+        // Verificar si se encontraron resultados
+        if ($resultados) {
+            // Retornar los resultados como JSON
+            return response()->json($resultados, 200);
+        } else {
+            // Retornar un mensaje de error si no se encontraron resultados
+            return response()->json(['message' => 'No se encontraron resultados'], 404);
+        }
+    }
+    public function modificarAbono(Request $request)
+    {
+        // Validar la solicitud
+        $validator = Validator::make($request->all(), [
+            'abono_fecha' => 'required|date',
+            'abono_facturas' => 'nullable|numeric',
+            'abono_tipo' => 'required|integer|in:0,1,2,3',
+            'abono_documento' => 'nullable|string|max:100',
+            'abono_concepto' => 'nullable|string|max:500',
+            'abono_cuenta' => 'nullable|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 0,
+                'message' => $validator->errors()
+            ], 422);
+        }
+
+        // Iniciar transacción
+        DB::beginTransaction();
+
+        try {
+             // Buscar el abono
+             $abono = Abono::findOrFail($request->abono_id);
+
+             if ($abono->abono_documento != $request->abono_documento) {
+                 $existingAbono = DB::table('abono')
+                     ->where('abono_documento', $request->abono_documento)
+                     ->where('abono_id', '!=', $request->abono_id)
+                     ->where('abono_estado', 0)
+                     ->orderBy('created_at', 'desc')
+                     ->first();
+     
+                 if ($existingAbono) {
+                     return response()->json([
+                         'status' => 0,
+                         'message' => 'El número de documento ya está en uso por otro abono.',
+                     ]);
+                 }
+             }
+
+            // Actualizar los campos
+            $abono->abono_fecha = $request->abono_fecha;
+            $abono->abono_facturas = $request->abono_facturas;
+            $abono->abono_tipo = $request->abono_tipo;
+            $abono->abono_documento = $request->abono_documento;
+            $abono->abono_concepto = $request->abono_concepto;
+            $abono->abono_cuenta = $request->abono_cuenta;
+            // Aquí puedes añadir cualquier otro campo que desees actualizar
+
+            // Guardar los cambios
+            $abono->save();
+
+            // Confirmar la transacción
+            DB::commit();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Abono actualizado correctamente.',
+                'data' => $abono
+            ]);
+        } catch (\Exception $e) {
+            // En caso de error, revertir la transacción
+            DB::rollback();
+            return response()->json([
+                'status' => 0,
+                'message' => 'Error al actualizar el abono: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    public function modificarAbonoNotas(Request $request)
+    {
+        // Validar la solicitud
+        $validator = Validator::make($request->all(), [
+            'abono_fecha' => 'required|date',
+            'abono_notas' => 'nullable|numeric',
+            'abono_tipo' => 'required|integer|in:0,1,2,3',
+            'abono_documento' => 'required|string|max:100',
+            'abono_concepto' => 'nullable|string|max:500',
+            'abono_cuenta' => 'nullable|integer',
+            'abono_id' => 'required'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 0,
+                'message' => $validator->errors()
+            ], 422);
+        }
+
+        // Iniciar transacción
+        DB::beginTransaction();
+
+        try {
+            // Buscar el abono
+            $abono = Abono::findOrFail($request->abono_id);
+
+            if ($abono->abono_documento != $request->abono_documento) {
+                $existingAbono = DB::table('abono')
+                ->where('abono_documento', $request->abono_documento)
+                ->where('abono_id', '!=', $request->abono_id)
+                ->where('abono_estado', 0)
+                ->orderBy('created_at', 'desc')
+                ->first();
+    
+                if ($existingAbono) {
+                    return response()->json([
+                        'status' => 0,
+                        'message' => 'El número de documento ya está en uso por otro abono.',
+                    ]);
+                }
+            }
+
+            // Actualizar los campos
+            $abono->abono_fecha = $request->abono_fecha;
+            $abono->abono_notas = $request->abono_notas;
+            $abono->abono_tipo = $request->abono_tipo;
+            $abono->abono_documento = $request->abono_documento;
+            $abono->abono_concepto = $request->abono_concepto;
+            $abono->abono_cuenta = $request->abono_cuenta;
+            // Aquí puedes añadir cualquier otro campo que desees actualizar
+
+            // Guardar los cambios
+            $abono->save();
+
+            // Confirmar la transacción
+            DB::commit();
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Abono actualizado correctamente.',
+                'data' => $abono
+            ]);
+        } catch (\Exception $e) {
+            // En caso de error, revertir la transacción
+            DB::rollback();
+            return response()->json([
+                'status' => 0,
+                'message' => 'Error al actualizar el abono: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    public function reporteAbonoVentas(Request $request) {
+        // Ejecutar la primera consulta
+        $reporte = DB::select("SELECT 
+                        fv.idtipodoc,
+                        ft.tdo_id,
+                        ft.tdo_nombre,
+                        ep.descripcion_corta AS empresa,
+                        ep.id AS id_empresa,
+                        i.nombreInstitucion,
+                        i.idInstitucion,
+                        fv.institucion_id,
+                        fv.ruc_cliente,
+                        fv.ven_tipo_inst,   
+                        ROUND(SUM(fv.ven_subtotal), 2) AS subtotal_total,
+                        ROUND(SUM(fv.ven_descuento), 2) AS descuento_total, 
+                        ROUND(SUM(fv.ven_valor), 2) AS valor_total
+                    FROM f_tipo_documento ft
+                    INNER JOIN f_venta fv ON fv.idtipodoc = ft.tdo_id
+                    INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+                    INNER JOIN empresas ep ON ep.id = fv.id_empresa
+                    WHERE fv.est_ven_codigo <> 3
+                    AND fv.periodo_id = ?
+                    GROUP BY 
+                        i.nombreInstitucion,
+                        ft.tdo_nombre,
+                        i.idInstitucion,
+                        fv.institucion_id,    
+                        fv.idtipodoc,
+                        ft.tdo_id,
+                        fv.ruc_cliente,
+                        ep.descripcion_corta,
+                        fv.ven_tipo_inst,
+                        ep.id;", [$request->periodo]);
+    
+        // Recorrer cada registro del reporte para añadir el abono_total
+        foreach ($reporte as $key => $registro) {
+            // Construir la consulta de abono con condiciones específicas
+            $abono_tipo = DB::select("SELECT 
+                                        CASE 
+                                            WHEN ? = 4 AND ? = 'V' THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 1 AND ? = 'V' THEN COALESCE(SUM(ab.abono_facturas), 0)
+                                            WHEN ? = 3 AND ? = 'L' THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 1 AND ? = 'L' THEN COALESCE(SUM(ab.abono_facturas), 0)
+                                            ELSE 0
+                                        END AS abono_total
+                                    FROM abono ab
+                                    WHERE ab.abono_ruc_cliente = ?
+                                    AND ab.abono_periodo = ?
+                                    AND ab.abono_empresa = ?
+                                    AND ab.abono_estado = 0", [
+                                        $registro->idtipodoc, $registro->ven_tipo_inst,
+                                        $registro->idtipodoc, $registro->ven_tipo_inst,
+                                        $registro->idtipodoc, $registro->ven_tipo_inst,
+                                        $registro->idtipodoc, $registro->ven_tipo_inst,
+                                        $registro->ruc_cliente, $request->periodo,
+                                        $registro->id_empresa
+                                    ]);
+    
+            // Añadir el abono_total al registro
+            $reporte[$key]->abono_total = $abono_tipo[0]->abono_total ?? 0;
+        }
+        // SELECT 
+        // fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta AS empresa, fv.ven_tipo_inst, 
+        // ROUND(SUM(fv.ven_subtotal), 2) AS subtotal_total,
+        // ROUND(SUM(fv.ven_descuento), 2) AS descuento_total, ROUND(SUM(fv.ven_valor), 2) AS valor_total,
+        // ROUND(SUM(COALESCE(a.abono_facturas, 0) + COALESCE(a.abono_notas, 0)), 2) AS abono_total
+        // FROM  f_venta fv 
+        // LEFT JOIN abono a ON a.abono_ruc_cliente = fv.ruc_cliente
+        // LEFT JOIN institucion i ON fv.institucion_id = i.idInstitucion
+        // LEFT JOIN empresas ep ON ep.id = fv.id_empresa
+        // WHERE (fv.est_ven_codigo <> 3 AND fv.periodo_id = '$request->periodo')
+        // OR (a.abono_estado = 0 AND a.abono_periodo = '$request->periodo')
+        // GROUP BY fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta, fv.ven_tipo_inst;
+        
+        return $reporte;
+    }
+    
+    
+    
 }

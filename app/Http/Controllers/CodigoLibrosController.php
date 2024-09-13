@@ -12,6 +12,8 @@ use App\Models\CodigosLibros;
 use App\Models\HistoricoCodigos;
 use App\Models\Institucion;
 use App\Repositories\Codigos\CodigosRepository;
+use App\Repositories\Facturacion\ProformaRepository;
+use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
@@ -21,8 +23,12 @@ class CodigoLibrosController extends Controller
 {
     use TraitCodigosGeneral;
     private $codigosRepository;
-    public function __construct(CodigosRepository $codigosRepository) {
-        $this->codigosRepository = $codigosRepository;
+    protected $proformaRepository;
+    protected $pedidosRepository;
+    public function __construct(CodigosRepository $codigosRepository,ProformaRepository $proformaRepository, PedidosRepository $pedidosRepository) {
+        $this->codigosRepository    = $codigosRepository;
+        $this->proformaRepository   = $proformaRepository;
+        $this->pedidosRepository    = $pedidosRepository;
     }
     //api:post//codigos/importar
     public function importar(Request $request){
@@ -1034,7 +1040,7 @@ class CodigoLibrosController extends Controller
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.contrato,c.porcentaje_descuento,
         c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro,
+        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,l.nombrelibro as libro,
         ib.nombreInstitucion as institucion_barras,
         pb.periodoescolar as periodo_barras,
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
@@ -1060,6 +1066,7 @@ class CodigoLibrosController extends Controller
         LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
         LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
         LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+        LEFT JOIN libro l ON c.libro_idlibro = l.idlibro
         WHERE (c.bc_institucion = '$request->institucion_id' OR venta_lista_institucion = '$request->institucion_id')
         AND c.bc_periodo = '$request->periodo_id'
         AND c.prueba_diagnostica = '0'
@@ -1603,154 +1610,211 @@ class CodigoLibrosController extends Controller
         $mensaje                = $request->observacion;
         $setContrato            = null;
         $verificacion_liquidada = null;
-        if($request->codigo){
-            return $this->devolucionIndividualBodega($request->codigo,$request->id_usuario,$request->cliente,$request->institucion_id,$request->periodo_id,$request->observacion,$mensaje,$request);
-        }
-        foreach($codigos as $key => $item){
-            //validar si el codigo existe
-            $validar = $this->getCodigos($item->codigo,0);
-            $ingreso = 0;
-            //valida que el codigo existe
-            if(count($validar)>0){
-                $codigo_union               = $validar[0]->codigo_union;
-                //validar si el codigo se encuentra liquidado
-                $ifLiquidado                = $validar[0]->estado_liquidacion;
-                //validar que el bc_institucion sea el mismo desde el front
-                $ifBc_Institucion           = $validar[0]->bc_institucion;
-                //institucion del venta lista
-                $ifventa_lista_institucion  = $validar[0]->venta_lista_institucion;
-                //contrato
-                $ifContrato                 = $validar[0]->contrato;
-                //numero de verificacion
-                $ifVerificacion             = $validar[0]->verificacion;
-                //para ver si es codigo regalado no este liquidado
-                $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
-                //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
-                $EstatusProceso             = false;
-                if($request->dLiquidado ==  '1'){
-                    $setContrato            = $ifContrato;
-                    $verificacion_liquidada = $ifVerificacion;
-                    //VALIDACION AUNQUE ESTE LIQUIDADO
-                    if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
-                }else{
-                    //VALIDACION QUE NO SEA LIQUIDADO
-                    if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
-                }
-                //jorge dice que se quita esta validacion
-                // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
-                //SI CUMPLE LA VALIDACION
-                if($EstatusProceso){
-                    //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
-                    $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
-                    if($codigo_union != null || $codigo_union != ""){
-                        //devolucion
-                        $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
-                        $ingreso =  $this->codigosRepository->updateDevolucion($item->codigo,$codigo_union,$getcodigoUnion,$request);
-                        //si ingresa correctamente
-                        if($ingreso == 1){
-                            $porcentaje++;
-                            //====CODIGO====
-                            //ingresar en el historico codigo
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
-                            //ingresar a la tabla de devolucion
-                            $this->codigosRepository->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
-                            //====CODIGO UNION=====
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null,$setContrato,$verificacion_liquidada);
-                            $this->codigosRepository->saveDevolucion($codigo_union,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
-                        }else{
-                            $codigosNoCambiados[$contadorNoCambiado] =[
-                                "codigo"        => $item->codigo,
-                                "mensaje"       => "Problema con el código union $codigo_union"
-                            ];
-                            $contadorNoCambiado++;
-                        }
-                    }
-                    //ACTUALIZAR CODIGO SIN UNION
-                    else{
-                        $ingreso =  $this->codigosRepository->updateDevolucion($item->codigo,0,null,$request);
-                        if($ingreso == 1){
-                            $porcentaje++;
-                            //ingresar en el historico
-                            $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
-                            //ingresar a la tabla de devolucion
-                            $this->codigosRepository->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
-                            $codigosSinCodigoUnion[] = $validar[0];
-                        }
-                        else{
-                            $codigosNoCambiados[$contadorNoCambiado] =[
-                                "codigo"        => $item->codigo,
-                                "mensaje"       => "0"
-                            ];
-                            $contadorNoCambiado++;
-                        }
-                    }
-                }
-                //SI NO CUMPLE LA VALIDACION
-                else{
-                    //admin
-                    if($request->admin == "yes"){
-                        $codigosConLiquidacion[] = $validar[0];
-                        $contador++;
-                    }
-                    //bodega
-                    else{
-                        $mensaje_personalizado = "";
-                        //mensaje personalizado front
-                        if($ifLiquidado == 0){
-                            $mensaje_personalizado = "Código liquidado";
-                        }
-                        if($ifLiquidado == 3){
-                            $mensaje_personalizado = "Código  ya devuelto";
-                        }
-                        if($ifliquidado_regalado == '1'){
-                            $mensaje_personalizado = "Código Regalado liquidado";
-                        }
-                        // if(($ifLiquidado == 1 || $ifLiquidado == 2) && ($ifBc_Institucion <> $institucion_id || $ifventa_lista_institucion <> $institucion_id)){
-                        //     $mensaje_personalizado = "Código no pertenece a la institución que salio";
-                        // }
-                        $codigosConLiquidacion[$contador] = [
-                            "codigo"                => $item->codigo,
-                            "prueba_diagnostica"    => $validar[0]->prueba_diagnostica,
-                            "tipoCodigo"            => $validar[0]->tipoCodigo,
-                            "barrasEstado"          => $validar[0]->barrasEstado,
-                            "codigoEstado"          => $validar[0]->codigoEstado,
-                            "liquidacion"           => $validar[0]->liquidacion,
-                            "ventaEstado"           => $validar[0]->ventaEstado,
-                            "idusuario"             => $validar[0]->idusuario,
-                            "estudiante"            => $validar[0]->estudiante,
-                            "nombreInstitucion"     => $validar[0]->nombreInstitucion,
-                            "institucionBarra"      => $validar[0]->institucionBarra,
-                            "periodo"               => $validar[0]->periodo,
-                            "periodo_barras"        => $validar[0]->periodo_barras,
-                            "cedula"                => $validar[0]->cedula,
-                            "email"                 => $validar[0]->email,
-                            "estado_liquidacion"    => $validar[0]->estado_liquidacion,
-                            "estado"                => $validar[0]->estado,
-                            "status"                => $validar[0]->status,
-                            "contador"              => $validar[0]->contador,
-                            "contrato"              => $validar[0]->contrato,
-                            "mensaje"               => $mensaje_personalizado,
-                            "porcentaje_descuento"  => $validar[0]->porcentaje_descuento,
-                            "factura"               => $validar[0]->factura,
-                            "codigo_union"          => $validar[0]->codigo_union,
-                        ];
-                        $contador++;
-                    }
-                }
+        try{
+            DB::beginTransaction();
+            if($request->codigo){
+                $resultado = $this->devolucionIndividualBodega($request->codigo,$request->id_usuario,$request->cliente,$request->institucion_id,$request->periodo_id,$request->observacion,$mensaje,$request);
+                //si ingresa correctamente commit
+                DB::commit();
+                return $resultado;
             }else{
-                $codigoNoExiste[$contadorNoexiste] =[
-                    "codigo"        => $item->codigo,
+                foreach($codigos as $key => $item){
+                    //validar si el codigo existe
+                    $validar                        = $this->getCodigos($item->codigo,0);
+                    $ingreso                        = 0;
+                    $ifsetProforma                  = 0;
+                    $ifErrorProforma                = 0;
+                    $messageProforma                = "";
+                    $datosProforma                  = [];
+                    $ingreso                        = 0;
+                    $messageIngreso                 = "";
+                    //valida que el codigo existe
+                    if(count($validar)>0){
+                        $codigo_union               = $validar[0]->codigo_union;
+                        //validar si el codigo se encuentra liquidado
+                        $ifLiquidado                = $validar[0]->estado_liquidacion;
+                        //contrato
+                        $ifContrato                 = $validar[0]->contrato;
+                        //numero de verificacion
+                        $ifVerificacion             = $validar[0]->verificacion;
+                        //para ver si es codigo regalado no este liquidado
+                        $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
+                        //para ver la empresa de la proforma
+                        $ifproforma_empresa         = $validar[0]->proforma_empresa;
+                        //para ver el estado devuelto proforma
+                        $ifdevuelto_proforma        = $validar[0]->devuelto_proforma;
+                        ///para ver el codigo de proforma
+                        $ifcodigo_proforma          = $validar[0]->codigo_proforma;
+                        //codigo de liquidacion
+                        $ifcodigo_liquidacion       = $validar[0]->codigo_liquidacion;
+                        //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
+                        $EstatusProceso             = false;
+                        if($request->dLiquidado ==  '1'){
+                            $setContrato            = $ifContrato;
+                            $verificacion_liquidada = $ifVerificacion;
+                            //VALIDACION AUNQUE ESTE LIQUIDADO
+                            if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
+                        }else{
+                            //VALIDACION QUE NO SEA LIQUIDADO
+                            if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
+                        }
+                        //====PROFORMA============================================
+                        //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
+                        if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1){
+                            $datosProforma     = $this->codigosRepository->validateProforma($ifdevuelto_proforma,$ifcodigo_proforma,$ifproforma_empresa);
+                            $ifErrorProforma   = $datosProforma["ifErrorProforma"];
+                            $messageProforma   = $datosProforma["messageProforma"];
+                            $ifsetProforma     = $datosProforma["ifsetProforma"];
+                            $mensaje           = $request->observacion." -  Se agrego la proforma $ifcodigo_proforma";
+                            if($ifsetProforma  == 1) { $EstatusProceso = true; }
+                            else                     { $EstatusProceso = false; }
+                        }
+                        //si la pre factura ya fue enviada a perseo
+                        if($ifsetProforma == 2){
+                            $mensaje = "Código no se pudo devolver porque la pre factura $ifcodigo_proforma ya fue enviada  en pedido a perseo";
+                            //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
+                            $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                            if($codigo_union != null || $codigo_union != ""){
+                                //devolucion
+                                $getcodigoUnion     = CodigosLibros::Where('codigo',$codigo_union)->get();
+                                $getIngreso         =  $this->codigosRepository->updateDevolucion($item->codigo,$codigo_union,$getcodigoUnion,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma);
+                                $ingreso            = $getIngreso["ingreso"];
+                                $messageIngreso     = $getIngreso["messageIngreso"];
+                                //si ingresa correctamente
+                                if($ingreso == 1){
+                                    //====CODIGO====
+                                    //ingresar en el historico codigo
+                                    $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
+                                    //====CODIGO UNION=====
+                                    $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null,$setContrato,$verificacion_liquidada);
+                                }
+                                else{
+                                    $codigosNoCambiados[$contadorNoCambiado] = [
+                                        "codigo"        => $item->codigo,
+                                        "mensaje"       => $messageIngreso
+                                    ];
+                                    $contadorNoCambiado++;
+                                }
+                            }
+                            //ACTUALIZAR CODIGO SIN UNION
+                            else{
+                                $getIngreso         = $this->codigosRepository->updateDevolucion($item->codigo,0,null,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma);
+                                $ingreso            = $getIngreso["ingreso"];
+                                $messageIngreso     = $getIngreso["messageIngreso"];
+                                if($ingreso == 1){
+                                    //ingresar en el historico
+                                    $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
+                                }
+                                else{
+                                    $codigosNoCambiados[$contadorNoCambiado] = [
+                                        "codigo"        => $item->codigo,
+                                        "mensaje"       => "0"
+                                    ];
+                                    $contadorNoCambiado++;
+                                }
+                            }
+                        }
+
+                        //====PROFORMA============================================
+                        //jorge dice que se quita esta validacion
+                        // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
+                        //SI CUMPLE LA VALIDACION
+                        if($EstatusProceso){
+                            //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
+                            $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
+                            if($codigo_union != null || $codigo_union != ""){
+                                //devolucion
+                                $getcodigoUnion     = CodigosLibros::Where('codigo',$codigo_union)->get();
+                                $getIngreso         =  $this->codigosRepository->updateDevolucion($item->codigo,$codigo_union,$getcodigoUnion,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma);
+                                $ingreso            = $getIngreso["ingreso"];
+                                $messageIngreso     = $getIngreso["messageIngreso"];
+                                //si ingresa correctamente
+                                if($ingreso == 1){
+                                    $porcentaje++;
+                                    //====CODIGO====
+                                    //ingresar en el historico codigo
+                                    $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
+                                    //ingresar a la tabla de devolucion
+                                    $this->codigosRepository->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
+                                    //====CODIGO UNION=====
+                                    $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,null,$setContrato,$verificacion_liquidada);
+                                    $this->codigosRepository->saveDevolucion($codigo_union,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
+                                }
+                                else{
+                                    $codigosNoCambiados[$contadorNoCambiado] = [
+                                        "codigo"        => $item->codigo,
+                                        "mensaje"       => $messageIngreso
+                                    ];
+                                    $contadorNoCambiado++;
+                                }
+                            }
+                            //ACTUALIZAR CODIGO SIN UNION
+                            else{
+                                $getIngreso         = $this->codigosRepository->updateDevolucion($item->codigo,0,null,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma);
+                                $ingreso            = $getIngreso["ingreso"];
+                                $messageIngreso     = $getIngreso["messageIngreso"];
+                                if($ingreso == 1){
+                                    $porcentaje++;
+                                    //ingresar en el historico
+                                    $this->GuardarEnHistorico(0,$request->institucion_id,$request->periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,null,$setContrato,$verificacion_liquidada);
+                                    //ingresar a la tabla de devolucion
+                                    $this->codigosRepository->saveDevolucion($item->codigo,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
+                                    $codigosSinCodigoUnion[] = $validar[0];
+                                }
+                                else{
+                                    $codigosNoCambiados[$contadorNoCambiado] = [
+                                        "codigo"        => $item->codigo,
+                                        "mensaje"       => $messageIngreso
+                                    ];
+                                    $contadorNoCambiado++;
+                                }
+                            }
+                        }
+                        //SI NO CUMPLE LA VALIDACION
+                        else{
+                            //admin
+                            if($request->admin == "yes"){
+                                if($ifErrorProforma == 1)               { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
+                                $codigosConLiquidacion[]                = $validar[0];
+                                $contador++;
+                            }
+                            //bodega
+                            else{
+                                $mensaje_personalizado                  = "";
+                                //mensaje personalizado front
+                                if($ifLiquidado == 0)                   { $mensaje_personalizado  = "Código liquidado"; }
+                                if($ifLiquidado == 3)                   { $mensaje_personalizado  = "Código  ya devuelto"; }
+                                if($ifliquidado_regalado == '1')        { $mensaje_personalizado  = "Código Regalado liquidado"; }
+                                //error proforma
+                                if($ifErrorProforma == 1)               { $mensaje_personalizado  = $messageProforma; }
+                                //add array to front
+                                $validar[0]->mensaje                    = $mensaje_personalizado;
+                                $codigosConLiquidacion[]                = $validar[0];
+                                $contador++;
+                            }
+                        }
+                    }else{
+                        $codigoNoExiste[$contadorNoexiste] = [ "codigo" => $item->codigo ];
+                        $contadorNoexiste++;
+                    }
+                }
+                DB::commit();
+                return [
+                    "cambiados"             => $porcentaje,
+                    "codigosNoCambiados"    => $codigosNoCambiados,
+                    "codigosConLiquidacion" => $codigosConLiquidacion,
+                    "codigoNoExiste"        => $codigoNoExiste,
+                    "codigosSinCodigoUnion" => $codigosSinCodigoUnion,
                 ];
-                $contadorNoexiste++;
             }
+
+        }catch(\Exception $e){
+            DB::rollBack();
+            return response()->json([
+                "status"  => 0,
+                'message' => $e->getMessage()
+            ], 200);
         }
-        return [
-            "cambiados"             => $porcentaje,
-            "codigosNoCambiados"    => $codigosNoCambiados,
-            "codigosConLiquidacion" => $codigosConLiquidacion,
-            "codigoNoExiste"        => $codigoNoExiste,
-            "codigosSinCodigoUnion" => $codigosSinCodigoUnion,
-        ];
     }
 
 
@@ -1764,109 +1828,141 @@ class CodigoLibrosController extends Controller
         $porcentaje             = 0;
         $contador               = 0;
         $fecha                  = date('Y-m-d H:i:s');
-        //validar si el codigo existe
-        $validar = $this->getCodigos($getCodigo,0);
-        //valida que el codigo existe
-        if(count($validar)>0){
-            //trae codigo union
-            $codigo_union       = $validar[0]->codigo_union;
-            //validar si el codigo no se encuentra liquidado
-            $ifLiquidado        = $validar[0]->estado_liquidacion;
-            //validar que el bc_institucion sea el mismo desde el front
-            $ifBc_Institucion   = $validar[0]->bc_institucion;
-            //institucion del venta lista
-            $ifventa_lista_institucion = $validar[0]->venta_lista_institucion;
-            $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
-            //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
-            if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0'){
-            //SE QUITA ESTA VALIDACION
-            // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )){
-                $getcodigoPrimero = CodigosLibros::Where('codigo',$getCodigo)->get();
-                if($codigo_union != null || $codigo_union != ""){
-                    //devolucion con codigo de union
-                    $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
-                    $ingreso =  $this->codigosRepository->updateDevolucion($getCodigo,$codigo_union,$getcodigoUnion,$request);
-                    if($ingreso == 1){
-                        $porcentaje++;
-                        //====CODIGO====
-                        //ingresar en el historico codigo
-                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$mensaje,$getcodigoPrimero,null);
-                        //ingresar a la tabla de devolucion
-                        $this->codigosRepository->saveDevolucion($getCodigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
-                        //====CODIGO UNION=====
-                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigo_union,$id_usuario,$mensaje,$getcodigoUnion,null);
-                        $this->codigosRepository->saveDevolucion($codigo_union,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
-                    }else{
-                        $codigosNoCambiados[0] =[
-                            "codigo"    	=> $getCodigo,
-                            "mensaje"       => "Problema con el código union $codigo_union"
-                        ];
-                    }
+        $messageProforma        = "";
+        $ifErrorProforma        = 0;
+        $ifsetProforma          = 0;
+        $EstatusProceso         = false;
+        $ingreso                = 0;
+        $messageIngreso         = "";
+        try{
+            //validar si el codigo existe
+            $validar = $this->getCodigos($getCodigo,0);
+            //valida que el codigo existe
+            if(count($validar)>0){
+                //trae codigo union
+                $codigo_union                   = $validar[0]->codigo_union;
+                //validar si el codigo no se encuentra liquidado
+                $ifLiquidado                    = $validar[0]->estado_liquidacion;
+                $ifliquidado_regalado           = $validar[0]->liquidado_regalado;
+                //para ver la empresa de la proforma
+                $ifproforma_empresa             = $validar[0]->proforma_empresa;
+                //para ver el estado devuelto proforma
+                $ifdevuelto_proforma            = $validar[0]->devuelto_proforma;
+                ///para ver el codigo de proforma
+                $ifcodigo_proforma              = $validar[0]->codigo_proforma;
+                //codigo de liquidacion
+                $ifcodigo_liquidacion           = $validar[0]->codigo_liquidacion;
+                if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
+                //====PROFORMA============================================
+                //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
+                if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1){
+                    $datosProforma     = $this->codigosRepository->validateProforma($ifdevuelto_proforma,$ifcodigo_proforma,$ifproforma_empresa);
+                    $ifErrorProforma   = $datosProforma["ifErrorProforma"];
+                    $messageProforma   = $datosProforma["messageProforma"];
+                    $ifsetProforma     = $datosProforma["ifsetProforma"];
+                    $mensaje           .= " Se agregó la proforma $ifcodigo_proforma";
+                    if($ifsetProforma  == 1) { $EstatusProceso = true; }
+                    else                     { $EstatusProceso = false; }
                 }
-                //devolucion sin codigo de union
-                else{
-                    $ingreso =  $this->codigosRepository->updateDevolucion($getCodigo,0,null,$request);
-                    if($ingreso == 1){
-                        $porcentaje++;
-                        //ingresar en el historico
-                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$observacion,$getcodigoPrimero,null);
-                        //ingresar a la tabla de devolucion
-                        $this->codigosRepository->saveDevolucion($getCodigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
-                        $codigosSinCodigoUnion[] = $validar[0];
+                //si la pre factura ya fue enviada a perseo
+                if($ifsetProforma == 2){
+                    $getcodigoPrimero  = CodigosLibros::Where('codigo',$getCodigo)->get();
+                    $getcodigoUnion     = CodigosLibros::Where('codigo',$codigo_union)->get();
+                    $this->codigosRepository->updateDevolucion($getCodigo,$codigo_union,$getcodigoUnion,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma);
+                    $mensaje = "Código no se pudo devolver porque la pre factura $ifcodigo_proforma ya fue enviada  en pedido a perseo";
+                    //ingresar en el historico codigo
+                    $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$mensaje,$getcodigoPrimero,null);
+                }
+                //====PROFORMA============================================
+                if($EstatusProceso){
+                //SE QUITA ESTA VALIDACION
+                    $getcodigoPrimero = CodigosLibros::Where('codigo',$getCodigo)->get();
+                    if($codigo_union != null || $codigo_union != ""){
+                        //devolucion con codigo de union
+                        $getcodigoUnion     = CodigosLibros::Where('codigo',$codigo_union)->get();
+                        $getIngreso         =  $this->codigosRepository->updateDevolucion($getCodigo,$codigo_union,$getcodigoUnion,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma);
+                        $ingreso            = $getIngreso["ingreso"];
+                        $messageIngreso     = $getIngreso["messageIngreso"];
+                        if($ingreso == 1){
+                            $porcentaje++;
+                            //====CODIGO====
+                            //ingresar en el historico codigo
+                            $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$mensaje,$getcodigoPrimero,null);
+                            //ingresar a la tabla de devolucion
+                            $this->codigosRepository->saveDevolucion($getCodigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
+                            //====CODIGO UNION=====
+                            $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigo_union,$id_usuario,$mensaje,$getcodigoUnion,null);
+                            $this->codigosRepository->saveDevolucion($codigo_union,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
+                        }else{
+                            $codigosNoCambiados[0]  = [
+                                "codigo"    	    => $getCodigo,
+                                "mensaje"           => $messageIngreso
+                            ];
+                        }
                     }
+                    //devolucion sin codigo de union
                     else{
-                        $codigosNoCambiados[0] =[
-                            "codigo"        => $getCodigo,
-                            "mensaje"       => "0"
-                        ];
+                        $getIngreso         = $this->codigosRepository->updateDevolucion($getCodigo,0,null,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma,$ifdevuelto_proforma);
+                        $ingreso            = $getIngreso["ingreso"];
+                        $messageIngreso     = $getIngreso["messageIngreso"];
+                        if($ingreso == 1){
+                            $porcentaje++;
+                            //ingresar en el historico
+                            $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$getCodigo,$id_usuario,$observacion,$getcodigoPrimero,null);
+                            //ingresar a la tabla de devolucion
+                            $this->codigosRepository->saveDevolucion($getCodigo,$cliente,$institucion_id,$periodo_id,$fecha,$observacion,$id_usuario);
+                            $codigosSinCodigoUnion[] = $validar[0];
+                        }
+                        else{
+                            $codigosNoCambiados[0] =[
+                                "codigo"        => $getCodigo,
+                                "mensaje"       => $messageIngreso
+                            ];
+                        }
                     }
+                }else{
+                    $mensaje_personalizado              = "";
+                    //mensaje personalizado front
+                    if($ifLiquidado == 0)               { $mensaje_personalizado = "Código liquidado"; }
+                    if($ifLiquidado == 2)               { if($ifliquidado_regalado == '1') { $mensaje_personalizado = "Código  Regalado liquidado"; } }
+                    if($ifLiquidado == 3)               { $mensaje_personalizado = "Código  ya devuelto"; }
+                    if($ifLiquidado == 4)               { $mensaje_personalizado = "Código Guia"; }
+                    //error proforma
+                    if($ifErrorProforma == 1)           { $mensaje_personalizado  = $messageProforma; }
+                    ////add array to front
+                    $codigosConLiquidacion[$contador]   = [
+                        "codigo"                         => $getCodigo,
+                        "prueba_diagnostica"             => $validar[0]->prueba_diagnostica,
+                        "tipoCodigo"                     => $validar[0]->tipoCodigo,
+                        "liquidacion"                    => $validar[0]->liquidacion,
+                        "institucionBarra"               => $validar[0]->institucion_barras,
+                        "periodo_barras"                 => $validar[0]->periodo_barras,
+                        "estado_liquidacion"             => $validar[0]->estado_liquidacion,
+                        "prueba_diagnostica"             => $validar[0]->prueba_diagnostica,
+                        "codigo_union"                   => $validar[0]->codigo_union,
+                        "mensaje"                        => $mensaje_personalizado
+                    ];
+                    $contador++;
                 }
             }else{
-                $mensaje_personalizado = "";
-                //mensaje personalizado front
-                if($ifLiquidado == 0){
-                    $mensaje_personalizado = "Código liquidado";
-                }
-                if($ifLiquidado == 2){
-                    if($ifliquidado_regalado == '1'){
-                        $mensaje_personalizado = "Código  Regalado liquidado";
-                    }
-                }
-                if($ifLiquidado == 3){
-                    $mensaje_personalizado = "Código  ya devuelto";
-                }
-                if($ifLiquidado == 4){
-                    $mensaje_personalizado = "Código Guia";
-                }
-                // if(($ifLiquidado == 1 || $ifLiquidado == 2) && ($ifBc_Institucion <> $institucion_id || $ifventa_lista_institucion <> $institucion_id)){
-                //     $mensaje_personalizado = "Código no pertenece a la institución que salio";
-                // }
-                $codigosConLiquidacion[$contador] = [
-                    "codigo"                => $getCodigo,
-                    "prueba_diagnostica"    => $validar[0]->prueba_diagnostica,
-                    "tipoCodigo"            => $validar[0]->tipoCodigo,
-                    "liquidacion"           => $validar[0]->liquidacion,
-                    "institucionBarra"      => $validar[0]->institucion_barras,
-                    "periodo_barras"        => $validar[0]->periodo_barras,
-                    "estado_liquidacion"    => $validar[0]->estado_liquidacion,
-                    "prueba_diagnostica"    => $validar[0]->prueba_diagnostica,
-                    "codigo_union"          => $validar[0]->codigo_union,
-                    "mensaje"               => $mensaje_personalizado
+                $codigoNoExiste[0] =[
+                    "codigo" => $getCodigo
                 ];
-                $contador++;
             }
-        }else{
-            $codigoNoExiste[0] =[
-                "codigo" => $getCodigo
+            return [
+                "cambiados"             => $porcentaje,
+                "codigosNoCambiados"    => $codigosNoCambiados,
+                "codigosConLiquidacion" => $codigosConLiquidacion,
+                "codigoNoExiste"        => $codigoNoExiste,
+                "codigosSinCodigoUnion" => $codigosSinCodigoUnion
             ];
         }
-        return [
-            "cambiados"             => $porcentaje,
-            "codigosNoCambiados"    => $codigosNoCambiados,
-            "codigosConLiquidacion" => $codigosConLiquidacion,
-            "codigoNoExiste"        => $codigoNoExiste,
-            "codigosSinCodigoUnion" => $codigosSinCodigoUnion
-        ];
+        catch(\Exception $e){
+            return response()->json([
+                "status"  => 0,
+                'message' => $e->getMessage()
+            ], 200);
+        }
     }
        //api:post//codigos/devolucion/activar
        public function ActivardevolucionCodigos(Request $request){
@@ -1888,12 +1984,21 @@ class CodigoLibrosController extends Controller
             $validar = $this->getCodigos($item->codigo,0);
             //valida que el codigo existe
             if(count($validar)>0){
+                $EstatusProceso         = false;
                 //validar si el codigo se encuentra liquidado
                 $ifDevuelto             = $validar[0]->estado_liquidacion;
                 //validar si tiene codigo de union
                 $codigo_union           = $validar[0]->codigo_union;
                 $ifliquidado_regalado   = $validar[0]->liquidado_regalado;
-                if($ifDevuelto != '0' && $ifliquidado_regalado == '0' && $ifDevuelto != '4'){
+                //para ver el estado devuelto proforma
+                $ifdevuelto_proforma        = $validar[0]->devuelto_proforma;
+                //VALIDACION QUE NO SEA LIQUIDADO
+                if($ifDevuelto != '0' && $ifliquidado_regalado == '0' && $ifDevuelto != '4'){ $EstatusProceso = true; }
+                //====PROFORMA============================================
+                //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
+                if($ifdevuelto_proforma == 2 ){ $EstatusProceso = false; $messageProforma = "No se puede activar el código, ya que tiene proforma que no se pudo devolver por que ya fue enviado a perseo el pedido"; }
+                //PROFORMA si tiene proforma que no se pudo devolver despues de enviar el pedido
+                if($EstatusProceso){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
                     if($codigo_union != null || $codigo_union != ""){
                         $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
@@ -1934,6 +2039,8 @@ class CodigoLibrosController extends Controller
                         }
                     }
                 }else{
+                    //si el codigo tiene proforma que no se pudo devolver despues de enviar el pedido
+                    if($ifdevuelto_proforma == 2)     { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
                     $codigoSinDevolucion[] = $validar[0];
                     $contador++;
                 }
@@ -2481,5 +2588,86 @@ class CodigoLibrosController extends Controller
                 ])
             ]);
         }
+    }
+    //api:get/metodosGetCodigos
+    public function metodosGetCodigos(Request $request){
+        if($request->reporteBodega)             { return $this->reporteBodega($request); }
+    }
+    //api:get/metodosGetCodigos?reporteBodega=1&periodo=24
+    public function reporteBodega($request){
+    //    $arrayCodigosActivos = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
+    //     c.libro_idlibro,ls.nombre as nombrelibro
+    //     FROM codigoslibros c
+    //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+    //     WHERE c.estado <> 2
+    //         and c.estado_liquidacion = '1'
+    //         AND c.bc_periodo  = ?
+
+    //         AND c.prueba_diagnostica = '0'
+    //     AND ls.idLibro = c.libro_idlibro
+    //     GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
+    //     ",[$request->periodo]);
+    //    return $arrayCodigosActivos;
+
+        $periodo    = $request->input('periodo');
+        $activos    = $request->input('activos');
+        $regalados  = $request->input('regalados');
+        $bloqueados = $request->input('bloqueados');
+        $puntoVenta = $request->input('puntoVenta');
+        // Realizar la consulta
+        $arrayCodigosActivos = CodigosLibros::select(
+            'libros_series.codigo_liquidacion AS codigo',
+            DB::raw('COUNT(libros_series.codigo_liquidacion) AS cantidad'),
+            'codigoslibros.serie',
+            'codigoslibros.libro_idlibro',
+            'libros_series.nombre AS nombrelibro',
+            'libros_series.year',
+            'libros_series.id_serie',
+            'asignatura.area_idarea'
+        )
+        ->leftJoin('libros_series', 'libros_series.idLibro', '=', 'codigoslibros.libro_idlibro')
+        ->leftJoin('libro', 'libro.idlibro', '=', 'libros_series.idLibro')
+        ->leftJoin('asignatura', 'asignatura.idasignatura', '=', 'libro.asignatura_idasignatura')
+        ->where('codigoslibros.prueba_diagnostica', '0')
+        ->where('codigoslibros.bc_periodo', $periodo)
+        ->when($activos, function ($query) {
+            $query->where(function ($query) {
+                $query->where('codigoslibros.estado_liquidacion', '1')
+                      ->orWhere('codigoslibros.estado_liquidacion', '0');
+            })
+            ->where('codigoslibros.estado', '<>', '2'); // Comparar como string si la columna es de tipo string
+        })
+        ->when($regalados, function ($query) {
+            $query->where('codigoslibros.estado_liquidacion', '2')
+                  ->where('codigoslibros.estado', '<>', '2'); // Comparar como string si la columna es de tipo string
+        })
+        ->when($bloqueados, function ($query) {
+            $query->where('codigoslibros.estado_liquidacion', '3')
+                  ->where('codigoslibros.estado', '2'); // Comparar como string si la columna es de tipo string
+        })
+        ->when($puntoVenta, function ($query) {
+            $query->where('codigoslibros.venta_lista_institucion', request('puntoVenta'))
+                  ->where(function ($query) {
+                      $query->where('codigoslibros.estado_liquidacion', '0')
+                            ->orWhere('codigoslibros.estado_liquidacion', '1')
+                            ->orWhere('codigoslibros.estado_liquidacion', '2')
+                            ->orWhere('codigoslibros.estado', '2');
+                  });
+        })
+        ->groupBy('libros_series.codigo_liquidacion', 'libros_series.nombre', 'codigoslibros.serie', 'codigoslibros.libro_idlibro', 'libros_series.year', 'libros_series.id_serie', 'asignatura.area_idarea')
+        ->get();
+
+        // Procesar los resultados para obtener el precio y multiplicar por la cantidad
+        foreach ($arrayCodigosActivos as $item) {
+            // Obtener el precio del libro usando el repositorio
+            $precio = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->libro_idlibro, $item->area_idarea, $periodo, $item->year);
+            $item->precio       = $precio;
+            // Multiplicar el precio por la cantidad
+            $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
+        }
+
+        return $arrayCodigosActivos;
+
+
     }
 }

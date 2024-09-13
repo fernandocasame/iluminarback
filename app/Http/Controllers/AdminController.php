@@ -173,6 +173,9 @@ class AdminController extends Controller
                      //PERIODO ANTES
                     $JsonAntes          = $this->getContratos($itemP->id_asesor,$iniciales,$periodo,$codigosContrato);
                 }
+                //quitar duplicar de JsonDespues y $JsonAntes
+                $JsonDespues = array_values(array_unique($JsonDespues, SORT_REGULAR));
+                $JsonAntes   = array_values(array_unique($JsonAntes, SORT_REGULAR));
                 //==========SIN CONTRATOS===================
                 $getSinContrato = $this->getSinContratoProlipa($itemP->id_asesor,$periodo);
                 if(empty($getSinContrato)){
@@ -314,6 +317,59 @@ class AdminController extends Controller
         return curl_exec($cURL);
     }
     public function pruebaData(Request $request){
+        try{
+            //transaccion
+            DB::beginTransaction();
+            $query = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+            WHERE p.pro_nombre LIKE '%guia%'
+            AND p.temporal is null
+            AND p.pro_codigo = 'GSMLL2'
+            limit 100
+            ");
+            $contador = 0;
+            foreach($query as $key => $item){
+                $stockReservaAnterior           = $item->pro_reservar;
+                $stockAnteriorProlipa           = $item->pro_stock;
+                $stockAnteriorCalmed            = $item->pro_stockCalmed;
+                $codigoFact                     = $item->pro_codigo;
+                $nuevoStockReserva              = 0;
+                $nuevoStockCalmed               = 0;
+                $nuevoStockProlipa              = 0;
+                $stockCalmed                    = 0 ;
+                //============================CALMED================================================
+                //get stock calmed
+                $getStockCalmed                 = DB::SELECT("SELECT * FROM cal_producto WHERE pro_codigo = '$codigoFact'");
+                if(empty($getStockCalmed))     { $stockCalmed = 0; }
+                else                           { $stockCalmed = $getStockCalmed[0]->pro_stock; }
+                // $getStockCalmed             = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+                // $json_stock                 = json_decode($getStockCalmed, true);
+                // $stockCalmed                = $json_stock["producto"][0]["proStock"];
+                //si stock de calmed es 5000 coloco el stockCalmed
+                return $stockAnteriorCalmed;
+                if($stockAnteriorCalmed == 5000){ $nuevoStockCalmed     = $stockCalmed; }
+                else                            {
+                    $stockAnteriorCalmed        = 5000 - $stockAnteriorCalmed;
+                    //si stock de calmed es menor a 5000 voy a restar el stock de calmed con el stock de calmed
+                    $nuevoStockCalmed           = $stockCalmed - $stockAnteriorCalmed;
+                }
+                return $nuevoStockCalmed;
+                $nuevoStockReserva          = $nuevoStockCalmed + $nuevoStockProlipa;
+                DB::table('1_4_cal_producto')
+                ->where('pro_codigo', $codigoFact)
+                ->update([ 'pro_reservar' => $nuevoStockReserva , "pro_stockCalmed"  => $nuevoStockCalmed]);
+                //==========================PROLIPA======================================================
+                $contador++;
+            }
+            DB::commit();
+            return "se actualizo correctamente ".$contador;
+        }
+        catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
 
 
 
@@ -498,74 +554,83 @@ class AdminController extends Controller
     public function guardarData(Request $request){
         set_time_limit(6000);
         ini_set('max_execution_time', 600000);
-        $contadorSolinfaGONZALEZ = 0;
-        $contadorSolinfaCOBACANGO= 0;
-        $resultsGonzales = DB::connection('mysql2')->select('SELECT * FROM product p
-         WHERE p.id_perseo_gonzales IS NULL
-        limit 90');
-        $resultsCobacango = DB::connection('mysql2')->select('SELECT * FROM product p
-        WHERE p.id_perseo_cobacango IS NULL
-        limit 90');
-        //GONZALES
-        foreach($resultsGonzales as $key => $item){
-                $formData = [
-                    "productocodigo"=> $item->barcode,
-                ];
-                $url                        = "productos_consulta";
-                $processSolinfa             = $this->tr_SolinfaPost($url, $formData,1);
-                $getContador                = $this->guardarIdProductoSolinfa($processSolinfa,$item->barcode,"id_perseo_gonzales");
-                $contadorSolinfaGONZALEZ    = $contadorSolinfaGONZALEZ + $getContador;
-        }
-        //COBACANGO
-        foreach($resultsCobacango as $key => $item){
-            $formData = [
-                "productocodigo"=> $item->barcode,
-            ];
-            $url                        = "productos_consulta";
-            $processSolinfa             = $this->tr_SolinfaPost($url, $formData,2);
-            $getContador                = $this->guardarIdProductoSolinfa($processSolinfa,$item->barcode,"id_perseo_cobacango");
-            $contadorSolinfaCOBACANGO    = $contadorSolinfaCOBACANGO + $getContador;
-        }
-        return ["contadorSolinfaGONZALEZ" => $contadorSolinfaGONZALEZ, "contadorSolinfaCOBACANGO" => $contadorSolinfaCOBACANGO];
-        // try {
-        //     $contadorProlipa = 0;
-        //     $contadorCalmed  = 0;
-        //     //PROLIPA
-        //     $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
-        //     WHERE p.id_perseo_prolipa_produccion IS NULL
-        //     LIMIT 90
-        //     ");
-        //     foreach($queryProlipa as $key => $item){
+        // $contadorSolinfaGONZALEZ = 0;
+        // $contadorSolinfaCOBACANGO= 0;
+        // $resultsGonzales = DB::connection('mysql2')->select('SELECT * FROM product p
+        //  WHERE p.id_perseo_gonzales IS NULL
+        // limit 90');
+        // $resultsCobacango = DB::connection('mysql2')->select('SELECT * FROM product p
+        // WHERE p.id_perseo_cobacango IS NULL
+        // limit 90');
+        // //GONZALES
+        // foreach($resultsGonzales as $key => $item){
         //         $formData = [
-        //             "productocodigo"=> $item->pro_codigo,
+        //             "productocodigo"=> $item->barcode,
         //         ];
-        //         $url                = "productos_consulta";
-        //         $processProlipa     = $this->tr_PerseoPost($url, $formData,1);
-        //         $getContador        = $this->guardarIdProducto($processProlipa,$item->pro_codigo,"id_perseo_prolipa_produccion");
-        //         //contadorProlipa + getContador
-        //         $contadorProlipa    = $contadorProlipa + $getContador;
-        //     }
-        //     //CALMED
-        //     $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
-        //     WHERE p.id_perseo_calmed_produccion IS NULL
-        //     LIMIT 100
-        //     ");
-        //     foreach($queryCalmed as $key => $item){
-        //         $formData = [
-        //             "productocodigo"=> $item->pro_codigo,
-        //         ];
-        //         $url                = "productos_consulta";
-        //         $processCalmed      = $this->tr_PerseoPost($url, $formData,3);
-        //         $getContador        = $this->guardarIdProducto($processCalmed,$item->pro_codigo,"id_perseo_calmed_produccion");
-        //         //contadorCalmed + getContador
-        //         $contadorCalmed     = $contadorCalmed + $getContador;
-        //     }
-        //     return ["contadorProlipa" => $contadorProlipa,"contadorCalmed" => $contadorCalmed];
-        // } catch (\Exception $e) {
-        //     return response()->json([
-        //         'error' => $e->getMessage()
-        //     ], 500);
+        //         $url                        = "productos_consulta";
+        //         $processSolinfa             = $this->tr_SolinfaPost($url, $formData,1);
+        //         $getContador                = $this->guardarIdProductoSolinfa($processSolinfa,$item->barcode,"id_perseo_gonzales");
+        //         $contadorSolinfaGONZALEZ    = $contadorSolinfaGONZALEZ + $getContador;
         // }
+        // //COBACANGO
+        // foreach($resultsCobacango as $key => $item){
+        //     $formData = [
+        //         "productocodigo"=> $item->barcode,
+        //     ];
+        //     $url                        = "productos_consulta";
+        //     $processSolinfa             = $this->tr_SolinfaPost($url, $formData,2);
+        //     $getContador                = $this->guardarIdProductoSolinfa($processSolinfa,$item->barcode,"id_perseo_cobacango");
+        //     $contadorSolinfaCOBACANGO    = $contadorSolinfaCOBACANGO + $getContador;
+        // }
+        // return ["contadorSolinfaGONZALEZ" => $contadorSolinfaGONZALEZ, "contadorSolinfaCOBACANGO" => $contadorSolinfaCOBACANGO];
+
+
+        try {
+            $contadorProlipa = 0;
+            $contadorCalmed  = 0;
+
+            $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+            WHERE p.pro_nombre  LIKE '%sina%';
+            ");
+            //PROLIPA
+            // $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+            // WHERE p.id_perseo_prolipa_produccion IS NULL
+            // LIMIT 90
+            // ");
+            foreach($queryProlipa as $key => $item){
+                $formData = [
+                    "productocodigo"=> $item->pro_codigo,
+                ];
+                $url                = "productos_consulta";
+                $processProlipa     = $this->tr_PerseoPost($url, $formData,1);
+                $getContador        = $this->guardarIdProducto($processProlipa,$item->pro_codigo,"id_perseo_prolipa_produccion");
+                //contadorProlipa + getContador
+                $contadorProlipa    = $contadorProlipa + $getContador;
+            }
+            //CALMED
+            $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+            WHERE p.pro_nombre  LIKE '%sina%';
+            ");
+            // $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+            // WHERE p.id_perseo_calmed_produccion IS NULL
+            // LIMIT 100
+            // ");
+            foreach($queryCalmed as $key => $item){
+                $formData = [
+                    "productocodigo"=> $item->pro_codigo,
+                ];
+                $url                = "productos_consulta";
+                $processCalmed      = $this->tr_PerseoPost($url, $formData,3);
+                $getContador        = $this->guardarIdProducto($processCalmed,$item->pro_codigo,"id_perseo_calmed_produccion");
+                //contadorCalmed + getContador
+                $contadorCalmed     = $contadorCalmed + $getContador;
+            }
+            return ["contadorProlipa" => $contadorProlipa,"contadorCalmed" => $contadorCalmed];
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
     public function guardarIdProducto($process,$pro_codigo,$campoPerseo){
         $contador = 0;

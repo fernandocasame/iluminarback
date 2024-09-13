@@ -62,7 +62,7 @@ class InstitucionController extends Controller
 
     public function selectInstitucion(Request $request){
         if(empty($request->idregion) && empty($request->idciudad)){
-            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion
+            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion,i.punto_venta
              FROM institucion i, periodoescolar_has_institucion pi
               WHERE i.idInstitucion != 66
               AND i.idInstitucion != 1170
@@ -76,7 +76,7 @@ class InstitucionController extends Controller
             ");
         }
         if(!empty($request->idregion) && empty($request->idciudad)){
-            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion
+            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion,i.punto_venta
              FROM institucion i, periodoescolar_has_institucion pi
              WHERE i.region_idregion = ? AND i.idInstitucion != 66
              AND i.idInstitucion != 1170
@@ -90,7 +90,7 @@ class InstitucionController extends Controller
             ",[$request->idregion]);
         }
         if(!empty($request->idciudad) && empty($request->idregion)){
-            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion
+            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion,i.punto_venta
              FROM institucion i, periodoescolar_has_institucion pi
              WHERE i.ciudad_id = ? AND i.idInstitucion != 66
               AND i.idInstitucion != 1170
@@ -104,7 +104,7 @@ class InstitucionController extends Controller
              ",[$request->idciudad]);
         }
         if(!empty($request->idciudad) && !empty($request->idregion)){
-            $institucion = DB::SELECT("SELECT idInstitucion,UPPER(nombreInstitucion) as nombreInstitucion
+            $institucion = DB::SELECT("SELECT idInstitucion,UPPER(nombreInstitucion) as nombreInstitucion,i.punto_venta
             FROM institucion i, periodoescolar_has_institucion pi
              WHERE i.ciudad_id = ? AND i.region_idregion = ? AND i.idInstitucion != 66
               AND i.idInstitucion != 1170
@@ -117,7 +117,9 @@ class InstitucionController extends Controller
              AND pi.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi WHERE phi.institucion_idInstitucion = i.idInstitucion)
             ",[$request->idciudad,$request->idregion]);
         }
-        return $institucion;
+        $resultado = collect($institucion)->where('punto_venta','0')->values();
+        return $resultado;
+        // return $institucion;
 
     }
 
@@ -184,7 +186,7 @@ class InstitucionController extends Controller
         $cambio->nombreInstitucion              = $request->nombreInstitucion;
         $cambio->direccionInstitucion           = $request->direccionInstitucion;
         $cambio->telefonoInstitucion            = $request->telefonoInstitucion;
-        $cambio->email                          = $request->email;
+        $cambio->email                          = $request->email == null || $request->email == "null" ? null : $request->email == null;
         $cambio->solicitudInstitucion           = $request->solicitudInstitucion;
         $cambio->codigo_institucion_milton      = $request->codigo_institucion_milton;
         $cambio->vendedorInstitucion            = $request->vendedorInstitucion;
@@ -199,6 +201,8 @@ class InstitucionController extends Controller
         $cambio->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
         $cambio->evaluacion_personalizada       = $request->evaluacion_personalizada;
         $cambio->cantidad_cambio_ventana_evaluacion     = $request->cantidad_cambio_ventana_evaluacion;
+        $cambio->ifcodigoEvaluacion             = $request->ifcodigoEvaluacion;
+        $cambio->ruc                            = $request->ruc;
         $cambio->save();
         return $cambio;
     }
@@ -502,7 +506,8 @@ class InstitucionController extends Controller
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
             ic.estado as EstadoConfiguracion, ic.periodo_configurado,i.codigo_mitlon_coincidencias,
-            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion
+            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion,
+            i.punto_venta
             FROM institucion i
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN region r ON i.region_idregion = r.idregion
@@ -514,12 +519,13 @@ class InstitucionController extends Controller
             ORDER BY i.fecha_registro DESC
             ");
         }else{
-            $lista = DB::SELECT("SELECT i.idInstitucion,i.region_idregion, i.nombreInstitucion,i.aplica_matricula,
+            $lista = DB::SELECT("SELECT DISTINCT i.idInstitucion,i.region_idregion, i.nombreInstitucion,i.aplica_matricula,
             IF(i.estado_idEstado = '1','activado','desactivado') AS estado,i.estado_idEstado as estadoInstitucion,
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
             ic.estado as EstadoConfiguracion, ic.periodo_configurado,i.codigo_mitlon_coincidencias,
-            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion
+            pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion,
+            i.punto_venta
             FROM institucion i
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN region r ON i.region_idregion = r.idregion
@@ -527,7 +533,7 @@ class InstitucionController extends Controller
             LEFT JOIN institucion_configuracion_periodo ic ON i.region_idregion = ic.region
             LEFT JOIN periodoescolar pec ON ic.periodo_configurado = pec.idperiodoescolar
             WHERE i.nombreInstitucion LIKE '%$request->busqueda%'
-            ORDER BY i.fecha_registro DESC
+            ORDER BY i.idInstitucion, i.fecha_registro DESC
             ");
         }
         $datos = [];
@@ -574,7 +580,8 @@ class InstitucionController extends Controller
                         "vendedorInstitucion"   => $item->vendedorInstitucion,
                         "iniciales"             => $item->iniciales,
                         "region"                => $item->region_idregion,
-                        "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion
+                        "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion,
+                        "punto_venta" => $item->punto_venta
                     ];
                 }else{
                     $datos[$key]=[
@@ -600,11 +607,18 @@ class InstitucionController extends Controller
                         "vendedorInstitucion"   => $item->vendedorInstitucion,
                         "iniciales"             => $item->iniciales,
                         "region"                => $item->region_idregion,
-                        "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion
+                        "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion,
+                        "punto_venta" => $item->punto_venta
                     ];
                 }
             }
-            return $datos;
+            if($request->todas){
+                return $datos;
+            }
+            else{
+                $resultado = collect($datos)->where('estadoInstitucion','1')->values();
+                return $resultado;
+            }
         }
     }
 
@@ -709,6 +723,15 @@ class InstitucionController extends Controller
         return "Se elimino correctamente";
     }
 
+    public function instituciones_periodo(Request $request)
+    {
+        $lista = DB::SELECT("SELECT inst.*, ase.cedula, ase.iniciales, CONCAT(ase.nombres, ase.apellidos)as nombres FROM institucion inst
+        INNER JOIN periodoescolar_has_institucion pei ON pei.institucion_idInstitucion=inst.idInstitucion
+        INNER JOIN periodoescolar p ON p.idperiodoescolar=pei.periodoescolar_idperiodoescolar
+        INNER JOIN usuario ase ON ase.idusuario=inst.asesor_id
+        WHERE pei.periodoescolar_idperiodoescolar= '$request->id' ORDER BY inst.fecha_registro DESC");
+        return $lista;
+    }
     public function instituciones_ciudad(Request $request)
     {
         $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.aplica_matricula,
@@ -755,6 +778,13 @@ class InstitucionController extends Controller
         ->get();
         return $dato;
     }
+    //api:post/eliminarInstitucionConfiguradaBodega
+    public function eliminarInstitucionConfiguradaBodega(Request $request){
+        $dato = DB::table('institucion_configuracion_periodo')
+        ->where('id',$request->id)
+        ->delete();
+        return $dato;
+    }
     public function institucion_conf_periodo(Request $request)
     {
         $valores = [
@@ -773,10 +803,27 @@ class InstitucionController extends Controller
             return [ 'dato'=>$dato, 'mensaje'=>'Datos registrados'];
         }
     }
+    public function InstitucionesXCobranzas(Request $request)
+    {
+        // $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.punto_venta
+        // FROM pedidos p
+        // INNER JOIN institucion i ON i.idInstitucion = p.id_institucion
+        // WHERE p.contrato_generado IS NOT NULL
+        // AND p.id_periodo = '$request->periodo'");
+        $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion
+        FROM f_venta fv
+        INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+        WHERE fv.clientesidPerseo = '$request->cliente'
+        AND fv.id_empresa = '$request->empresa'
+        AND fv.periodo_id = '$request->periodo'
+        GROUP BY i.idInstitucion,i.nombreInstitucion");
+
+        return $lista;
+    }
     //se debe habilitar cuando la zona sea obligatoria
     // public function institucion_zona(Request $request)
     // {
-    //    if($request->idInstitucion){        
+    //    if($request->idInstitucion){
     //     $zonas = Institucion::findOrFail($request->idInstitucion);
     //     $zonas->zona_id = $request->zona_id;
     //    }else{

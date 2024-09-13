@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Repositories\Facturacion\ProformaRepository;
 use Facade\FlareClient\Http\Response;
 use Illuminate\Http\Request;
-
+use DB;
 class DevolucionController extends Controller
 {
     /**
@@ -24,11 +24,28 @@ class DevolucionController extends Controller
     {
        if($request->listadoProformasAgrupadas)  { return $this->listadoProformasAgrupadas($request); }
     }
-    //api:get/devoluciones?listadoProformasAgrupadas=1&institucion=
-    public function listadoProformasAgrupadas(Request $request): \Illuminate\Http\JsonResponse
+    //api:get/devoluciones?listadoProformasAgrupadas=1&institucion=1620
+    public function listadoProformasAgrupadas(Request $request)
     {
-        $institucion = $request->input('institucion');
-        return $this->proformaRepository->listadoProformasAgrupadas($institucion);
+        $institucion                = $request->input('institucion');
+        $getProformas               = $this->proformaRepository->listadoProformasAgrupadas($institucion);
+        if(empty($getProformas))    { return []; }
+        foreach($getProformas as $key => $item){
+            $query = DB::SELECT("SELECT * FROM f_venta_agrupado v
+            WHERE v.id_factura = ?
+            AND v.estadoPerseo = '1'
+            AND v.id_empresa = ?
+            ",[$item->id_factura,$item->id_empresa]);
+            if(count($query) > 0){
+                $getProformas[$key]->ifPedidoPerseo = 1;
+            }else{
+                $getProformas[$key]->ifPedidoPerseo = 0;
+            }
+        }
+        $resultado = collect($getProformas);
+        //filtrar por ifPedidoPerseo igual a 0
+        $resultado = $resultado->where('ifPedidoPerseo','0')->all();
+        return $resultado;
     }
     /**
      * Show the form for creating a new resource.

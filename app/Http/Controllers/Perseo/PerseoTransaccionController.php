@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Abono;
 use App\Models\Ventas;
 use App\Models\VentasF;
+use App\Models\CuentaBancaria;
 use App\Repositories\perseo\PerseoConsultasRepository;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use Illuminate\Http\Request;
@@ -36,10 +37,11 @@ class PerseoTransaccionController extends Controller
         try {
             DB::beginTransaction();
             $factura        = $request->ven_codigo; //F-S23-ER-0000073
+            $empresa        = $request->id_empresa;
             //$factura        = "PF-C23-MFACT-0000095";
             $concepto       = "Proforma";
             $observacion    = "Proforma"; //observacion
-            $getFactura     = Ventas::where('ven_codigo',$factura)->first();
+            $getFactura     = Ventas::where('ven_codigo',$factura)->where('id_empresa',$empresa)->first();
             //validar que exista la factura
             if(!$getFactura)                        { return ["status" => "0", "message" => "La factura no existe"]; }
             //validar si la factura ya fue enviada a Perseo
@@ -87,6 +89,7 @@ class PerseoTransaccionController extends Controller
                 ->select('vd.*', DB::raw('(vd.det_ven_cantidad * vd.det_ven_valor_u) AS valorTotal'), DB::raw("`$productoBuscar` AS idPerseoProducto"))
                 ->leftJoin('1_4_cal_producto as p', 'vd.pro_codigo', '=', 'p.pro_codigo')
                 ->where('vd.ven_codigo', $factura)
+                ->where('vd.id_empresa','=',$empresa)
                 ->get();
             if(empty($detalle)) { return ["status" => "0", "message" => "La factura no tiene detalle"]; }
             foreach( $detalle as $d){ $totalFactura += $d->valorTotal; }
@@ -155,10 +158,10 @@ class PerseoTransaccionController extends Controller
             if(isset($process["proformas"])) {
                 $proformasid_nuevo   = $process["proformas"][0]["proformasid_nuevo"];
                 $proformas_codigo    = $process["proformas"][0]["proformas_codigo"];
-                Ventas::where('ven_codigo',$factura)->update(['estadoPerseo' => 1,"idPerseo" => $proformasid_nuevo, "proformas_codigo" => $proformas_codigo, "fecha_envio_perseo" => date('Y-m-d H:i:s') ]);
+                Ventas::where('ven_codigo',$factura)->where('id_empresa',$empresa)->update(['estadoPerseo' => 1,"idPerseo" => $proformasid_nuevo, "proformas_codigo" => $proformas_codigo, "fecha_envio_perseo" => date('Y-m-d H:i:s') ]);
             }
             else{
-                Ventas::where('ven_codigo',$factura)->update(['estadoPerseo' => 0 ]);
+                Ventas::where('ven_codigo',$factura)->where('id_empresa',$empresa)->update(['estadoPerseo' => 0 ]);
             }
             //transaccion de laravel commit
             DB::commit();
@@ -174,14 +177,14 @@ class PerseoTransaccionController extends Controller
     //api:post/perseo/transaccion/pedidos_crear
     public function pedidos_crear(Request $request)
     {
-
         try {
             DB::beginTransaction();
-            $factura     = $request->ven_codigo; //F-C23-ER-0000076
+            $factura        = $request->ven_codigo; //F-C23-ER-0000076
             // $factura        = "F-C23-ER-0000076";
+            $empresa        = $request->id_empresa;
             $observacion    = "Pedido"; //observacion
             $concepto       = "Pedido";
-            $getFactura = VentasF::where('id_factura',$factura)->first();
+            $getFactura = VentasF::where('id_factura',$factura)->where('id_empresa',$empresa)->first();
             //validar que exista la factura
             if(!$getFactura)                        { return ["status" => "0", "message" => "La factura no existe"]; }
             //validar si la factura ya fue enviada a Perseo
@@ -193,22 +196,7 @@ class PerseoTransaccionController extends Controller
             $clientesidPerseo = $getFactura->clientesidPerseo;
             $totalFactura    = 0;
             $detalle         = [];
-            //prolipa
-            // if($id_empresa == 1){
-            //     $detalle = DB::SELECT("SELECT vd.*, (vd.det_ven_cantidad * vd.det_ven_valor_u) AS valorTotal,p.id_perseo_prolipa as idPerseoProducto
-            //         FROM f_detalle_venta_agrupado vd
-            //         LEFT JOIN 1_4_cal_producto p ON vd.pro_codigo = p.pro_codigo
-            //         WHERE vd.id_factura = ?
-            //     ",[$factura]);
-            // }
-            // //calmed
-            // if($id_empresa == 3){
-            //     $detalle = DB::SELECT("SELECT vd.*, (vd.det_ven_cantidad * vd.det_ven_valor_u) AS valorTotal,p.id_perseo_calmed as idPerseoProducto
-            //         FROM f_detalle_venta_agrupado vd
-            //         LEFT JOIN 1_4_cal_producto p ON vd.pro_codigo = p.pro_codigo
-            //         WHERE vd.id_factura = ?
-            //     ",[$factura]);
-            // }
+
             if ($id_empresa == 1) {
                 $productoBuscar = $this->perseoProduccion == 0 ? 'id_perseo_prolipa' : 'id_perseo_prolipa_produccion';
             } elseif ($id_empresa == 3) {
@@ -222,12 +210,18 @@ class PerseoTransaccionController extends Controller
             ->select('vd.*', DB::raw('(vd.det_ven_cantidad * vd.det_ven_valor_u) AS valorTotal'), DB::raw("`$productoBuscar` AS idPerseoProducto"))
             ->leftJoin('1_4_cal_producto as p', 'vd.pro_codigo', '=', 'p.pro_codigo')
             ->where('vd.id_factura', $factura)
+            ->where('id_empresa',$empresa)
             ->get();
             foreach( $detalle as $d){ $totalFactura += $d->valorTotal; }
             //con 2 decimales
             $totalFactura   = number_format($totalFactura, 2, '.', '');
             $detalles = [];
             foreach($detalle as $d){
+                $pro_codigo = $d->pro_codigo;
+                $id_perseo = $d->idPerseoProducto;
+                if($id_perseo == 0 || $id_perseo == null || $id_perseo == ""){
+                    return ["status" => "0", "message" => "El codigo $pro_codigo no se encuentra en perseo"];
+                }
                 $detalles[] = [
                     "pedidosid"                 => 1,
                     "centros_costosid"          => 1,
@@ -282,12 +276,13 @@ class PerseoTransaccionController extends Controller
             $process    = $this->tr_PerseoPost($url, $formData,$id_empresa);
              //si existe proccess["facturas"] enviar a perseo
             //actualizar a 1 en la tabla f_venta modelo Ventas campo estadoPerseo a 1
+
             if(isset($process["pedidos"])) {
                 $pedidoCodigo_nuevo = $process["pedidos"][0]["pedidos_codigo"];
-                VentasF::where('id_factura',$factura)->update(['estadoPerseo' => 1,"pedido_codigo" => $pedidoCodigo_nuevo, "fecha_envio_perseo" => date('Y-m-d H:i:s') ]);
+                VentasF::where('id_factura',$factura)->where('id_empresa',$empresa)->update(['estadoPerseo' => 1,"pedido_codigo" => $pedidoCodigo_nuevo, "fecha_envio_perseo" => date('Y-m-d H:i:s') ]);
             }
             else{
-                VentasF::where('id_factura',$factura)->update(['estadoPerseo' => 0 ]);
+                VentasF::where('id_factura',$factura)->where('id_empresa',$empresa)->update(['estadoPerseo' => 0 ]);
             }
             //transaccion de laravel commit
             DB::commit();
@@ -410,13 +405,15 @@ class PerseoTransaccionController extends Controller
             $usuarioCreador = $request->usuarioCreador;
             // $abono_id = 49;
             $getAbono = Abono::where('abono_id',$abono_id)->first();
+            $getBanco = CuentaBancaria::where('cue_pag_codigo',$getAbono->abono_cuenta)->first();
             //si no existe el abono
             if(!$getAbono) { return ["status" => "0", "message" => "El abono no existe"]; }
             $importe = 0;
             $tipoPago = 0;
             $tipoPago = 0;
-            $banco = 1;
-            $fecha = Carbon::parse($getAbono->abono_fecha)->format('Ymd');
+            $banco =  $getBanco->ban_codigo;
+            // return $banco;
+            $fecha = Carbon::parse($getAbono->ban_codigo)->format('Ymd');
             $cliente = $getAbono->idClientePerseo;
             $empresa = $getAbono->abono_empresa;
             $documento = $getAbono->abono_documento;
@@ -425,13 +422,15 @@ class PerseoTransaccionController extends Controller
             }else{
                 $importe = $getAbono->abono_facturas;
             }
-            if($getAbono->abono_tipo === 0 || $getAbono->abono_tipo === 1){
+            if($getAbono->abono_tipo === 0 ){
                 $tipoPago = 5;
             }else if($getAbono->abono_tipo === 2){
-                $tipoPago = 3;
+                $tipoPago = 5;
                 $banco = $getAbono->abono_cheque_banco;
+            }else if($getAbono->abono_tipo === 1){
+                $tipoPago = 6;
             }
-            $observacion = "Cobro";
+            $observacion = $getAbono->abono_concepto;
             $detalles    = [];
             $detalles[0] = [
                 "bancoid"           => $banco,
@@ -464,14 +463,15 @@ class PerseoTransaccionController extends Controller
                             "fechavencimiento"         => $fecha,
                             "importe"                  => $importe,
                             "cajasid"                  => 1,//Id de la caja que va afectar esta factura
-                            "bancosid"                 => 1,//Consultar
+                            "bancosid"                  => $banco,
                             "usuariocreacion"          => $usuarioCreador,//mando del front
                             "usuarioid"                => 3,
-                            "detalles"                 => $detalles
+                            "detalles"                 => $detalles,
                         ]
                     ]
                 ]
             ];
+            // return $formData;
             $url        = "cobros_crear";
             $process    = $this->tr_PerseoPost($url, $formData,$empresa);
             //si existe proccess["cobros"] guardo
@@ -484,7 +484,7 @@ class PerseoTransaccionController extends Controller
             }
             //transaccion de laravel commit
             DB::commit();
-            return $process;
+            return [$formData, $process];
         } catch (\Exception $e) {
             //transaccion de laravel rollback
             DB::rollBack();

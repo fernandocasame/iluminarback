@@ -107,7 +107,19 @@ trait TraitPedidosGeneral
             AND (
             o.estado_libros_obsequios = "0"
             OR o.estado_libros_obsequios  = "3"
+            OR o.estado_libros_obsequios  = "4"
+            OR o.estado_libros_obsequios  = "6"
             )
+        ) as contadorHijosDocentesAbiertosEnviados,
+        (
+            SELECT  COUNT(o.id) FROM p_libros_obsequios o
+            WHERE o.id_pedido = p.id_pedido
+            AND o.estado_libros_obsequios = "5"
+        ) as contadorHijosDocentesAbiertosAprobados,
+        (
+            SELECT  COUNT(o.id) FROM p_libros_obsequios o
+            WHERE o.id_pedido = p.id_pedido
+            AND o.estado_libros_obsequios = "8"
         ) as contadorObsequiosAbiertosEnviados,
         pe.periodoescolar as periodo,pe.codigo_contrato,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
@@ -238,6 +250,14 @@ trait TraitPedidosGeneral
        ");
         return $query;
     }
+    public function tr_getPreproformas($ca_codigo_agrupado){
+        $query = DB::SELECT("SELECT DISTINCT fp.prof_id
+        FROM  f_proforma fp
+        WHERE fp.idPuntoventa = '$ca_codigo_agrupado'
+        ORDER BY fp.created_at DESC
+       ");
+        return $query;
+    }
     public function tr_pedidosXDespacho($ca_codigo_agrupado,$id_periodo){
         // consulta sin contrato
         $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,
@@ -287,6 +307,18 @@ trait TraitPedidosGeneral
         ");
        return $query;
     }
+    public function tr_getPuntosVentasDespachos($periodo){
+        $query = DB::SELECT("SELECT DISTINCT c.venta_lista_institucion, i.nombreInstitucion
+        FROM codigoslibros c
+        LEFT JOIN institucion i ON i.idInstitucion = c.venta_lista_institucion
+        WHERE c.bc_periodo = ?
+        AND c.venta_lista_institucion  > 0
+        AND c.estado_liquidacion <> '3'
+        AND c.estado_liquidacion <> '4'
+        ORDER BY i.nombreInstitucion"
+        ,[ $periodo ]);
+        return $query;
+    }
     public function tr_getPuntosVenta($busqueda){
         $query = DB::SELECT("SELECT  i.idInstitucion, i.nombreInstitucion,i.ruc,i.email,i.telefonoInstitucion,
         i.direccionInstitucion,  c.nombre as ciudad
@@ -295,6 +327,19 @@ trait TraitPedidosGeneral
         -- LEFT JOIN usuario u ON i.idrepresentante=u.idusuario
         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
         WHERE i.nombreInstitucion LIKE '%$busqueda%'
+        ");
+        return $query;
+    }
+    public function tr_getPuntosVentaRegion($busqueda,$region){
+        $query = DB::SELECT("SELECT  i.idInstitucion, i.nombreInstitucion,i.ruc,i.email,i.telefonoInstitucion,
+        i.direccionInstitucion,  c.nombre as ciudad
+        -- CONCAT(u.nombres,' ',u.apellidos) as representante
+        FROM institucion i
+        -- LEFT JOIN usuario u ON i.idrepresentante=u.idusuario
+        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        WHERE i.nombreInstitucion LIKE '%$busqueda%'
+        AND i.region_idregion = '$region'
+        AND i.estado_idEstado = '1'
         ");
         return $query;
     }
