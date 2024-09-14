@@ -203,8 +203,10 @@ class AbonoController extends Controller
             'notasOfactura' => $abono->abono_notas > 0 ? 'nota' : 'factura',
             'tipo' => $tipoAbono,
             'responsable' => $usuario,
-            ...[$abono]
         ];
+    
+        // Añadir propiedades del objeto $abono al array $datosAbono
+        $datosAbono = array_merge($datosAbono, get_object_vars($abono));
     
         $abonoHistorico = new AbonoHistorico();
         $abonoHistorico->abono_id = $abono->abono_id;
@@ -216,6 +218,7 @@ class AbonoController extends Controller
             throw new \Exception('Error al guardar el registro histórico');
         }
     }
+    
     public function eliminarAbono(Request $request)
     {
         \DB::beginTransaction();
@@ -487,7 +490,7 @@ class AbonoController extends Controller
         $query = DB::SELECT("SELECT fv.* FROM f_venta fv
         WHERE fv.periodo_id='$request->periodo'
         AND fv.id_empresa='$request->empresa'
-        AND fv.ruc_cliente ='$request->cliente'
+        AND fv.ruc_cliente REGEXP '$request->cliente'
         AND fv.est_ven_codigo <> 3");
         return $query;
     }
@@ -666,7 +669,7 @@ class AbonoController extends Controller
 
             // Guardar los cambios
             $abono->save();
-
+            $this->guardarAbonoHistorico($abono, 4, $request->user_created);
             // Confirmar la transacción
             DB::commit();
 
