@@ -728,7 +728,7 @@ class PaqueteController extends Controller
         ]);
         //guardar en historico paquetes
         $this->save_historico_paquetes([
-            "codigo_paquete"    => $codigo,
+            "codigo_paquete"    => $request->paquete,
             "user_created"      => $user_created,
             "observacion"       => $comentario,
             "old_values"        => json_encode($codigo)
