@@ -323,8 +323,7 @@ class AdminController extends Controller
             $query = DB::SELECT("SELECT * FROM 1_4_cal_producto p
             WHERE p.pro_nombre LIKE '%guia%'
             AND p.temporal is null
-            AND p.pro_codigo = 'GSMLL2'
-            limit 100
+            limit 1000
             ");
             $contador = 0;
             foreach($query as $key => $item){
@@ -335,29 +334,44 @@ class AdminController extends Controller
                 $nuevoStockReserva              = 0;
                 $nuevoStockCalmed               = 0;
                 $nuevoStockProlipa              = 0;
-                $stockCalmed                    = 0 ;
+                $stockCalmed                    = 0;
+                $stockProlipa                   = 0;
                 //============================CALMED================================================
+
                 //get stock calmed
                 $getStockCalmed                 = DB::SELECT("SELECT * FROM cal_producto WHERE pro_codigo = '$codigoFact'");
                 if(empty($getStockCalmed))     { $stockCalmed = 0; }
                 else                           { $stockCalmed = $getStockCalmed[0]->pro_stock; }
-                // $getStockCalmed             = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-                // $json_stock                 = json_decode($getStockCalmed, true);
-                // $stockCalmed                = $json_stock["producto"][0]["proStock"];
                 //si stock de calmed es 5000 coloco el stockCalmed
-                return $stockAnteriorCalmed;
-                if($stockAnteriorCalmed == 5000){ $nuevoStockCalmed     = $stockCalmed; }
+                if($stockAnteriorCalmed == 5000){ $nuevoStockCalmed = $stockCalmed; }
                 else                            {
                     $stockAnteriorCalmed        = 5000 - $stockAnteriorCalmed;
                     //si stock de calmed es menor a 5000 voy a restar el stock de calmed con el stock de calmed
                     $nuevoStockCalmed           = $stockCalmed - $stockAnteriorCalmed;
                 }
-                return $nuevoStockCalmed;
+
+                //==========================PROLIPA======================================================
+                //get stock prolipa
+                $getStockProlipa                 = DB::SELECT("SELECT * FROM pro_producto WHERE pro_codigo = '$codigoFact'");
+                if(empty($getStockProlipa))      { $stockProlipa = 0; }
+                else                             { $stockProlipa = $getStockProlipa[0]->pro_stock; }
+                    //si stock de prolipa es 5000 coloco el stockProlipa
+                if($stockAnteriorProlipa == 5000){ $nuevoStockProlipa = $stockProlipa; }
+                else                             {
+                    $stockAnteriorProlipa        = 5000 - $stockAnteriorProlipa;
+                    //si stock de prolipa es menor a 5000 voy a restar el stock de prolipa con el stock de prolipa
+                    $nuevoStockProlipa           = $stockProlipa - $stockAnteriorProlipa;
+                }
+                //==========================PROCESO======================================================
                 $nuevoStockReserva          = $nuevoStockCalmed + $nuevoStockProlipa;
                 DB::table('1_4_cal_producto')
                 ->where('pro_codigo', $codigoFact)
-                ->update([ 'pro_reservar' => $nuevoStockReserva , "pro_stockCalmed"  => $nuevoStockCalmed]);
-                //==========================PROLIPA======================================================
+                ->update([
+                    'pro_reservar'      => $nuevoStockReserva ,
+                    "pro_stockCalmed"   => $nuevoStockCalmed,
+                    "pro_stock"         => $nuevoStockProlipa,
+                    "temporal"          => 1
+                ]);
                 $contador++;
             }
             DB::commit();
