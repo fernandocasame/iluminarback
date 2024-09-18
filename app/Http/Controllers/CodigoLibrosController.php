@@ -2592,8 +2592,9 @@ class CodigoLibrosController extends Controller
     //api:get/metodosGetCodigos
     public function metodosGetCodigos(Request $request){
         if($request->reporteBodega)             { return $this->reporteBodega($request); }
+        if($request->reporteBodegaCombos)       { return $this->reporteBodegaCombos($request); }
     }
-    //api:get/metodosGetCodigos?reporteBodega=1&periodo=24
+    //api:get/metodosGetCodigos?reporteBodega=1&periodo=25
     public function reporteBodega($request){
     //    $arrayCodigosActivos = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
     //     c.libro_idlibro,ls.nombre as nombrelibro
@@ -2667,7 +2668,41 @@ class CodigoLibrosController extends Controller
         }
 
         return $arrayCodigosActivos;
-
-
+    }
+    //api:get/metodosGetCodigos?reporteBodegaCombos=1&periodo=25
+    public function reporteBodegaCombos($request){
+        $periodo    = $request->input('periodo');
+        $result = DB::table('f_detalle_venta as v')
+        ->leftJoin('f_venta as d', 'd.ven_codigo', '=', 'v.ven_codigo')
+        ->leftJoin('1_4_cal_producto as p', 'v.pro_codigo', '=', 'p.pro_codigo')
+        ->leftJoin('libros_series as ls', 'ls.codigo_liquidacion', '=', 'p.pro_codigo')
+        ->leftJoin('libro as l', 'l.idlibro', '=', 'ls.idLibro')
+        ->leftJoin('asignatura as a', 'a.idasignatura', '=', 'l.asignatura_idasignatura')
+        ->select(
+            'v.pro_codigo as codigo',
+            'p.pro_nombre as nombrelibro',
+            'ls.idLibro as libro_idlibro',
+            'ls.year',
+            'ls.id_serie',
+            'a.area_idarea',
+            'p.codigos_combos',
+            DB::raw('SUM(v.det_ven_cantidad) as cantidad'),
+            DB::raw('SUM(v.det_ven_dev) as cantidad_devuelta'),
+            DB::raw('SUM(v.det_ven_cantidad) - SUM(v.det_ven_dev) as cantidad')
+        )
+        ->where('d.periodo_id', $periodo)
+        ->where('p.ifcombo', '1')
+        ->where('d.est_ven_codigo','<>','3')
+        ->groupBy('v.pro_codigo', 'p.pro_nombre', 'ls.idLibro', 'ls.year', 'ls.id_serie', 'a.area_idarea', 'p.codigos_combos')
+        ->get();
+        // Procesar los resultados para obtener el precio y multiplicar por la cantidad
+        foreach ($result as $item) {
+            // Obtener el precio del libro usando el repositorio
+            $precio             = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->libro_idlibro, $item->area_idarea, $periodo, $item->year);
+            $item->precio       = $precio;
+            // Multiplicar el precio por la cantidad
+            $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
+        }
+        return $result;
     }
 }
