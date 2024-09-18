@@ -323,7 +323,7 @@ class AdminController extends Controller
             $query = DB::SELECT("SELECT * FROM 1_4_cal_producto p
             WHERE p.pro_nombre LIKE '%guia%'
             AND p.temporal is null
-            limit 1000
+            limit 500
             ");
             $contador = 0;
             foreach($query as $key => $item){

@@ -1239,7 +1239,7 @@ class PedidosController extends Controller
             $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
             p.descuento, p.id_periodo,
             p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
-            se.nombre_serie
+            se.nombre_serie,p.fecha_aprobado_facturacion
             FROM pedidos_val_area pv
             left join area ar ON  pv.id_area = ar.idarea
             left join series se ON pv.id_serie = se.id_serie
@@ -1311,6 +1311,7 @@ class PedidosController extends Controller
                     "idasignatura"      => $valores[0]->asignatura_idasignatura,
                     "subtotal"          => $item->valor * $valores[0]->precio,
                     "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
+                    "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion
                 ];
             }
             return $datos;
@@ -5949,8 +5950,8 @@ class PedidosController extends Controller
         return $query;
     }
     public function obtenerDetalleDocumentosLibrosObsequios(Request $request){
-        $query = DB::SELECT("SELECT DISTINCT fdv.*, ls.nombre AS pro_nombre, fv.user_created, CONCAT(us.nombres , ' ' , us.apellidos) AS facturador , cp.pro_nombre AS nombreproducto,
-        l.descripcionlibro, ls.id_serie
+        $query = DB::SELECT("SELECT DISTINCT fdv.*, ls.nombre AS pro_nombre, fv.user_created, CONCAT(us.nombres , ' ' , us.apellidos) AS facturador , ls.nombre AS nombreproducto,
+        l.descripcionlibro, ls.id_serie, cp.pro_nombre
         FROM f_detalle_venta fdv
         INNER JOIN f_venta fv ON fdv.ven_codigo = fv.ven_codigo
         INNER JOIN libros_series ls ON ls.codigo_liquidacion = fdv.pro_codigo
