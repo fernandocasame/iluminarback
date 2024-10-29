@@ -9,16 +9,27 @@ use App\Models\Proforma;
 use App\Models\f_tipo_documento;
 use App\Models\_14Producto ;
 use App\Http\Controllers\Log;
+use App\Repositories\Facturacion\ProformaRepository;
 use DB;
 use App\Http\Controllers\Controller;
 use App\Models\Pedidos;
+use App\Models\Periodo;
 use App\Models\User;
 use App\Traits\Pedidos\TraitProforma;
+use App\Repositories\pedidos\PedidosRepository;
 use Illuminate\Http\Request;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 class VentasController extends Controller
 {
     use TraitProforma;
+    protected $pedidosRepository;
+    protected $proformaRepository;
+    public function __construct(PedidosRepository $pedidosRepository, ProformaRepository $proformaRepository)
+    {
+        $this->pedidosRepository    = $pedidosRepository;
+        $this->proformaRepository   = $proformaRepository;
+    }
     //
     public function Get_tdocu(){
         $query = DB::SELECT("SELECT *FROM f_tipo_documento where (tdo_id=1 or tdo_id=3 or tdo_id=4) and tdo_estado=1");
@@ -81,7 +92,33 @@ class VentasController extends Controller
         from f_detalle_proforma dp
         left join f_detalle_venta dfv on dfv.idProforma=dp.prof_id
         where dp.prof_id='$request->id'");
-        return $query;
+    }
+
+    public function VerificacionDVentaProforma(Request $request) {
+        if ($request->id) {
+            $proforma = DB::table('f_proforma')
+                ->where('id', $request->id)
+                ->where('prof_estado', 3)
+                ->first();
+            if ($proforma) {
+
+                $ventas = DB::table('f_venta')
+                    ->where('ven_idproforma', $proforma->prof_id)
+                    ->where('est_ven_codigo', '!=', 3)
+                    ->get();
+
+
+                $result = [
+                    'ventas' => $ventas,
+                    'count' => $ventas->count(),
+                ];
+
+                return response()->json($result);
+            } else {
+                return response()->json(['message' => 'Proforma not found or not approved', 'status'=>'0']);
+            }
+        }
+        return response()->json(['message' => 'No ID provided', 'status'=>'0']);
     }
 
     //api:get/GetFacturasTodas
@@ -191,7 +228,7 @@ class VentasController extends Controller
             usa.cedula,
             usa.email,
             usa.telefono,
-            em.nombre,
+            em.descripcion_corta as nombre,
             CONCAT(us.nombres,' ',us.apellidos) AS responsable,
             COUNT(DISTINCT dfv.pro_codigo) AS item,
             SUM(dfv.det_ven_cantidad) AS libros
@@ -1277,36 +1314,67 @@ ORDER BY f.ven_fecha;");
         return $query;
     }
     //cambio ingereso de datos de libros a excluir o despachar
-    public function despachar(Request $request){
-        try{
-            set_time_limit(6000000);
-            ini_set('max_execution_time', 6000000);
-            $miarray=json_decode($request->deta);
+    public function despachar(Request $request) {
+        try {
+            set_time_limit(600);
+            ini_set('max_execution_time', 600);
+
+            $miarray = json_decode($request->deta);
+
+            // Verifica si el JSON fue decodificado correctamente
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return response()->json(['error' => 'JSON inválido'], 400);
+            }
+
             DB::beginTransaction();
-            $venta = Ventas::where('ven_codigo', $request->ven_codigo)
-            ->where('id_empresa', $request->id_empresa)
-            ->firstOrFail();
-                if (!$venta){
-                    return "El ven_codigo no existe en la base de datos";
-                }
-                $venta->est_ven_codigo = $request->estado;
-                $venta->updated_at     = now();
-                $venta->save();
-                foreach($miarray as $key => $item){
-                    if($item->despacho!=0){
-                        $venta = DetalleVentas::findOrFail($item->det_ven_codigo);
-                        if (!$venta){
-                            return "El det_ven_codigo no existe en la base de datos";
-                        }
-                        $venta->det_ven_cantidad_despacho=$item->despacho;
-                        $venta->save();
+
+            // Busca la venta en la tabla f_ventas
+            $venta = DB::table('f_venta')
+                       ->where('ven_codigo', $request->ven_codigo)
+                       ->where('id_empresa', $request->id_empresa)
+                       ->first();
+
+            if (!$venta) {
+                return response()->json(['error' => 'El ven_codigo no existe en la base de datos'], 404);
+            }
+
+            // Actualiza el estado de la venta
+            DB::table('f_venta')
+              ->where('ven_codigo', $request->ven_codigo)
+              ->where('id_empresa', $request->id_empresa)
+              ->update([
+                  'est_ven_codigo' => $request->estado,
+                  'updated_at' => now(),
+              ]);
+
+            // Actualiza los detalles de la venta
+            foreach ($miarray as $item) {
+                if ($item->despacho != 0) {
+                    $detalle = DB::table('f_detalle_venta')
+                                 ->where('det_ven_codigo', $item->det_ven_codigo)
+                                 ->first();
+
+                    if (!$detalle) {
+                        return response()->json(['error' => 'El det_ven_codigo no existe en la base de datos'], 404);
                     }
+
+                    // Actualiza la cantidad de despacho
+                    DB::table('f_detalle_venta')
+                      ->where('det_ven_codigo', $item->det_ven_codigo)
+                      ->update(['det_ven_cantidad_despacho' => $item->despacho]);
                 }
+            }
+
             DB::commit();
             return response()->json(['message' => 'Preparación de empaque exitosa'], 200);
-        }catch(\Exception $e){
-            return response()->json(["error"=>"0", "message" => "No se pudo preparar", 'error' => $e->getMessage()], 500);
-            DB::rollback();
+
+        } catch (\Exception $e) {
+            DB::rollback(); // Asegúrate de hacer rollback aquí
+            return response()->json([
+                "error" => "0",
+                "message" => "No se pudo preparar",
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
     //agrupados para pedidos
@@ -1386,4 +1454,383 @@ ORDER BY f.ven_fecha;");
             return response()->json(["error" => "500", "message" => "No se pudo guardar", "exception" => $e->getMessage()],500);
         }
     }
+
+    public function PostFacturarReal(Request $request)
+{
+    try {
+        $miarray = json_decode($request->data_detalle);
+        DB::beginTransaction();
+
+        // Verificar si el ven_codigo ya existe
+        $query = DB::SELECT("SELECT id_factura FROM f_venta_agrupado WHERE id_factura = ?", [$request->ven_codigo]);
+
+        if (!empty($query)) {
+            return response()->json(["status" => "2", "message" => "El ven_codigo ya existe"], 0);
+        }
+
+        // Crear la venta
+        $venta = new VentasF;
+        $venta->id_factura = $request->ven_codigo;
+        $venta->id_empresa = $request->id_empresa;
+        $venta->ven_desc_por = $request->ven_desc_por;
+        $venta->ven_iva_por = $request->ven_iva_por;
+        $venta->ven_descuento = $request->ven_descuento;
+        $venta->ven_iva = $request->ven_iva;
+        $venta->ven_transporte = $request->ven_transporte;
+        $venta->ven_valor = $request->ven_valor;
+        $venta->ven_subtotal = $request->ven_subtotal;
+        $venta->ven_devolucion = 0;
+        $venta->ven_pagado = 0;
+        $venta->institucion_id = $request->id_ins_depacho;
+        $venta->periodo_id = $request->periodo_id;
+        $venta->idtipodoc = 11;
+        $venta->ven_cliente = $request->ven_cliente;
+        $venta->clientesidPerseo = $request->clientesidPerseo;
+        $venta->ven_fecha = $request->ven_fecha;
+        $venta->user_created = $request->user_created;
+        $venta->updated_at = now();
+        $venta->save();
+
+        if($request->id_empresa==1){
+            $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_Prolipa as cod from  f_tipo_documento where tdo_id=11");
+        }else if ($request->id_empresa==3){
+            $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_calmed as cod from  f_tipo_documento where tdo_id=11");
+        }
+        $id=$query1[0]->id;
+        $codi=$query1[0]->cod;
+        $co=(int)$codi+1;
+        $tipo_doc = f_tipo_documento::findOrFail($id);
+        if($request->id_empresa==1){
+            $tipo_doc->tdo_secuencial_Prolipa = $co;
+        }else if ($request->id_empresa==3){
+            $tipo_doc->tdo_secuencial_calmed = $co;
+        }
+        $tipo_doc->save();
+
+        // Guardar los detalles de la venta
+        foreach ($miarray as $item) {
+            if ($item->cantidad_real_facturar > 0) {
+                $venta1 = new DetalleVentasF;
+                $venta1->id_factura = $request->ven_codigo;  // Asegúrate de que esta relación existe
+                $venta1->id_empresa = $request->id_empresa;
+                $venta1->pro_codigo = $item->pro_codigo;
+                $venta1->det_ven_cantidad = $item->cantidad_real_facturar;
+                $venta1->det_ven_valor_u = $item->det_ven_valor_u;
+                $venta1->save();
+            }
+        }
+
+        // Finalizar la transacción
+        DB::commit();
+        return response()->json(["status" => "200", 'message' => 'Documento creado con éxito'], 200);
+    } catch (\Exception $e) {
+        DB::rollback();
+        return response()->json(["error" => "500", "message" => "No se pudo guardar", "exception" => $e->getMessage(), "line" => $e->getLine()], 500);
+    }
+}
+
+
+    public function prefacturasCliente(Request $request){
+        $query = DB::SELECT("SELECT DISTINCT i.nombreInstitucion, i.idInstitucion FROM institucion i
+        INNER JOIN f_venta fv ON i.idInstitucion = fv.institucion_id
+        WHERE i.nombreInstitucion  LIKE '%$request->busqueda%'");
+
+        // $query = DB::SELECT("SELECT fv.*, CONCAT(usu.nombres, '', usu.apellidos) AS clienteUsuario, i.nombreInstitucion AS clienteInstitucion FROM f_venta fv
+        // INNER JOIN usuario usu ON usu.cedula  = fv.ruc_cliente
+        // INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+        // WHERE i.nombreInstitucion  LIKE '%$request->busqueda%'");
+        return $query;
+    }
+    public function getAllPrefacturas(Request $request) {
+        $ventas = DB::table('f_venta as fv')
+            ->join('empresas as e', 'fv.id_empresa', '=', 'e.id')
+            ->join('periodoescolar as p', 'fv.periodo_id', '=', 'p.idperiodoescolar')
+            ->select(
+                'fv.*',
+                'e.descripcion_corta',
+                'p.periodoescolar'
+            )
+            ->where('institucion_id', $request->busqueda)
+            ->where('periodo_id', $request->periodo)
+            ->where('fv.idtipodoc', 1)
+            ->where('fv.est_ven_codigo', '<>', 3)
+            // ->whereNull('fv.id_factura')
+            ->get();
+
+        // Recopila los ruc_cliente para hacer la segunda consulta
+        $rucClientes = $ventas->pluck('ruc_cliente')->unique();
+
+        // Obtiene los usuarios y las instituciones en una sola consulta
+        $usuarios = DB::table('usuario')
+            ->whereIn('cedula', $rucClientes)
+            ->get()
+            ->keyBy('cedula');
+
+        $instituciones = DB::table('institucion')
+            ->whereIn('idInstitucion', $ventas->pluck('institucion_id')->unique())
+            ->get()
+            ->keyBy('idInstitucion');
+
+        // Combina los resultados en un solo array
+        foreach ($ventas as $key => $venta) {
+            $usuario = $usuarios->get($venta->ruc_cliente);
+            $institucion = $instituciones->get($venta->institucion_id);
+
+            // Aquí puedes agregar los datos de cliente e institución directamente a la venta
+            $ventas[$key]->clienteUsuario = $usuario ? $usuario->nombres . ' ' . $usuario->apellidos : null;
+            $ventas[$key]->clienteInstitucion = $institucion ? $institucion->nombreInstitucion : null;
+        }
+
+        // Devuelve las ventas con los datos combinados
+        return response()->json($ventas);
+    }
+    public function getCantidadFacturada(Request $request)
+    {
+        // Validar los parámetros de entrada
+        $request->validate([
+            'institucion' => 'required|integer',
+            'empresa' => 'required|integer',
+            'periodo' => 'required|integer',
+        ]);
+
+        // Ejecutar la consulta
+        $resultados = DB::table('f_venta_agrupado as fva')
+            ->join('f_detalle_venta_agrupado as fdva', 'fva.id_factura', '=', 'fdva.id_factura')
+            ->select('fdva.pro_codigo', DB::raw('SUM(fdva.det_ven_cantidad) as det_ven_cantidad'))
+            ->where('fva.institucion_id', $request->institucion)
+            ->where('fva.id_empresa', $request->empresa)
+            ->where('fva.periodo_id', $request->periodo)
+            ->groupBy('fdva.pro_codigo')
+            ->get();
+
+        // Devolver los resultados
+        return response()->json($resultados);
+    }
+    public function Get_PREFactura(Request $request){
+        $query = DB::SELECT("SELECT dv.det_ven_codigo, dv.pro_codigo, dv.det_ven_dev, dv.det_ven_cantidad , dv.det_ven_valor_u,
+        l.descripcionlibro, ls.nombre, s.nombre_serie, ls.id_serie, a.area_idarea, ls.year, fv.periodo_id, l.idlibro FROM f_detalle_venta as dv
+        INNER JOIN f_venta as fv ON dv.ven_codigo=fv.ven_codigo
+        INNER JOIN libros_series as ls ON dv.pro_codigo=ls.codigo_liquidacion
+        INNER JOIN series as s ON ls.id_serie=s.id_serie
+        INNER JOIN libro l ON ls.idLibro = l.idlibro
+        LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
+        WHERE dv.ven_codigo='$request->ven_codigo' AND dv.id_empresa=fv.id_empresa
+        AND fv.id_empresa=$request->idemp  ORDER BY dv.pro_codigo");
+
+        foreach ($query as $key => $item) {
+
+            //Precio por cada item
+            $precio = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->idlibro, $item->area_idarea, $item->periodo_id, $item->year);
+
+            //Añadir el precio
+            $query[$key]->precio = $precio ?? 0;
+        }
+
+        return $query;
+    }
+
+    public function devolucionDetalle(Request $request)
+    {
+        $query = DB::SELECT("SELECT ch.*, i.nombreInstitucion AS cliente, ls.id_serie, ls.nombre, a.area_idarea, ls.year
+            FROM codigoslibros_devolucion_son AS ch
+            LEFT JOIN codigoslibros_devolucion_header AS cl ON ch.codigoslibros_devolucion_id = cl.id
+            LEFT JOIN institucion AS i ON i.idInstitucion = ch.id_cliente
+            LEFT JOIN libros_series ls ON ls.idLibro = ch.id_libro
+            LEFT JOIN libro l ON l.idlibro = ch.id_libro
+            LEFT JOIN asignatura a ON a.idasignatura = l.asignatura_idasignatura
+            WHERE cl.codigo_devolucion = '$request->busqueda'
+            AND ch.prueba_diagnostico = 0");
+        foreach ($query as $key => $item) {
+
+            //Precio por cada item
+            $precio = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->id_libro, $item->area_idarea, $item->id_periodo, $item->year);
+
+            //Añadir el precio
+            $query[$key]->precio = $precio ?? 0;
+        }
+        return $query;
+    }
+
+    public function updateDocument(Request $request)
+    {
+        $request->validate([
+            'documentoVenta' => 'required|string',
+            'id_institucion' => 'required|integer',
+            'documentoProforma' => 'required|string',
+        ], [
+            'documentoVenta.required' => 'El documento de venta es obligatorio.',
+            'id_institucion.required' => 'El ID de la institución es obligatorio.',
+            'documentoProforma.required' => 'El documento de proforma es obligatorio.',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Actualizar f_venta
+            $venta = Ventas::where('ven_codigo', $request->documentoVenta)->firstOrFail();
+
+            if ($venta->institucion_id !== $request->id_institucion) {
+                $venta->institucion_id = $request->id_institucion;
+                $venta->save();
+            }
+
+            // Actualizar f_proforma
+            $proforma = Proforma::where('prof_id', $request->documentoProforma)->firstOrFail();
+
+            if ($proforma->id_ins_depacho !== $request->id_institucion) {
+                $proforma->id_ins_depacho = $request->id_institucion;
+                $proforma->save();
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Información actualizada correctamente.'], 200);
+        } catch (ModelNotFoundException $e) {
+            DB::rollback();
+            return response()->json(['success' => false, 'message' => 'Documento no encontrado.'], 404);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+    //api:>>/GetNotas?notas=1&activas=1&periodo=25&empresa=1
+    public function GetNotas(Request $request){
+        $notas      = $request->input('notas');
+        $prefactura = $request->input('prefactura');
+        $activas    = $request->input('activas');
+        $periodo    = $request->input('periodo');
+        $empresa    = $request->input('empresa');
+        $query = Ventas::query()
+        ->where('periodo_id', $periodo)
+        ->where('id_empresa', $empresa)
+        ->when($notas, function ($query) {
+            $query->where(function ($query) {
+                $query->where('idtipodoc', 4)
+                    ->orWhere('idtipodoc', 3);
+            });
+        })
+        ->when($prefactura, function ($query) {
+            $query->where(function ($query) {
+                $query->where('idtipodoc', 1);
+            });
+        })
+        ->when($activas, function ($query) {
+            $query->where(function ($query) {
+                $query->where('est_ven_codigo', '<>', 3);
+            });
+        })
+        ->get();
+        return $query;
+    }
+    //api:post>>/notasMoverToPrefactura
+    public function notasMoverToPrefactura(Request $request)
+    {
+        $ven_codigoAnterior = $request->input('ven_codigo');
+        $id_empresa         = $request->input('id_empresa');
+        $id_periodo         = $request->input('id_periodo');
+        $iniciales          = $request->input('iniciales');
+        $observacion        = $request->input('observacion');
+        $id_usuario         = $request->input('id_usuario');
+        $letraDocumento     = "PF";
+        $letraEmpresa       = $id_empresa == 1 ? "P" : "C";
+
+        // Obtener el código de contrato del período
+        $getPeriodo = Periodo::where('idperiodoescolar', $id_periodo)->first();
+        if(!$getPeriodo){  return ["status" => "0", "mensaje" => "No existe el codigo para  periodo escolar"];  }
+        $codigo_contrato = $getPeriodo->codigo_contrato;
+        // Obtener nuevo número de documento
+        $getNumeroDocumento = $this->proformaRepository->getNumeroDocumento($id_empresa);
+        $nuevo_ven_codigo = $letraDocumento . "-" . $letraEmpresa . "-" . $codigo_contrato . "-" . $iniciales . "-" . $getNumeroDocumento;
+        try {
+            // Iniciar la transacción
+            DB::beginTransaction();
+
+            // Obtener la venta existente
+            $f_venta = DB::table('f_venta')
+                ->where('id_empresa', $id_empresa)
+                ->where('ven_codigo', $ven_codigoAnterior)
+                ->first();
+
+            if (!$f_venta) {
+                throw new \Exception("El registro de venta no existe.");
+            }
+
+            // Convertir el objeto stdClass a un array para manipular sus propiedades
+            $ventaData = (array) $f_venta;
+
+            // Cambiar el ven_codigo al nuevo
+            $ventaData['ven_codigo'] = $nuevo_ven_codigo;
+            //idtipodoc a 1 para  pre factura
+            $ventaData['idtipodoc'] = 1;
+            // Crear una nueva instancia del modelo Ventas con los datos modificados
+            $nuevaVenta = new Ventas();
+            foreach ($ventaData as $key => $value) {
+                $nuevaVenta->$key = $value;
+            }
+
+            // Guardar la nueva venta
+            $nuevaVenta->save();
+
+            // Obtener y actualizar los hijos del modelo DetalleVentas
+            $detalleVentas = DetalleVentas::where('ven_codigo', $ven_codigoAnterior)
+                ->where('id_empresa', $id_empresa)
+                ->get();
+
+            foreach ($detalleVentas as $detalleVenta) {
+                $detalleVenta->ven_codigo = $nuevo_ven_codigo;
+                $detalleVenta->save();
+            }
+
+            // Eliminar el registro anterior
+            DB::table('f_venta')
+                ->where('id_empresa', $id_empresa)
+                ->where('ven_codigo', $ven_codigoAnterior)
+                ->delete();
+            //GUARDAR EN HISTORICO
+            $datos = (Object)[
+                "descripcion"       => $ven_codigoAnterior,
+                "tipo"              => "0",
+                "nueva_prefactura"  => $nuevo_ven_codigo,
+                "cantidad"          => 0,
+                "id_periodo"        => $id_periodo,
+                "id_empresa"        => $id_empresa,
+                "observacion"       => $observacion,
+                "user_created"      => $id_usuario
+            ];
+            $this->proformaRepository->saveHistoricoNotasMove($datos);
+
+            // Confirmar la transacción
+            DB::commit();
+
+        } catch (\Exception $e) {
+            // Deshacer la transacción si ocurre un error
+            DB::rollBack();
+            // Retornar una respuesta de error
+            return response()->json(['status' => '0', 'message' => $e->getMessage()], 200);
+        }
+
+        return response()->json(['status' => '1', 'message' => "La nota fue movida y guardada con la nueva Pre factura $nuevo_ven_codigo."]);
+    }
+    //api:get/metodosGetVentas
+    public function metodosGetVentas(Request $request){
+        if($request->getMovimientosNotas)    { return $this->getMovimientosNotas($request); }
+    }
+    //api:get/metodosGetVentas?getMovimientosNotas=1
+    public function getMovimientosNotas($request){
+        $f_venta_historico_notas_cambiadas = DB::table('f_venta_historico_notas_cambiadas as h')
+            ->where('id_periodo', $request->get('periodo_id'))
+            ->leftJoin('usuario as u', 'h.user_created', '=', 'u.idusuario')
+            //left join con la empresa
+            ->leftJoin('empresas as e', 'h.id_empresa', '=', 'e.id')
+            //left join con el periodo
+            ->leftJoin('periodoescolar as p', 'h.id_periodo', '=', 'p.idperiodoescolar')
+            ->select(
+                'h.*',
+                'e.descripcion_corta',
+                'p.periodoescolar',
+                DB::raw("COALESCE(CONCAT(COALESCE(u.nombres, ''), ' ', COALESCE(u.apellidos, '')), 'sin nombre') as editor")
+            )
+            ->get();
+        return $f_venta_historico_notas_cambiadas;
+    }
+
 }

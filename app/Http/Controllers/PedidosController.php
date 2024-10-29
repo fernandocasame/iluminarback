@@ -1208,6 +1208,7 @@ class PedidosController extends Controller
                 "alcance"           => $item->alcance,
                 "cantidad"          => $tr->cantidad,
                 "descripcion"       => $valores[0]->descripcionlibro,
+                "serie"             => $item->nombre_serie,
             ];
             $contador++;
         }
@@ -1225,6 +1226,7 @@ class PedidosController extends Controller
             LEFT JOIN area ar ON a.area_idarea = ar.idarea
             INNER JOIN 1_4_cal_producto cp ON ls.codigo_liquidacion = cp.pro_codigo
             WHERE l.Estado_idEstado = '1'
+            AND (SELECT f.pvp FROM pedidos_formato f WHERE f.id_serie = ls.id_serie AND f.id_area = a.area_idarea AND f.id_periodo = '$request->periodo' LIMIT 1) IS NOT NULL 
             AND a.estado = '1';");
         return $datos;
     }
@@ -2981,25 +2983,71 @@ class PedidosController extends Controller
                 ORDER BY ps.id DESC
             ");
             //obsequios
-            $obsequios = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS nombre_ciudad,
-            p.contrato_generado,
-            CONCAT(u.nombres,' ',u.apellidos) as asesor,
-            CONCAT(uc.nombres,' ',uc.apellidos) as creador,
-            p.descuento as procentaje_institucion,
-            u.nombres, u.apellidos, pe.periodoescolar as periodo, p.TotalVentaReal,p.total_series_basicas,
-            i.nombreInstitucion,3 as TipoPendiente,p.descuento, pa.created_at as fechaCreacionPedido, pa.observacion_asesor as observacion,
-            p.id_pedido as pedido_id
+            $obsequios = DB::SELECT(" SELECT 
+                pa.*,  
+                i.nombreInstitucion, 
+                c.nombre AS nombre_ciudad,
+                p.contrato_generado,
+                CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+                CONCAT(uc.nombres, ' ', uc.apellidos) AS creador,
+                p.descuento AS procentaje_institucion,
+                u.nombres, 
+                u.apellidos, 
+                pe.periodoescolar AS periodo, 
+                p.TotalVentaReal,
+                p.total_series_basicas,
+                3 AS TipoPendiente,
+                pa.created_at AS fechaCreacionPedido, 
+                pa.observacion_asesor AS observacion,
+                p.id_pedido AS pedido_id                
             FROM p_libros_obsequios pa
             LEFT JOIN pedidos p ON pa.id_pedido = p.id_pedido
             LEFT JOIN usuario u ON p.id_asesor = u.idusuario
             LEFT JOIN usuario uc ON uc.idusuario = pa.user_created
             LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id  = c.idciudad
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
             WHERE pa.estado_libros_obsequios = 3
-            and pa.porcentaje_descuento = 100
-            ORDER BY id DESC
+            AND pa.porcentaje_descuento = 100
+            ORDER BY pa.id DESC
             ");
+
+            foreach ($obsequios as $key => $item) {
+                $result = DB::SELECT("SELECT COUNT(*) 
+                    FROM p_detalle_libros_obsequios pdo 
+                    INNER JOIN p_libros_obsequios po ON po.id = pdo.p_libros_obsequios_id 
+                    WHERE po.estado_libros_obsequios = 3 
+                    AND po.porcentaje_descuento = 100 
+                    AND po.id_pedido = :idPedido", ['idPedido' => $item->id_pedido]);
+
+                $obsequios[$key]->cantidadlibrosObsequios = $result[0]->{'COUNT(*)'};
+
+                $obsequios[$key]->DatosPedidoGeneral = $this->get_val_pedidoLibrosObsequiosInfoTodo($item->id_pedido);
+
+                // Inicializar arreglo para almacenar totales por serieArea
+                $totalesPorArea = [];
+
+                // Recorrer DatosPedidoGeneral
+                foreach ($item->DatosPedidoGeneral as $dato) {
+                    // Calcular total por serieArea
+                    if (!isset($totalesPorArea[$dato['serie']])) {
+                        $totalesPorArea[$dato['serie']] = [
+                            'total' => 0,
+                            'areas' => [],
+                        ];
+                    }
+                    $totalesPorArea[$dato['serie']]['total'] += $dato['valor'];
+                    $totalesPorArea[$dato['serie']]['areas'][] = [
+                        'area' => $dato['nombrelibro'],
+                        'valor' => $dato['valor'],
+                    ];
+                }
+            
+
+                // Asignar totales por serieArea a $obsequios
+                $obsequios[$key]->totalesPorArea = $totalesPorArea;
+            };
+            
             //CIERRE DE CONVENIO AUTORIZACION COMISION
             $cierreConvenios = DB::SELECT("SELECT ps.*, p.contrato_generado, i.nombreInstitucion, p.id_pedido,
             p.id_pedido as pedido_id, CONCAT(u.nombres,' ',u.apellidos) as asesor,
@@ -5349,7 +5397,7 @@ class PedidosController extends Controller
             DB::rollBack();
 
             // Opcional: Loguear el error
-            Log::error('Error al anular libros obsequios: ' . $e->getMessage());
+            // Log::error('Error al anular libros obsequios: ' . $e->getMessage());
 
             return ["status" => "0", "message" => "No se pudo anular"];
         }
@@ -6086,5 +6134,13 @@ class PedidosController extends Controller
             \DB::rollBack();
             return response()->json(['error' => 'Error al eliminar el abono: ' . $e->getMessage()], 500);
         }
+    }
+    public function get_usuarios_institucion(Request $request){
+        $query = DB::SELECT("SELECT DISTINCT fv.ruc_cliente, fv.institucion_id
+            FROM f_venta fv
+            WHERE fv.institucion_id ='$request->institucion'
+            AND fv.est_ven_codigo <> 3 
+            AND fv.ven_p_libros_obsequios IS NULL ");
+        return $query;
     }
 }

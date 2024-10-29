@@ -44,7 +44,8 @@ class LibroController extends Controller
     //api:get/getAllBooks
     public function getAllBooks(Request $request){
         $query = DB::SELECT("SELECT l.nombrelibro, l.demo,  l.idlibro,l.asignatura_idasignatura ,
-        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea
+        a.area_idarea ,l.portada, s.nombre_serie, ar.nombrearea,ls.codigo_liquidacion,
+        CONCAT(ls.codigo_liquidacion,' ',l.nombrelibro) as codigolibro
          FROM libros_series ls
          LEFT JOIN series s ON ls.id_serie = s.id_serie
          LEFT JOIN libro l ON ls.idLibro = l.idlibro
@@ -52,6 +53,7 @@ class LibroController extends Controller
          LEFT JOIN area ar ON a.area_idarea = ar.idarea
          WHERE l.Estado_idEstado = '1'
          AND a.estado = '1'
+         AND s.id_serie <> '19'
         ");
         return $query;
     }

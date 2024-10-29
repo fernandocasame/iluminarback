@@ -62,7 +62,7 @@ class InstitucionController extends Controller
 
     public function selectInstitucion(Request $request){
         if(empty($request->idregion) && empty($request->idciudad)){
-            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion,i.punto_venta
+            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion
              FROM institucion i, periodoescolar_has_institucion pi
               WHERE i.idInstitucion != 66
               AND i.idInstitucion != 1170
@@ -76,7 +76,7 @@ class InstitucionController extends Controller
             ");
         }
         if(!empty($request->idregion) && empty($request->idciudad)){
-            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion,i.punto_venta
+            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion
              FROM institucion i, periodoescolar_has_institucion pi
              WHERE i.region_idregion = ? AND i.idInstitucion != 66
              AND i.idInstitucion != 1170
@@ -90,7 +90,7 @@ class InstitucionController extends Controller
             ",[$request->idregion]);
         }
         if(!empty($request->idciudad) && empty($request->idregion)){
-            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion,i.punto_venta
+            $institucion = DB::SELECT("SELECT i.idInstitucion,UPPER(i.nombreInstitucion) as nombreInstitucion
              FROM institucion i, periodoescolar_has_institucion pi
              WHERE i.ciudad_id = ? AND i.idInstitucion != 66
               AND i.idInstitucion != 1170
@@ -104,7 +104,7 @@ class InstitucionController extends Controller
              ",[$request->idciudad]);
         }
         if(!empty($request->idciudad) && !empty($request->idregion)){
-            $institucion = DB::SELECT("SELECT idInstitucion,UPPER(nombreInstitucion) as nombreInstitucion,i.punto_venta
+            $institucion = DB::SELECT("SELECT idInstitucion,UPPER(nombreInstitucion) as nombreInstitucion
             FROM institucion i, periodoescolar_has_institucion pi
              WHERE i.ciudad_id = ? AND i.region_idregion = ? AND i.idInstitucion != 66
               AND i.idInstitucion != 1170
@@ -117,9 +117,7 @@ class InstitucionController extends Controller
              AND pi.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi WHERE phi.institucion_idInstitucion = i.idInstitucion)
             ",[$request->idciudad,$request->idregion]);
         }
-        $resultado = collect($institucion)->where('punto_venta','0')->values();
-        return $resultado;
-        // return $institucion;
+        return $institucion;
 
     }
 
@@ -196,7 +194,8 @@ class InstitucionController extends Controller
         $cambio->estado_idEstado                = $request->estado;
         $cambio->aplica_matricula               = $request->aplica_matricula;
         $cambio->punto_venta                    = $request->punto_venta;
-        $cambio->zona_id                        = $request->zona_id;
+        // Validación para enviar NULL si está vacío o es "null"
+        $cambio->zona_id = $request->zona_id === '' || $request->zona_id === 'null' ? null : $request->zona_id;
         $cambio->asesor_id                      = $request->asesor_id;
         $cambio->maximo_porcentaje_autorizado   = $request->maximo_porcentaje_autorizado;
         $cambio->evaluacion_personalizada       = $request->evaluacion_personalizada;
@@ -494,13 +493,7 @@ class InstitucionController extends Controller
     public function listaInsitucion(Request $request)
     {
         if($request->asesor){
-            $cedula = "";
-            //para hacer pruebas
-            if($request->cedula == "854564544564564"){
-                $cedula = "0915171920";
-            }else{
-                $cedula = $request->cedula;
-            }
+            $cedula = $request->cedula;
             $lista = DB::SELECT("SELECT i.idInstitucion,i.region_idregion, i.nombreInstitucion,i.aplica_matricula,
             IF(i.estado_idEstado = '1','activado','desactivado') AS estado,i.estado_idEstado as estadoInstitucion,
             c.nombre AS ciudad, u.idusuario AS asesor_id,u.nombres AS nombre_asesor,

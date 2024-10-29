@@ -116,7 +116,7 @@ class BancoController extends Controller
             'ban_codigo' => 'required|integer',
             'chq_tipo' => 'required|integer',
             'chq_valor' => 'required|numeric|min:0',
-            'chq_cuenta' => 'required|integer',
+            'chq_cuenta' => 'required',
             'chq_referenca' => 'required',
             'chq_numero' => 'required|integer',
             // 'chq_institucion' => 'required|string',
@@ -177,6 +177,28 @@ class BancoController extends Controller
             'changed_by' => $cheque->user_created,
         ]);
     }
+    public function cheque_eliminar(Request $request)
+        {
+            // Validación de los datos recibidos
+            $request->validate([
+                'chequeid' => 'required|integer',
+            ]);
+
+            // Buscar el cheque a eliminar
+            $cheque = Cheque::find($request->chequeid);
+
+            // Registrar el historial antes de eliminar
+            $this->registrarHistorial($cheque, 1, json_encode($cheque->toArray()), json_encode($cheque->toArray())); // Tipo 1 para 'eliminar'
+
+            // Eliminar el cheque
+            $cheque->delete();
+
+            // Retornar una respuesta JSON adecuada
+            return response()->json([
+                'status' => 1,
+                'message' => 'Cheque eliminado correctamente'
+            ]);
+        }
 
     public function cuenta_registro(Request $request)
     {

@@ -1,6 +1,7 @@
 <?php
 namespace App\Traits\Codigos;
 
+use App\Models\CodigosLibrosDevolucionSon;
 use DB;
 use App\Models\HistoricoCodigos;
 trait TraitCodigosGeneral{
@@ -55,7 +56,9 @@ trait TraitCodigosGeneral{
         p.periodoescolar as periodo, pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
         c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado
+        c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,
+        c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma, ls.codigo_liquidacion,
+        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -64,6 +67,8 @@ trait TraitCodigosGeneral{
         LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
         LEFT JOIN periodoescolar p ON c.id_periodo = p.idperiodoescolar
         LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+        LEFT JOIN libros_series as ls ON ls.idLibro = c.libro_idlibro
+        LEFT JOIN usuario as ase ON c.asesor_id = ase.idusuario
         WHERE c.codigo LIKE '%$codigo%'");
         return $consulta;
     }
@@ -116,9 +121,11 @@ trait TraitCodigosGeneral{
         ib.nombreInstitucion as institucionBarra, i.nombreInstitucion,
         p.periodoescolar as periodo,
         pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
-        c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma, ls.codigo_liquidacion'
+        c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma,
+        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo'
         ))
         ->leftJoin('usuario as  u',         'c.idusuario',                  'u.idusuario')
+        ->leftJoin('usuario as  ase',       'c.asesor_id',                  'ase.idusuario')
         ->leftJoin('institucion  as ib',    'c.bc_institucion',             'ib.idInstitucion')
         ->leftJoin('institucion as  i',     'u.institucion_idInstitucion',  'i.idInstitucion')
         ->leftJoin('institucion  as ivl',   'c.venta_lista_institucion',    'ivl.idInstitucion')
@@ -201,6 +208,8 @@ trait TraitCodigosGeneral{
                 "proforma_empresa"              => $item->proforma_empresa,
                 "codigo_liquidacion"            => $item->codigo_liquidacion,
                 'devuelto_proforma'             => $item->devuelto_proforma,
+                "asesor"                        => $item->asesor,
+                'combo'                         => $item->combo
             ];
         }
         return $datos;
@@ -320,6 +329,12 @@ trait TraitCodigosGeneral{
         ");
         return $query;
     }
+    public function obtenerPreFacturasLike($factura){
+        $query = DB::SELECT("SELECT distinct factura FROM codigoslibros c
+        WHERE c.codigo_proforma LIKE '%$factura%'
+        ");
+        return $query;
+    }
     public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values,$devueltos_liquidados=null,$verificacion_liquidada=null){
         $historico = new HistoricoCodigos();
         $historico->id_usuario              =  $id_usuario;
@@ -334,6 +349,39 @@ trait TraitCodigosGeneral{
         $historico->verificacion_liquidada  = $verificacion_liquidada;
         $historico->save();
         return "Guardado en historico";
+    }
+    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio){
+        $devolucionH                                = new CodigosLibrosDevolucionSon();
+        $devolucionH->codigoslibros_devolucion_id   = $id_devolucion;
+        $devolucionH->codigo                        = $codigo;
+        $devolucionH->pro_codigo                    = $pro_codigo;
+        $devolucionH->id_cliente                    = $id_cliente;
+        $devolucionH->combo                         = $combo;
+        $devolucionH->factura                       = $factura;
+        $devolucionH->documento                     = $documento;
+        $devolucionH->id_empresa                    = $id_empresa;
+        $devolucionH->tipo_venta                    = $tipo_venta;
+        $devolucionH->id_periodo                    = $id_periodo;
+        $devolucionH->prueba_diagnostico            = $prueba_diagnostico;
+        $devolucionH->codigo_union                  = $codigo_union;
+        $devolucionH->codigo_paquete                = $codigo_paquete;
+        $devolucionH->id_libro                      = $id_libro;
+        $devolucionH->documento_estado_liquidacion  = $estado_liquidacion;
+        $devolucionH->documento_regalado_liquidado  = $regalado_liquidado;
+        $devolucionH->precio                        = $precio;
+        $devolucionH->save();
+        return "Guardado en devolucion hijo";
+    }
+    public function tr_updateDevolucionHijos($codigo,$estado,$id_devolucion){
+        $getCodigo = CodigosLibrosDevolucionSon::where('codigo',$codigo)
+        ->where('codigoslibros_devolucion_id',$id_devolucion)
+        ->first();
+        if($getCodigo){
+            $getCodigo->estado = $estado;
+            $getCodigo->save();
+            return "Actualizado";
+        }
+        return "No se encontro el codigo";
     }
     public function PeriodoInstitucion($institucion){
         $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo ,

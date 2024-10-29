@@ -115,7 +115,7 @@ class PerseoTransaccionController extends Controller
                     "preciovisible"             => $d->det_ven_valor_u,
                     "iva"                       => 0,
                     "precioiva"                 => $d->det_ven_valor_u,
-                    "descuento"                 => 0 //consulta //Porcentaje de descuento que se va a aplicar a cada producto.
+                    "descuento"                 => $discount //consulta //Porcentaje de descuento que se va a aplicar a cada producto.
                 ];
             }
             $formData = [
@@ -194,6 +194,7 @@ class PerseoTransaccionController extends Controller
             $ven_descuento   = $getFactura->ven_descuento;
             $id_empresa      = $getFactura->id_empresa;
             $clientesidPerseo = $getFactura->clientesidPerseo;
+            $discount         = $getFactura->ven_desc_por;
             $totalFactura    = 0;
             $detalle         = [];
 
@@ -235,7 +236,7 @@ class PerseoTransaccionController extends Controller
                     "preciovisible"             => $d->det_ven_valor_u,
                     "iva"                       => 0,
                     "precioiva"                 => $d->det_ven_valor_u,
-                    "descuento"                 => 0 //consulta //Porcentaje de descuento que se va a aplicar a cada producto.
+                    "descuento"                 => $discount //consulta //Porcentaje de descuento que se va a aplicar a cada producto.
                 ];
             }
             $formData = [

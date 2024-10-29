@@ -2,6 +2,7 @@
 namespace App\Repositories\Facturacion;
 
 use App\Models\Proforma;
+use App\Models\VentasHistoricoNotasMove;
 use App\Repositories\BaseRepository;
 use DB;
 class  ProformaRepository extends BaseRepository
@@ -18,7 +19,6 @@ class  ProformaRepository extends BaseRepository
     public function listadoProformasAgrupadas($institucion){
         $query = DB::SELECT("SELECT * FROM f_venta v
         WHERE v.institucion_id = ?
-        AND v.idtipodoc = '1'
         AND v.est_ven_codigo <> '3'",[$institucion]);
         return $query;
     }
@@ -49,6 +49,47 @@ class  ProformaRepository extends BaseRepository
         $resultado = $resultado->where('ifPedidoPerseo','1')->all();
         return $resultado;
     }
+    public function getNumeroDocumento($empresa){
+        if($empresa == 1){
+            $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_Prolipa as cod from f_tipo_documento where tdo_nombre='PRE-FACTURA'");
+        }else if ($empresa==3){
+            $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_calmed as cod from f_tipo_documento where tdo_nombre='PRE-FACTURA'");
+        }
+        $getSecuencia = 1;
+        if(!empty($query1)){
+            $pre= $query1[0]->tdo_letra;
+            $codi=$query1[0]->cod;
+            $getSecuencia=(int)$codi+1;
+            if($getSecuencia>0 && $getSecuencia<10){
+                $secuencia = "000000".$getSecuencia;
+            } else if($getSecuencia>9 && $getSecuencia<100){
+                $secuencia = "00000".$getSecuencia;
+            } else if($getSecuencia>99 && $getSecuencia<1000){
+                $secuencia = "0000".$getSecuencia;
+            }else if($getSecuencia>999 && $getSecuencia<10000){
+                $secuencia = "000".$getSecuencia;
+            }else if($getSecuencia>9999 && $getSecuencia<100000){
+                $secuencia = "00".$getSecuencia;
+            }else if($getSecuencia>99999 && $getSecuencia<1000000){
+                $secuencia = "0".$getSecuencia;
+            }else if($getSecuencia>999999 && $getSecuencia<10000000){
+                $secuencia = $getSecuencia;
+            }
+        }
 
+        return $secuencia;
+    }
+    public function saveHistoricoNotasMove($datos){
+        $VentasHistoricoNotasMove                   = new VentasHistoricoNotasMove();
+        $VentasHistoricoNotasMove->descripcion      = $datos->descripcion;
+        $VentasHistoricoNotasMove->tipo             = $datos->tipo;
+        $VentasHistoricoNotasMove->nueva_prefactura = $datos->nueva_prefactura;
+        $VentasHistoricoNotasMove->cantidad         = $datos->cantidad;
+        $VentasHistoricoNotasMove->id_periodo       = $datos->id_periodo;
+        $VentasHistoricoNotasMove->id_empresa       = $datos->id_empresa;
+        $VentasHistoricoNotasMove->observacion      = $datos->observacion;
+        $VentasHistoricoNotasMove->user_created     = $datos->user_created;
+        $VentasHistoricoNotasMove->save();
+    }
 }
 ?>

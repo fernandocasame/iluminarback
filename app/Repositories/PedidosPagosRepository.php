@@ -166,7 +166,7 @@ class  PedidosPagosRepository extends BaseRepository
     }
     //api:get>>/pedigo_Pagos?getVentaRealXAsesor=1&idAsesor=1&idPeriodo=1
     public function getVentaRealXAsesor($idusuario,$periodo){
-        $query = DB::SELECT("SELECT p.id_pedido, p.contrato_generado, p.TotalVentaReal,p.total_venta
+        $query = DB::SELECT("SELECT p.id_pedido, p.id_institucion, p.tipo_venta, p.id_periodo, p.contrato_generado, p.TotalVentaReal,p.total_venta
         FROM pedidos p
         WHERE p.id_asesor = ?
         AND p.tipo ='0'

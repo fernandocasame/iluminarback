@@ -136,7 +136,7 @@ class AbonoController extends Controller
     public function obtenerAbonos(Request $request)
     {
         $abonoNotas = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
-            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta  
+            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta
             WHERE bn.abono_notas > 0
             AND bn.abono_facturas = 0
             AND bn.idClientePerseo ='$request->cliente'
@@ -146,7 +146,7 @@ class AbonoController extends Controller
         $abonosConNotas = $abonoNotas;
 
         $abonoFacturas = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
-            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta  
+            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta
             WHERE bn.abono_facturas > 0
             AND bn.abono_notas = 0
             AND bn.idClientePerseo ='$request->cliente'
@@ -156,12 +156,12 @@ class AbonoController extends Controller
         $abonosConFacturas = $abonoFacturas;
 
         $abonosAll = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
-            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta  
+            LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta
             WHERE bn.idClientePerseo ='$request->cliente'
             -- AND bn.abono_institucion = $request->institucion
             AND bn.abono_periodo = $request->periodo
             AND bn.abono_empresa = $request->empresa");
-        
+
         // abonos con abono_facturas > 0 y abono_notas = 0
         // $abonosConFacturas = Abono::where('abono_facturas', '>', 0)
         //                         ->where('abono_notas', '=', 0)
@@ -198,27 +198,27 @@ class AbonoController extends Controller
         } elseif ($tipo == 5) {
             $tipoAbono = 'Cancellation Abono';
         }
-    
+
         $datosAbono = [
             'notasOfactura' => $abono->abono_notas > 0 ? 'nota' : 'factura',
             'tipo' => $tipoAbono,
             'responsable' => $usuario,
         ];
-    
+
         // Añadir propiedades del objeto $abono al array $datosAbono
         $datosAbono = array_merge($datosAbono, get_object_vars($abono));
-    
+
         $abonoHistorico = new AbonoHistorico();
         $abonoHistorico->abono_id = $abono->abono_id;
         $abonoHistorico->ab_histotico_tipo = $tipo;
         $abonoHistorico->ab_historico_values = json_encode($datosAbono);
         $abonoHistorico->user_created = $abono->user_created;
-    
+
         if (!$abonoHistorico->save()) {
             throw new \Exception('Error al guardar el registro histórico');
         }
     }
-    
+
     public function eliminarAbono(Request $request)
     {
         \DB::beginTransaction();
@@ -264,7 +264,7 @@ class AbonoController extends Controller
 
             // Guardar en histórico (aquí asumimos que este método existe y funciona correctamente)
             $this->guardarAbonoHistorico($abono, 5, $validatedData['usuario']);
-            
+
             // Guardar los cambios en la base de datos
             $abono->save();
 
@@ -284,8 +284,8 @@ class AbonoController extends Controller
             return response()->json(['error' => 'Error al anular el abono'], 500);
         }
     }
-    
-    
+
+
 
     public function retencion_registro(Request $request)
     {
@@ -298,7 +298,7 @@ class AbonoController extends Controller
             'periodo' => 'required',
             'abono_tipo' => 'required',
             'user_created' => 'required',
-            
+
         ]);
 
         if ($validator->fails()) {
@@ -358,14 +358,14 @@ class AbonoController extends Controller
             'abono_valor' => 'required|numeric',
             'abono_cheque_numero' => 'required|numeric',
             'abono_cheque_cuenta' => 'required|numeric',
-            'abono_empresa' => 'required',           
+            'abono_empresa' => 'required',
             // 'institucion' => 'required',
             'periodo' => 'required',
             'user_created' => 'required',
             'estado' => 'required',
             'abono_ruc_cliente' => 'required',
         ]);
-    
+
         if ($validator->fails()) {
             $errors = $validator->errors();
             $message = '';
@@ -378,9 +378,9 @@ class AbonoController extends Controller
                 'errors' => $errors,
             ]);
         }
-    
+
         \DB::beginTransaction();
-    
+
         try {
             // Crear instancia de Abono
             $abono = new Abono();
@@ -397,7 +397,7 @@ class AbonoController extends Controller
             $abono->abono_cheque_numero = $request->abono_cheque_numero;
             $abono->abono_cheque_cuenta = $request->abono_cheque_cuenta;
             $abono->abono_cheque_banco = $request->abono_cheque_banco;
-            $abono->abono_concepto = $request->abono_concepto;         
+            $abono->abono_concepto = $request->abono_concepto;
             $abono->idClientePerseo = $request->idClientePerseo;
             $abono->clienteCodigoPerseo = $request->clienteCodigoPerseo;
             $abono->abono_ruc_cliente = $request->abono_ruc_cliente;
@@ -405,7 +405,7 @@ class AbonoController extends Controller
             $cheque = Cheque::where('chq_numero', $request->abono_cheque_numero)
                             ->where('chq_cuenta', $request->abono_cheque_cuenta)
                             ->first();
-    
+
             if (!$cheque) {
                 \DB::rollBack();
                 return response()->json([
@@ -413,7 +413,7 @@ class AbonoController extends Controller
                     'message' => 'El cheque no existe o no se encontró con el número y cuenta proporcionados',
                 ]);
             }
-    
+
             // Guardar el abono
             if (!$abono->save()) {
                 \DB::rollBack();
@@ -422,17 +422,17 @@ class AbonoController extends Controller
                     'message' => 'Error al guardar el abono',
                 ]);
             }
-    
-            
+
+
             $cheque->chq_id_abono = $abono->abono_id;
             $cheque->chq_estado = $request->estado;
             $cheque->save();
-    
+
             // Guardar historial de abono
             $this->guardarAbonoHistorico($abono, 2,$request->user_created);
-    
+
             \DB::commit();
-    
+
             // Responder con éxito
             return response()->json([
                 'status' => 1,
@@ -501,7 +501,13 @@ class AbonoController extends Controller
         // AND fv.id_empresa='$request->empresa'
         // AND fv.clientesidPerseo ='$request->cliente'
         // AND fv.est_ven_codigo <> 3");
-        $query = DB::SELECT("SELECT fv.*, ep.descripcion_corta 
+        $query = DB::SELECT("SELECT fv.*, ep.descripcion_corta ,
+        (
+        SELECT SUM(dv.det_ven_cantidad * dv.det_ven_valor_u) FROM f_detalle_venta dv
+        LEFT JOIN f_venta v ON dv.ven_codigo = v.ven_codigo
+        WHERE v.est_ven_codigo <> '3'
+        AND v.periodo_id = '$request->periodo'
+        ) as ventaBruta
         FROM f_venta fv
         LEFT JOIN empresas ep ON ep.id = fv.id_empresa
         WHERE fv.periodo_id='$request->periodo'
@@ -509,7 +515,7 @@ class AbonoController extends Controller
         return $query;
     }
     public function getClienteCobranzaxInstitucion(Request $request){
-        
+
         $query = DB::SELECT("SELECT DISTINCT usu.* FROM f_venta fv
             LEFT JOIN usuario usu ON fv.ven_cliente  = usu.idusuario
             WHERE fv.id_ins_depacho = '$request->institucion'
@@ -522,12 +528,13 @@ class AbonoController extends Controller
         $id_periodo = $request->id_periodo;
         $query = $this->tr_getPuntosVenta($busqueda);
         //traer datos de la tabla f_formulario_proforma por id_periodo
-        foreach($query as $key => $item){ 
-            $query[$key]->datosClienteInstitucion = DB::SELECT("SELECT DISTINCT usu.cedula, CONCAT(usu.nombres,' ', usu.apellidos) nombres  
+        foreach($query as $key => $item){
+            $query[$key]->datosClienteInstitucion = DB::SELECT("SELECT DISTINCT usu.cedula, CONCAT(usu.nombres,' ', usu.apellidos) nombres
             FROM f_venta fv LEFT JOIN usuario usu ON fv.ven_cliente  = usu.idusuario
             WHERE fv.id_ins_depacho = '$item->idInstitucion'
             OR fv.institucion_id = '$item->idInstitucion'
-            AND fv.periodo_id = '$request->id_periodo'"); }
+            AND fv.periodo_id = '$request->id_periodo'
+            AND fv.est_ven_codigo <> 3"); }
         return $query;
 
         // $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.punto_venta
@@ -557,13 +564,13 @@ class AbonoController extends Controller
         return $query;
     }
     public function traerCobros(Request $request){
-        $cobros = DB::SELECT("SELECT * FROM abono ab 
+        $cobros = DB::SELECT("SELECT * FROM abono ab
         WHERE ab.abono_periodo = $request->periodo");
         $totalCobros = DB::SELECT("SELECT SUM(ab.abono_facturas) AS total_facturas, SUM(ab.abono_notas) AS total_notas,
         COUNT(CASE WHEN ab.abono_notas <> '0.00' THEN 1 END) AS numero_notas, COUNT(CASE WHEN ab.abono_facturas <> '0.00' THEN 1 END) AS numero_facturas
         FROM abono ab WHERE ab.abono_periodo = $request->periodo");
         return [
-            'datosCobros' => $cobros, 
+            'datosCobros' => $cobros,
             'totalCobros' => $totalCobros
         ];
     }
@@ -598,15 +605,15 @@ class AbonoController extends Controller
         $request->validate([
             'cedula' => 'required|string',
         ]);
-    
+
         // Obtener el valor de 'cedula'
         $cedula = $request->input('cedula');
-    
+
         // Realizar las consultas
         $resultados = DB::table('usuario')
             ->where('cedula', $cedula)
             ->first(); // Si esperas solo un resultado, usa ->first()
-    
+
         // Verificar si se encontraron resultados
         if ($resultados) {
             // Retornar los resultados como JSON
@@ -649,7 +656,7 @@ class AbonoController extends Controller
                      ->where('abono_estado', 0)
                      ->orderBy('created_at', 'desc')
                      ->first();
-     
+
                  if ($existingAbono) {
                      return response()->json([
                          'status' => 0,
@@ -721,7 +728,7 @@ class AbonoController extends Controller
                 ->where('abono_estado', 0)
                 ->orderBy('created_at', 'desc')
                 ->first();
-    
+
                 if ($existingAbono) {
                     return response()->json([
                         'status' => 0,
@@ -761,7 +768,7 @@ class AbonoController extends Controller
     }
     public function reporteAbonoVentas(Request $request) {
         // Ejecutar la primera consulta
-        $reporte = DB::select("SELECT 
+        $reporte = DB::select("SELECT
                         fv.idtipodoc,
                         ft.tdo_id,
                         ft.tdo_nombre,
@@ -769,11 +776,11 @@ class AbonoController extends Controller
                         ep.id AS id_empresa,
                         i.nombreInstitucion,
                         i.idInstitucion,
+                        i.punto_venta,
                         fv.institucion_id,
                         fv.ruc_cliente,
-                        fv.ven_tipo_inst,   
                         ROUND(SUM(fv.ven_subtotal), 2) AS subtotal_total,
-                        ROUND(SUM(fv.ven_descuento), 2) AS descuento_total, 
+                        ROUND(SUM(fv.ven_descuento), 2) AS descuento_total,
                         ROUND(SUM(fv.ven_valor), 2) AS valor_total
                     FROM f_tipo_documento ft
                     INNER JOIN f_venta fv ON fv.idtipodoc = ft.tdo_id
@@ -781,27 +788,27 @@ class AbonoController extends Controller
                     INNER JOIN empresas ep ON ep.id = fv.id_empresa
                     WHERE fv.est_ven_codigo <> 3
                     AND fv.periodo_id = ?
-                    GROUP BY 
+                    GROUP BY
                         i.nombreInstitucion,
                         ft.tdo_nombre,
                         i.idInstitucion,
-                        fv.institucion_id,    
+                        fv.institucion_id,
                         fv.idtipodoc,
                         ft.tdo_id,
                         fv.ruc_cliente,
                         ep.descripcion_corta,
-                        fv.ven_tipo_inst,
+                        i.punto_venta,
                         ep.id;", [$request->periodo]);
-    
+
         // Recorrer cada registro del reporte para añadir el abono_total
         foreach ($reporte as $key => $registro) {
             // Construir la consulta de abono con condiciones específicas
-            $abono_tipo = DB::select("SELECT 
-                                        CASE 
-                                            WHEN ? = 4 AND ? = 'V' THEN COALESCE(SUM(ab.abono_notas), 0)
-                                            WHEN ? = 1 AND ? = 'V' THEN COALESCE(SUM(ab.abono_facturas), 0)
-                                            WHEN ? = 3 AND ? = 'L' THEN COALESCE(SUM(ab.abono_notas), 0)
-                                            WHEN ? = 1 AND ? = 'L' THEN COALESCE(SUM(ab.abono_facturas), 0)
+            $abono_tipo = DB::select("SELECT
+                                        CASE
+                                            WHEN ? = 4 AND ? = 0 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 1 AND ? = 0 THEN COALESCE(SUM(ab.abono_facturas), 0)
+                                            WHEN ? = 3 AND ? = 1 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 1 AND ? = 1 THEN COALESCE(SUM(ab.abono_facturas), 0)
                                             ELSE 0
                                         END AS abono_total
                                     FROM abono ab
@@ -809,33 +816,163 @@ class AbonoController extends Controller
                                     AND ab.abono_periodo = ?
                                     AND ab.abono_empresa = ?
                                     AND ab.abono_estado = 0", [
-                                        $registro->idtipodoc, $registro->ven_tipo_inst,
-                                        $registro->idtipodoc, $registro->ven_tipo_inst,
-                                        $registro->idtipodoc, $registro->ven_tipo_inst,
-                                        $registro->idtipodoc, $registro->ven_tipo_inst,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
                                         $registro->ruc_cliente, $request->periodo,
                                         $registro->id_empresa
                                     ]);
-    
+
             // Añadir el abono_total al registro
             $reporte[$key]->abono_total = $abono_tipo[0]->abono_total ?? 0;
+
+            //Devolucion por el Detalle Venta
+            $devolucion = DB::select("SELECT ROUND(SUM(dv.det_ven_dev * dv.det_ven_valor_u), 2) AS devolucion FROM f_detalle_venta dv
+            INNER JOIN f_venta fv ON fv.ven_codigo = dv.ven_codigo AND fv.id_empresa = dv.id_empresa 
+            WHERE fv.ruc_cliente = '$registro->ruc_cliente'
+            AND dv.id_empresa = '$registro->id_empresa';");
+
+            // // Añadir la devolucion al registro
+            $reporte[$key]->devolucion = $devolucion[0]->devolucion ?? 0;
         }
-        // SELECT 
-        // fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta AS empresa, fv.ven_tipo_inst, 
+        // SELECT
+        // fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta AS empresa, fv.ven_tipo_inst,
         // ROUND(SUM(fv.ven_subtotal), 2) AS subtotal_total,
         // ROUND(SUM(fv.ven_descuento), 2) AS descuento_total, ROUND(SUM(fv.ven_valor), 2) AS valor_total,
         // ROUND(SUM(COALESCE(a.abono_facturas, 0) + COALESCE(a.abono_notas, 0)), 2) AS abono_total
-        // FROM  f_venta fv 
+        // FROM  f_venta fv
         // LEFT JOIN abono a ON a.abono_ruc_cliente = fv.ruc_cliente
         // LEFT JOIN institucion i ON fv.institucion_id = i.idInstitucion
         // LEFT JOIN empresas ep ON ep.id = fv.id_empresa
         // WHERE (fv.est_ven_codigo <> 3 AND fv.periodo_id = '$request->periodo')
         // OR (a.abono_estado = 0 AND a.abono_periodo = '$request->periodo')
         // GROUP BY fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta, fv.ven_tipo_inst;
-        
+
         return $reporte;
     }
+    public function reporteVariacionVentas(Request $request) {
+        $query = DB::SELECT("SELECT fv.ven_codigo, fv.ruc_cliente,  fv.institucion_id, fv.ven_tipo_inst, i.nombreInstitucion AS nombre, e.descripcion_corta AS empresa
+        FROM f_venta fv 
+        INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+        INNER JOIN empresas e ON e.id = fv.id_empresa
+        WHERE fv.est_ven_codigo <> 3
+        AND fv.periodo_id = '$request->periodo'");
+        return $query;
+    }
+    public function clientesAbonoNoDocumentos(Request $request) {
+        // Validar el periodo recibido en la solicitud
+        $request->validate([
+            'periodo' => 'required|string',
+        ]);
     
+        // Primera consulta: obtener datos de abonos
+        $query = DB::SELECT("SELECT 
+                    ab.abono_ruc_cliente AS `Ruc/Ci Cliente`,
+                    e.nombre AS `Empresa`,
+                    ab.abono_empresa,
+                    COUNT(CASE WHEN ab.abono_notas > 0 THEN 1 END) AS `Abono(Notas)`,
+                    COUNT(CASE WHEN ab.abono_facturas > 0 THEN 1 END) AS `Abono(Facturas)`,
+                    COUNT(CASE WHEN f.idtipodoc IN (3, 4) THEN 1 END) AS `Documento(Notas)`,
+                    COUNT(CASE WHEN f.idtipodoc = 1 THEN 1 END) AS `Documento(Prefacturas)`
+                FROM 
+                    abono ab
+                LEFT JOIN 
+                    f_venta f ON ab.abono_ruc_cliente = f.ruc_cliente 
+                              AND ab.abono_empresa = f.id_empresa
+                INNER JOIN 
+                    empresas e ON ab.abono_empresa = e.id
+                WHERE 
+                    ab.abono_estado = 0
+                AND
+                    ab.abono_periodo = ?
+                GROUP BY 
+                    ab.abono_ruc_cliente, e.nombre, ab.abono_empresa
+                HAVING 
+                    COUNT(f.ven_codigo) = 0;", [$request->periodo]);
     
+        // Obtener RUC/CIs de los clientes
+        $rucClientes = array_column($query, 'Ruc/Ci Cliente');
+        $rucClientesStr = implode(',', array_map(function($ruc) {
+            return "'" . $ruc . "'";
+        }, $rucClientes));
     
+        // Segunda consulta: obtener nombres y apellidos de los usuarios
+        $usuarios = DB::SELECT("SELECT 
+                    c.cedula,
+                    CONCAT(c.nombres, ' ', c.apellidos) AS `Nombres y Apellidos Cliente`
+                FROM 
+                    usuario c
+                WHERE 
+                    c.cedula IN ($rucClientesStr);");
+    
+        // Crear un arreglo asociativo para facilitar la combinación de resultados
+        $usuariosAssoc = [];
+        foreach ($usuarios as $usuario) {
+            $usuariosAssoc[$usuario->cedula] = $usuario->{'Nombres y Apellidos Cliente'};
+        }
+    
+        // Combinar resultados
+        foreach ($query as &$item) {
+            $item->{'Nombres y Apellidos Cliente'} = $usuariosAssoc[$item->{'Ruc/Ci Cliente'}] ?? null;
+        }
+    
+        // Devolver la respuesta
+        return response()->json($query);
+    }
+
+
+    public function getSalesAndPayments(Request $request)
+    {
+        $request->validate([
+            'institucion' => 'required|integer',
+            'periodo' => 'required|integer',
+        ]);
+    
+        $institucionId = $request->institucion;
+        $periodoId = $request->periodo;
+        $ventas = DB::table('f_venta as fv')
+            ->select('fv.ven_codigo', 'fv.ruc_cliente', 'fv.ven_valor')
+            ->where('fv.institucion_id', $institucionId)
+            ->where('fv.periodo_id', $periodoId)
+            ->get();
+    
+        $result = [];
+        $valorVenta = 0;
+        $valorAbonoTotal = 0;
+    
+        $rucs = [];
+        $result['documentos'] = [];
+        
+        foreach ($ventas as $venta) {
+            $valorVenta += round($venta->ven_valor, 2);
+    
+            if (!in_array($venta->ruc_cliente, $rucs)) {
+                $rucs[] = $venta->ruc_cliente;
+            }
+    
+            $result['documentos'][] = [
+                'ven_codigo' => $venta->ven_codigo,
+                'ruc_cliente' => $venta->ruc_cliente,
+                'ven_valor' => $venta->ven_valor,
+            ];
+        }
+    
+        foreach ($rucs as $ruc) {
+            $valorAbono = DB::table('abono as ab')
+                ->where('ab.abono_ruc_cliente', $ruc)
+                ->sum(DB::raw('ab.abono_facturas + ab.abono_notas'));
+    
+            $valorAbono = round($valorAbono, 2);
+            $valorAbonoTotal += $valorAbono;
+        }
+    
+        $result['total_venta'] = $valorVenta;
+        $result['total_abono'] = $valorAbonoTotal;
+    
+        return response()->json($result);
+    }
+
+
+
 }

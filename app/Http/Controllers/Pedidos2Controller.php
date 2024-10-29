@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Models\CodigosLibros;
 use App\Models\Models\Pedidos\PedidosDocumentosLiq;
 use App\Models\Institucion;
 use App\Models\User;
 use App\Models\Usuario;
 use App\Models\Ventas;
+use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use DB;
@@ -18,9 +20,11 @@ class Pedidos2Controller extends Controller
 {
     use TraitPedidosGeneral;
     protected $pedidosRepository = null;
-    public function __construct(PedidosRepository $pedidosRepository)
+    private $codigosRepository;
+    public function __construct(PedidosRepository $pedidosRepository,CodigosRepository $codigosRepository)
     {
         $this->pedidosRepository = $pedidosRepository;
+        $this->codigosRepository = $codigosRepository;
     }
     /**
      * Display a listing of the resource.
@@ -33,6 +37,8 @@ class Pedidos2Controller extends Controller
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         if($request->getLibrosFormato)              { return $this->getLibrosFormato($request->periodo_id); }
+        if($request->geAllLibrosxAsesorEscuelas)    { return $this->geAllLibrosxAsesorEscuelas($request->asesor_id,$request->periodo_id); }
+        if($request->geAllGuiasxAsesor)             { return $this->geAllGuiasxAsesor($request->asesor_id,$request->periodo_id); }
         if($request->geAllLibrosxAsesor)            { return $this->geAllLibrosxAsesor($request->asesor_id,$request->periodo_id); }
         if($request->getLibrosXAreaXSerieUsados)    { return $this->getLibrosXAreaXSerieUsados($request->periodo_id,$request->area,$request->serie); }
         //api:get/pedidos2/pedidos?getAsesoresPedidos=1
@@ -42,7 +48,9 @@ class Pedidos2Controller extends Controller
         if($request->getLibrosXInstituciones)       { return $this->getLibrosXInstituciones($request->id_periodo,$request->tipo_venta); }
         if($request->getLibrosXInstitucionesAsesor) { return $this->getLibrosXInstitucionesAsesor($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
         if($request->getproStockReserva)            { return $this->getproStockReserva($request); }
+        if($request->getPuntosVentaDespachadosComparativo) { return $this->getPuntosVentaDespachadosComparativo($request); }
         if($request->getPuntosVentaDespachados)     { return $this->getPuntosVentaDespachados($request); }
+        if($request->getpuntosVentaDespachadosFacturacion) { return $this->getpuntosVentaDespachadosFacturacion($request); }
         if($request->getDatosPuntosAllVenta)        { return $this->getDatosPuntosAllVenta($request); }
         if($request->getDatosPuntosVenta)           { return $this->getDatosPuntosVenta($request); }
         if($request->getDatosClient)                { return $this->getDatosClient($request); }
@@ -50,6 +58,10 @@ class Pedidos2Controller extends Controller
         if($request->getDatosDespachoProforma)      { return $this->getDatosDespachoProforma($request); }
         if($request->InformacionAgrupado)           { return $this->InformacionAgrupado($request->codigo); }
         if($request->informacionInstitucionPerseo)  { return $this->informacionInstitucionPerseo($request); }
+        if($request->getReporteFacturacionAsesores) { return $this->getReporteFacturacionAsesores($request); }
+        if($request->getReporteFacturadoXAsesores)  { return $this->getReporteFacturadoXAsesores($request); }
+        if($request->getInfoFacturadoXyear)         { return $this->getInfoFacturadoXyear($request); }
+        if($request->getInfoVendidoXyear)           { return $this->getInfoVendidoXyear($request); }
     }
     //API:GET/pedidos2/pedidos?getLibrosFormato=yes&periodo_id=22
     /**
@@ -82,6 +94,9 @@ class Pedidos2Controller extends Controller
                 'codigo_contrato'   => $item->codigo_contrato,
                 'pedidos'           => $this->tr_pedidosXDespacho($item->ca_codigo_agrupado,$id_periodo),
                 'preproformas'      => $this->tr_getPreproformas($item->ca_codigo_agrupado),
+                'datoAgrupado'      => $this->tr_getAgrupado($item->ca_codigo_agrupado),
+                'Instituciones'     => $this->tr_getPreproformasInstitucion($item->ca_codigo_agrupado),
+                'documentos'        => $this->tr_getDocumentos($item->ca_codigo_agrupado),
                 'ca_descripcion'    => $item->ca_descripcion,
                 'ca_tipo_pedido'    => $item->ca_tipo_pedido,
                 'ca_id'             => $item->ca_id,
@@ -177,6 +192,48 @@ class Pedidos2Controller extends Controller
         }
         return $response;
     }
+     //API:GET/pedidos2/pedidos?getPuntosVentaDespachadosComparativo=1&periodo=25&idusuario=1
+     public function getPuntosVentaDespachadosComparativo($request){
+        $periodo   = $request->periodo;
+        $idusuario = $request->idusuario;
+
+        // $clave = "getPuntosVentaDespachadosComparativo".$periodo.$idusuario;
+        // if (Cache::has($clave)) {
+        //     $response = Cache::get($clave);
+        // } else {
+            $filtro   = 0;
+            $query     = $this->tr_getPuntosVentasDespachos($periodo);
+            foreach($query as $key => $item){
+                $libros = [];
+                $libros = $this->codigosRepository->getCodigosBodega($filtro,$periodo,$item->venta_lista_institucion);
+                if(count($libros) > 0){
+                    $query[$key]->totalCantidadBodegaPuntoVenta = count($libros);
+                    $query[$key]->totalValorBodegaPuntoVenta    = collect($libros)->sum('precio_total');
+                }else{
+                    $query[$key]->totalCantidadBodegaPuntoVenta = 0;
+                    $query[$key]->totalValorBodegaPuntoVenta    = 0;
+                }
+            }
+            return $query;
+            //$response = $query;
+        //     Cache::put($clave,$response);
+        // }
+        // return $response;
+    }
+    //API:GET/pedidos2/pedidos?getpuntosVentaDespachadosFacturacion=1&periodo=25&idusuario=1
+    public function getpuntosVentaDespachadosFacturacion($request){
+        $periodo   = $request->periodo;
+        $idusuario = $request->idusuario;
+        $clave = "getpuntosVentaDespachadosFacturacion".$periodo.$idusuario;
+        if (Cache::has($clave)) {
+            $response = Cache::get($clave);
+        } else {
+            $query     = $this->tr_puntosVentaDespachadosFacturacion($periodo);
+            $response = $query;
+            Cache::put($clave,$response);
+        }
+        return $response;
+    }
     //API:GET/pedidos2/pedidos?getDatosPuntosAllVenta=1&busqueda=prolipa
     public function getDatosPuntosAllVenta($request){
         $busqueda   = $request->busqueda;
@@ -191,7 +248,7 @@ class Pedidos2Controller extends Controller
         ->where('idperiodoescolar',$id_periodo)
         ->get();
         $region = $getPeriodo[0]->region_idregion;
-        $query = $this->tr_getPuntosVentaRegion($busqueda,$region);
+        $query = $this->tr_getPuntosVentaRegion($busqueda,$region,$id_periodo);
         //traer datos de la tabla f_formulario_proforma por id_periodo
         foreach($query as $key => $item){ $query[$key]->datosInstitucion = DB::SELECT("SELECT * FROM f_formulario_proforma fp WHERE fp.idInstitucion = '$item->idInstitucion' AND fp.idperiodoescolar = '$id_periodo'"); }
         return $query;
@@ -242,6 +299,414 @@ class Pedidos2Controller extends Controller
         $query = $this->tr_getInformacionInstitucionPerseo($institucion_id);
         return $query;
     }
+    //API:GET/pedidos2/pedidos?getReporteFacturacionAsesores=1&periodo_id=25
+    public function getReporteFacturacionAsesores($request){
+      
+
+        $periodo_id = $request->periodo_id;
+        $query      = $this->tr_getAsesoresFacturacionXPeriodo($periodo_id);
+        
+        foreach($query as $key => $item){
+            $getInstituciones       = $this->tr_InstitucionesDespachadosFacturacionAsesor($periodo_id,$item->asesor_id);
+            // Convertir a colección en caso de que no lo sea
+            $getInstituciones       = collect($getInstituciones);
+            // $item->instituciones    = $getInstituciones;
+            // Usar pluck para obtener solo los institucion_id
+            $getInstitucionesId     = $getInstituciones->pluck('institucion_id');
+            // $item->institucionesId  = $getInstitucionesId;
+            //====libros====
+            //prolipa
+            $datosRequest = (Object)[
+                "periodo"               => $periodo_id,
+                "empresa"               => 1,
+                "variasInstituciones"   => 1,
+                "getInstitucionesId"    => $getInstitucionesId
+            ];
+            $getLibrosProlipa           = $this->tr_metodoFacturacion($datosRequest);
+            //calmed
+            $datosRequest = (Object)[
+                "periodo"               => $periodo_id,
+                "empresa"               => 3,
+                "variasInstituciones"   => 1,
+                "getInstitucionesId"    => $getInstitucionesId
+            ];
+            $getLibrosCalmed            = $this->tr_metodoFacturacion($datosRequest);
+            $item->librosProlipa        = $getLibrosProlipa;
+            $item->librosCalmed         = $getLibrosCalmed;
+            //sumar cantidad de prolipa y calmed
+            $item->totalLibrosProlipa    = collect($item->librosProlipa)->sum('cantidad');
+            $item->totalLibrosCalmed     = collect($item->librosCalmed)->sum('cantidad');
+            //sumar precio_total
+            $item->totalPrecioProlipa    = collect($item->librosProlipa)->sum('precio_total');
+            $item->totalPrecioCalmed     = collect($item->librosCalmed)->sum('precio_total');
+        }
+        return $query;
+        
+    }
+    public function getReporteFacturadoXAsesores($request){
+        $periodo_id = $request->periodo_id;
+        $query      = $this->tr_getAsesoresFacturadoXPeriodo($periodo_id);
+        
+        foreach($query as $key => $item){
+            $getInstituciones       = $this->tr_InstitucionesDespachadosFacturadoAsesor($periodo_id,$item->asesor_id);
+            // Convertir a colección en caso de que no lo sea
+            $getInstituciones       = collect($getInstituciones);
+            // $item->instituciones    = $getInstituciones;
+            // Usar pluck para obtener solo los institucion_id
+            $getInstitucionesId     = $getInstituciones->pluck('institucion_id');
+            // $item->institucionesId  = $getInstitucionesId;
+            //====libros====
+            //prolipa
+            $datosRequest = (Object)[
+                "periodo"               => $periodo_id,
+                "empresa"               => 1,
+                "variasInstituciones"   => 1,
+                "getInstitucionesId"    => $getInstitucionesId,
+                "tipo"                  => $request->tipo
+            ];
+            $getLibrosProlipa           = $this->tr_metodoFacturado($datosRequest);
+            //calmed
+            $datosRequest = (Object)[
+                "periodo"               => $periodo_id,
+                "empresa"               => 3,
+                "variasInstituciones"   => 1,
+                "getInstitucionesId"    => $getInstitucionesId,
+                "tipo"                  => $request->tipo
+            ];
+            $getLibrosCalmed            = $this->tr_metodoFacturado($datosRequest);
+            $item->librosProlipa        = $getLibrosProlipa;
+            $item->librosCalmed         = $getLibrosCalmed;
+            //sumar cantidad de prolipa y calmed
+            $item->totalLibrosProlipa    = collect($item->librosProlipa)->sum('cantidad');
+            $item->totalLibrosCalmed     = collect($item->librosCalmed)->sum('cantidad');
+            //sumar precio_total
+            $item->totalPrecioProlipa    = collect($item->librosProlipa)->sum('precio_total');
+            $item->totalPrecioCalmed     = collect($item->librosCalmed)->sum('precio_total');
+        }
+        return $query;
+        
+    }
+    
+    public function getInfoFacturadoXyear($request) {
+        $year = $request->year;
+        
+        $ventas = DB::table('f_venta_agrupado')
+            ->whereYear('ven_fecha', $year)
+            ->get();
+        
+        $ventas = collect($ventas);
+        $result = [
+            'datosProlipa' => [
+                'detalles'      => [],
+                'totalDetalles' => 0,
+                'ventaBruta'    => 0,
+                'ventaNeta'     => 0,
+                'descuento'     => 0,
+            ],
+            'datosCalmed' => [
+                'detalles'      => [],
+                'totalDetalles' => 0,
+                'ventaBruta'    => 0,
+                'ventaNeta'     => 0,
+                'descuento'     => 0,
+            ],
+        ];
+    
+        foreach ($ventas as $venta) {
+            // Obtener detalles de la venta
+            $detalles = DB::table('f_detalle_venta_agrupado AS fda')
+                ->join('libros_series AS ls', 'ls.codigo_liquidacion', '=', 'fda.pro_codigo')
+                ->where('fda.id_factura', $venta->id_factura)
+                ->where('fda.id_empresa', $venta->id_empresa)
+                ->select('ls.nombre', 'fda.*')
+                ->get();
+            
+            $detalles = collect($detalles);
+            
+            // Calcular descuento si es necesario
+            $descuento = $venta->ven_descuento ?? 0;
+    
+            if ($venta->id_empresa == 1) {
+                $result['datosProlipa']['ventaBruta']    += $venta->ven_subtotal;
+                $result['datosProlipa']['ventaNeta']     += $venta->ven_valor;
+                $result['datosProlipa']['descuento']     += $descuento;
+            }elseif ($venta->id_empresa == 3) {
+                $result['datosCalmed']['ventaBruta']    += $venta->ven_subtotal;
+                $result['datosCalmed']['ventaNeta']     += $venta->ven_valor;
+                $result['datosCalmed']['descuento']     += $descuento;
+            }
+            // Procesar detalles según la empresa
+            foreach ($detalles as $detalle) {
+                $libro              = $detalle->nombre;
+                $pro_codigo         = $detalle->pro_codigo;
+                $cantidad           = $detalle->det_ven_cantidad;
+                $precio_unitario    = $detalle->det_ven_valor_u;
+    
+                if ($venta->id_empresa == 1) { // Prolipa
+                    if (!isset($result['datosProlipa']['detalles'][$pro_codigo])) {
+                        $result['datosProlipa']['detalles'][$pro_codigo] = [
+                            'libro'             => $libro,
+                            'pro_codigo'        => $pro_codigo,
+                            'cantidad'          => 0,
+                            'precio_unitario'   => $precio_unitario,
+                            'total'             => 0,
+                        ];
+                    }
+    
+                    $result['datosProlipa']['detalles'][$pro_codigo]['cantidad'] += $cantidad;
+                    $result['datosProlipa']['detalles'][$pro_codigo]['total']    += round($cantidad * $precio_unitario, 2);
+    
+                    // Sumar totales de Prolipa
+                    $result['datosProlipa']['totalDetalles'] += $cantidad;
+    
+                } elseif ($venta->id_empresa == 3) { // Calmed
+                    if (!isset($result['datosCalmed']['detalles'][$pro_codigo])) {
+                        $result['datosCalmed']['detalles'][$pro_codigo] = [
+                            'libro'             => $libro,
+                            'pro_codigo'        => $pro_codigo,
+                            'cantidad'          => 0,
+                            'precio_unitario'   => $precio_unitario,
+                            'total'             => 0,
+                        ];
+                    }
+    
+                    $result['datosCalmed']['detalles'][$pro_codigo]['cantidad'] += $cantidad;
+                    $result['datosCalmed']['detalles'][$pro_codigo]['total']    += round($cantidad * $precio_unitario, 2);
+    
+                    // Sumar totales de Calmed
+                    $result['datosCalmed']['totalDetalles'] += $cantidad;
+                }
+            }
+        }
+    
+        $result['datosProlipa']['ventaBruta'] = round($result['datosProlipa']['ventaBruta'], 2);
+        $result['datosProlipa']['ventaNeta']  = round($result['datosProlipa']['ventaNeta'], 2);
+        $result['datosProlipa']['descuento']  = round($result['datosProlipa']['descuento'], 2);
+        
+        $result['datosCalmed']['ventaBruta']  = round($result['datosCalmed']['ventaBruta'], 2);
+        $result['datosCalmed']['ventaNeta']   = round($result['datosCalmed']['ventaNeta'], 2);
+        $result['datosCalmed']['descuento']   = round($result['datosCalmed']['descuento'], 2);
+    
+        $result['datosProlipa']['detalles']   = array_values($result['datosProlipa']['detalles']);
+        $result['datosCalmed']['detalles']    = array_values($result['datosCalmed']['detalles']);
+    
+        return $result;
+    }
+
+    public function getInfoVendidoXyear($request) {
+        $year = $request->year;
+        
+        $ventas = DB::table('f_venta')
+            ->where('est_ven_codigo','<>', 3)
+            ->whereYear('ven_fecha', $year)
+            ->get();
+        
+        $ventas = collect($ventas);
+        $result = [
+            'datosProlipa' => [
+                'totalDetalles' => 0,
+                'ventaBruta'    => 0,
+                'ventaNeta'     => 0,
+                'descuento'     => 0,
+                'documentos'    => [
+                    'facturas' => [
+                        'detalles' => [],
+                        'totalDetalles' => 0,
+                        'ventaBruta' => 0,
+                        'ventaNeta' => 0,
+                        'descuento' => 0,
+                    ],
+                    'actas' => [
+                        'detalles' => [],
+                        'totalDetalles' => 0,
+                        'ventaBruta' => 0,
+                        'ventaNeta' => 0,
+                        'descuento' => 0,
+                    ],
+                    'notas' => [
+                        'detalles' => [],
+                        'totalDetalles' => 0,
+                        'ventaBruta' => 0,
+                        'ventaNeta' => 0,
+                        'descuento' => 0,
+                    ],
+                ],
+            ],
+            'datosCalmed' => [
+                'totalDetalles' => 0,
+                'ventaBruta'    => 0,
+                'ventaNeta'     => 0,
+                'descuento'     => 0,
+                'documentos'    => [
+                    'facturas' => [
+                        'detalles' => [],
+                        'totalDetalles' => 0,
+                        'ventaBruta' => 0,
+                        'ventaNeta' => 0,
+                        'descuento' => 0,
+                    ],
+                    'actas' => [
+                        'detalles' => [],
+                        'totalDetalles' => 0,
+                        'ventaBruta' => 0,
+                        'ventaNeta' => 0,
+                        'descuento' => 0,
+                    ],
+                    'notas' => [
+                        'detalles' => [],
+                        'totalDetalles' => 0,
+                        'ventaBruta' => 0,
+                        'ventaNeta' => 0,
+                        'descuento' => 0,
+                    ],
+                ],
+            ],
+        ];
+    
+        foreach ($ventas as $venta) {
+            // Obtener detalles de la venta
+            $detalles = DB::table('f_detalle_venta AS fda')
+                ->join('libros_series AS ls', 'ls.codigo_liquidacion', '=', 'fda.pro_codigo')
+                ->where('fda.ven_codigo', $venta->ven_codigo)
+                ->where('fda.id_empresa', $venta->id_empresa)
+                ->select('ls.nombre', 'fda.*')
+                ->get();
+            
+            $detalles = collect($detalles);
+            
+            // Calcular descuento si es necesario
+            $descuento = $venta->ven_descuento ?? 0;
+    
+            // Definir el tipo de documento
+            $tipoDocumento = '';
+            switch ($venta->idtipodoc) {
+                case 1:
+                    $tipoDocumento = 'facturas';
+                    break;
+                case 2:
+                    $tipoDocumento = 'actas';
+                    break;
+                case 3:
+                case 4:
+                    $tipoDocumento = 'notas';
+                    break;
+            }
+    
+            // Procesar según la empresa
+            if ($venta->id_empresa == 1) {
+                $result['datosProlipa']['ventaBruta'] += $venta->ven_subtotal;
+                $result['datosProlipa']['ventaNeta'] += $venta->ven_valor;
+                $result['datosProlipa']['descuento'] += $descuento;
+                $result['datosProlipa']['documentos'][$tipoDocumento]['ventaBruta'] += round($venta->ven_subtotal, 2);
+                $result['datosProlipa']['documentos'][$tipoDocumento]['ventaNeta'] += round($venta->ven_valor, 2);
+                $result['datosProlipa']['documentos'][$tipoDocumento]['descuento'] += round($descuento, 2);
+            } elseif ($venta->id_empresa == 3) {
+                $result['datosCalmed']['ventaBruta'] += $venta->ven_subtotal;
+                $result['datosCalmed']['ventaNeta'] += $venta->ven_valor;
+                $result['datosCalmed']['descuento'] += $descuento;
+                $result['datosCalmed']['documentos'][$tipoDocumento]['ventaBruta'] += round($venta->ven_subtotal, 2);
+                $result['datosCalmed']['documentos'][$tipoDocumento]['ventaNeta'] += round($venta->ven_valor, 2);
+                $result['datosCalmed']['documentos'][$tipoDocumento]['descuento'] += round($descuento, 2);
+            }
+    
+            // Procesar detalles
+            foreach ($detalles as $detalle) {
+                $libro = $detalle->nombre;
+                $pro_codigo = $detalle->pro_codigo;
+                $cantidad = $detalle->det_ven_cantidad;
+                $precio_unitario = $detalle->det_ven_valor_u;
+    
+                // Sumar totales de Prolipa
+                if ($venta->id_empresa == 1) {
+                    if (!isset($result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo])) {
+                        $result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo] = [
+                            'libro'             => $libro,
+                            'pro_codigo'        => $pro_codigo,
+                            'cantidad'          => 0,
+                            'precio_unitario'   => $precio_unitario,
+                            'total'             => 0,
+                        ];
+                    }
+    
+                    $result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['cantidad'] += $cantidad;
+                    $result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['total'] += round($cantidad * $precio_unitario, 2);
+                    $result['datosProlipa']['documentos'][$tipoDocumento]['totalDetalles'] += $cantidad;
+                    // $result['datosProlipa']['documentos'][$tipoDocumento]['ventaBruta'] += round($cantidad * $precio_unitario, 2);
+    
+                // Sumar totales de Calmed
+                } elseif ($venta->id_empresa == 3) {
+                    if (!isset($result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo])) {
+                        $result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo] = [
+                            'libro'             => $libro,
+                            'pro_codigo'        => $pro_codigo,
+                            'cantidad'          => 0,
+                            'precio_unitario'   => $precio_unitario,
+                            'total'             => 0,
+                        ];
+                    }
+    
+                    $result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['cantidad'] += $cantidad;
+                    $result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['total'] += round($cantidad * $precio_unitario, 2);
+                    $result['datosCalmed']['documentos'][$tipoDocumento]['totalDetalles'] += $cantidad;
+                    // $result['datosCalmed']['documentos'][$tipoDocumento]['ventaBruta'] += round($cantidad * $precio_unitario, 2);
+                }
+            }
+        }
+    
+        // Redondear totales
+        $result['datosProlipa']['ventaBruta'] = round($result['datosProlipa']['ventaBruta'], 2);
+        $result['datosProlipa']['ventaNeta']  = round($result['datosProlipa']['ventaNeta'], 2);
+        $result['datosProlipa']['descuento']  = round($result['datosProlipa']['descuento'], 2);
+        
+        $result['datosCalmed']['ventaBruta']  = round($result['datosCalmed']['ventaBruta'], 2);
+        $result['datosCalmed']['ventaNeta']   = round($result['datosCalmed']['ventaNeta'], 2);
+        $result['datosCalmed']['descuento']   = round($result['datosCalmed']['descuento'], 2);
+    
+        $result['datosProlipa']['documentos']['facturas']['detalles'] = array_values($result['datosProlipa']['documentos']['facturas']['detalles']);
+        $result['datosProlipa']['documentos']['actas']['detalles'] = array_values($result['datosProlipa']['documentos']['actas']['detalles']);
+        $result['datosProlipa']['documentos']['notas']['detalles'] = array_values($result['datosProlipa']['documentos']['notas']['detalles']);
+    
+        $result['datosCalmed']['documentos']['facturas']['detalles'] = array_values($result['datosCalmed']['documentos']['facturas']['detalles']);
+        $result['datosCalmed']['documentos']['actas']['detalles'] = array_values($result['datosCalmed']['documentos']['actas']['detalles']);
+        $result['datosCalmed']['documentos']['notas']['detalles'] = array_values($result['datosCalmed']['documentos']['notas']['detalles']);
+        
+        return $result;
+    }
+   
+   
+   
+    //API:GET/pedidos2/pedidos?geAllLibrosxAsesorEscuelas=1&asesor_id=4179&periodo_id=24
+    public function geAllLibrosxAsesorEscuelas($asesor_id,$periodo_id){
+        //traer las escuelas del asesor
+        $query = $this->tr_institucionesAsesorPedidos($periodo_id,$asesor_id);
+        //traer los libros por escuela
+        foreach($query as $key => $item){
+            //request
+            $request                 = (Object)[ "escuela_pedido"        => $item->id_institucion ];
+            $query[$key]->libros     = $this->tr_getLibrosAsesores($periodo_id,$item->id_asesor,$request);
+        }
+        return $query;
+    }
+    //geAllGuiasxAsesor
+    //API:GET/pedidos2/pedidos?geAllGuiasxAsesor=1&asesor_id=4179&periodo_id=24
+    public function geAllGuiasxAsesor($asesor_id,$periodo_id){
+        $request                 = (Object)[ "guiasAsesor"   => $asesor_id ];
+        $query                   = $this->tr_getLibrosAsesores($periodo_id,$asesor_id,$request);
+        //buscar en la tabla codigoslibros el campo libro_id con el libro_id del array buscar cuantos codigos tiene el asesor_id con asesor_id parametro
+        $libros = [];
+        $query2 = DB::SELECT("SELECT * FROM codigoslibros c
+        WHERE c.asesor_id = ?
+        AND c.bc_periodo = ?
+        AND c.prueba_diagnostica = '0'
+        ",[$asesor_id,$periodo_id]);
+        return $query2;
+        // foreach($query as $key => $item){
+
+        //     $query[$key]->cantidadBodega = count($query2);
+        //     // $libros[$key] = $item->libro_id;
+        // }
+        // return $query;
+    }
     //API:GET/pedidos2/pedidos?geAllLibrosxAsesor=yes&asesor_id=4179&periodo_id=22
     public function geAllLibrosxAsesor($asesor_id,$periodo_id,$tipo = null,$parametro1=null){
         $val_pedido = [];
@@ -259,8 +724,9 @@ class Pedidos2Controller extends Controller
             LEFT JOIN usuario u ON p.id_asesor = u.idusuario
             WHERE p.id_asesor = '$asesor_id'
             AND p.id_periodo  = '$periodo_id'
-            AND p.tipo        = '0'
+            AND p.tipo        = '1'
             AND p.estado      = '1'
+            And p.estado_entrega = '2'
             GROUP BY pv.id
             ");
         }
