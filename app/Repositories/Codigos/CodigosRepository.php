@@ -487,6 +487,9 @@ class  CodigosRepository extends BaseRepository
                     //==PROCESO====
                     ///correcto o que la proforma se vaya a estado 2 que es para asignar que devolvio despues de enviar de perseo
                     if($unionCorrecto || $ifGuardarProforma == 2){
+                        if($unionCorrecto){
+                            $estadoIngreso = 1;
+                        }
                         //PROFORMA
                         //regresar el stock
                         if($ifGuardarProforma == 1){
@@ -496,9 +499,7 @@ class  CodigosRepository extends BaseRepository
                                 $messageIngreso   = $getEstadoIngreso["messageIngreso"];
                             }
                         }
-                        if($unionCorrecto){
-                            $estadoIngreso = 1;
-                        }
+                        
                         if($estadoIngreso == 1 || $ifGuardarProforma == 2){
                             //PROFORMA
                             $codigoU = DB::table('codigoslibros')

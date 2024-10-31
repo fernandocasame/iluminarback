@@ -451,7 +451,7 @@ class PaqueteController extends Controller
         $miArrayDeObjetos           = json_decode($request->data_codigos);
         //variables
         $usuario_editor             = $request->id_usuario;
-        $institucion_id             = 0;
+        $institucion_id             = $request->institucion_id;
         $periodo_id                 = $request->periodo_id;
         $arregloResumen             = [];
         $contadorResumen            = 0;
