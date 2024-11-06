@@ -42,6 +42,8 @@ use App\Models\HistoriocoPedidosLibroObsequio;
 use App\Models\PedidoNotificacion;
 use App\Models\Abono;
 use App\Models\AbonoHistorico;
+use App\Models\Pedidos_val_area_new;
+use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\PedidosPagosRepository;
 use App\Repositories\pedidos\ConvenioRepository;
 use App\Repositories\pedidos\PedidosRepository;
@@ -66,11 +68,13 @@ class PedidosController extends Controller
     private $pagoRepository;
     private $convenioRepository;
     private $pedidosRepository;
-    public function __construct(PedidosPagosRepository $pagoRepository, ConvenioRepository $convenioRepository,PedidosRepository $pedidosRepository)
+    private $codigosRepository;
+    public function __construct(PedidosPagosRepository $pagoRepository, ConvenioRepository $convenioRepository,PedidosRepository $pedidosRepository,CodigosRepository $codigosRepository)
     {
      $this->pagoRepository          = $pagoRepository;
      $this->convenioRepository      = $convenioRepository;
      $this->pedidosRepository       = $pedidosRepository;
+     $this->codigosRepository       = $codigosRepository;
     }
     //api:get/pedidos
     public function index(Request $request)
@@ -339,8 +343,15 @@ class PedidosController extends Controller
                 $this->saveHistoricoAnticipos($request);
             }
             if($request->generarNuevo == 'yes'){
-                //Si se genera un pedido apartir de un  pedido anulado
-                $this->changeBeneficiariosLibros($request->pedidoAnterior,$pedido->id_pedido);
+                //JEYSON METODOS
+                //Si se genera un pedido apartir de un  pedido anulado (cambiar id periodo inicio)mixinIdInicioFormatoNewData
+                if($request->periodo <= 26){
+                    //Si se genera un pedido apartir de un  pedido anulado
+                    $this->changeBeneficiariosLibros($request->pedidoAnterior,$pedido->id_pedido);
+                    // (cambiar id periodo inicio)mixinIdInicioFormatoNewData
+                }else if($request->periodo > 26){
+                    $this->changeBeneficiariosLibros_new($request->pedidoAnterior,$pedido->id_pedido);
+                }
                 //CAMBIAR PEDIDO  EN PROCESO A PEDIDO CREADO-> actualizar la fecha de creacion de pedido
                 $fechaActual = date('Y-m-d H:i:s');
                 DB::table('pedidos')
@@ -1236,92 +1247,6 @@ class PedidosController extends Controller
         AND a.estado_alcance = '1'");
         return $query;
     }
-    public function get_val_pedidoInfo($pedido){
-        try{
-            $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
-            p.descuento, p.id_periodo,
-            p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
-            se.nombre_serie,p.fecha_aprobado_facturacion
-            FROM pedidos_val_area pv
-            left join area ar ON  pv.id_area = ar.idarea
-            left join series se ON pv.id_serie = se.id_serie
-            INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
-            WHERE pv.id_pedido = '$pedido'
-            AND pv.alcance = '0'
-            GROUP BY pv.id;
-            ");
-            $datos = [];
-            foreach($val_pedido as $key => $item){
-                $valores = [];
-                //plan lector
-                if($item->plan_lector > 0 ){
-                    $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,l.asignatura_idasignatura,
-                    (
-                        SELECT f.pvp AS precio
-                        FROM pedidos_formato f
-                        WHERE f.id_serie = '6'
-                        AND f.id_area = '69'
-                        AND f.id_libro = '$item->plan_lector'
-                        AND f.id_periodo = '$item->id_periodo'
-                    )as precio, ls.codigo_liquidacion,ls.version,ls.year
-                    FROM libro l
-                    left join libros_series ls  on ls.idLibro = l.idlibro
-                    WHERE l.idlibro = '$item->plan_lector'
-                    ");
-                    $valores = $getPlanlector;
-                }else{
-                    $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,l.asignatura_idasignatura,
-                    (
-                        SELECT f.pvp AS precio
-                        FROM pedidos_formato f
-                        WHERE f.id_serie = ls.id_serie
-                        AND f.id_area = a.area_idarea
-                        AND f.id_periodo = '$item->id_periodo'
-                    )as precio
-                    FROM libros_series ls
-                    LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                    LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-                    WHERE ls.id_serie = '$item->id_serie'
-                    AND a.area_idarea  = '$item->id_area'
-                    AND l.Estado_idEstado = '1'
-                    AND a.estado = '1'
-                    AND ls.year = '$item->year'
-                    LIMIT 1
-                    ");
-                    $valores = $getLibros;
-                }
-                $datos[$key] = [
-                    "id"                => $item->id,
-                    "id_pedido"         => $item->id_pedido,
-                    "valor"             => $item->valor,
-                    "id_area"           => $item->id_area,
-                    "tipo_val"          => $item->tipo_val,
-                    "id_serie"          => $item->id_serie,
-                    "year"              => $item->year,
-                    "anio"              => $valores[0]->year,
-                    "version"           => $valores[0]->version,
-                    "created_at"        => $item->created_at,
-                    "updated_at"        => $item->updated_at,
-                    "descuento"         => $item->descuento,
-                    "anticipo"          => $item->anticipo,
-                    "comision"          => $item->comision,
-                    "plan_lector"       => $item->plan_lector,
-                    "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$valores[0]->nombrelibro : $item->serieArea,
-                    "idlibro"           => $valores[0]->idlibro,
-                    "nombrelibro"       => $valores[0]->nombrelibro,
-                    "precio"            => $valores[0]->precio,
-                    "idasignatura"      => $valores[0]->asignatura_idasignatura,
-                    "subtotal"          => $item->valor * $valores[0]->precio,
-                    "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
-                    "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion
-                ];
-            }
-            return $datos;
-        }
-        catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        }
-    }
     public function get_val_pedidoInfo_alcance($pedido,$alcance){
         $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
         p.descuento, p.id_periodo,
@@ -1691,7 +1616,9 @@ class PedidosController extends Controller
                 // "banco"                 => $consulta[0]->banco,
                 "email"                 => $consulta[0]->email,
                 "cedula_beneficiario"   => $consulta[0]->cedula_beneficiario,
-                "direccionBenefiario"   => $consulta[0]->direccionBenefiario
+                "direccionBenefiario"   => $consulta[0]->direccionBenefiario,
+                "banco"                 => $consulta[0]->banco,
+                "num_cuenta"            => $consulta[0]->num_cuenta
             ];
         }
         return $datos;
@@ -3801,6 +3728,8 @@ class PedidosController extends Controller
         $id_alcance     = $request->id_alcance;
         $ventaBruta     = $request->ventaBruta;
         $user_created   = $request->user_created;
+        //METODO MODIFICADO JEYSON
+        $id_periodo     = $request->id_periodo;
         //validar que el pedido alcance este abierto
         $validateAbierto     = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id = '$id_alcance' AND pa.estado_alcance = '0'");
         if(empty($validateAbierto)){
@@ -3828,6 +3757,8 @@ class PedidosController extends Controller
             // if($estado != 3 && !str_starts_with($convertido , 'C')){
                 //===PROCESO======
                 //ACTUALIZAR DETALLE DE VENTA
+                //METODO MODIFICADO JEYSON (cambiar id periodo inicio)mixinIdInicioFormatoNewData
+            if ($id_periodo <= 26) {
                 $nuevoIngreso       = $this->get_val_pedidoInfo_alcance($id_pedido,$id_alcance);
                 if(!empty($nuevoIngreso)){
                     // foreach($nuevoIngreso as $key => $item){
@@ -3889,6 +3820,70 @@ class PedidosController extends Controller
                 }else{
                     return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
                 }
+                // (cambiar id periodo inicio)mixinIdInicioFormatoNewData
+            }else if ($id_periodo > 26) {
+                $nuevoIngreso       = $this->get_val_pedidoInfo_alcance_new($id_pedido,$id_alcance);
+                if(!empty($nuevoIngreso)){
+                    // foreach($nuevoIngreso as $key => $item){
+                    //     $proCodigo      = $item["codigo_liquidacion"];
+                    //     $cantidad       = $item["valor"];
+                    //     $precio         = $item["precio"];
+                    //     $form_data      = [];
+                    //     //consultar si hay codigo registrado en el contrato en el detalle de venta
+                    //     $responseBook   = Http::get("http://186.4.218.168:9095/api/f_DetalleVenta/Busquedaxvencodyprocod?ven_codigo=".$contrato."&pro_codigo=".$proCodigo);
+                    //     $JsonLibro      = json_decode($responseBook, true);
+                    //     //si no  existe : creo
+                    //     if(sizeOf($JsonLibro["detalle_venta"]) == 0){
+                    //         $form_data = [
+                    //             "venCodigo"             => $contrato,
+                    //             "proCodigo"             => $proCodigo,
+                    //             "detVenCantidad"        => intval($cantidad),
+                    //             "detVenValorU"          => floatval($precio),
+                    //             "detVenIva"             => 0,
+                    //             "detVenDescontar"       => false,
+                    //             "detVenInicio"          => false,
+                    //             "detVenCantidadReal"    => intval($cantidad),
+                    //         ];
+                    //         $saveLibros     = Http::post('http://186.4.218.168:9095/api/f_DetalleVenta/CreateOrUpdateDetalleVenta',$form_data);
+                    //         $JsonLibroSave  = json_decode($saveLibros, true);
+                    //         //GUARDAR EN EL HISTORICO ALCANCE LIBROS
+                    //         $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,0,$cantidad,$user_created,1,$proCodigo);
+                    //     }
+                    //     //si existe : actualizo
+                    //     else{
+                    //         $cantidadAnterior = $JsonLibro["detalle_venta"][0]["detVenCantidad"];
+                    //         //sumo la cantidad anterior + la nueva
+                    //         $resultadoLibro = intvaL($cantidadAnterior) + intval($cantidad);
+                    //         $form_data = [
+                    //             'detVenCantidad'        => intval($resultadoLibro),
+                    //             'detVenCantidadReal'    => intval($resultadoLibro),
+                    //         ];
+                    //         $updateLibros = Http::post('http://186.4.218.168:9095/api/f_DetalleVenta/UpdateDetallveVenta?venCodigo='.$contrato.'&proCodigo='.$proCodigo, $form_data);
+                    //         $json_saveLibros = json_decode($updateLibros, true);
+                    //         //GUARDAR EN EL HISTORICO ALCANCE LIBROS
+                    //         $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidadAnterior,$resultadoLibro,$user_created,1,$proCodigo);
+                    //     }
+                    // }
+                    ////////=========
+                    ///============PROCESO  DE GUARDADO TABLA VENTA====
+                    //GUARDAR NUEVO VEN_VALOR VENTA
+                    // $cantidad_anterior  = $JsonContrato["veN_VALOR"];
+                    // $nueva_cantidad     = floatval($cantidad_anterior) + floatval($ventaBruta);
+                    // $datos = [
+                    //     "venValor"        => floatval($nueva_cantidad)
+                    // ];
+                    // $saveValor          = Http::post('http://186.4.218.168:9095/api/f_Venta/ActualizarVenvalor?venCodigo='.$contrato,$datos);
+                    // //GUARDAR EN EL HISTORICO ALCANCE VEN_VALOR
+                    // $this->saveHistoricoAlcance($id_alcance,$id_pedido,$contrato,$cantidad_anterior,$nueva_cantidad,$user_created,0,null);
+                    //CERRAR ALCANCE
+                    $alcance = PedidoAlcance::findOrFail($id_alcance);
+                    $alcance->estado_alcance = 1;
+                    $alcance->save();
+                    return $alcance;
+                }else{
+                    return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
+                }
+            }
 
             // }else{
             //     return ["status" => "0", "message" => "El contrato $contrato esta anulado o pertenece a un ven_convertido"];
@@ -4038,47 +4033,104 @@ class PedidosController extends Controller
         return $query;
     }
     public function getStockProlipaDevolucion(Request $request){
-        $query = DB::SELECT("SELECT pb.*,l.nombrelibro
-        FROM pedidos_guias_bodega pb
-        LEFT JOIN libros_series ls ON pb.pro_codigo = ls.codigo_liquidacion
-        LEFT JOIN libro l ON ls.idLibro = l.idlibro
-        WHERE pb.asesor_id = '$request->asesor_id'
-        ");
-        return $query;
-        //get devolucion
-        $getIdDevolucion = 0;
-        $query2 = DB::SELECT("SELECT * FROM pedidos_guias_devolucion pd
-        WHERE pd.asesor_id = '$request->asesor_id'
-        AND pd.periodo_id = '$request->periodo_id'
-        AND pd.estado = '0'
-        LIMIT 1
-        ");
-        if(count($query2)) {
-            $getIdDevolucion = $query2[0]->id;
-        }
-        $datos = [];
-        foreach($query as $key => $item){
-            //traer la cantidad de devolucion si ya ha devuelto algo y quiere editar
-            $cantidadD = 0;
-            $query3 = DB::SELECT("SELECT * FROM pedidos_guias_devolucion_detalle gd
-            WHERE gd.pro_codigo = '$item->pro_codigo'
-            AND gd.pedidos_guias_devolucion_id = '$getIdDevolucion'
-            LIMIT 1
-            ");
-            if(count($query3) >0){
-                $cantidadD = $query3[0]->cantidad_devuelta;
+
+        $periodo                        = $request->periodo_id;
+        $id_asesor                      = $request->asesor_id;
+        $guias                          = $this->codigosRepository->getLibrosAsesores($periodo, $id_asesor);
+        $resultado                      = [];
+        $guiasPedidos                   = collect($guias);
+        $GuiasBodega                    = collect($this->codigosRepository->getCodigosBodega(1, $periodo, 0, $id_asesor));
+
+        if ($guiasPedidos->isEmpty()) {
+            $resultado = $GuiasBodega;
+        } else {
+            if ($GuiasBodega->isEmpty()) {
+                $resultado = $guiasPedidos;
+            } else {
+                $GuiasBodega->map(function($item) use ($guiasPedidos) {
+                    $codigo = $item->codigo;
+                    $existing = $guiasPedidos->firstWhere('codigo', $codigo);
+                    if ($existing) {
+                        $existing->valor += $item->valor;
+                    } else {
+                        $guiasPedidos->push($item);
+                    }
+                });
+                $resultado = $guiasPedidos;
             }
-            $datos[$key] = [
-                "id"            => $item->id,
-                "asesor_id"     => $item->asesor_id,
-                "pro_codigo"    => $item->pro_codigo,
-                "pro_stock"     => $item->pro_stock,
-                "created_at"    => $item->created_at,
-                "nombrelibro"   => $item->nombrelibro,
-                "formato"       => $cantidadD,
-            ];
         }
-        return $datos;
+
+        // Agregar pro_codigo al campo codigo y procesar cantidad y stock
+        foreach ($resultado as $key => $item) {
+            $resultado[$key]->pro_codigo = $item->codigo;
+            $resultado[$key]->formato    = 0;
+            unset($resultado[$key]->stock);
+            //obtener cantidad devuelta pendiente
+            $getCantidadDevuelta = $this->tr_cantidadDevueltaPendiente($id_asesor, $resultado[$key]->pro_codigo, $periodo);
+            if($getCantidadDevuelta > 0) {
+                $resultado[$key]->formato = (int) $getCantidadDevuelta[0]->cantidad_devuelta;
+            } else {
+                $resultado[$key]->formato = 0;
+            }
+            // Obtener cantidad devuelta
+            $getCantidadDevuelta = $this->tr_cantidadDevuelta($id_asesor, $resultado[$key]->pro_codigo, $periodo);
+            if($getCantidadDevuelta > 0) {
+                $resultado[$key]->cantidad_devuelta = (int) $getCantidadDevuelta;
+            } else {
+                $resultado[$key]->cantidad_devuelta = 0;
+            }
+            // // Asegurar que cantidad es un entero
+            $resultado[$key]->valor = (int) $resultado[$key]->valor;
+            //sumar la $resultado[$key]->cantidad_devuelta +  $resultado[$key]->formato en un campo cantidad_devuelta_total
+            $cantidad_devuelta_total = $resultado[$key]->cantidad_devuelta + $resultado[$key]->formato;
+            // Calcular stockAsesor
+            $resultado[$key]->stockAsesor = $resultado[$key]->valor - $cantidad_devuelta_total;
+        }
+
+        return $resultado;
+
+        // $query = DB::SELECT("SELECT pb.*,l.nombrelibro
+        // FROM pedidos_guias_bodega pb
+        // LEFT JOIN libros_series ls ON pb.pro_codigo = ls.codigo_liquidacion
+        // LEFT JOIN libro l ON ls.idLibro = l.idlibro
+        // WHERE pb.asesor_id = '$request->asesor_id'
+        // ");
+        // return $query;
+        // //get devolucion
+        // $getIdDevolucion = 0;
+        // $query2 = DB::SELECT("SELECT * FROM pedidos_guias_devolucion pd
+        // WHERE pd.asesor_id = '$request->asesor_id'
+        // AND pd.periodo_id  = '$request->periodo_id'
+        // AND pd.estado = '0'
+        // LIMIT 1
+        // ");
+        // if(count($query2)) {
+        //     $getIdDevolucion = $query2[0]->id;
+        // }
+        // $datos = [];
+        // foreach($query as $key => $item){
+        //     //traer la cantidad de devolucion si ya ha devuelto algo y quiere editar
+        //     $cantidadD = 0;
+        //     $query3 = DB::SELECT("SELECT * FROM pedidos_guias_devolucion_detalle gd
+        //     WHERE gd.pro_codigo = '$item->pro_codigo'
+        //     AND gd.pedidos_guias_devolucion_id = '$getIdDevolucion'
+        //     LIMIT 1
+        //     ");
+        //     if(count($query3) >0){
+        //         $cantidadD = $query3[0]->cantidad_devuelta;
+        //     }
+        //     //stock de bodega
+        //     $datos[$key] = [
+        //         "id"            => $item->id,
+        //         "asesor_id"     => $item->asesor_id,
+        //         "pro_codigo"    => $item->pro_codigo,
+        //         "pro_stock"     => $item->pro_stock,
+        //         "created_at"    => $item->created_at,
+        //         "nombrelibro"   => $item->nombrelibro,
+        //         "formato"       => $cantidadD,
+        //     ];
+        // }
+        // return $datos;
     }
     //api para mostrar las entregas de guias a instituciones
     public function getEntregasGuias(Request $request){
@@ -6143,4 +6195,1028 @@ class PedidosController extends Controller
             AND fv.ven_p_libros_obsequios IS NULL ");
         return $query;
     }
+
+    //INICIO JEYSON METODOS
+    public function cargarPeriodoFormatoPedidosNew(Request $request){
+        $query = DB::SELECT("SELECT DISTINCT pfn.idperiodoescolar, pe.periodoescolar
+        FROM pedidos_formato_new pfn
+        LEFT JOIN periodoescolar pe ON pfn.idperiodoescolar = pe.idperiodoescolar
+        WHERE pfn.idperiodoescolar <> $request->periodoActual
+        ORDER BY pe.periodoescolar
+        ");
+        return $query;
+    }
+
+    //Metodo anterior save_val_pedido
+    public function PostRegistrar_modificar_pedidosNew(Request $request)
+    {
+        // return $request;
+        DB::beginTransaction();
+        $fechaActual = date('Y-m-d H:i:s');
+        // return $request;
+        try {
+            $validate = DB::SELECT("SELECT * FROM pedidos p
+            WHERE p.id_pedido = '$request->id_pedido'
+            AND (p.estado_entrega = '1' OR p.estado_entrega = '2')
+            ");
+            if (empty($validate)) {
+                $validate2 = DB::SELECT("SELECT * FROM pedidos p
+                WHERE p.id_pedido = '$request->id_pedido'
+                AND p.estado = '2'
+                ");
+                if(count($validate2)){
+                    DB::rollback();
+                    return response()->json(["status" => "0", 'message' => 'No se puede modificar un pedido anulado'], 200);
+                }
+                if($request->pvn_cantidad == 0){
+                    // Si no hay libros, eliminar el detalle del pedido
+                    Pedidos_val_area_new::where('id_pedido', $request->id_pedido)
+                        ->where('idlibro', $request->idlibro)
+                        ->where('pvn_tipo', $request->pvn_tipo)
+                        ->delete();
+                    DB::commit();
+                    return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+                    // return response()->json([
+                    //     'message' => 'Recibido correctamente',
+                    // ]);
+                }else if($request->pvn_cantidad != 0){
+                    // Si hay libros, procesar los detalles del pedido
+                    $pedidosvalarea_new = Pedidos_val_area_new::where('id_pedido', $request->id_pedido)
+                        ->where('idlibro', $request->idlibro)
+                        ->where('pvn_tipo', $request->pvn_tipo)
+                        ->first();
+                    if ($pedidosvalarea_new) {
+                        if ($request->guias) {
+                            $this->procesoGuias_new($request);
+                            // return $this->procesoGuias_new($request);
+                            if(isset($this->procesoGuias_new($request)["status"])){
+                                $estatus = $this->procesoGuias_new($request)["status"];
+                                if($estatus == 0){
+                                    $message = $this->procesoGuias_new($request)["message"];
+                                    DB::rollback();
+                                    return response()->json(["status" => "0", "message" => $message], 200);
+                                }
+                            }
+                        }
+                        $pedidosvalarea_new->pvn_cantidad = $request->pvn_cantidad;
+                        $pedidosvalarea_new->updated_at = now();
+                        $pedidosvalarea_new->save();
+                        DB::commit();
+                        return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+                    }else {
+                        if ($request->guias) {
+                            // return "elseeee";
+                            $this->procesoGuias_new($request);
+                            // return $this->procesoGuias_new($request);
+                            if(isset($this->procesoGuias_new($request)["status"])){
+                                $estatus = $this->procesoGuias_new($request)["status"];
+                                if($estatus == 0){
+                                    $message = $this->procesoGuias_new($request)["message"];
+                                    DB::rollback();
+                                    return response()->json(["status" => "0", "message" => $message], 200);
+                                }
+                            }
+                        }
+                        $pedidosvalarea_new = new Pedidos_val_area_new([
+                            'id_pedido' => $request->id_pedido,
+                            'idlibro' => $request->idlibro,
+                            'pvn_cantidad' => $request->pvn_cantidad,
+                            'pvn_tipo' => $request->pvn_tipo,
+                            'updated_at' => now(),
+                        ]);
+                        // $pedidosvalarea_new->updated_at = now();
+                        $pedidosvalarea_new->save();
+
+                        DB::table('pedidos')
+                        ->where('id_pedido', $request->id_pedido)
+                        ->update([
+                            'estado' => 1,
+                            'fecha_creacion_pedido' => $fechaActual
+                        ]);
+                        DB::commit();
+                        return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+                    }
+                }  
+            }else{
+                DB::rollback();
+                return ["status" => "0", "message" => "El pedido ya fue entregado por bodega no se puede modificar"];
+            }
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
+        }
+    }
+
+    //metodo anterior save_val_pedido_alcance
+    public function PostRegistrar_modificar_pedidos_alcanceNew(Request $request)
+    {
+        // return $request;
+        DB::beginTransaction();
+        // return $request;
+        try {
+            $validate = DB::SELECT("SELECT * FROM pedidos p
+            WHERE p.id_pedido = '$request->id_pedido'
+            AND (p.estado_entrega = '1' OR p.estado_entrega = '2')
+            ");
+            if(empty($validate)){
+                $validate2 = DB::SELECT("SELECT * FROM pedidos p
+                WHERE p.id_pedido = '$request->id_pedido'
+                AND p.estado = '2'
+                ");
+                if(count($validate2)){
+                    DB::rollback();
+                    return ["status" => "0", "message" => "No se puede modificar un pedido anulado"];
+                }
+                if($request->pvn_cantidad == 0){
+                    // Si no hay libros, eliminar el detalle del pedido
+                    Pedidos_val_area_new::where('id_pedido', $request->id_pedido)
+                        ->where('idlibro', $request->idlibro)
+                        ->where('pvn_tipo', $request->pvn_tipo)
+                        ->delete();
+                    DB::commit();
+                    return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+                    // return response()->json([
+                    //     'message' => 'Recibido correctamente',
+                    // ]);
+                }else if($request->pvn_cantidad != 0){
+                    // Si hay libros, procesar los detalles del pedido
+                    $pedidosvalarea_new = Pedidos_val_area_new::where('id_pedido', $request->id_pedido)
+                        ->where('idlibro', $request->idlibro)
+                        ->where('pvn_tipo', $request->pvn_tipo)
+                        ->first();
+                    if ($pedidosvalarea_new) {
+                        // return response()->json([
+                        //     'message' => 'Recibido correctamente',
+                        //     'pedidosvalarea_new' => $pedidosvalarea_new,
+                        // ]);
+                        $pedidosvalarea_new->pvn_cantidad = $request->pvn_cantidad;
+                        $pedidosvalarea_new->updated_at = now();
+                        $pedidosvalarea_new->save();
+                        DB::commit();
+                        return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+                    } else {
+                        $pedidosvalarea_new = new Pedidos_val_area_new([
+                            'id_pedido' => $request->id_pedido,
+                            'idlibro' => $request->idlibro,
+                            'pvn_cantidad' => $request->pvn_cantidad,
+                            'pvn_tipo' => $request->pvn_tipo,
+                            'updated_at' => now(),
+                        ]);
+                        // $pedidosvalarea_new->updated_at = now();
+                        $pedidosvalarea_new->save();
+                        DB::commit();
+                        return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+    
+                        // DB::table('pedidos')
+                        // ->where('id_pedido', $request->id_pedido)
+                        // ->update([
+                        //     'estado' => 1,
+                        //     'fecha_creacion_pedido' => $fechaActual
+                        // ]);
+                    }
+                }
+            }else{
+                DB::rollback();
+                return ["status" => "0", "message" => "El pedido ya fue entregado por bodega no se puede modificar"];
+            }
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function get_val_pedido_new($pedido)
+    {
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.*, p.descuento, p.id_periodo,
+            p.anticipo, p.comision ,pe.porcentaje_descuento,p.anticipo_aprobado,
+            p.contrato_generado,p.estado_entrega,p.id_asesor
+            FROM pedidos_val_area_new pv
+            INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+            LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+            WHERE pv.id_pedido = '$pedido'
+            AND pv.pvn_tipo = '0'
+            GROUP BY pv.pvn_id;
+        ");
+        return $val_pedido;
+    }
+
+    public function guardar_total_pedido_new($id_pedido, $total_usd, $total_unid,$total_guias,$total_series_basicas,$anticipoSugerido)
+    {
+        //validar que el pedido que tenga contrato no se actualize
+        $query = DB::SELECT("SELECT * FROM pedidos WHERE id_pedido = '$id_pedido'");
+        // $query = DB::SELECT("SELECT * FROM pedidos WHERE id_pedido = '$id_pedido' AND contrato_generado IS NULL");
+        if(count($query) > 0){
+            DB::UPDATE("UPDATE `pedidos` SET
+                `total_venta` = $total_usd,
+                `total_unidades` = $total_unid,
+                `total_unidades_guias` = $total_guias,
+                `total_series_basicas` = $total_series_basicas,
+                `anticipo`             = $anticipoSugerido
+                WHERE `id_pedido` = $id_pedido
+            ");
+        }
+    }
+
+    public function generar_contrato_pedido_new($id_pedido, $usuario_fact){
+        //limpiar cache
+        DB::beginTransaction();
+        try {
+        Cache::flush();
+            $validateBeneficiarios = $this->getAllBeneficiarios($id_pedido);
+            if(empty($validateBeneficiarios)){
+                return ["status" => "0", "message" => "Seleccione algun beneficiario para poder guardar"];
+            }
+            $pedido = DB::SELECT("SELECT p.*, pe.codigo_contrato, u.iniciales,u.cli_ins_codigo,
+            i.codigo_institucion_milton, pe.region_idregion,
+            CONCAT(u.nombres, ' ', u.apellidos) AS asesor,u.cedula,i.nombreInstitucion,
+            (
+                SELECT c.nombre
+                FROM institucion iss
+                LEFT JOIN ciudad c ON iss.ciudad_id = c.idciudad
+                WHERE iss.idInstitucion = i.idInstitucion
+            ) AS ciudad
+            FROM pedidos p, periodoescolar pe, usuario u, institucion i
+            WHERE p.id_periodo = pe.idperiodoescolar
+            AND p.id_asesor = u.idusuario
+            AND p.id_institucion = i.idInstitucion
+            AND `id_pedido` = $id_pedido");
+            $usuario_verifica = DB::SELECT("SELECT * FROM `usuario` WHERE `idusuario` = ?", [$usuario_fact]);
+            $docente = DB::SELECT("SELECT u.cedula,  CONCAT(u.nombres, ' ', u.apellidos) AS docente FROM  usuario u WHERE `idusuario` = ?", [$pedido[0]->id_responsable]);
+            // $observacion = DB::SELECT("SELECT * FROM `pedidos_comentarios` WHERE `id_pedido` = $id_pedido ORDER BY `id` DESC;");
+            $comentario             = '';
+            $comentario             = $pedido[0]->observacion;
+            $institucion            = $pedido[0]->id_institucion;
+            $asesor_id              = $pedido[0]->id_asesor;
+            $asesor                 = $pedido[0]->asesor;
+            $cedulaAsesor           = $pedido[0]->cedula;
+            $temporada              = substr($pedido[0]->codigo_contrato,0,1);
+            $periodo                = $pedido[0]->id_periodo;
+            $ciudad                 = $pedido[0]->ciudad;
+            $iniciales              = $pedido[0]->iniciales;
+            $cli_ins_codigoAsesor   = $pedido[0]->cli_ins_codigo;
+            $codigo_contrato        = $pedido[0]->codigo_contrato;
+            $nombreInstitucion      = $pedido[0]->nombreInstitucion;
+            $convenio_anios         = $pedido[0]->convenio_anios;
+            $fechaActual = date('Y-m-d H:i:s');
+            $setAnticipo = 0;
+            //variables del docente beneficiarios
+            $nombreDocente      = $docente[0]->docente;
+            $cedulaDocente      = $docente[0]->cedula;
+            if($pedido[0]->anticipo_aprobado == null || $pedido[0]->anticipo_aprobado == ""){
+                $setAnticipo = 0;
+            }else{
+                $setAnticipo = $pedido[0]->anticipo_aprobado;
+            }
+            $setNumCuenta = 0;
+            // if($pedido[0]->num_cuenta == null || $pedido[0]->num_cuenta == ""){
+            //     $setNumCuenta = 0;
+            // }else{
+            //     $setNumCuenta = $pedido[0]->num_cuenta;
+            // }
+            ///obtener la secuencia
+            $getSecuencia = DB::SELECT("SELECT * FROM pedidos_secuencia ps
+            WHERE ps.asesor_id = '$asesor_id'
+            AND ps.sec_ven_nombre = '$codigo_contrato'
+            ");
+            $secuencia = 1;
+            //vacio seria la primera secuencia
+            if(empty($getSecuencia)){
+                $secuencia  = 1;
+            }else{
+                $idSecuencia            = $getSecuencia[0]->id;
+                $secuencia              = $getSecuencia[0]->sec_ven_valor + 1;
+                //editar de secuencia
+            }
+            if( $secuencia < 10 ){
+                $format_id_pedido = '000000' . $secuencia;
+            }
+            if( $secuencia >= 10 && $secuencia < 1000 ){
+                $format_id_pedido = '00000' . $secuencia;
+            }
+            if( $secuencia > 1000 ){
+                $format_id_pedido = '0000' . $secuencia;
+            }
+            $codigo_ven = 'C-' . $pedido[0]->codigo_contrato . '-' . $format_id_pedido . '-' . $pedido[0]->iniciales;
+            $fecha_formato = date('Y-m-d');
+            // if( !$pedido[0]->cli_ins_codigo ){
+            //     return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el cliente institucion id para solicitar guias']);
+            // }
+            if( !$pedido[0]->codigo_contrato ){
+                return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del periodo']);
+            }
+            // if( !$usuario_verifica[0]->cod_usuario ){
+            //     return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del usuario facturador']);
+            // }
+            $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
+            WHERE `id_asesor` = ? AND `id_institucion` = ?
+            AND `id_docente` = ?", [$pedido[0]->iniciales,
+            $pedido[0]->codigo_institucion_milton, $docente[0]->cedula]);
+            if (strlen($comentario) > 500) {
+                $cadenaRecortada = substr($comentario, 0, 500); // Recorta la cadena a 500 caracteres
+            } else {
+                $cadenaRecortada = $comentario; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
+            }
+            // $form_data = [
+            //     'veN_CODIGO' => $codigo_ven, //codigo formato milton
+            //     'usU_CODIGO' => strval($usuario_verifica[0]->cod_usuario),
+            //     'veN_D_CODIGO' => $pedido[0]->iniciales, // codigo del asesor
+            //     'clI_INS_CODIGO' => floatval($cli_ins_cod[0]->cli_ins_codigo),
+            //     'tiP_veN_CODIGO' => $pedido[0]->tipo_venta,
+            //     'esT_veN_CODIGO' => 2, // por defecto
+            //     'veN_OBSERVACION' => $cadenaRecortada,
+            //     'veN_VALOR' => $pedido[0]->total_venta,
+            //     'veN_PAGADO' => 0.00, // por defecto
+            //     'veN_ANTICIPO' => $setAnticipo,
+            //     'veN_DESCUENTO' => $pedido[0]->descuento,
+            //     'veN_FECHA' => $fecha_formato,
+            //     'veN_CONVERTIDO' => '', // por defecto
+            //     'veN_TRANSPORTE' => 0.00, // por defecto
+            //     'veN_ESTADO_TRANSPORTE' => false, // por defecto
+            //     'veN_FIRMADO' => 'DS', // por defecto
+            //     'veN_TEMPORADA' => $pedido[0]->region_idregion == 1 ? 0 :1 ,
+            //     'cueN_NUMERO' => strval($setNumCuenta)
+            // ];
+            //guardar en la tabla de temporadas
+            $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
+            // try {
+            //     $contrato = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
+            //     $json_contrato = json_decode($contrato, true);
+            //  } catch (\Exception  $ex) {
+            //     return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+            // }
+             //GUARDAR DETALLE DE VENTA
+            //DETALLE DE VENTA
+            $detalleVenta = $this->get_val_pedidoInfo_new($id_pedido);
+            //Si no hay nada en detalle de venta
+            // return $detalleVenta;
+            if(empty($detalleVenta)){
+                return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];
+            }
+            // $iva = 0;
+            // $descontar =0;
+            // try {
+            // for($i =0; $i< count($detalleVenta);$i++){
+            //     $form_data_detalleVenta = [
+            //         "VEN_CODIGO"            => $codigo_ven,
+            //         "PRO_CODIGO"            => $detalleVenta[$i]["codigo_liquidacion"],
+            //         "DET_VEN_CANTIDAD"      => intval($detalleVenta[$i]["valor"]),
+            //         "DET_VEN_VALOR_U"       => floatval($detalleVenta[$i]["precio"]),
+            //         "DET_VEN_IVA"           => floatval($iva),
+            //         "DET_VEN_DESCONTAR"     => intval($descontar),
+            //         "DET_VEN_INICIO"        => false,
+            //         "DET_VEN_CANTIDAD_REAL" => intval($detalleVenta[$i]["valor"]),
+            //     ];
+            //     $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleVenta);
+            //     $json_detalle = json_decode($detalle, true);
+            // }
+            // } catch (\Exception  $ex) {
+            //     return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+            // }
+            //FIN GUARDAR DETALLE DE VENTA
+            //si se guardo el contrato actualizo la secuencia
+            if(empty($getSecuencia)){
+                $sec = new PedidosSecuencia();
+            }else{
+                //editar de secuencia
+                $sec                        = PedidosSecuencia::findOrFail($idSecuencia);
+                $sec->asesor_id             = $asesor_id;
+            }
+            //guardar
+                $sec->sec_ven_nombre        = $codigo_contrato;
+                $sec->sec_ven_valor         = $secuencia;
+                $sec->ven_d_codigo          = $iniciales;
+                $sec->asesor_id             = $asesor_id;
+                $sec->id_periodo            = $periodo;
+                $sec->cli_ins_codigo        = $cli_ins_codigoAsesor;
+                $sec->save();
+            //ACTUALIZAR CONTRATO Y FECHA CREACION CONTRATO
+            $query = "UPDATE `pedidos` SET `contrato_generado` = '$codigo_ven', `id_usuario_verif` = $usuario_fact,`fecha_generacion_contrato` = '$fechaActual' WHERE `id_pedido` = $id_pedido;";
+            DB::SELECT($query);
+            //ACTUALIZAR EN EL HISTORICO
+            $queryHistorico = "UPDATE `pedidos_historico` SET `fecha_generar_contrato` = '$fechaActual', `estado` = '2' WHERE `id_pedido` = $id_pedido;";
+            DB::UPDATE($queryHistorico);
+            //ASIGNAR A TABLA CONVENIO HIJOS
+            if($convenio_anios > 0){
+                 $getConvenio = $this->asignarToConvenio($institucion,$id_pedido,$codigo_ven,$convenio_anios,$periodo);
+                 $getConvenio;
+            }
+            //DEJAR NOTIFICACION REVIVISION A CERO
+            $this->changeRevisonNotificacion($id_pedido,0);
+            //COLOCAR CONTRATO A LAS PAGOS QUE NO TIENEN
+            $this->asignarContratoToPagos($institucion,$periodo,$codigo_ven);
+            DB::commit();
+            return $codigo_ven;
+            // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al generar el contrato: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function get_val_pedidoInfo_alcance_new($pedido,$alcance){
+        try{
+            $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, 
+                                pv.id_pedido, 
+                                pv.pvn_cantidad AS valor, 
+                                ar.idarea AS id_area, 
+                                s.id_serie, 
+                                ls.year, 
+                                pv.pvn_tipo, 
+                                pv.created_at, 
+                                pv.updated_at, 
+                                l.idlibro, 
+                                p.descuento, 
+                                p.id_periodo, 
+                                p.anticipo, 
+                                p.comision, 
+                                l.nombrelibro as serieArea, 
+                                s.nombre_serie,
+                                ls.version,
+                                asi.idasignatura,
+                                ls.codigo_liquidacion
+                FROM pedidos_val_area_new pv
+                LEFT JOIN libro l ON  pv.idlibro = l.idlibro
+                LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
+                LEFT JOIN asignatura asi ON l.asignatura_idasignatura = asi.idasignatura
+                LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+                LEFT JOIN series s ON ls.id_serie = s.id_serie
+                INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+                WHERE pv.id_pedido = '$pedido'
+                AND pv.pvn_tipo = '$alcance'
+                GROUP BY pv.pvn_id, s.nombre_serie, ls.year, s.id_serie, ls.version, ls.codigo_liquidacion;
+            ");
+            $final_result = [];
+            foreach ($val_pedido as $item) {
+                // Busca el pfn_pvp correcto basado en el id_periodo
+                $pfn_pvp_result = (float) DB::table('pedidos_formato_new')
+                ->where('idperiodoescolar', $item->id_periodo)
+                ->where('idlibro', $item->idlibro)
+                ->value('pfn_pvp');
+                
+                // Construye el array final
+                $final_result[] = [
+                    "id"                => $item->id,
+                    "id_pedido"         => $item->id_pedido,
+                    "valor"             => $item->valor,
+                    "id_area"           => $item->id_area,
+                    "id_serie"          => $item->id_serie,
+                    "year"              => $item->year,
+                    "anio"              => $item->year,
+                    "version"           => $item->version,
+                    "pvn_tipo"          => $item->pvn_tipo,
+                    "created_at"        => $item->created_at,
+                    "updated_at"        => $item->updated_at,
+                    "descuento"         => $item->descuento,
+                    "anticipo"          => $item->anticipo,
+                    "comision"          => $item->comision,
+                    "id_periodo"        => $item->id_periodo,
+                    "serieArea"         => $item->serieArea,
+                    "idlibro"           => $item->idlibro,
+                    "nombrelibro"       => $item->serieArea,
+                    "nombre_serie"      => $item->nombre_serie,
+                    "precio"            => $pfn_pvp_result,  // Añade el pfn_pvp correcto
+                    "idasignatura"      => $item->idasignatura,
+                    "subtotal"          => $item->valor * $pfn_pvp_result,  // Añade el pfn_pvp correcto
+                    "codigo_liquidacion"=> $item->codigo_liquidacion,
+                ];
+            }
+            return $final_result;
+        }
+        catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
+    }
+    
+
+
+    public function get_val_pedido_alcance_new($pedido,$alcance)
+    {
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.*, p.descuento, p.id_periodo,
+        p.anticipo, p.comision ,pe.porcentaje_descuento,p.anticipo_aprobado,
+        p.contrato_generado,p.estado_entrega
+        FROM pedidos_val_area_new pv
+        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
+        WHERE pv.id_pedido = '$pedido'
+        AND pv.pvn_tipo = '$alcance'
+        GROUP BY pv.pvn_id;
+        ");
+        return $val_pedido;
+    }
+
+    public function changeBeneficiariosLibros_new($pedidoAnterior,$pedidoNuevo){
+        //actualizar beneficiarios
+        DB::table('pedidos_beneficiarios')
+        ->where('id_pedido', $pedidoAnterior)
+        ->update(['id_pedido' => $pedidoNuevo]);
+        //actualizar libros
+        DB::table('pedidos_val_area_new')
+        ->where('id_pedido', $pedidoAnterior)
+        ->where('pvn_tipo', '=','0')
+        ->update(['id_pedido' => $pedidoNuevo]);
+    }
+
+    public function get_val_pedidoInfoTodo_new($pedido){
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, pv.id_pedido, pv.pvn_cantidad AS valor, ar.idarea AS id_area, s.id_serie, ls.year, 
+        pv.pvn_tipo AS alcance, pv.created_at, pv.updated_at, l.idlibro, p.descuento, p.id_periodo, p.anticipo, p.comision, l.nombrelibro as serieArea, s.nombre_serie, ls.version, asi.idasignatura,ls.codigo_liquidacion,  0 as cantidad
+        FROM pedidos_val_area_new pv
+        LEFT JOIN libro l ON  pv.idlibro = l.idlibro
+        LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
+        LEFT JOIN asignatura asi ON l.asignatura_idasignatura = asi.idasignatura
+        LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+        LEFT JOIN series s ON ls.id_serie = s.id_serie
+        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        WHERE pv.id_pedido = '$pedido'
+        GROUP BY pv.pvn_id, s.nombre_serie, ls.year, s.id_serie, ls.version, ls.codigo_liquidacion;
+        ");
+        if(empty($val_pedido)){
+            return $val_pedido;
+        }
+        $arreglo = [];
+        $cont    = 0;
+        //obtener solo los alcances activos
+        foreach($val_pedido as $k => $tr){
+            //Cuando es el pedido original
+            $alcance_id = 0;
+            $alcance_id = $tr->alcance;
+            if($alcance_id == 0){
+                $arreglo[$cont] =   (object)[
+                    "id"                => $tr->id,
+                    "id_pedido"         => $tr->id_pedido,
+                    "valor"             => $tr->valor,
+                    "id_area"           => $tr->id_area,
+                    "id_serie"          => $tr->id_serie,
+                    "year"              => $tr->year,
+                    "version"           => $tr->version,
+                    "created_at"        => $tr->created_at,
+                    "updated_at"        => $tr->updated_at,
+                    "descuento"         => $tr->descuento,
+                    "anticipo"          => $tr->anticipo,
+                    "comision"          => $tr->comision,
+                    "id_periodo"        => $tr->id_periodo,
+                    "serieArea"         => $tr->serieArea,
+                    "idlibro"           => $tr->idlibro,
+                    "nombre_serie"      => $tr->nombre_serie,
+                    "idasignatura"      => $tr->idasignatura,
+                    "codigo_liquidacion"=> $tr->codigo_liquidacion,
+                    "alcance"           => $alcance_id,
+                    "cantidad"          => $tr->cantidad,
+                ];
+            }else{
+                //validate que el alcance este cerrado o aprobado
+                $query = $this->getAlcanceAbiertoXId($alcance_id);
+                if(count($query) > 0){
+                    $arreglo[$cont] = (object) [
+                        "id"                => $tr->id,
+                        "id_pedido"         => $tr->id_pedido,
+                        "valor"             => $tr->valor,
+                        "id_area"           => $tr->id_area,
+                        "id_serie"          => $tr->id_serie,
+                        "year"              => $tr->year,
+                        "version"           => $tr->version,
+                        "created_at"        => $tr->created_at,
+                        "updated_at"        => $tr->updated_at,
+                        "descuento"         => $tr->descuento,
+                        "anticipo"          => $tr->anticipo,
+                        "comision"          => $tr->comision,
+                        "id_periodo"        => $tr->id_periodo,
+                        "serieArea"         => $tr->serieArea,
+                        "idlibro"           => $tr->idlibro,
+                        "nombre_serie"      => $tr->nombre_serie, 
+                        "idasignatura"      => $tr->idasignatura,
+                        "codigo_liquidacion"=> $tr->codigo_liquidacion,
+                        "alcance"           => $alcance_id,
+                        "cantidad"          => $tr->cantidad,
+                    ];
+                }
+            }
+            $cont++;
+        }
+        //mostrar el arreglo bien
+        $renderSet = [];
+        $renderSet = array_values($arreglo);
+        if(count($renderSet) == 0){
+            return $renderSet;
+        }
+        $datos = [];
+        $contador = 0;
+        //return $renderSet;
+        $final_result = [];
+        foreach ($renderSet as $item) {
+            // Busca el pfn_pvp correcto basado en el id_periodo
+            $var_planlector = '';
+            $pfn_pvp_result = (float) DB::table('pedidos_formato_new')
+            ->where('idperiodoescolar', $item->id_periodo)
+            ->where('idlibro', $item->idlibro)
+            ->value('pfn_pvp');
+
+            // Busca el pfn_pvp correcto basado en el id_periodo
+            $stock_producto = (int) DB::table('1_4_cal_producto')
+            ->where('pro_codigo', $item->codigo_liquidacion)
+            ->value('pro_reservar');
+            //Asigna id de libro si es plan lector
+            if($item->id_serie == 6){
+                $var_planlector = $item->idlibro;
+            }else if($item->id_serie <> 6){
+                $var_planlector = 0;
+            }
+            // Construye el array final
+            $final_result[] = [
+                "id"                => $item->id,
+                "id_pedido"         => $item->id_pedido,
+                "valor"             => $item->valor,
+                "id_area"           => $item->id_area,
+                "id_serie"          => $item->id_serie,
+                "year"              => $item->year,
+                "anio"              => $item->year,
+                "version"           => $item->version,
+                "created_at"        => $item->created_at,
+                "updated_at"        => $item->updated_at,
+                "descuento"         => $item->descuento,
+                "anticipo"          => $item->anticipo,
+                "comision"          => $item->comision,
+                "plan_lector"       => $var_planlector,
+                "id_periodo"        => $item->id_periodo,
+                "serieArea"         => $item->serieArea,
+                "idlibro"           => $item->idlibro,
+                "nombrelibro"       => $item->serieArea,
+                "nombre_serie"      => $item->nombre_serie,
+                "precio"            => $pfn_pvp_result,
+                "stock"             => $stock_producto,
+                "idasignatura"      => $item->idasignatura,
+                "subtotal"          => $item->valor * $pfn_pvp_result,
+                "codigo_liquidacion"=> $item->codigo_liquidacion,
+                "alcance"           => $item->alcance,
+                "cantidad"          => $item->cantidad,
+            ];
+        }
+        return $final_result;
+    }
+
+    public function procesoGuias_new($request){
+        try{
+            $valor          = $request->valor;
+            $valorReserva   = 0;
+            $totalAReservar = 0;
+            //VALIDACION CONTANDO LOS QUE HAN RESERVADO LAS GUIAS EXCEPTO DEL PEDIDO MAS LUEGO SE VA A SUMAR
+            $getReserva = $this->getReservaCodigosStock_new($request);
+            if(count($getReserva) > 0){
+                foreach($getReserva as $key2 => $item2){
+                    $valorReserva = $valorReserva + $item2->pvn_cantidad;
+                }
+            }
+            $totalAReservar = $valorReserva + $valor;
+            ///PROCESO
+            $query = [];
+           //plan lector
+           if($request->id_serie == 6) { $query = $this->tr_pedidoxLibroPlanLector($request); }
+           else                        { $query = $this->tr_pedidoxLibro($request); }
+           if(empty($query)){
+               return ["status" => "0", "message" => "No existe el libro"];
+           }
+          $codigoCodigo = $query[0]->codigo_liquidacion;
+          $nombreLibro  = $query[0]->nombre;
+          if($codigoCodigo == null || $codigoCodigo == "null" || $codigoCodigo == ""){
+               return ["status" => "0", "message" => "No existe codigo de liquidacion para el libro"];
+          }
+          $codigoFact     = "G".$codigoCodigo;
+          //obtener stock
+          try {
+               // Llama al método estático obtenerProducto usando el nombre de la clase
+               $producto     = _14Producto::obtenerProducto($codigoFact);
+               $stockAnterior = $producto->pro_reservar;
+               //post stock
+               //MENOS 1 ES PORQUE es el minimo que se puede pedir
+               $nuevoStock     = $stockAnterior - $totalAReservar;
+               $stockDisponible = $stockAnterior - $valorReserva -1;
+              if($nuevoStock < 1){
+               return ["status" => "0", "message" => "No existe stock del libro ".$nombreLibro." cantidad disponible: ".$stockDisponible ];
+              }
+           } catch (\Exception $e) {
+               // Manejo de excepciones, devuelve un error JSON
+               return ["status" => "0", "message" => "".$e->getMessage()];
+           }
+
+       } catch (\Exception  $ex) {
+           return ["status" => "0","message" => "Hubo problemas al ingresar la guia"];
+       }
+    }
+
+    public function getReservaCodigosStock_new($request){
+        $query = DB::SELECT("SELECT pvn.* FROM pedidos p 
+        LEFT JOIN pedidos_val_area_new pvn ON p.id_pedido = pvn.id_pedido
+        WHERE p.tipo = '1' 
+        AND p.estado = '1' 
+        AND p.estado_entrega = '0'
+        AND pvn.idlibro = '$request->idlibro'
+        AND pvn.pvn_tipo = '0'
+        AND p.id_pedido <> '$request->id_pedido'
+       ");
+       return $query;
+    }
+
+    public function deletePedidoGuia_new($id)
+    {
+        // Inicia una transacción para asegurarse de que ambas eliminaciones sean atómicas
+        DB::beginTransaction();
+        try {
+            // Encuentra el pedido en la tabla "pedidos"
+            $pedido = Pedidos::find($id);
+            if (!$pedido) {
+                return response()->json(['error' => 'Pedido no encontrado'], 404);
+            }
+            // Elimina los registros relacionados en la tabla "pedidos_val_area_new"
+            DB::table('pedidos_val_area_new')
+                ->where('id_pedido', $pedido->id_pedido)
+                ->delete();
+
+            // Elimina el registro en la tabla "pedidos"
+            $pedido->delete();
+            // Si ambas eliminaciones fueron exitosas, confirma la transacción
+            DB::commit();
+            return response()->json(['message' => 'Pedido y registros relacionados eliminados correctamente', 'pedido' => $pedido]);
+        } catch (\Exception $e) {
+            // Si ocurre algún error, cancela la transacción
+            DB::rollBack();
+            return response()->json(['error' => 'Error al eliminar el pedido: ' . $e->getMessage()], 500);
+        }
+    }
+
+    //api:post//eliminarAlcance
+    public function eliminarAlcance_new(Request $request){
+        try {
+            //eliminar el alcance
+            DB::beginTransaction();
+            $alcance = PedidoAlcance::findOrFail($request->id)->delete();
+            //eliminar libros
+            DB::DELETE("DELETE FROM pedidos_val_area_new WHERE id_pedido = '$request->id_pedido' AND pvn_tipo = '$request->id'");
+            DB::commit();
+        } catch (\Exception $e) {
+            // Si ocurre algún error, cancela la transacción
+            DB::rollBack();
+            return response()->json(['error' => 'Error al eliminar el alcance: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function get_val_pedidoInfo($pedido){
+        //Este metodo esta redirigido al TraitPedidosGeneral.php
+        return $this->tr_get_val_pedidoInfo($pedido);
+    }
+
+    public function get_val_pedidoInfo_new($pedido){
+        //Este metodo esta redirigido al TraitPedidosGeneral.php
+        return $this->tr_get_val_pedidoInfo_new($pedido);
+    }
+
+    public function guardarGuiasBDMilton_new(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        try {
+            //transaccion
+            DB::beginTransaction();
+            //variables
+            $asesor_id            = $request->asesor_id;
+            $id_pedido            = $request->id_pedido;
+            $id_periodo           = $request->id_periodo;
+            $codigo_contrato      = $request->codigo_contrato;
+            $cod_fact             = $request->codigo_usuario_fact;
+            $usuario_fact         = $request->usuario_fact;
+            $iniciales            = $request->iniciales;
+            $fechaActual          = date("Y-m-d H:i:s");
+            $secuencia            = 0;
+            $empresa_id           = $request->empresa_id;
+            $letra                = "";
+            //id general de prolipa para los vendedores
+            $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
+            WHERE s.id_periodo  = '$request->id_periodo'
+            AND s.asesor_id     = '$request->asesor_id'
+            -- AND s.institucion_facturacion = '22926'
+            ");
+            if(empty($query)){
+                $sec = new PedidosSecuencia();
+                $sec->asesor_id             = $asesor_id;
+                //guardar
+                $sec->sec_ven_nombre        = $codigo_contrato;
+                $sec->sec_ven_valor         = 0;
+                $sec->ven_d_codigo          = $iniciales;
+                $sec->asesor_id             = $asesor_id;
+                $sec->id_periodo            = $id_periodo;
+                $sec->cli_ins_codigo        = 0;
+                $sec->save();
+            }
+            //get secuencia
+            $getSecuencia                   = f_tipo_documento::obtenerSecuencia("GUIA");
+            if(!$getSecuencia)              { return ["status" => "0", "message" => "No se pudo obtener la secuencia de guias"]; }
+            //prolipa
+            if($empresa_id == 1)            { $secuencia = $getSecuencia->tdo_secuencial_Prolipa; $letra = "P"; }
+            //calmed
+            if($empresa_id == 3)            { $secuencia = $getSecuencia->tdo_secuencial_calmed; $letra = "C"; }
+            $secuencia                      = $secuencia + 1;
+            //format secuencia
+            $format_id_pedido               = f_tipo_documento::formatSecuencia($secuencia);
+            //codigo de la acta de guias
+            $codigo_ven                     = 'A-'.$letra.'-' . $codigo_contrato . '-' .$cod_fact . '-'. $format_id_pedido;
+
+            //================SAVE DETALLE DE LAS GUIAS======================
+            //obtener las guias por libros
+            $detalleGuias                   = $this->get_val_pedidoInfo_new($request->id_pedido);
+            // return [
+            //     'detalleGuias' => $detalleGuias,
+            //     'mensaje' => 'hola2'
+            // ];
+            //Si no hay nada en detalle de venta
+            if(empty($detalleGuias))        { return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];   }
+
+            //===ACTUALIZAR STOCK========
+            $resultado                      = $this->actualizarStockFacturacion($detalleGuias,$codigo_ven,$empresa_id);
+            if(isset($resultado["status"])) {
+                $estatus = $resultado["status"];  if($estatus == "0") { return $resultado; }
+            }
+            // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
+            $query                          = "UPDATE `pedidos` SET `ven_codigo` = '$codigo_ven', `id_usuario_verif` = $usuario_fact ,`fecha_aprobado_facturacion` = '$fechaActual', `estado_entrega` = '1', `empresa_id` = '$empresa_id' WHERE `id_pedido` = $id_pedido;";
+            DB::UPDATE($query);
+            //ACTUALIZAR LA SECUENCIA
+            f_tipo_documento::updateSecuencia("GUIA",$empresa_id,$secuencia);
+           //Commit
+            DB::commit();
+            return response()->json(['status' => '1', 'message' => 'Guías guardadas correctamente'], 200);
+         } catch (\Exception  $ex) {
+            //Rollback
+            DB::rollBack();
+            return ["status" => "0","message" => "Hubo problemas al guardar las guias".$ex];
+        }
+
+    }
+
+    public function get_val_pedidoLibrosObsequiosInfoTodo_new($pedido){
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, pv.id_pedido, pv.pvn_cantidad AS valor, ar.idarea AS id_area, s.id_serie, ls.year, 
+        pv.pvn_tipo AS alcance, pv.created_at, pv.updated_at, l.idlibro, p.descuento, p.id_periodo, p.anticipo, p.comision, l.nombrelibro as serieArea,
+        s.nombre_serie, ls.version, asi.idasignatura,ls.codigo_liquidacion,  0 as cantidad, l.descripcionlibro
+        FROM pedidos_val_area_new pv
+        LEFT JOIN libro l ON  pv.idlibro = l.idlibro
+        LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
+        LEFT JOIN asignatura asi ON l.asignatura_idasignatura = asi.idasignatura
+        LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+        LEFT JOIN series s ON ls.id_serie = s.id_serie
+        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        WHERE pv.id_pedido = '$pedido'
+        GROUP BY pv.pvn_id, s.nombre_serie, ls.year, s.id_serie, ls.version, ls.codigo_liquidacion;
+        ");
+        if(empty($val_pedido)){
+            return $val_pedido;
+        }
+        $arreglo = [];
+        $cont    = 0;
+        //obtener solo los alcances activos
+        foreach($val_pedido as $k => $tr){
+            //Cuando es el pedido original
+            $alcance_id = 0;
+            $alcance_id = $tr->alcance;
+            if($alcance_id == 0){
+                $arreglo[$cont] =   (object)[
+                    "id"                => $tr->id,
+                    "id_pedido"         => $tr->id_pedido,
+                    "valor"             => $tr->valor,
+                    "id_area"           => $tr->id_area,
+                    "id_serie"          => $tr->id_serie,
+                    "year"              => $tr->year,
+                    "version"           => $tr->version,
+                    "created_at"        => $tr->created_at,
+                    "updated_at"        => $tr->updated_at,
+                    "descuento"         => $tr->descuento,
+                    "anticipo"          => $tr->anticipo,
+                    "comision"          => $tr->comision,
+                    "id_periodo"        => $tr->id_periodo,
+                    "serieArea"         => $tr->serieArea,
+                    "idlibro"           => $tr->idlibro,
+                    "nombre_serie"      => $tr->nombre_serie,
+                    "idasignatura"      => $tr->idasignatura,
+                    "codigo_liquidacion"=> $tr->codigo_liquidacion,
+                    "alcance"           => $alcance_id,
+                    "cantidad"          => $tr->cantidad,
+                    "descripcion"       => $tr->descripcionlibro,
+                ];
+            }else{
+                //validate que el alcance este cerrado o aprobado
+                $query = $this->getAlcanceAbiertoXId($alcance_id);
+                if(count($query) > 0){
+                    $arreglo[$cont] = (object) [
+                        "id"                => $tr->id,
+                        "id_pedido"         => $tr->id_pedido,
+                        "valor"             => $tr->valor,
+                        "id_area"           => $tr->id_area,
+                        "id_serie"          => $tr->id_serie,
+                        "year"              => $tr->year,
+                        "version"           => $tr->version,
+                        "created_at"        => $tr->created_at,
+                        "updated_at"        => $tr->updated_at,
+                        "descuento"         => $tr->descuento,
+                        "anticipo"          => $tr->anticipo,
+                        "comision"          => $tr->comision,
+                        "id_periodo"        => $tr->id_periodo,
+                        "serieArea"         => $tr->serieArea,
+                        "idlibro"           => $tr->idlibro,
+                        "nombre_serie"      => $tr->nombre_serie, 
+                        "idasignatura"      => $tr->idasignatura,
+                        "codigo_liquidacion"=> $tr->codigo_liquidacion,
+                        "alcance"           => $alcance_id,
+                        "cantidad"          => $tr->cantidad,
+                        "descripcion"       => $tr->descripcionlibro,
+                    ];
+                }
+            }
+            $cont++;
+        }
+        //mostrar el arreglo bien
+        $renderSet = [];
+        $renderSet = array_values($arreglo);
+        if(count($renderSet) == 0){
+            return $renderSet;
+        }
+        $datos = [];
+        $contador = 0;
+        //return $renderSet;
+        $final_result = [];
+        foreach ($renderSet as $item) {
+            // Busca el pfn_pvp correcto basado en el id_periodo
+            $var_planlector = '';
+            $pfn_pvp_result = (float) DB::table('pedidos_formato_new')
+            ->where('idperiodoescolar', $item->id_periodo)
+            ->where('idlibro', $item->idlibro)
+            ->value('pfn_pvp');
+
+            // Obtener los valores de pro_stock y pro_deposito
+            $stock_producto = DB::table('1_4_cal_producto')
+            ->where('pro_codigo', $item->codigo_liquidacion)
+            ->select('pro_stock', 'pro_deposito')
+            ->first();
+            //Asigna id de libro si es plan lector
+            if($item->id_serie == 6){
+                $var_planlector = $item->idlibro;
+            }else if($item->id_serie <> 6){
+                $var_planlector = 0;
+            }
+            // Construye el array final
+            $final_result[] = [
+                "id"                => $item->id,
+                "id_pedido"         => $item->id_pedido,
+                "valor"             => $item->valor,
+                "id_area"           => $item->id_area,
+                "id_serie"          => $item->id_serie,
+                "year"              => $item->year,
+                "anio"              => $item->year,
+                "version"           => $item->version,
+                "created_at"        => $item->created_at,
+                "updated_at"        => $item->updated_at,
+                "descuento"         => $item->descuento,
+                "anticipo"          => $item->anticipo,
+                "comision"          => $item->comision,
+                "plan_lector"       => $var_planlector,
+                "id_periodo"        => $item->id_periodo,
+                "serieArea"         => $item->serieArea,
+                "idlibro"           => $item->idlibro,
+                "nombrelibro"       => $item->serieArea,
+                "nombre_serie"      => $item->nombre_serie,
+                "precio"            => $pfn_pvp_result,
+                "stock"             => $stock_producto->pro_stock,
+                "stockNotas"        => $stock_producto->pro_deposito,
+                "idasignatura"      => $item->idasignatura,
+                "subtotal"          => $item->valor * $pfn_pvp_result,
+                "codigo_liquidacion"=> $item->codigo_liquidacion,
+                "alcance"           => $item->alcance,
+                "cantidad"          => $item->cantidad,
+                "descripcion"       => $item->descripcion,
+                "serie"             => $item->nombre_serie,
+            ];
+        }
+        return $final_result;
+    }
+
+    public function get_val_pedidoLibrosObsequiosInfoTodoSinPedido_new(Request $request){
+        $datos = DB::SELECT("SELECT ls.codigo_liquidacion,l.nombrelibro, ls.idlibro,
+            (
+            SELECT f.pfn_pvp 
+            FROM pedidos_formato_new f
+            WHERE f.idlibro = ls.idlibro 
+            AND f.idperiodoescolar = '$request->periodo' LIMIT 1 
+            ) AS precio ,
+            cp.pro_codigo, cp.pro_nombre, cp.pro_descripcion, cp.pro_reservar,cp.pro_stock,cp.pro_deposito, cp.pro_stockCalmed, cp.pro_depositoCalmed
+            FROM libros_series ls
+            LEFT JOIN series s ON ls.id_serie = s.id_serie
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+            LEFT JOIN area ar ON a.area_idarea = ar.idarea
+            INNER JOIN 1_4_cal_producto cp ON ls.codigo_liquidacion = cp.pro_codigo
+            WHERE l.Estado_idEstado = '1'
+            AND (
+            SELECT f.pfn_pvp 
+            FROM pedidos_formato_new f
+            WHERE f.idlibro = ls.idlibro 
+            AND f.idperiodoescolar = '$request->periodo' LIMIT 1 
+            ) IS NOT NULL 
+            AND a.estado = '1';");
+        return $datos;
+    }
+
+    //FIN METODOS JEYSON
 }

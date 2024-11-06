@@ -329,9 +329,17 @@ class VerificacionControllerAnterior extends Controller
          if($request->getAllCodigosXContrato){
             return $this->getAllCodigosXContrato($request);
          }
+         //para traer todos los codigos new
+         if($request->getAllCodigosXContrato_new){
+            return $this->getAllCodigosXContrato_new($request);
+         }
           //para calcular la venta real x Tipo de venta
          if($request->getVentaRealXVerificacionXTipoVenta){
             return $this->obtenerVentaRealXVerificacionXTipoVenta($request);
+         }
+         //para calcular la venta real x Tipo de venta new SE UTILIZA LOS TRAITS
+         if($request->getVentaRealXVerificacionXTipoVenta_new){
+            return $this->obtenerVentaRealXVerificacionXTipoVenta_new($request);
          }
          //para traer todos los codigos individuales por contrato
             if($request->getAllCodigosIndividualesContrato){
@@ -1236,13 +1244,13 @@ class VerificacionControllerAnterior extends Controller
         ",[$contrato]);
         $id_pedido = $query[0]->id_pedido;
         //validar que el pedido no tenga alcaces abiertos o activos
-        $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa
-        WHERE pa.id_pedido = ?
-        AND pa.estado_alcance = '0'
-        ",[$id_pedido]);
-        if(count($query2) > 0){
-            return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"];
-        }
+        // $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa
+        // WHERE pa.id_pedido = ?
+        // AND pa.estado_alcance = '0'
+        // ",[$id_pedido]);
+        // if(count($query2) > 0){
+        //     return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"];
+        // }
         if($periodo ==  null || $periodo == 0 || $periodo == ""){
             return ["status"=>"0", "message" => "El contrato no tiene asignado a un período"];
          }else{
@@ -1380,8 +1388,8 @@ class VerificacionControllerAnterior extends Controller
             if(count($pedido) == 0){ return ["status"=>"0","message"=>"No existe el contrato"]; }
             $id_pedido      = $pedido[0]->id_pedido;
             //validar que el pedido no tenga alcaces abiertos o activos
-            $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id_pedido = ? AND pa.estado_alcance = '0'",[$id_pedido]);
-            if(count($query2) > 0){ return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; }
+            // $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id_pedido = ? AND pa.estado_alcance = '0'",[$id_pedido]);
+            // if(count($query2) > 0){ return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; }
         if($periodo ==  null || $periodo == 0 || $periodo == ""){ return ["status"=>"0", "message" => "El contrato no tiene asignado a un período"]; }
         //======================FIN VALIDACIONES=========================================================
         else{
@@ -1523,4 +1531,65 @@ class VerificacionControllerAnterior extends Controller
         }
         return $query;
     }
+
+    //INICIO METODOS JEYSON 
+    public function getAllCodigosXContrato_new($request){
+        //limpiar cache
+        Cache::flush();
+        $periodo        = $request->periodo_id;
+        $institucion    = $request->institucion_id;
+        $verif          = "verif".$request->verificacion_id;
+        $IdVerificacion = $request->IdVerificacion;
+        $contrato       = $request->contrato;
+        $detalles = DB::SELECT("SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
+            c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
+            c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion,
+            ls.year
+            FROM codigoslibros c
+            LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+            WHERE c.bc_periodo          = ?
+            AND c.prueba_diagnostica    = '0'
+            AND `$verif`                = '$IdVerificacion'
+            AND (c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
+            -- AND c.contrato           = '$contrato'
+            ",
+            [$periodo,$institucion]
+        );
+        // return $detalles;
+        $datos = [];
+        $contador = 0;
+        foreach($detalles as $key => $item){
+            // Busca el pfn_pvp correcto basado en el id_periodo
+            $pfn_pvp_result = (float) DB::table('pedidos_formato_new')
+            ->where('idperiodoescolar', $periodo)
+            ->where('idlibro', $item->libro_idlibro)
+            ->value('pfn_pvp');
+            $datos[$contador] = [
+                "codigo_libro"              => $item->codigo_libro,
+                "IdVerificacion"            => $IdVerificacion,
+                "verificacion_id"           => $request->verificacion_id,
+                "contrato"                  => $contrato,
+                "codigo"                    => $item->codigo,
+                "nombre_libro"              => $item->nombrelibro,
+                "libro_id"                  => $item->libro_idlibro,
+                "libro_idlibro"             => $item->libro_idlibro,
+                "id_serie"                  => $item->id_serie,
+                "id_periodo"                => $periodo,
+                "precio"                    => $pfn_pvp_result,
+                "estado_liquidacion"        => $item->estado_liquidacion,
+                "estado"                    => $item->estado,
+                "bc_estado"                 => $item->bc_estado,
+                "venta_estado"              => $item->venta_estado,
+                "liquidado_regalado"        => $item->liquidado_regalado,
+                "bc_institucion"            => $item->bc_institucion,
+                "contrato"                  => $item->contrato,
+                "venta_lista_institucion"   => $item->venta_lista_institucion
+            ];
+            $contador++;
+        }
+        return $datos;
+     }
+    //FIN METODOS JEYSON
 }

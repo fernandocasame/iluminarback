@@ -14,6 +14,7 @@ use App\Models\PedidoGuiaTemp;
 use App\Models\Pedidos;
 use App\Models\PedidosGuiasBodega;
 use App\Traits\Pedidos\TraitGuiasGeneral;
+use App\Traits\Pedidos\TraitPedidosGeneral;
 use Illuminate\Support\Facades\Http;
 class GuiasController extends Controller
 {
@@ -23,6 +24,7 @@ class GuiasController extends Controller
      * @return \Illuminate\Http\Response
      */
     use TraitGuiasGeneral;
+    use TraitPedidosGeneral;
     //API:get/guias
     public function index(Request $request)
     {
@@ -45,9 +47,17 @@ class GuiasController extends Controller
         if($request->verStock){
             return $this->verStock($request->id_pedido,$request->empresa);
         }
+        //ver stock guias NEW
+        if($request->verStock_new){
+            return $this->verStock_new($request->id_pedido,$request->empresa);
+        }
         //stock de las
         if($request->verStockGuiasProlipa){
             return $this->verStockGuiasProlipa($request->id_pedido,$request->acta);
+        }
+        //stock de las new
+        if($request->verStockGuiasProlipa_new){
+            return $this->verStockGuiasProlipa_new($request->id_pedido,$request->acta);
         }
         //dashboard guias bodega
         if($request->datosGuias){
@@ -56,86 +66,6 @@ class GuiasController extends Controller
         //api:get/guias?listadoGuiasXEstado=1&estado_entrega=
         //listado por tipo de entrega
         if($request->listadoGuiasXEstado) { return $this->listadoGuiasXEstado($request->estado_entrega); }
-    }
-    public function get_val_pedidoInfo($pedido){
-        $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
-        p.descuento, p.id_periodo,
-        p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
-        se.nombre_serie
-        FROM pedidos_val_area pv
-        left join area ar ON  pv.id_area = ar.idarea
-        left join series se ON pv.id_serie = se.id_serie
-        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
-        WHERE pv.id_pedido = '$pedido'
-        AND pv.alcance = '0'
-        GROUP BY pv.id;
-        ");
-        $datos = [];
-        foreach($val_pedido as $key => $item){
-            $valores = [];
-            //plan lector
-            if($item->plan_lector > 0 ){
-                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,
-                (
-                    SELECT f.pvp AS precio
-                    FROM pedidos_formato f
-                    WHERE f.id_serie = '6'
-                    AND f.id_area = '69'
-                    AND f.id_libro = '$item->plan_lector'
-                    AND f.id_periodo = '$item->id_periodo'
-                )as precio, ls.codigo_liquidacion,ls.version,ls.year
-                FROM libro l
-                left join libros_series ls  on ls.idLibro = l.idlibro
-                WHERE l.idlibro = '$item->plan_lector'
-                ");
-                $valores = $getPlanlector;
-            }else{
-                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,
-                (
-                    SELECT f.pvp AS precio
-                    FROM pedidos_formato f
-                    WHERE f.id_serie = ls.id_serie
-                    AND f.id_area = a.area_idarea
-                    AND f.id_periodo = '$item->id_periodo'
-                )as precio
-                FROM libros_series ls
-                LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-                WHERE ls.id_serie = '$item->id_serie'
-                AND a.area_idarea  = '$item->id_area'
-                AND l.Estado_idEstado = '1'
-                AND a.estado = '1'
-                AND ls.year = '$item->year'
-                LIMIT 1
-                ");
-                $valores = $getLibros;
-            }
-            $datos[$key] = [
-                "id"                => $item->id,
-                "id_pedido"         => $item->id_pedido,
-                "valor"             => $item->valor,
-                "id_area"           => $item->id_area,
-                "tipo_val"          => $item->tipo_val,
-                "id_serie"          => $item->id_serie,
-                "year"              => $item->year,
-                "anio"              => $valores[0]->year,
-                "version"           => $valores[0]->version,
-                "created_at"        => $item->created_at,
-                "updated_at"        => $item->updated_at,
-                "descuento"         => $item->descuento,
-                "anticipo"          => $item->anticipo,
-                "comision"          => $item->comision,
-                "plan_lector"       => $item->plan_lector,
-                "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$valores[0]->nombrelibro : $item->serieArea,
-                "idlibro"           => $valores[0]->idlibro,
-                "nombrelibro"       => $valores[0]->nombrelibro,
-                "precio"            => $valores[0]->precio,
-                "subtotal"          => $item->valor * $valores[0]->precio,
-                "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
-            ];
-        }
-        return $datos;
-
     }
     public function verStock($id_pedido,$empresa){
         try {
@@ -453,8 +383,9 @@ class GuiasController extends Controller
     public function saveDevolucionGuiasBodega(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $detalles  = json_decode($request->data_detalle);
-        $asesor_id = $request->asesor_id;
+        $detalles   = json_decode($request->data_detalle);
+        $asesor_id  = $request->asesor_id;
+        $periodo_id = $request->periodo_id;
         if($request->id == 0){
             //save devolucion
             $devolucion = new PedidoGuiaDevolucion();
@@ -472,7 +403,7 @@ class GuiasController extends Controller
             $codigo     = $item->pro_codigo;
             $cantidad   = $item->formato;
             //GUARDAR DETALLE DE ENTREGA
-            $this->saveDevolucionDetalle($item,$devolucion);
+            $this->saveDevolucionDetalle($item,$devolucion,$asesor_id,$periodo_id);
             //GUARDAR EL STOCK EN BODEGA DE PROLIPA
             //tipo  0 = suma; 1 = dismunuir stock
             //$this->saveStockBodegaProlipa($tipo,$asesor_id,$codigo,$cantidad);
@@ -483,11 +414,13 @@ class GuiasController extends Controller
             return ["status" => "0", "message" => "No se pudo guardar"];
         }
     }
-    public function saveDevolucionDetalle($tr,$devolucion){
+    public function saveDevolucionDetalle($tr,$devolucion,$asesor_id,$periodo_id){
         //validar que el libro ya haya sido devuelto
         $validate = DB::SELECT("SELECT * FROM  pedidos_guias_devolucion_detalle
         WHERE pro_codigo = '$tr->pro_codigo'
         AND pedidos_guias_devolucion_id = '$devolucion->id'
+        AND asesor_id = '$asesor_id'
+        AND periodo_id = '$periodo_id'
         LIMIT 1
         ");
         if(count($validate) > 0){
@@ -499,6 +432,8 @@ class GuiasController extends Controller
         $detalle->pro_codigo                   = $tr->pro_codigo;
         $detalle->cantidad_devuelta            = $tr->formato;
         $detalle->pedidos_guias_devolucion_id  = $devolucion->id;
+        $detalle->asesor_id                    = $asesor_id;
+        $detalle->periodo_id                   = $periodo_id;
         $detalle->save();
     }
     //api:post/eliminarDevolucionGuias
@@ -615,4 +550,124 @@ class GuiasController extends Controller
          WHERE `id_pedido` = '$request->id_pedido'
          ");
     }
+
+    //INICIO METODOS JEYSON 
+
+    public function get_val_pedidoInfo($pedido){
+        //Este metodo esta redirigido al TraitPedidosGeneral.php
+        return $this->tr_get_val_pedidoInfo($pedido);
+    }
+
+    public function get_val_pedidoInfo_new($pedido){
+        //Este metodo esta redirigido al TraitPedidosGeneral.php
+        return $this->tr_get_val_pedidoInfo_new($pedido);
+    }
+
+    public function verStock_new($id_pedido,$empresa){
+        try {
+            //consultar el stock
+            $arregloCodigos     = $this->get_val_pedidoInfo_new($id_pedido);
+            $contador = 0;
+            $form_data_stock = [];
+            foreach($arregloCodigos as $key => $item){
+                $stockAnterior  = 0;
+                $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
+                $codigoFact     = "G".$codigo;
+                $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
+                //get stock
+                $getStock       = _14Producto::obtenerProducto($codigoFact);
+                //prolipa
+                if($empresa == 1){
+                    $stockAnterior  = $getStock->pro_stock;
+                }
+                //calmed
+                if($empresa == 3){
+                    $stockAnterior  = $getStock->pro_stockCalmed;
+                }
+                $valorNew       = $arregloCodigos[$contador]["valor"];
+                $nuevoStock     = $stockAnterior - $valorNew;
+                $form_data_stock[$contador] = [
+                "nombrelibro"    => $nombrelibro,
+                "stockAnterior"  => $stockAnterior,
+                "valorNew"       => $valorNew,
+                "nuevoStock"     => $nuevoStock,
+                "codigoFact"     => $codigoFact,
+                "codigo"         => $codigo
+                ];
+                $contador++;
+            }
+            return $form_data_stock;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+        }
+    }
+
+    //PARA VER EL STOCK INGRESADO DE LA ACTA
+    public function verStockGuiasProlipa_new($id_pedido,$acta){
+        try {
+            //consultar el stock
+            $arregloCodigos = $this->get_val_pedidoInfo_new($id_pedido);
+            $contador = 0;
+            $form_data_stock = [];
+            $contador = 0;
+            foreach($arregloCodigos as $key => $item){
+                //variables
+                $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
+                $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
+                $valorNew       = $arregloCodigos[$contador]["valor"];
+                //consulta
+                $query = DB::SELECT("SELECT * FROM pedidos_historico_actas pa
+                WHERE pa.ven_codigo = '$acta'
+                AND pa.pro_codigo = '$codigo'
+                LIMIT 1
+                ");
+                if(empty($query)){
+                    $form_data_stock[$contador] = [
+                    "nombrelibro"    => $nombrelibro,
+                    "stockAnterior"  => "",
+                    "valorNew"       => $valorNew,
+                    "nuevoStock"     => "",
+                    "codigo"         => $codigo
+                    ];
+                }else{
+                    $stockAnterior  = $query[0]->stock_anterior;
+                    $nuevo_stock    = $query[0]->nuevo_stock;
+                    $form_data_stock[$contador] = [
+                    "nombrelibro"    => $nombrelibro,
+                    "stockAnterior"  => $stockAnterior,
+                    "valorNew"       => $valorNew,
+                    "nuevoStock"     => $nuevo_stock,
+                    "codigo"         => $codigo
+                    ];
+                }
+                $contador++;
+            }
+            return $form_data_stock;
+            // foreach($arregloCodigos as $key => $item){
+            //     $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
+            //     $codigoFact     = "G".$codigo;
+            //     $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
+            //     //get stock
+            //     $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
+            //     $json_stock     = json_decode($getStock, true);
+            //     $stockAnterior  = $json_stock["producto"][0]["proStock"];
+            //     //post stock
+            //     $valorNew       = $arregloCodigos[$contador]["valor"];
+            //     $nuevoStock     = $stockAnterior - $valorNew;
+            //     $form_data_stock[$contador] = [
+            //     "nombrelibro"    => $nombrelibro,
+            //     "stockAnterior"  => $stockAnterior,
+            //     "valorNew"       => $valorNew,
+            //     "nuevoStock"     => $nuevoStock,
+            //     "codigoFact"     => $codigoFact,
+            //     "codigo"         => $codigo
+            //     ];
+            //     $contador++;
+            // }
+            return $form_data_stock;
+        } catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
+    }
+    //FIN METODOS JEYSON
 }

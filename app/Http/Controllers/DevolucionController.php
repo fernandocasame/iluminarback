@@ -38,6 +38,8 @@ class DevolucionController extends Controller
         if($request->listadoProformasAgrupadas)          { return $this->listadoProformasAgrupadas($request); }
         if($request->filtroDocumentosDevueltos)          { return $this->filtroDocumentosDevueltos($request); }
         if($request->getCodigosxDocumentoDevolucion)     { return $this->getCodigosxDocumentoDevolucion($request); }
+        if($request->historicoDevolucionPreFacturas)     { return $this->historicoDevolucionPreFacturas($request); }
+        if($request->getDocumentosDevolucion)            { return $this->getDocumentosDevolucion($request); }
        if($request->todoDevolucionCliente)  { return $this->todoDevolucionCliente($request); }
        if($request->devolucionDetalle)  { return $this->devolucionDetalle($request); }
        if($request->CargarDevolucion)  { return $this->CargarDevolucion($request); }
@@ -121,6 +123,7 @@ class DevolucionController extends Controller
                 'institucion'           => $documento->institucion,
                 'cantidadCajas'         => $documento->cantidadCajas,
                 'cantidadPaquetes'      => $documento->cantidadPaquetes,
+                'tipo_importacion'      => $documento->tipo_importacion,
                 'usuario'               => [
                     'nombres'           => $documento->usuario->nombres ?? null,
                     'apellidos'         => $documento->usuario->apellidos ?? null
@@ -149,35 +152,100 @@ class DevolucionController extends Controller
         $revisados    = $request->input('revisados');
         $finalizados  = $request->input('finalizados');
         $agrupar      = $request->input('agrupar');
+        $porcliente   = $request->input('porcliente');
         $getCodigos = CodigosLibrosDevolucionSon::query()
             ->leftJoin('codigoslibros', 'codigoslibros.codigo', '=', 'codigoslibros_devolucion_son.codigo')
             ->leftJoin('libro', 'libro.idlibro', '=', 'codigoslibros.libro_idlibro')
-            ->leftJoin('libros_series','libros_series.idLibro', '=', 'libro.idlibro')
+            ->leftJoin('libros_series', 'libros_series.idLibro', '=', 'libro.idlibro')
+            ->leftJoin('empresas', 'empresas.id', 'codigoslibros_devolucion_son.id_empresa')     
+            ->leftJoin('institucion', 'institucion.idInstitucion', 'codigoslibros_devolucion_son.id_cliente')       
+            ->leftJoin('codigoslibros_devolucion_header', 'codigoslibros_devolucion_header.id', 'codigoslibros_devolucion_son.codigoslibros_devolucion_id')
             ->where('codigoslibros_devolucion_id', $id_documento)
-            ->where('codigoslibros_devolucion_son.prueba_diagnostico','0')
+            ->where('codigoslibros_devolucion_son.prueba_diagnostico', '0')
             ->when($revisados, function ($query) use ($revisados) {
                 $query->where('codigoslibros_devolucion_son.estado', 1);
             })
             ->when($finalizados, function ($query) use ($finalizados) {
                 $query->where('codigoslibros_devolucion_son.estado', 2);
             })
-            ->select('codigoslibros_devolucion_son.*', 'codigoslibros.estado_liquidacion','codigoslibros.liquidado_regalado','libro.nombrelibro','libros_series.codigo_liquidacion')
+            ->select(
+                'codigoslibros_devolucion_son.*', 
+                'codigoslibros.estado_liquidacion',
+                'codigoslibros.liquidado_regalado', 
+                'libro.nombrelibro', 
+                'libros_series.codigo_liquidacion',
+                'empresas.descripcion_corta', 
+                'institucion.nombreInstitucion', 
+                'institucion.idInstitucion as id_cliente',
+            )
             ->get();
-        $resultado = [];
+    
         if ($agrupar == 1) {
             // Agrupar por nombre libro y contar cuántas veces se repite
             $resultado = collect($getCodigos)->groupBy('nombrelibro')->map(function ($item) {
                 return [
-                    'nombrelibro'        => $item[0]->nombrelibro,
-                    'codigo'             => $item[0]->codigo_liquidacion,
-                    'cantidad'           => count($item),
+                    'nombrelibro' => $item[0]->nombrelibro,
+                    'codigo'      => $item[0]->codigo_liquidacion,
+                    'cantidad'    => count($item),
                 ];
-            })->values(); // Esto convertirá el resultado a un array normal
+            })->values();
         } else {
             $resultado = $getCodigos;
+            if($porcliente){
+                //Agrupar por cliente, usando "Sin cliente" para id_cliente 0 o null
+                $agrupados = $resultado->groupBy(function ($item) {
+                    return $item->id_cliente ?: 'sin_cliente';  // 'sin_cliente' como clave para id_cliente 0 o null
+                })
+                ->map(function ($items, $key) {
+                    return [
+                        'id_cliente'       => $key == 'sin_cliente' ? 0 : $key,
+                        'nombreInstitucion' => $key == 'sin_cliente' ? 'Sin cliente' : $items[0]->nombreInstitucion,
+                        'data'             => $items
+                    ];
+                })->values();
+                $resultado = $agrupados;
+            }
         }
-
+    
         return $resultado;
+    }
+    //api:get/devoluciones?historicoDevolucionPreFacturas=yes
+    public function historicoDevolucionPreFacturas(Request $request)
+    {
+        $query = DB::SELECT("SELECT s.*, e.descripcion_corta,
+        i.nombreInstitucion, p.periodoescolar,
+        ch.observacion,ch.fecha_revisado
+        FROM codigoslibros_devolucion_son s
+        LEFT JOIN empresas e ON s.id_empresa = e.id
+        LEFT JOIN codigoslibros_devolucion_header ch ON s.codigoslibros_devolucion_id = ch.id
+        LEFT JOIN periodoescolar p ON ch.periodo_id = p.idperiodoescolar
+        LEFT JOIN institucion i ON ch.id_cliente = i.idInstitucion
+        WHERE s.estado = '1'
+        AND s.prueba_diagnostico = '0'
+        AND s.documento IS NOT NULL 
+        ORDER BY s.id desc
+        ");
+        return $query;
+    }
+    //api:get/devoluciones?getDocumentosDevolucion=1&creadas=1
+    public function getDocumentosDevolucion(Request $request)
+    {
+        $creadas = $request->input('creadas');
+        $results = DB::table('codigoslibros_devolucion_header as h')
+            ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'h.id_cliente')
+            ->leftJoin('periodoescolar as p','p.idperiodoescolar','=','h.periodo_id')
+            ->select(
+                'h.*',
+                'i.nombreInstitucion',
+                'p.region_idregion as region',
+                DB::raw("CONCAT(h.codigo_devolucion, ' - ', i.nombreInstitucion) AS documento_cliente")
+            )
+            ->when($creadas, function ($query) {
+                $query->where('h.estado', '0');
+            })
+            ->get();
+        
+        return $results;
     }
     //api:get/devoluciones?devolucionCliente=yes
     public function devolucionCliente(Request $request)
@@ -459,7 +527,7 @@ class DevolucionController extends Controller
     //api:post/devoluciones?changeNotasToPrefacturas=1&id_empresa=3&id_institucion=1287&id_periodo=25&id_usuario=1
     public function changeNotasToPrefacturas($request)
     {
-        $id_empresa     = $request->input('id_empresa');
+        // $id_empresa     = $request->input('id_empresa');
         $id_institucion = $request->input('id_institucion');
         $id_periodo     = $request->input('id_periodo');
         $id_usuario     = $request->input('id_usuario'); // ID del usuario que realiza la acción
@@ -468,12 +536,15 @@ class DevolucionController extends Controller
 //            {
 //                "codigo": "SMLL3-K8GA4WZ",
 //                "codigo_proforma": "N-C-S24-FR-BC44",
-//                "codigo_liquidacion": "SMCN6"
+//                "codigo_liquidacion": "SMCN6",
+//                "proforma_empresa": 3
+
 //            },
 //            {
 //                "codigo": "SMLL3-K8GA4WZ",
 //                "codigo_proforma": "N-C-S24-FR-BC44",
-//                "codigo_liquidacion": "SEN3"
+//                "codigo_liquidacion": "SEN3",
+//                "proforma_empresa": 1
 //            }
 //        ]';
 
@@ -488,14 +559,16 @@ class DevolucionController extends Controller
         // Agrupar por 'codigo_proforma' y 'codigo_liquidacion'
         $agrupadoPrenotas = collect($arrayCodigosNotaCredito)
             ->groupBy(function ($item) {
-                return $item->codigo_proforma . '-' . $item->codigo_liquidacion;
+                //agrupar por codigo proforma y codigo liquidacion y codigo empresa
+                return $item->codigo_proforma . '-' . $item->codigo_liquidacion . '-' . $item->proforma_empresa;
             })
             ->map(function ($items, $key) {
                 $firstItem = $items->first();
                 return (object)[
                     'codigo_proforma'       => $firstItem->codigo_proforma,
                     'codigo_liquidacion'    => $firstItem->codigo_liquidacion,
-                    'cantidad'              => $items->count()
+                    'cantidad'              => $items->count(),
+                    'proforma_empresa'      => $firstItem->proforma_empresa
                 ];
             })
             ->values();
@@ -509,9 +582,10 @@ class DevolucionController extends Controller
                 $cantidadLibroDescontar = $value->cantidad;
                 $codigo_liquidacion     = $value->codigo_liquidacion;
                 $codigo_proforma        = $value->codigo_proforma;
+                $codigo_empresa         = $value->proforma_empresa;
                 // Obtener la nota correspondiente
                 $getNota = DetalleVentas::where('ven_codigo', $codigo_proforma)
-                    ->where('id_empresa', $id_empresa)
+                    ->where('id_empresa', $codigo_empresa)
                     ->where('pro_codigo', $codigo_liquidacion)
                     ->first();
                 // Si no existe el libro en la nota
@@ -529,6 +603,7 @@ class DevolucionController extends Controller
                         $codigosFiltrarXDocumento = collect($arrayCodigosNotaCredito)
                             ->where('codigo_proforma', $codigo_proforma)
                             ->where('codigo_liquidacion', $codigo_liquidacion)
+                            ->where('proforma_empresa', $codigo_empresa)
                             ->toArray();
                         foreach ($codigosFiltrarXDocumento as $item) {
                             $cantidadDisponible             = 0;
@@ -539,13 +614,24 @@ class DevolucionController extends Controller
                                 "pro_codigo"                => $item->codigo_liquidacion,
                                 "id_institucion"            => $id_institucion,
                                 "id_periodo"                => $id_periodo,
-                                "id_empresa"                => $id_empresa
+                                "id_empresa"                => $codigo_empresa   
                             ];
                             $cantidadDisponible = $this->devolucionRepository->getDisponibilidadCodigoPrefactura($datos);
                             if ($cantidadDisponible < 1) {
                                 $value->disponible          = $cantidadDisponible;
-                                $value->mensaje             = 'El libro ' . $item->codigo . ' no ha sido despachado mediante pre-facturas, no es posible mover';
-                                $arrayCodigosProblemas[]    = $value;
+                                // $value->mensaje             = 'El libro ' . $item->codigo . ' no ha sido despachado mediante pre-facturas, no es posible mover';
+                                // $arrayCodigosProblemas[]    = $value;
+                                //si el codigo tiene codigo_union tambien le actualizo
+                                $codigoUpdate = CodigosLibros::where('codigo',$item->codigo)->first();
+                                $codigo_union = $codigoUpdate->codigo_union;
+                                if($codigo_union != null && $codigo_union != "null" && $codigo_union != ""){
+                                    CodigosLibros::where('codigo', $codigo_union)
+                                    ->update(['permitir_devolver_nota' => 1]);
+                                }
+                                // Actualizar la pre factura en el código
+                                CodigosLibros::where('codigo', $item->codigo)
+                                ->update(['permitir_devolver_nota' => 1]);
+                                $cambiados++;
                             } else {
                                 // Obtener la primera prefactura disponible
                                 $getPrefactura                      = $this->devolucionRepository->getFacturaAvailable($datos);
@@ -554,7 +640,7 @@ class DevolucionController extends Controller
                                     $resultadoSuma                  = $cantidadDisponiblePrefactura + 1;
                                     // Aumentar en las pre facturas
                                     DetalleVentas::where('ven_codigo', $getPrefactura->ven_codigo)
-                                        ->where('id_empresa', $id_empresa)
+                                        ->where('id_empresa', $codigo_empresa)
                                         ->where('pro_codigo', $codigo_liquidacion)
                                         ->update(['det_ven_cantidad' => $resultadoSuma]);
                                     // Descontar en las notas
@@ -580,7 +666,7 @@ class DevolucionController extends Controller
                                         "nueva_prefactura"  => $getPrefactura->ven_codigo,
                                         "cantidad"          => 1,
                                         "id_periodo"        => $id_periodo,
-                                        "id_empresa"        => $id_empresa,
+                                        "id_empresa"        => $codigo_empresa,
                                         "observacion"       => $mensajeHistorico,
                                         "user_created"      => $id_usuario
                                     ];
@@ -629,6 +715,9 @@ class DevolucionController extends Controller
 
             // Validar que el id_documento tenga estado 0 o 1, si no, no se puede eliminar porque ya fue finalizado
             $documento = CodigosLibrosDevolucionHeader::find($id_documento);
+            if ($documento->estado == 1) {
+                return response()->json(['status' => '0', 'message' => 'No se puede eliminar un revisado por que los codigos ya fueron devueltos'], 200);
+            }
             if ($documento->estado == 2) {
                 return response()->json(['status' => '0', 'message' => 'No se puede eliminar un documento finalizado'], 200);
             }
@@ -636,9 +725,9 @@ class DevolucionController extends Controller
             // Primero encontrar los hijos, traer los códigos, y en la tabla CodigosLibros actualizar el documento_devolucion a null
             $codigos = CodigosLibrosDevolucionSon::where('codigoslibros_devolucion_id', $id_documento)->get();
             foreach ($codigos as $codigo) {
-                CodigosLibros::where('codigo', $codigo->codigo)->update(['documento_devolucion' => null]);
+                CodigosLibros::where('codigo', $codigo->codigo)->update(['documento_devolucion' => null,'permitir_devolver_nota' => 0]);
             }
-
+            
             // Eliminar los hijos
             CodigosLibrosDevolucionSon::where('codigoslibros_devolucion_id', $id_documento)->delete();
 

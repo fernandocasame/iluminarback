@@ -807,4 +807,183 @@ trait TraitPedidosGeneral
     
         return $query;
     }
+
+    //TRAIT JEYSON INICIO
+    public function tr_get_val_pedidoInfo($pedido){
+        try{
+            $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
+            p.descuento, p.id_periodo,
+            p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
+            se.nombre_serie,p.fecha_aprobado_facturacion
+            FROM pedidos_val_area pv
+            left join area ar ON  pv.id_area = ar.idarea
+            left join series se ON pv.id_serie = se.id_serie
+            INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+            WHERE pv.id_pedido = '$pedido'
+            AND pv.alcance = '0'
+            GROUP BY pv.id;
+            ");
+            $datos = [];
+            foreach($val_pedido as $key => $item){
+                $valores = [];
+                //plan lector
+                if($item->plan_lector > 0 ){
+                    $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,l.asignatura_idasignatura,
+                    (
+                        SELECT f.pvp AS precio
+                        FROM pedidos_formato f
+                        WHERE f.id_serie = '6'
+                        AND f.id_area = '69'
+                        AND f.id_libro = '$item->plan_lector'
+                        AND f.id_periodo = '$item->id_periodo'
+                    )as precio, ls.codigo_liquidacion,ls.version,ls.year
+                    FROM libro l
+                    left join libros_series ls  on ls.idLibro = l.idlibro
+                    WHERE l.idlibro = '$item->plan_lector'
+                    ");
+                    $valores = $getPlanlector;
+                }else{
+                    $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,l.asignatura_idasignatura,
+                    (
+                        SELECT f.pvp AS precio
+                        FROM pedidos_formato f
+                        WHERE f.id_serie = ls.id_serie
+                        AND f.id_area = a.area_idarea
+                        AND f.id_periodo = '$item->id_periodo'
+                    )as precio
+                    FROM libros_series ls
+                    LEFT JOIN libro l ON ls.idLibro = l.idlibro
+                    LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                    WHERE ls.id_serie = '$item->id_serie'
+                    AND a.area_idarea  = '$item->id_area'
+                    AND l.Estado_idEstado = '1'
+                    AND a.estado = '1'
+                    AND ls.year = '$item->year'
+                    LIMIT 1
+                    ");
+                    $valores = $getLibros;
+                }
+                $datos[$key] = [
+                    "id"                => $item->id,
+                    "id_pedido"         => $item->id_pedido,
+                    "valor"             => $item->valor,
+                    "id_area"           => $item->id_area,
+                    "tipo_val"          => $item->tipo_val,
+                    "id_serie"          => $item->id_serie,
+                    "year"              => $item->year,
+                    "anio"              => $valores[0]->year,
+                    "version"           => $valores[0]->version,
+                    "created_at"        => $item->created_at,
+                    "updated_at"        => $item->updated_at,
+                    "descuento"         => $item->descuento,
+                    "anticipo"          => $item->anticipo,
+                    "comision"          => $item->comision,
+                    "plan_lector"       => $item->plan_lector,
+                    "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$valores[0]->nombrelibro : $item->serieArea,
+                    "idlibro"           => $valores[0]->idlibro,
+                    "nombrelibro"       => $valores[0]->nombrelibro,
+                    "precio"            => $valores[0]->precio,
+                    "idasignatura"      => $valores[0]->asignatura_idasignatura,
+                    "subtotal"          => $item->valor * $valores[0]->precio,
+                    "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
+                    "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion
+                ];
+            }
+            return $datos;
+        }
+        catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
+    }
+
+    public function tr_get_val_pedidoInfo_new($pedido){
+        try{
+            $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, 
+                                pv.id_pedido, 
+                                pv.pvn_cantidad AS valor, 
+                                ar.idarea AS id_area, 
+                                s.id_serie, 
+                                ls.year, 
+                                pv.pvn_tipo, 
+                                pv.created_at, 
+                                pv.updated_at, 
+                                l.idlibro, 
+                                p.descuento, 
+                                p.id_periodo, 
+                                p.anticipo, 
+                                p.comision, 
+                                l.nombrelibro as serieArea, 
+                                s.nombre_serie,
+                                ls.version,
+                                asi.idasignatura,
+                                ls.codigo_liquidacion,
+                                p.fecha_aprobado_facturacion
+                FROM pedidos_val_area_new pv
+                LEFT JOIN libro l ON  pv.idlibro = l.idlibro
+                LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
+                LEFT JOIN asignatura asi ON l.asignatura_idasignatura = asi.idasignatura
+                LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+                LEFT JOIN series s ON ls.id_serie = s.id_serie
+                INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+                WHERE pv.id_pedido = '$pedido'
+                AND pv.pvn_tipo = '0'
+                GROUP BY pv.pvn_id, s.nombre_serie, ls.year, s.id_serie, ls.version, ls.codigo_liquidacion;
+            ");
+            $final_result = [];
+            foreach ($val_pedido as $item) {
+                $var_planlector = '';
+                $var_year = '';
+                $var_idarea = '';
+                // Busca el pfn_pvp correcto basado en el id_periodo
+                $pfn_pvp_result = (float) DB::table('pedidos_formato_new')
+                ->where('idperiodoescolar', $item->id_periodo)
+                ->where('idlibro', $item->idlibro)
+                ->value('pfn_pvp');
+                //Asigna id de libro si es plan lector
+                if($item->id_serie == 6){
+                    $var_planlector = $item->idlibro;
+                    $var_year = 0;
+                    $var_idarea = $item->idlibro;
+                }else if($item->id_serie <> 6){
+                    $var_planlector = 0;
+                    $var_year = $item->year;
+                    $var_idarea = $item->id_area;
+                }
+                
+                // Construye el array final
+                $final_result[] = [
+                    "id"                => $item->id,
+                    "id_pedido"         => $item->id_pedido,
+                    "valor"             => $item->valor,
+                    "id_area"           => $var_idarea,
+                    "id_serie"          => $item->id_serie,
+                    "year"              => $var_year,
+                    "anio"              => $item->year,
+                    "version"           => $item->version,
+                    "pvn_tipo"          => $item->pvn_tipo,
+                    "created_at"        => $item->created_at,
+                    "updated_at"        => $item->updated_at,
+                    "descuento"         => $item->descuento,
+                    "anticipo"          => $item->anticipo,
+                    "comision"          => $item->comision,
+                    "plan_lector"       => $var_planlector,
+                    "id_periodo"        => $item->id_periodo,
+                    "serieArea"         => $item->serieArea,
+                    "idlibro"           => $item->idlibro,
+                    "nombrelibro"       => $item->serieArea,
+                    "nombre_serie"      => $item->nombre_serie,
+                    "precio"            => $pfn_pvp_result,  // Añade el pfn_pvp correcto
+                    "idasignatura"      => $item->idasignatura,
+                    "subtotal"          => $item->valor * $pfn_pvp_result,  // Añade el pfn_pvp correcto
+                    "codigo_liquidacion"=> $item->codigo_liquidacion,
+                    "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion,
+                ];
+            }
+            return $final_result;
+        }
+        catch (\Exception  $ex) {
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
+        }
+    }
+    //TRAIT JEYSON FIN
 }

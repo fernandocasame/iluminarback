@@ -994,6 +994,7 @@ class PaqueteController extends Controller
         $arregloResumen             = [];
         //====PROCESO===================================
         try{
+            DB::beginTransaction();
             foreach($miArrayDeObjetos as $key => $item){
                 $problemasconCodigo         = [];
                 $contadorProblemasCodigos   = 0;
@@ -1081,28 +1082,6 @@ class PaqueteController extends Controller
                                     if(($ifDevueltoA == '1' || $ifDevueltoA == '2' || $ifDevueltoA == '4') && $ifliquidado_regaladoA == '0' ) { $errorA = 0; }
                                     if(($ifDevueltoD == '1' || $ifDevueltoD == '2' || $ifDevueltoD == '4') && $ifliquidado_regaladoD == '0' ) { $errorD = 0; }
                                 }
-                                //====PROFORMA============================================
-                                //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
-                                //codigo
-                                if($ifproforma_empresaA > 0 && $ifdevuelto_proformaA != 1){
-                                    $comentario         = $request->observacion." -  Se agrego la proforma $ifcodigo_proformaA";
-                                    $datosProformaA     = $this->codigosRepository->validateProforma($ifdevuelto_proformaA,$ifcodigo_proformaA,$ifproforma_empresaA);
-                                    $ifErrorProformaA   = $datosProformaA["ifErrorProforma"];
-                                    $messageProformaA   = $datosProformaA["messageProforma"];
-                                    $ifsetProformaA     = $datosProformaA["ifsetProforma"];
-                                    if($ifsetProformaA == 1) { $errorA = 0; }
-                                    else                     { $errorA = 1; $validarA[0]->errorProforma = 1; $validarA[0]->mensajeErrorProforma   = $messageProformaA; }
-                                }
-                                //codigo union
-                                if($ifproforma_empresaD > 0 && $ifdevuelto_proformaD != 1){
-                                    $datosProformaA     = $this->codigosRepository->validateProforma($ifdevuelto_proformaD,$ifcodigo_proformaD,$ifproforma_empresaD);
-                                    $ifErrorProformaD   = $datosProformaA["ifErrorProforma"];
-                                    $messageProformaD   = $datosProformaA["messageProforma"];
-                                    $ifsetProformaD     = $datosProformaA["ifsetProforma"];
-                                    if($ifsetProformaD == 1) { $errorD = 0; }
-                                    else                     { $errorD = 1; $validarD[0]->errorProforma = 1; $validarD[0]->mensajeErrorProforma   = $messageProformaD;}
-                                }
-                                //====PROFORMA============================================
                                 //===MENSAJE VALIDACION====
                                 if($errorA == 1 && $errorD == 0) { $mensajeError = "Problema con el código de activación".$mensajeFront;  $codigoConProblemas->push($validarA); }
                                 if($errorA == 0 && $errorD == 1) { $mensajeError = "Problema con el código de diagnóstico".$mensajeFront; $codigoConProblemas->push($validarD); }
@@ -1118,14 +1097,16 @@ class PaqueteController extends Controller
                                     $messageIngreso     = $getIngreso["messageIngreso"];
                                     //si se guarda codigo de activacion
                                     if($ingreso == 1){
+                                        $newValuesActivacion = CodigosLibros::where('codigo',$codigoActivacion)->get();
+                                        $newValuesDiagnostico = CodigosLibros::where('codigo',$codigoDiagnostico)->get();
                                         $contadorA++;
                                         $contadorD++;
                                         //====CODIGO====
                                         //ingresar en el historico codigo de actvacion
-                                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,null,$setContrato,$verificacion_liquidada);
+                                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoActivacion,$usuario_editor,$comentario,$old_valuesA,$newValuesActivacion,$setContrato,$verificacion_liquidada);
                                         $this->codigosRepository->saveDevolucion($codigoActivacion,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                                         //====CODIGO UNION=====
-                                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,null,$setContrato,$verificacion_liquidada);
+                                        $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,$newValuesDiagnostico,$setContrato,$verificacion_liquidada);
                                         $this->codigosRepository->saveDevolucion($codigoDiagnostico,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
                                     }else{
                                         //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
@@ -1188,6 +1169,7 @@ class PaqueteController extends Controller
                     $contadorErrPaquetes++;
                 }
             }
+            DB::commit();
             if(count($codigoConProblemas) == 0){
                 return [
                     "arregloResumen"                   => $arregloResumen,
@@ -1205,6 +1187,7 @@ class PaqueteController extends Controller
             }
         }
         catch(\Exception $e){
+            DB::rollBack();
             return response()->json([
                 "status"  => 0,
                 'message' => $e->getMessage()

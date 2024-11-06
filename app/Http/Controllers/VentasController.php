@@ -49,11 +49,13 @@ class VentasController extends Controller
             GROUP BY dv.pro_codigo");
             return $query1;
         }else if($request->tipo== 1){
-            $query1 = DB::SELECT("SELECT SUM(dv.det_ven_cantidad) AS cantidad, dv.pro_codigo, ls.nombre as nombrelibro, dv.det_ven_valor_u FROM f_venta v
+            $query1 = DB::SELECT("SELECT SUM(dv.det_ven_cantidad) AS cantidad, dv.pro_codigo,v.ven_desc_por, ls.nombre as nombrelibro, dv.det_ven_valor_u 
+            FROM f_venta v
             INNER JOIN f_detalle_venta dv ON v.ven_codigo=dv.ven_codigo AND v.id_empresa=dv.id_empresa
             INNER JOIN libros_series as ls ON dv.pro_codigo=ls.codigo_liquidacion
             INNER JOIN f_proforma fp ON fp.prof_id=v.ven_idproforma
-            WHERE fp.idPuntoventa = '$request->pedido_id' AND v.est_ven_codigo != 3
+            WHERE fp.idPuntoventa = '$request->pedido_id' 
+            AND v.est_ven_codigo <> 3
             GROUP BY dv.pro_codigo");
             return $query1;
         }else if($request->tipo== 2){

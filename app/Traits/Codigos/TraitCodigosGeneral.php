@@ -350,27 +350,34 @@ trait TraitCodigosGeneral{
         $historico->save();
         return "Guardado en historico";
     }
-    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio){
-        $devolucionH                                = new CodigosLibrosDevolucionSon();
-        $devolucionH->codigoslibros_devolucion_id   = $id_devolucion;
-        $devolucionH->codigo                        = $codigo;
-        $devolucionH->pro_codigo                    = $pro_codigo;
-        $devolucionH->id_cliente                    = $id_cliente;
-        $devolucionH->combo                         = $combo;
-        $devolucionH->factura                       = $factura;
-        $devolucionH->documento                     = $documento;
-        $devolucionH->id_empresa                    = $id_empresa;
-        $devolucionH->tipo_venta                    = $tipo_venta;
-        $devolucionH->id_periodo                    = $id_periodo;
-        $devolucionH->prueba_diagnostico            = $prueba_diagnostico;
-        $devolucionH->codigo_union                  = $codigo_union;
-        $devolucionH->codigo_paquete                = $codigo_paquete;
-        $devolucionH->id_libro                      = $id_libro;
-        $devolucionH->documento_estado_liquidacion  = $estado_liquidacion;
-        $devolucionH->documento_regalado_liquidado  = $regalado_liquidado;
-        $devolucionH->precio                        = $precio;
-        $devolucionH->save();
-        return "Guardado en devolucion hijo";
+    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion){
+        //validar que si el codigo ya existe no guardar 
+        $validate = CodigosLibrosDevolucionSon::where('codigo',$codigo)->where('id_cliente',$id_cliente)->where('codigoslibros_devolucion_id',$id_devolucion)->first();
+        if($validate){
+            return "Codigo ya existe";
+        }else{
+            $devolucionH                                = new CodigosLibrosDevolucionSon();
+            $devolucionH->codigoslibros_devolucion_id   = $id_devolucion;
+            $devolucionH->codigo                        = $codigo;
+            $devolucionH->pro_codigo                    = $pro_codigo;
+            $devolucionH->id_cliente                    = $id_cliente;
+            $devolucionH->combo                         = $combo;
+            $devolucionH->factura                       = $factura;
+            $devolucionH->documento                     = $documento;
+            $devolucionH->id_empresa                    = $id_empresa;
+            $devolucionH->tipo_venta                    = $tipo_venta;
+            $devolucionH->id_periodo                    = $id_periodo;
+            $devolucionH->prueba_diagnostico            = $prueba_diagnostico;
+            $devolucionH->codigo_union                  = $codigo_union;
+            $devolucionH->codigo_paquete                = $codigo_paquete;
+            $devolucionH->id_libro                      = $id_libro;
+            $devolucionH->documento_estado_liquidacion  = $estado_liquidacion;
+            $devolucionH->documento_regalado_liquidado  = $regalado_liquidado;
+            $devolucionH->precio                        = $precio;
+            $devolucionH->tipo_importacion              = $tipo_importacion;
+            $devolucionH->save();
+            return "Guardado en devolucion hijo";
+        }
     }
     public function tr_updateDevolucionHijos($codigo,$estado,$id_devolucion){
         $getCodigo = CodigosLibrosDevolucionSon::where('codigo',$codigo)

@@ -775,6 +775,7 @@ class AbonoController extends Controller
                         ep.descripcion_corta AS empresa,
                         ep.id AS id_empresa,
                         i.nombreInstitucion,
+                        CONCAT(usu.nombres,' ',usu.apellidos) AS asesor,
                         i.idInstitucion,
                         i.punto_venta,
                         fv.institucion_id,
@@ -786,6 +787,7 @@ class AbonoController extends Controller
                     INNER JOIN f_venta fv ON fv.idtipodoc = ft.tdo_id
                     INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
                     INNER JOIN empresas ep ON ep.id = fv.id_empresa
+                    LEFT JOIN usuario usu on usu.idusuario= i.asesor_id
                     WHERE fv.est_ven_codigo <> 3
                     AND fv.periodo_id = ?
                     GROUP BY
@@ -806,8 +808,10 @@ class AbonoController extends Controller
             $abono_tipo = DB::select("SELECT
                                         CASE
                                             WHEN ? = 4 AND ? = 0 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 3 AND ? = 0 THEN COALESCE(SUM(ab.abono_notas), 0)
                                             WHEN ? = 1 AND ? = 0 THEN COALESCE(SUM(ab.abono_facturas), 0)
                                             WHEN ? = 3 AND ? = 1 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 4 AND ? = 1 THEN COALESCE(SUM(ab.abono_notas), 0)
                                             WHEN ? = 1 AND ? = 1 THEN COALESCE(SUM(ab.abono_facturas), 0)
                                             ELSE 0
                                         END AS abono_total
@@ -816,6 +820,8 @@ class AbonoController extends Controller
                                     AND ab.abono_periodo = ?
                                     AND ab.abono_empresa = ?
                                     AND ab.abono_estado = 0", [
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
                                         $registro->idtipodoc, $registro->punto_venta,
                                         $registro->idtipodoc, $registro->punto_venta,
                                         $registro->idtipodoc, $registro->punto_venta,
@@ -932,20 +938,30 @@ class AbonoController extends Controller
         $institucionId = $request->institucion;
         $periodoId = $request->periodo;
         $ventas = DB::table('f_venta as fv')
-            ->select('fv.ven_codigo', 'fv.ruc_cliente', 'fv.ven_valor')
             ->where('fv.institucion_id', $institucionId)
             ->where('fv.periodo_id', $periodoId)
+            ->where('fv.est_ven_codigo','<>', 3)
             ->get();
     
         $result = [];
-        $valorVenta = 0;
+        $valorVentaNeta = 0;
+        $valorVentaBruta = 0;
         $valorAbonoTotal = 0;
+        $descuentoPorcentaje = 0;
     
         $rucs = [];
+        $descuentos = [];
         $result['documentos'] = [];
         
         foreach ($ventas as $venta) {
-            $valorVenta += round($venta->ven_valor, 2);
+            $valorVentaNeta += round($venta->ven_valor, 2);
+            $valorVentaBruta += round($venta->ven_subtotal, 2);
+
+            if ($venta->ven_desc_por) {
+                if($venta->idtipodoc==1||$venta->idtipodoc==3||$venta->idtipodoc==4){
+                    $descuentos[] = $venta->ven_desc_por;
+                }
+            }
     
             if (!in_array($venta->ruc_cliente, $rucs)) {
                 $rucs[] = $venta->ruc_cliente;
@@ -954,7 +970,10 @@ class AbonoController extends Controller
             $result['documentos'][] = [
                 'ven_codigo' => $venta->ven_codigo,
                 'ruc_cliente' => $venta->ruc_cliente,
+                'ven_subtotal' => $venta->ven_subtotal,
                 'ven_valor' => $venta->ven_valor,
+                'descuento_porcentaje' => $venta->ven_desc_por,
+                'valor_desvuento' => $venta->ven_descuento,
             ];
         }
     
@@ -966,9 +985,14 @@ class AbonoController extends Controller
             $valorAbono = round($valorAbono, 2);
             $valorAbonoTotal += $valorAbono;
         }
+
+        $descuentosUnicos = array_unique($descuentos);
     
-        $result['total_venta'] = $valorVenta;
+        $result['total_venta'] = $valorVentaNeta;
+        $result['total_ventaBruta'] = $valorVentaBruta;
         $result['total_abono'] = $valorAbonoTotal;
+        $result['porcentaje_descuento'] = !empty($descuentosUnicos) ? $descuentosUnicos[0] : 0;
+        
     
         return response()->json($result);
     }
