@@ -2990,29 +2990,17 @@ class CodigoLibrosController extends Controller
     }
     //api:get/metodosGetCodigos
     public function metodosGetCodigos(Request $request){
-        if($request->reporteBodega)             { return $this->reporteBodega($request); }
-        if($request->reporteBodegaCombos)       { return $this->reporteBodegaCombos($request); }
-        if($request->getCombos)                 { return $this->codigosRepository->getCombos(); }
-        if($request->getReporteLibrosAsesores)  { return $this->getReporteLibrosAsesores($request); }
-        if($request->getReporteLibrosXAsesor)   { return $this->getReporteLibrosXAsesor($request); }
-        if($request->getCodigosIndividuales)    { return $this->getCodigosIndividuales($request); }
+        if($request->reporteBodega)                             { return $this->reporteBodega($request); }
+        if($request->reporteBodegaCombos)                       { return $this->reporteBodegaCombos($request); }
+        if($request->getCombos)                                 { return $this->codigosRepository->getCombos(); }
+        if($request->getReporteLibrosAsesores)                  { return $this->getReporteLibrosAsesores($request); }
+        if($request->getReporteLibrosXAsesor)                   { return $this->getReporteLibrosXAsesor($request); }
+        if($request->getCodigosIndividuales)                    { return $this->getCodigosIndividuales($request); }
+        if($request->getCodigosAgrupadoLiquidadoRegalados)      { return $this->getCodigosAgrupadoLiquidadoRegalados($request); }
+        if($request->getReporteXTipoVenta)                      { return $this->getReporteXTipoVenta($request); }
     }
     //api:get/metodosGetCodigos?reporteBodega=1&periodo=25
     public function reporteBodega($request){
-    //    $arrayCodigosActivos = DB::SELECT("SELECT ls.codigo_liquidacion AS codigo,  COUNT(ls.codigo_liquidacion) AS cantidad, c.serie,
-    //     c.libro_idlibro,ls.nombre as nombrelibro
-    //     FROM codigoslibros c
-    //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-    //     WHERE c.estado <> 2
-    //         and c.estado_liquidacion = '1'
-    //         AND c.bc_periodo  = ?
-
-    //         AND c.prueba_diagnostica = '0'
-    //     AND ls.idLibro = c.libro_idlibro
-    //     GROUP BY ls.codigo_liquidacion,ls.nombre, c.serie,c.libro_idlibro
-    //     ",[$request->periodo]);
-    //    return $arrayCodigosActivos;
-
         $periodo            = $request->input('periodo');
         $activos            = $request->input('activos');
         $regalados          = $request->input('regalados');
@@ -3432,6 +3420,193 @@ class CodigoLibrosController extends Controller
 
         return $codigosLibros;
     }
+    //api:get/metodosGetCodigos?getCodigosAgrupadoLiquidadoRegalados=1&periodo=24&institucion=1485
+    public function getCodigosAgrupadoLiquidadoRegalados($request)
+    {
+        
+    // SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
+    // c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
+    // c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion,
+    // ls.year
+    // FROM codigoslibros c
+    // LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
+    // LEFT JOIN libro l ON ls.idLibro = l.idlibro
+    // LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+    // WHERE c.bc_periodo          = 24
+    // AND c.prueba_diagnostica    = '0'
+    // AND (c.bc_institucion       = '503' OR c.venta_lista_institucion = '503')
+    // AND c.estado_liquidacion = '0'
+
+        $periodo        = $request->input('periodo');
+        $institucion    = $request->input('institucion');
+
+        // Obtener los resultados de la base de datos
+        $results = DB::table('codigoslibros as c')
+            ->select(
+                'ls.codigo_liquidacion as codigo',
+                'c.codigo as codigo_libro',
+                'c.serie',
+                'c.libro_idlibro',
+                'l.nombrelibro as nombrelibro',
+                'ls.id_serie',
+                'a.area_idarea',
+                'c.estado_liquidacion',
+                'c.estado',
+                'c.bc_estado',
+                'c.venta_estado',
+                'c.liquidado_regalado',
+                'c.bc_institucion',
+                'c.contrato',
+                'c.venta_lista_institucion',
+                'ls.year'
+            )
+            ->leftJoin('libros_series as ls', 'ls.idLibro', '=', 'c.libro_idlibro')
+            ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
+            ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
+            ->where('c.bc_periodo', $periodo)
+            ->where('c.prueba_diagnostica', '0')
+            ->where(function ($query) use ($institucion) {
+                $query->where('c.bc_institucion', $institucion)
+                    ->orWhere('c.venta_lista_institucion', $institucion);
+            })
+            ->get();
+        // Agrupamos por nombrelibro y contamos los estados de liquidación
+        $conteo = $results->groupBy('nombrelibro')->map(function ($grupo) {
+            return [
+                'libro'                 => $grupo->first()->nombrelibro, // Nombre del libro
+                'codigo_liquidacion'    => $grupo->first()->codigo, // Código de liquidación
+                'liquidados'            => $grupo->where('estado_liquidacion', '0')->count(), // Contar libros con estado 0
+                'regalados'             => $grupo->where('estado_liquidacion', '2')->count(), // Contar libros con estado 2
+            ];
+        })->values(); // Aseguramos que el resultado sea un array
+
+        // Ordenamos por nombre del libro
+        $conteoOrdenado = $conteo->sortBy('libro')->values(); // Ordenamos por 'libro'
+        return [
+            'codigosAgrupado' => $conteoOrdenado,
+            'todos'           => $results    
+        ];
+    }
+    //api:get/metodosGetCodigos?getReporteXTipoVenta=1&periodo=25&tipoVenta=1
+    // public function getReporteXTipoVenta($request){
+    //     $periodo            = $request->input('periodo');
+    //     $tipoVenta          = $request->input('tipoVenta');
+    //     $query = DB::SELECT("SELECT 
+    //         i.nombreInstitucion,
+    //         COUNT(DISTINCT c.codigo) AS cantidad_codigos,
+    //         MAX(pp.pfn_pvp) AS pfn_pvp, -- Toma un solo valor de `pfn_pvp` por institución
+    //         COUNT(DISTINCT c.codigo) * MAX(pp.pfn_pvp) AS total_valor -- Multiplica la cantidad de códigos únicos por un solo `pfn_pvp`
+    //     FROM 
+    //         codigoslibros c
+    //     LEFT JOIN 
+    //         institucion i ON c.bc_institucion = i.idInstitucion
+    //     LEFT JOIN 
+    //         pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro
+    //     WHERE 
+    //         c.bc_periodo = ?
+    //         AND (c.estado_liquidacion = '0' OR c.estado_liquidacion = '1')
+    //         AND c.prueba_diagnostica = '0'
+    //         AND c.venta_estado = ?
+    //         AND c.estado <> '2'
+    //     GROUP BY 
+    //         i.nombreInstitucion;
+    //         ", [$periodo, $tipoVenta]);
+    //     return $query;
+    // }
+
+    
+    public function getReporteXTipoVenta($request)
+    {
+        $periodo            = $request->periodo;
+        $tipoVenta          = $request->tipoVenta;
+        if($tipoVenta == 1){
+              // Paso 1: Ejecutar la consulta SQL
+            $query = DB::SELECT("
+                SELECT 
+                    i.nombreInstitucion,            -- Nombre de la institución
+                    ls.nombrelibro,                 -- Nombre del libro
+                    pp.idlibro,                     -- ID del libro
+                    pp.pfn_pvp,                     -- Precio del libro
+                    COUNT(c.codigo) AS cantidad,    -- Contamos los códigos por libro e institución
+                    (COUNT(c.codigo) * pp.pfn_pvp) AS valortotal  -- Valor total (cantidad de códigos * precio)
+                FROM 
+                    codigoslibros c
+                JOIN 
+                    institucion i ON c.bc_institucion = i.idInstitucion  -- Relacionamos la institución
+                JOIN 
+                    pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro  -- Relacionamos los libros
+                JOIN 
+                    libro ls ON pp.idlibro = ls.idlibro  -- Relacionamos el nombre del libro
+                WHERE 
+                    c.bc_periodo = '$periodo'  -- Filtro por periodo
+                    AND (c.estado_liquidacion = '0' OR c.estado_liquidacion = '1')  -- Filtro por estado de liquidación
+                    AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
+                    AND c.venta_estado = '1'  -- Filtro por estado de venta
+                    AND pp.idperiodoescolar = '$periodo'  -- Filtro por periodo escolar
+                    AND c.estado <> '2'
+                GROUP BY 
+                    i.nombreInstitucion, ls.nombrelibro, pp.idlibro, pp.pfn_pvp  -- Agrupamos por institución, libro y precio
+                ORDER BY 
+                    i.nombreInstitucion, ls.nombrelibro;
+            ");
+        }
+        if($tipoVenta == 2){
+            $query = DB::SELECT("
+                SELECT 
+                    i.nombreInstitucion,            -- Nombre de la institución
+                    ls.nombrelibro,                 -- Nombre del libro
+                    pp.idlibro,                     -- ID del libro
+                    pp.pfn_pvp,                     -- Precio del libro
+                    COUNT(c.codigo) AS cantidad,    -- Contamos los códigos por libro e institución
+                    (COUNT(c.codigo) * pp.pfn_pvp) AS valortotal  -- Valor total (cantidad de códigos * precio)
+                FROM 
+                    codigoslibros c
+                JOIN 
+                    institucion i ON c.venta_lista_institucion = i.idInstitucion  -- Relacionamos la institución
+                JOIN 
+                    pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro  -- Relacionamos los libros
+                JOIN 
+                    libro ls ON pp.idlibro = ls.idlibro  -- Relacionamos el nombre del libro
+                WHERE 
+                    c.bc_periodo = '$periodo'  -- Filtro por periodo
+                    AND (c.estado_liquidacion = '0' OR c.estado_liquidacion = '1')  -- Filtro por estado de liquidación
+                    AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
+                    AND c.venta_estado = '2'  -- Filtro por estado de venta
+                    AND pp.idperiodoescolar = '$periodo'  -- Filtro por periodo escolar
+                    AND c.estado <> '2'
+                GROUP BY 
+                    i.nombreInstitucion, ls.nombrelibro, pp.idlibro, pp.pfn_pvp  -- Agrupamos por institución, libro y precio
+                ORDER BY 
+                    i.nombreInstitucion, ls.nombrelibro;
+            ");
+        }
+      
+        // Paso 2: Convertir los resultados a una colección
+        $resultados = collect($query);
+    
+        // Paso 3: Agrupar por institución
+        $instituciones = $resultados->groupBy('nombreInstitucion')->map(function ($grupoInstitucion) {
+            // Para cada institución, sumar la cantidad y el valor total de los libros
+            $totalCantidad = $grupoInstitucion->sum('cantidad');  // Sumar cantidad
+            $totalValor = $grupoInstitucion->sum('valortotal');   // Sumar valor total de los libros
+    
+            return [
+                'nombreInstitucion' => $grupoInstitucion->first()->nombreInstitucion,  // Nombre de la institución
+                'cantidad_codigos' => $totalCantidad,  // Total de códigos por institución
+                'total_valor' => $totalValor  // Total valor de los libros por institución
+            ];
+        });
+    
+        // Paso 4: Devolver los resultados agrupados y sumados
+        return $instituciones->values()->toArray();
+    }
+    
+
+
+
+    
+    
+    
     public function metodosPostCodigos(Request $request){
         if($request->getPrevisualizarCodigosSinEmpresa)     { return $this->getPrevisualizarCodigosSinEmpresa($request); }
         if($request->getPrevisualizarCodigos)               { return $this->getPrevisualizarCodigos($request); }

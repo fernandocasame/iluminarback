@@ -501,13 +501,7 @@ class AbonoController extends Controller
         // AND fv.id_empresa='$request->empresa'
         // AND fv.clientesidPerseo ='$request->cliente'
         // AND fv.est_ven_codigo <> 3");
-        $query = DB::SELECT("SELECT fv.*, ep.descripcion_corta ,
-        (
-        SELECT SUM(dv.det_ven_cantidad * dv.det_ven_valor_u) FROM f_detalle_venta dv
-        LEFT JOIN f_venta v ON dv.ven_codigo = v.ven_codigo
-        WHERE v.est_ven_codigo <> '3'
-        AND v.periodo_id = '$request->periodo'
-        ) as ventaBruta
+        $query = DB::SELECT("SELECT fv.*, ep.descripcion_corta
         FROM f_venta fv
         LEFT JOIN empresas ep ON ep.id = fv.id_empresa
         WHERE fv.periodo_id='$request->periodo'
@@ -997,6 +991,34 @@ class AbonoController extends Controller
         return response()->json($result);
     }
 
+    public function obtenerVentas(Request $request)
+    {
+        $periodo = $request->input('periodo');
+
+        // Ejecuta la consulta SQL
+        $ventas = DB::table('f_venta as fv')
+            ->leftJoin('1_4_tipo_venta as tv', 'tv.tip_ven_codigo', '=', 'fv.tip_ven_codigo')
+            ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'fv.institucion_id')
+            ->leftJoin('empresas as e', 'e.id', '=', 'fv.id_empresa')
+            ->leftJoin('f_tipo_documento as ft', 'ft.tdo_id', '=', 'fv.idtipodoc')
+            ->leftJoin('usuario as u', 'u.idusuario', '=', 'fv.ven_cliente')
+            ->select(
+                'fv.ven_codigo as codigo',
+                'ft.tdo_nombre as documento',
+                'tv.tip_ven_nombre as tipo_venta',
+                'fv.ven_idproforma as proforma',
+                'fv.ven_subtotal as valor_bruto',
+                'i.nombreInstitucion as Lugar_despacho_documento',
+                'e.descripcion_corta as empresa',
+                DB::raw("CONCAT(u.nombres, ' ', u.apellidos) as cliente_documento")
+            )
+            ->where('fv.est_ven_codigo', '<>', 3)
+            ->where('fv.periodo_id', $periodo)
+            ->get();
+
+        // Retorna los resultados en formato JSON
+        return response()->json($ventas);
+    }
 
 
 }

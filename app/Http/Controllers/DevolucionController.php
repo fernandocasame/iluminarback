@@ -160,6 +160,7 @@ class DevolucionController extends Controller
             ->leftJoin('empresas', 'empresas.id', 'codigoslibros_devolucion_son.id_empresa')     
             ->leftJoin('institucion', 'institucion.idInstitucion', 'codigoslibros_devolucion_son.id_cliente')       
             ->leftJoin('codigoslibros_devolucion_header', 'codigoslibros_devolucion_header.id', 'codigoslibros_devolucion_son.codigoslibros_devolucion_id')
+            ->leftJoin('periodoescolar','periodoescolar.idperiodoescolar','codigoslibros_devolucion_son.id_periodo')
             ->where('codigoslibros_devolucion_id', $id_documento)
             ->where('codigoslibros_devolucion_son.prueba_diagnostico', '0')
             ->when($revisados, function ($query) use ($revisados) {
@@ -177,6 +178,7 @@ class DevolucionController extends Controller
                 'empresas.descripcion_corta', 
                 'institucion.nombreInstitucion', 
                 'institucion.idInstitucion as id_cliente',
+                'periodoescolar.periodoescolar'
             )
             ->get();
     

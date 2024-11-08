@@ -6717,8 +6717,18 @@ class PedidosController extends Controller
     }
 
     public function get_val_pedidoInfoTodo_new($pedido){
-        $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, pv.id_pedido, pv.pvn_cantidad AS valor, ar.idarea AS id_area, s.id_serie, ls.year, 
-        pv.pvn_tipo AS alcance, pv.created_at, pv.updated_at, l.idlibro, p.descuento, p.id_periodo, p.anticipo, p.comision, l.nombrelibro as serieArea, s.nombre_serie, ls.version, asi.idasignatura,ls.codigo_liquidacion,  0 as cantidad
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, pv.id_pedido, pv.pvn_cantidad AS valor, 
+        CASE 
+            WHEN s.id_serie = 6 THEN l.idlibro 
+            ELSE ar.idarea 
+        END as id_area,
+        s.id_serie,
+        CASE
+            WHEN s.id_serie = 6 THEN 0
+            ELSE ls.year
+        END as year,
+        ls.year as anio,
+        pv.pvn_tipo AS alcance, pv.created_at, pv.updated_at, l.idlibro, p.descuento, p.id_periodo, p.anticipo, p.comision, l.nombrelibro, CONCAT(s.nombre_serie,' ',ar.nombrearea) as serieArea, s.nombre_serie, ls.version, asi.idasignatura,ls.codigo_liquidacion,  0 as cantidad
         FROM pedidos_val_area_new pv
         LEFT JOIN libro l ON  pv.idlibro = l.idlibro
         LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
@@ -6727,7 +6737,7 @@ class PedidosController extends Controller
         LEFT JOIN series s ON ls.id_serie = s.id_serie
         INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
         WHERE pv.id_pedido = '$pedido'
-        GROUP BY pv.pvn_id, s.nombre_serie, ls.year, s.id_serie, ls.version, ls.codigo_liquidacion;
+        GROUP BY pv.pvn_id;
         ");
         if(empty($val_pedido)){
             return $val_pedido;
@@ -6761,6 +6771,8 @@ class PedidosController extends Controller
                     "codigo_liquidacion"=> $tr->codigo_liquidacion,
                     "alcance"           => $alcance_id,
                     "cantidad"          => $tr->cantidad,
+                    "nombrelibro"       => $tr->nombrelibro,
+                    "anio"              => $tr->anio,
                 ];
             }else{
                 //validate que el alcance este cerrado o aprobado
@@ -6787,6 +6799,8 @@ class PedidosController extends Controller
                         "codigo_liquidacion"=> $tr->codigo_liquidacion,
                         "alcance"           => $alcance_id,
                         "cantidad"          => $tr->cantidad,
+                        "nombrelibro"       => $tr->nombrelibro,
+                        "anio"              => $tr->anio,
                     ];
                 }
             }
@@ -6828,7 +6842,7 @@ class PedidosController extends Controller
                 "id_area"           => $item->id_area,
                 "id_serie"          => $item->id_serie,
                 "year"              => $item->year,
-                "anio"              => $item->year,
+                "anio"              => $item->anio,
                 "version"           => $item->version,
                 "created_at"        => $item->created_at,
                 "updated_at"        => $item->updated_at,
@@ -6837,9 +6851,9 @@ class PedidosController extends Controller
                 "comision"          => $item->comision,
                 "plan_lector"       => $var_planlector,
                 "id_periodo"        => $item->id_periodo,
-                "serieArea"         => $item->serieArea,
+                "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$item->nombrelibro : $item->serieArea,
                 "idlibro"           => $item->idlibro,
-                "nombrelibro"       => $item->serieArea,
+                "nombrelibro"       => $item->nombrelibro,
                 "nombre_serie"      => $item->nombre_serie,
                 "precio"            => $pfn_pvp_result,
                 "stock"             => $stock_producto,
