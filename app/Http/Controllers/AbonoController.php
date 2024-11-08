@@ -851,6 +851,101 @@ class AbonoController extends Controller
 
         return $reporte;
     }
+
+    public function reporteAbonoVentasXD(Request $request) {
+        // Ejecutar la primera consulta
+        $reporte = DB::select("SELECT
+                        fv.idtipodoc,
+                        ft.tdo_id,
+                        ft.tdo_nombre,
+                        ep.descripcion_corta AS empresa,
+                        ep.id AS id_empresa,
+                        i.nombreInstitucion,
+                        CONCAT(usu.nombres,' ',usu.apellidos) AS asesor,
+                        i.idInstitucion,
+                        i.punto_venta,
+                        fv.institucion_id,
+                        fv.ruc_cliente,
+                        ROUND(SUM(fv.ven_subtotal), 2) AS subtotal_total,
+                        ROUND(SUM(fv.ven_descuento), 2) AS descuento_total,
+                        ROUND(SUM(fv.ven_valor), 2) AS valor_total,
+                        SUM(fdv.det_ven_cantidad) AS cantidad_detalles
+                    FROM f_tipo_documento ft
+                    INNER JOIN f_venta fv ON fv.idtipodoc = ft.tdo_id
+                    INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+                    INNER JOIN empresas ep ON ep.id = fv.id_empresa
+                    LEFT JOIN usuario usu on usu.idusuario= i.asesor_id
+                    LEFT JOIN f_detalle_venta fdv ON fdv.ven_codigo = fv.ven_codigo AND fdv.id_empresa = fv.id_empresa
+                    WHERE fv.est_ven_codigo <> 3
+                    AND fv.periodo_id = ?
+                    GROUP BY
+                        i.nombreInstitucion,
+                        ft.tdo_nombre,
+                        i.idInstitucion,
+                        fv.institucion_id,
+                        fv.idtipodoc,
+                        ft.tdo_id,
+                        fv.ruc_cliente,
+                        ep.descripcion_corta,
+                        i.punto_venta,
+                        ep.id;", [$request->periodo]);
+
+        // Recorrer cada registro del reporte para añadir el abono_total
+        foreach ($reporte as $key => $registro) {
+            // Construir la consulta de abono con condiciones específicas
+            $abono_tipo = DB::select("SELECT
+                                        CASE
+                                            WHEN ? = 4 AND ? = 0 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 3 AND ? = 0 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 1 AND ? = 0 THEN COALESCE(SUM(ab.abono_facturas), 0)
+                                            WHEN ? = 3 AND ? = 1 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 4 AND ? = 1 THEN COALESCE(SUM(ab.abono_notas), 0)
+                                            WHEN ? = 1 AND ? = 1 THEN COALESCE(SUM(ab.abono_facturas), 0)
+                                            ELSE 0
+                                        END AS abono_total
+                                    FROM abono ab
+                                    WHERE ab.abono_ruc_cliente = ?
+                                    AND ab.abono_periodo = ?
+                                    AND ab.abono_empresa = ?
+                                    AND ab.abono_estado = 0", [
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->idtipodoc, $registro->punto_venta,
+                                        $registro->ruc_cliente, $request->periodo,
+                                        $registro->id_empresa
+                                    ]);
+
+            // Añadir el abono_total al registro
+            $reporte[$key]->abono_total = $abono_tipo[0]->abono_total ?? 0;
+
+            //Devolucion por el Detalle Venta
+            $devolucion = DB::select("SELECT ROUND(SUM(dv.det_ven_dev * dv.det_ven_valor_u), 2) AS devolucion FROM f_detalle_venta dv
+            INNER JOIN f_venta fv ON fv.ven_codigo = dv.ven_codigo AND fv.id_empresa = dv.id_empresa 
+            WHERE fv.ruc_cliente = '$registro->ruc_cliente'
+            AND dv.id_empresa = '$registro->id_empresa';");
+
+            // // Añadir la devolucion al registro
+            $reporte[$key]->devolucion = $devolucion[0]->devolucion ?? 0;
+        }
+        // SELECT
+        // fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta AS empresa, fv.ven_tipo_inst,
+        // ROUND(SUM(fv.ven_subtotal), 2) AS subtotal_total,
+        // ROUND(SUM(fv.ven_descuento), 2) AS descuento_total, ROUND(SUM(fv.ven_valor), 2) AS valor_total,
+        // ROUND(SUM(COALESCE(a.abono_facturas, 0) + COALESCE(a.abono_notas, 0)), 2) AS abono_total
+        // FROM  f_venta fv
+        // LEFT JOIN abono a ON a.abono_ruc_cliente = fv.ruc_cliente
+        // LEFT JOIN institucion i ON fv.institucion_id = i.idInstitucion
+        // LEFT JOIN empresas ep ON ep.id = fv.id_empresa
+        // WHERE (fv.est_ven_codigo <> 3 AND fv.periodo_id = '$request->periodo')
+        // OR (a.abono_estado = 0 AND a.abono_periodo = '$request->periodo')
+        // GROUP BY fv.ruc_cliente, i.nombreInstitucion, ep.descripcion_corta, fv.ven_tipo_inst;
+
+        return $reporte;
+    }
+
     public function reporteVariacionVentas(Request $request) {
         $query = DB::SELECT("SELECT fv.ven_codigo, fv.ruc_cliente,  fv.institucion_id, fv.ven_tipo_inst, i.nombreInstitucion AS nombre, e.descripcion_corta AS empresa
         FROM f_venta fv 
@@ -997,24 +1092,40 @@ class AbonoController extends Controller
 
         // Ejecuta la consulta SQL
         $ventas = DB::table('f_venta as fv')
-            ->leftJoin('1_4_tipo_venta as tv', 'tv.tip_ven_codigo', '=', 'fv.tip_ven_codigo')
-            ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'fv.institucion_id')
-            ->leftJoin('empresas as e', 'e.id', '=', 'fv.id_empresa')
-            ->leftJoin('f_tipo_documento as ft', 'ft.tdo_id', '=', 'fv.idtipodoc')
-            ->leftJoin('usuario as u', 'u.idusuario', '=', 'fv.ven_cliente')
-            ->select(
-                'fv.ven_codigo as codigo',
-                'ft.tdo_nombre as documento',
-                'tv.tip_ven_nombre as tipo_venta',
-                'fv.ven_idproforma as proforma',
-                'fv.ven_subtotal as valor_bruto',
-                'i.nombreInstitucion as Lugar_despacho_documento',
-                'e.descripcion_corta as empresa',
-                DB::raw("CONCAT(u.nombres, ' ', u.apellidos) as cliente_documento")
-            )
-            ->where('fv.est_ven_codigo', '<>', 3)
-            ->where('fv.periodo_id', $periodo)
-            ->get();
+        ->leftJoin('1_4_tipo_venta as tv', 'tv.tip_ven_codigo', '=', 'fv.tip_ven_codigo')
+        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'fv.institucion_id')
+        ->leftJoin('empresas as e', 'e.id', '=', 'fv.id_empresa')
+        ->leftJoin('f_tipo_documento as ft', 'ft.tdo_id', '=', 'fv.idtipodoc')
+        ->leftJoin('usuario as u', 'u.idusuario', '=', 'fv.ven_cliente')
+        ->leftJoin('f_detalle_venta as fdv', function($join) {
+            $join->on('fdv.ven_codigo', '=', 'fv.ven_codigo')
+                ->on('fdv.id_empresa', '=', 'fv.id_empresa');
+        })
+        ->select(
+            'fv.ven_codigo as codigo',
+            'ft.tdo_nombre as documento',
+            'tv.tip_ven_nombre as tipo_venta',
+            'fv.ven_idproforma as proforma',
+            'fv.ven_subtotal as valor_bruto',
+            'i.nombreInstitucion as Lugar_despacho_documento',
+            'e.descripcion_corta as empresa',
+            DB::raw("CONCAT(u.nombres, ' ', u.apellidos) as cliente_documento"),
+            DB::raw("SUM(fdv.det_ven_cantidad) as cantidad_detalles")
+        )
+        ->where('fv.est_ven_codigo', '<>', 3)
+        ->where('fv.periodo_id', $periodo)
+        ->groupBy(
+            'fv.ven_codigo',
+            'ft.tdo_nombre',
+            'tv.tip_ven_nombre',
+            'fv.ven_idproforma',
+            'fv.ven_subtotal',
+            'i.nombreInstitucion',
+            'e.descripcion_corta',
+            'u.nombres',
+            'u.apellidos'
+        )
+        ->get();
 
         // Retorna los resultados en formato JSON
         return response()->json($ventas);

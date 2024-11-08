@@ -1036,9 +1036,11 @@ Route::post('modificarAbono', 'AbonoController@modificarAbono');
 Route::post('modificarAbonoNotas', 'AbonoController@modificarAbonoNotas');
 Route::post('anularAbono', 'AbonoController@anularAbono');
 Route::get('reporteAbonoVentas', 'AbonoController@reporteAbonoVentas');
+Route::get('reporteAbonoVentasXD', 'AbonoController@reporteAbonoVentasXD');
 Route::get('reporteVariacionVentas', 'AbonoController@reporteVariacionVentas');
 Route::get('clientesAbonoNoDocumentos', 'AbonoController@clientesAbonoNoDocumentos');
 Route::get('getSalesAndPayments', 'AbonoController@getSalesAndPayments');
+Route::get('obtenerVentas', 'AbonoController@obtenerVentas');
 
 //FIN ABONO
 //CUENTA DE BANCO
