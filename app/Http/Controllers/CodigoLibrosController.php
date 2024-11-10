@@ -2023,7 +2023,7 @@ class CodigoLibrosController extends Controller
                 $getSecuencia                   = f_tipo_documento::obtenerSecuencia("DEVOLUCION-CODIGO");
                 if(!$getSecuencia)              { return ["status" => "0", "message" => "No se pudo obtener la secuencia de guias"]; }
                 $letra                          = $getSecuencia->tdo_letra;
-                $secuencia                      = $getSecuencia->tdo_secuencial_Prolipa;
+                $secuencia                      = $getSecuencia->tdo_secuencial_Prolipa; 
                 $secuencia                      = $secuencia + 1;
                 $format_id_pedido               = f_tipo_documento::formatSecuencia($secuencia);
                 $codigo_ven                     = $letra.'-'. $codigo_contrato .'-'. $iniciales.'-'. $format_id_pedido;
@@ -3160,7 +3160,7 @@ class CodigoLibrosController extends Controller
                     $resultado[0]->valor = $resultado[0]->valor + $GuiasBodega[0]->cantidad;
                 }
             }
-
+          
             //guardar un campo totalguias obtener el [0]->valor
             $itemAsesor->guias      = $resultado;
             if(count($resultado) == 0){
@@ -3424,7 +3424,7 @@ class CodigoLibrosController extends Controller
     //api:get/metodosGetCodigos?getCodigosAgrupadoLiquidadoRegalados=1&periodo=24&institucion=1485
     public function getCodigosAgrupadoLiquidadoRegalados($request)
     {
-
+        
     // SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
     // c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
     // c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion,
@@ -3485,37 +3485,37 @@ class CodigoLibrosController extends Controller
         $conteoOrdenado = $conteo->sortBy('libro')->values(); // Ordenamos por 'libro'
         return [
             'codigosAgrupado' => $conteoOrdenado,
-            'todos'           => $results
+            'todos'           => $results    
         ];
     }
     //api:get/metodosGetCodigos?getReporteXTipoVenta=1&periodo=25&tipoVenta=1
     // public function getReporteXTipoVenta($request){
     //     $periodo            = $request->input('periodo');
     //     $tipoVenta          = $request->input('tipoVenta');
-    //     $query = DB::SELECT("SELECT
+    //     $query = DB::SELECT("SELECT 
     //         i.nombreInstitucion,
     //         COUNT(DISTINCT c.codigo) AS cantidad_codigos,
     //         MAX(pp.pfn_pvp) AS pfn_pvp, -- Toma un solo valor de `pfn_pvp` por institución
     //         COUNT(DISTINCT c.codigo) * MAX(pp.pfn_pvp) AS total_valor -- Multiplica la cantidad de códigos únicos por un solo `pfn_pvp`
-    //     FROM
+    //     FROM 
     //         codigoslibros c
-    //     LEFT JOIN
+    //     LEFT JOIN 
     //         institucion i ON c.bc_institucion = i.idInstitucion
-    //     LEFT JOIN
+    //     LEFT JOIN 
     //         pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro
-    //     WHERE
+    //     WHERE 
     //         c.bc_periodo = ?
     //         AND (c.estado_liquidacion = '0' OR c.estado_liquidacion = '1')
     //         AND c.prueba_diagnostica = '0'
     //         AND c.venta_estado = ?
     //         AND c.estado <> '2'
-    //     GROUP BY
+    //     GROUP BY 
     //         i.nombreInstitucion;
     //         ", [$periodo, $tipoVenta]);
     //     return $query;
     // }
 
-
+    
     public function getReporteXTipoVenta($request)
     {
         $periodo            = $request->periodo;
@@ -3523,89 +3523,89 @@ class CodigoLibrosController extends Controller
         if($tipoVenta == 1){
               // Paso 1: Ejecutar la consulta SQL
             $query = DB::SELECT("
-                SELECT
+                SELECT 
                     i.nombreInstitucion,            -- Nombre de la institución
                     ls.nombrelibro,                 -- Nombre del libro
                     pp.idlibro,                     -- ID del libro
                     pp.pfn_pvp,                     -- Precio del libro
                     COUNT(c.codigo) AS cantidad,    -- Contamos los códigos por libro e institución
                     (COUNT(c.codigo) * pp.pfn_pvp) AS valortotal  -- Valor total (cantidad de códigos * precio)
-                FROM
+                FROM 
                     codigoslibros c
-                JOIN
+                JOIN 
                     institucion i ON c.bc_institucion = i.idInstitucion  -- Relacionamos la institución
-                JOIN
+                JOIN 
                     pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro  -- Relacionamos los libros
-                JOIN
+                JOIN 
                     libro ls ON pp.idlibro = ls.idlibro  -- Relacionamos el nombre del libro
-                WHERE
+                WHERE 
                     c.bc_periodo = '$periodo'  -- Filtro por periodo
                     AND (c.estado_liquidacion = '0' OR c.estado_liquidacion = '1')  -- Filtro por estado de liquidación
                     AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
                     AND c.venta_estado = '1'  -- Filtro por estado de venta
                     AND pp.idperiodoescolar = '$periodo'  -- Filtro por periodo escolar
-                GROUP BY
+                GROUP BY 
                     i.nombreInstitucion, ls.nombrelibro, pp.idlibro, pp.pfn_pvp  -- Agrupamos por institución, libro y precio
-                ORDER BY
+                ORDER BY 
                     i.nombreInstitucion, ls.nombrelibro;
             ");
         }
         if($tipoVenta == 2){
             $query = DB::SELECT("
-                SELECT
+                SELECT 
                     i.nombreInstitucion,            -- Nombre de la institución
                     ls.nombrelibro,                 -- Nombre del libro
                     pp.idlibro,                     -- ID del libro
                     pp.pfn_pvp,                     -- Precio del libro
                     COUNT(c.codigo) AS cantidad,    -- Contamos los códigos por libro e institución
                     (COUNT(c.codigo) * pp.pfn_pvp) AS valortotal  -- Valor total (cantidad de códigos * precio)
-                FROM
+                FROM 
                     codigoslibros c
-                JOIN
+                JOIN 
                     institucion i ON c.venta_lista_institucion = i.idInstitucion  -- Relacionamos la institución
-                JOIN
+                JOIN 
                     pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro  -- Relacionamos los libros
-                JOIN
+                JOIN 
                     libro ls ON pp.idlibro = ls.idlibro  -- Relacionamos el nombre del libro
-                WHERE
+                WHERE 
                     c.bc_periodo = '$periodo'  -- Filtro por periodo
                     AND (c.estado_liquidacion = '0' OR c.estado_liquidacion = '1')  -- Filtro por estado de liquidación
                     AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
                     AND c.venta_estado = '2'  -- Filtro por estado de venta
                     AND pp.idperiodoescolar = '$periodo'  -- Filtro por periodo escolar
-                GROUP BY
+                GROUP BY 
                     i.nombreInstitucion, ls.nombrelibro, pp.idlibro, pp.pfn_pvp  -- Agrupamos por institución, libro y precio
-                ORDER BY
+                ORDER BY 
                     i.nombreInstitucion, ls.nombrelibro;
             ");
         }
-
+      
         // Paso 2: Convertir los resultados a una colección
         $resultados = collect($query);
-
+    
         // Paso 3: Agrupar por institución
         $instituciones = $resultados->groupBy('nombreInstitucion')->map(function ($grupoInstitucion) {
             // Para cada institución, sumar la cantidad y el valor total de los libros
             $totalCantidad = $grupoInstitucion->sum('cantidad');  // Sumar cantidad
             $totalValor = $grupoInstitucion->sum('valortotal');   // Sumar valor total de los libros
-
+    
             return [
                 'nombreInstitucion' => $grupoInstitucion->first()->nombreInstitucion,  // Nombre de la institución
                 'cantidad_codigos' => $totalCantidad,  // Total de códigos por institución
                 'total_valor' => $totalValor  // Total valor de los libros por institución
             ];
         });
-
+    
         // Paso 4: Devolver los resultados agrupados y sumados
         return $instituciones->values()->toArray();
     }
+    
 
 
 
-
-
-
-
+    
+    
+    
     public function metodosPostCodigos(Request $request){
         if($request->getPrevisualizarCodigosSinEmpresa)     { return $this->getPrevisualizarCodigosSinEmpresa($request); }
         if($request->getPrevisualizarCodigos)               { return $this->getPrevisualizarCodigos($request); }
@@ -3909,10 +3909,10 @@ class CodigoLibrosController extends Controller
     }
     //api:post/metodosPostCodigos?getPrevisualizarPaquetes=1
     public function getPrevisualizarPaquetes($request) {
-
+       
     // Inicializamos arrays para almacenar los paquetes encontrados y no encontrados
     $arrayPaquetesNoEncontrados = [];
-
+    
     // Simulación de JSON con códigos de paquetes
     // $data = '
     //     [
@@ -4065,7 +4065,7 @@ class CodigoLibrosController extends Controller
     // $allData = array_merge(...array_map(function($item) {
     //     return $item['data']->toArray(); // Convertir `data` a array
     // }, $agrupadosPorInstitucion->toArray()));
-
+    
     // Retornar los resultados finales
     return [
         'paquetesEncontrados'   => $paquetesEncontrados,
