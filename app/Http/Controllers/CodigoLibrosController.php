@@ -3520,7 +3520,9 @@ class CodigoLibrosController extends Controller
     {
         $periodo            = $request->periodo;
         $tipoVenta          = $request->tipoVenta;
-        if($tipoVenta == 1){
+        $ifDevueltos        = $request->ifDevueltos;
+        //solo venta directa
+        if($tipoVenta == 1 && $ifDevueltos == 0){
               // Paso 1: Ejecutar la consulta SQL
             $query = DB::SELECT("
                 SELECT 
@@ -3550,7 +3552,8 @@ class CodigoLibrosController extends Controller
                     i.nombreInstitucion, ls.nombrelibro;
             ");
         }
-        if($tipoVenta == 2){
+        //Venta lista
+        if($tipoVenta == 2 && $ifDevueltos == 0){
             $query = DB::SELECT("
                 SELECT 
                     i.nombreInstitucion,            -- Nombre de la institución
@@ -3579,7 +3582,66 @@ class CodigoLibrosController extends Controller
                     i.nombreInstitucion, ls.nombrelibro;
             ");
         }
-      
+        //Devueltos y venta directa
+        if($tipoVenta == 1 && $ifDevueltos == 1){
+            $query = DB::SELECT("
+                SELECT 
+                    i.nombreInstitucion,            -- Nombre de la institución
+                    ls.nombrelibro,                 -- Nombre del libro
+                    pp.idlibro,                     -- ID del libro
+                    pp.pfn_pvp,                     -- Precio del libro
+                    COUNT(c.codigo) AS cantidad,    -- Contamos los códigos por libro e institución
+                    (COUNT(c.codigo) * pp.pfn_pvp) AS valortotal  -- Valor total (cantidad de códigos * precio)
+                FROM 
+                    codigoslibros c
+                LEFT JOIN 
+                    institucion i ON c.bc_institucion = i.idInstitucion  -- Relacionamos la institución
+                LEFT JOIN 
+                    pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro  -- Relacionamos los libros
+                LEFT JOIN 
+                    libro ls ON pp.idlibro = ls.idlibro  -- Relacionamos el nombre del libro
+                WHERE 
+                    c.bc_periodo = '$periodo'  -- Filtro por periodo
+                    AND c.estado_liquidacion = '3'  -- Filtro por estado de liquidación
+                    AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
+                    AND (c.venta_estado = '1' OR c.venta_estado = '0')  -- Filtro por estado de venta
+                    AND pp.idperiodoescolar = '$periodo'  -- Filtro por periodo escolar
+                GROUP BY 
+                    i.nombreInstitucion, ls.nombrelibro, pp.idlibro, pp.pfn_pvp  -- Agrupamos por institución, libro y precio
+                ORDER BY 
+                    i.nombreInstitucion, ls.nombrelibro;
+            ");
+        }
+        //Devueltos y venta lista
+        if($tipoVenta == 2 && $ifDevueltos == 1){
+            $query = DB::SELECT("
+                SELECT 
+                    i.nombreInstitucion,            -- Nombre de la institución
+                    ls.nombrelibro,                 -- Nombre del libro
+                    pp.idlibro,                     -- ID del libro
+                    pp.pfn_pvp,                     -- Precio del libro
+                    COUNT(c.codigo) AS cantidad,    -- Contamos los códigos por libro e institución
+                    (COUNT(c.codigo) * pp.pfn_pvp) AS valortotal  -- Valor total (cantidad de códigos * precio)
+                FROM 
+                    codigoslibros c
+                LEFT JOIN 
+                    institucion i ON c.venta_lista_institucion = i.idInstitucion  -- Relacionamos la institución
+                LEFT JOIN 
+                    pedidos_formato_new pp ON pp.idlibro = c.libro_idlibro  -- Relacionamos los libros
+                LEFT JOIN 
+                    libro ls ON pp.idlibro = ls.idlibro  -- Relacionamos el nombre del libro
+                WHERE 
+                    c.bc_periodo = '$periodo'  -- Filtro por periodo
+                    AND c.estado_liquidacion = '3'  -- Filtro por estado de liquidación
+                    AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
+                    AND c.venta_estado = '2'  -- Filtro por estado de venta
+                    AND pp.idperiodoescolar = '$periodo'  -- Filtro por periodo escolar
+                GROUP BY 
+                    i.nombreInstitucion, ls.nombrelibro, pp.idlibro, pp.pfn_pvp  -- Agrupamos por institución, libro y precio
+                ORDER BY 
+                    i.nombreInstitucion, ls.nombrelibro;
+            ");
+        }
         // Paso 2: Convertir los resultados a una colección
         $resultados = collect($query);
     
@@ -3588,11 +3650,11 @@ class CodigoLibrosController extends Controller
             // Para cada institución, sumar la cantidad y el valor total de los libros
             $totalCantidad = $grupoInstitucion->sum('cantidad');  // Sumar cantidad
             $totalValor = $grupoInstitucion->sum('valortotal');   // Sumar valor total de los libros
-    
+        
             return [
                 'nombreInstitucion' => $grupoInstitucion->first()->nombreInstitucion,  // Nombre de la institución
                 'cantidad_codigos' => $totalCantidad,  // Total de códigos por institución
-                'total_valor' => $totalValor  // Total valor de los libros por institución
+                'total_valor' => number_format($totalValor, 2)  // Total valor de los libros con 2 decimales
             ];
         });
     
