@@ -3028,8 +3028,8 @@ class CodigoLibrosController extends Controller
             $query->where(function ($query) {
                 $query->where('codigoslibros.estado_liquidacion', '1')
                       ->orWhere('codigoslibros.estado_liquidacion', '0');
-            })
-            ->where('codigoslibros.estado', '<>', '2'); // Comparar como string si la columna es de tipo string
+            });
+            // ->where('codigoslibros.estado', '<>', '2'); // Comparar como string si la columna es de tipo string
         })
         ->when($regalados, function ($query) {
             $query->where('codigoslibros.estado_liquidacion', '2')
