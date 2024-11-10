@@ -173,6 +173,7 @@ class DevolucionController extends Controller
                 'codigoslibros_devolucion_son.*', 
                 'codigoslibros.estado_liquidacion',
                 'codigoslibros.liquidado_regalado', 
+                'codigoslibros.estado as estadoActualCodigo',
                 'libro.nombrelibro', 
                 'libros_series.codigo_liquidacion',
                 'empresas.descripcion_corta', 

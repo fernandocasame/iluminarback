@@ -7233,4 +7233,25 @@ class PedidosController extends Controller
     }
 
     //FIN METODOS JEYSON
+    public function get_liquidaciones(Request $request){
+        $liquidaciones = DB::table('pedidos as p')
+        ->join('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+        ->join('usuario as usu', 'usu.idusuario', '=', 'p.id_asesor')
+        ->select(
+            'p.id_asesor',
+            'usu.iniciales as codigo',
+            DB::raw("CONCAT(usu.nombres, ' ', usu.apellidos) as vendedor"),
+            DB::raw("SUM(p.TotalVentaReal) as ventabruta"),
+            DB::raw("SUM(p.descuento) as Descuento"),
+            DB::raw("SUM(p.anticipo_aprobado) as anticipo"),
+            DB::raw("SUM(p.descuento - p.anticipo_aprobado) as liq_proyectada"),
+            DB::raw("SUM(p.totalPagado) as liq_Pagada"),
+            DB::raw("SUM(p.totalPendienteLiquidar) as liq_pendiente")
+        )
+        ->where('p.id_periodo', $request->periodo)
+        ->where('p.estado', 1)
+        ->groupBy('p.id_asesor', 'usu.iniciales', 'usu.nombres', 'usu.apellidos')
+        ->get();
+        return $liquidaciones;
+    }
 }
