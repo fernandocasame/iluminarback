@@ -1066,7 +1066,9 @@ Route::get('GetCheque_todo', 'BancoController@GetCheque_todo');
 Route::post('cheque_registro', 'BancoController@cheque_registro');
 Route::post('estado_cheque', 'AbonoController@estado_cheque');
 Route::post('cheque_eliminar', 'BancoController@cheque_eliminar');
-
+//liquidaciones
+Route::get('get_liquidaciones', 'PedidosController@get_liquidaciones');
+//fin liquidaciones
 //FIN CHEQUE
 //guardar la deuda
 Route::post('guardarPedidoDeuda','PedidosController@guardarPedidoDeuda');
