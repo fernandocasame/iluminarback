@@ -3654,7 +3654,7 @@ class CodigoLibrosController extends Controller
             return [
                 'nombreInstitucion' => $grupoInstitucion->first()->nombreInstitucion,  // Nombre de la institución
                 'cantidad_codigos' => $totalCantidad,  // Total de códigos por institución
-                'total_valor' => number_format($totalValor, 2)  // Total valor de los libros con 2 decimales
+                'total_valor' => $totalValor // Total valor de los libros con 2 decimales
             ];
         });
     
