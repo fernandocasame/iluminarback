@@ -810,4 +810,113 @@ class _14ProductoController extends Controller {
             1_4_cal_producto;");
         return $query;
     }
+
+    public function GetProducto_StockMenor() {
+        // Obtener los productos
+        $productos = DB::select("
+            SELECT p.*, g.*
+            FROM 1_4_cal_producto p
+            INNER JOIN 1_4_grupo_productos g ON p.gru_pro_codigo = g.gru_pro_codigo
+            
+        ");
+    
+        // Obtener los valores mínimos de configuracion_general
+        $configuracion = DB::select("SELECT * FROM configuracion_general");
+    
+        // Filtrar los productos que cumplen con la condición de stock menor
+        $productosMenores = [];
+    
+        foreach ($productos as $producto) {
+            // Inicializamos un flag para verificar si el producto cumple alguna condición
+            $esMenor = false;
+    
+            // Comparar cada campo de la tabla 1_4_cal_producto con los valores mínimos correspondientes de configuracion_general
+            foreach ($configuracion as $config) {
+                // Verificar si el campo del producto es menor que el valor mínimo correspondiente en configuracion_general
+                switch ($config->id) {
+                    case 5: // DEPOSITO CALMED
+                        if (isset($producto->pro_depositoCalmed) && $producto->pro_depositoCalmed < $config->minimo) {
+                            $esMenor = true;
+                        }
+                        break;
+                    case 4: // DEPOSITO PROLIPA
+                        if (isset($producto->pro_deposito) && $producto->pro_deposito < $config->minimo) {
+                            $esMenor = true;
+                        }
+                        break;
+                    case 3: // STOCK CALMED
+                        if (isset($producto->pro_stockCalmed) && $producto->pro_stockCalmed < $config->minimo) {
+                            $esMenor = true;
+                        }
+                        break;
+                    case 2: // STOCK PROLIPA
+                        if (isset($producto->pro_stock) && $producto->pro_stock < $config->minimo) {
+                            $esMenor = true;
+                        }
+                        break;
+                    case 1: // RESERVAR
+                        if (isset($producto->pro_reservar) && $producto->pro_reservar < $config->minimo) {
+                            $esMenor = true;
+                        }
+                        break;
+                }
+            }
+    
+            // Si alguna de las condiciones se cumple, agregar el producto al resultado
+            if ($esMenor) {
+                $productosMenores[] = $producto;
+            }
+        }
+    
+        // Devolver los productos que cumplen con la condición
+        return $productosMenores;
+    }
+
+    public function GetProductosSoloStocks() {
+        $query = DB:: SELECT("SELECT pro.pro_codigo, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed, pro.pro_deposito,
+        pro.pro_depositoCalmed
+        FROM 1_4_cal_producto pro
+        ORDER BY pro.pro_codigo ASC");
+        return $query;
+    }
+
+    public function GuardarDatosEdicionStockMasiva(Request $request) {
+        // Verifica que el array `DatosAcumuladosStockMasivo` esté presente en el request
+        if ($request->has('DatosAcumuladosStockMasivo') && is_array($request->DatosAcumuladosStockMasivo)) {
+            // Recorre cada elemento en `DatosAcumuladosStockMasivo`
+            foreach ($request->DatosAcumuladosStockMasivo as $item) {
+                // Busca el producto por `pro_codigo`
+                $producto = _14Producto::find($item['pro_codigo']);
+    
+                // Verifica si el producto existe
+                if ($producto) {
+                    // Actualiza solo los campos específicos
+                    $producto->pro_reservar = $item['pro_reservar'];
+                    $producto->pro_stock = $item['pro_stock'];
+                    $producto->pro_stockCalmed = $item['pro_stockCalmed'];
+                    $producto->pro_deposito = $item['pro_deposito'];
+                    $producto->pro_depositoCalmed = $item['pro_depositoCalmed'];
+    
+                    // Guarda los cambios en la base de datos
+                    $producto->save();
+                } else {
+                    // Si algún `pro_codigo` no existe, puedes retornar un mensaje de error opcionalmente
+                    return response()->json([
+                        'status' => 0,
+                        'message' => "El producto con código {$item['pro_codigo']} no existe en la base de datos."
+                    ], 404);
+                }
+            }
+            // Retorna una respuesta de éxito
+            return response()->json([
+                'status' => 1,
+                'message' => 'Stock de productos actualizados exitosamente.'
+            ], 200);
+        } else {
+            return response()->json([
+                'status' => 0,
+                'message' => 'No se han enviado datos válidos para actualizar.'
+            ], 400);
+        }
+    }
 }

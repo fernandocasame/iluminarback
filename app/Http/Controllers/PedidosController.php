@@ -5924,6 +5924,38 @@ class PedidosController extends Controller
             ->where('p_libros_obsequios_id', $librosObsequiosId)
             ->delete();
     }
+    public function eliminarRegistroDetallesPedidoACTA(Request $request) {
+        // Valida y filtra los datos de entrada
+        $codigo = $request->input('removerItem.codigo');
+        $librosObsequiosId = $request->input('librosObsequiosId');
+    
+        // Iniciar una transacción
+        DB::beginTransaction();
+        try {
+            // Eliminar detalle del pedido de libro obsequio
+            DetallePedidoLibroObsequio::where('pro_codigo', $codigo)
+                ->where('p_libros_obsequios_id', $librosObsequiosId)
+                ->delete();
+    
+            // Obtener la venta asociada para eliminar el detalle de la venta
+            $venta = Ventas::where('ven_p_libros_obsequios', $librosObsequiosId)->firstOrFail();
+    
+            // Eliminar detalle de venta
+            DetalleVentas::where('pro_codigo', $codigo)
+                ->where('ven_codigo', $venta->ven_codigo)
+                ->where('id_empresa', $venta->id_empresa)
+                ->delete();
+    
+            // Commit de la transacción
+            DB::commit();
+            return response()->json(["status" => "1", 'message' => 'Detalles eliminados correctamente'], 200);
+        } catch (\Exception $e) {
+            // Rollback de la transacción
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al eliminar los datos: ' . $e->getMessage()], 500);
+        }
+    }
+    
 
     public function guardarDatosPedidoLibrosObsequios(Request $request)
     {
@@ -5992,6 +6024,77 @@ class PedidosController extends Controller
             return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
         }
     }
+
+    public function guardarDetallesPedidoLibrosObsequios(Request $request)
+    {
+        // Validación
+        $request->validate([
+            'librosConCantidad' => 'array',
+            'porcentajeDescuento' => 'required|numeric',
+            'id_librosObsequios' => 'required|exists:p_libros_obsequios,id',
+            'cantidadTotal' => 'required|numeric',
+        ]);
+    
+        $librosConCantidad = $request->input('librosConCantidad', []);
+        $porcentajeDescuento = $request->input('porcentajeDescuento');
+        $id_librosObsequios = $request->input('id_librosObsequios');
+        $cantidadTotal = $request->input('cantidadTotal');
+    
+        // Iniciar una transacción
+        DB::beginTransaction();
+        try {
+            // Obtener venta asociada
+            $venta = Ventas::where('ven_p_libros_obsequios', $id_librosObsequios)->firstOrFail();
+    
+            foreach ($librosConCantidad as $libro) {
+                // Validar que el precio no sea null
+                if ($libro['precio'] === null) {
+                    throw new \Exception('El precio no puede ser nulo para el libro ' . $libro['codigo']);
+                }
+    
+                // Actualizar o crear detalle de libro obsequio
+                DetallePedidoLibroObsequio::updateOrCreate(
+                    [
+                        'pro_codigo' => $libro['codigo'],
+                        'p_libros_obsequios_id' => $id_librosObsequios,
+                    ],
+                    [
+                        'p_libros_cantidad' => $libro['cantidad'],
+                        'p_libros_cantidad_aprobada' => 0,
+                        'p_libros_cantidad_pendiente' => $libro['cantidadPendiente'],
+                        'p_libros_valor_u' => $libro['precio'],
+                        'updated_at' => now(),
+                    ]
+                );
+    
+                // Actualizar o crear detalle de venta
+                DetalleVentas::updateOrCreate(
+                    [
+                        'pro_codigo' => $libro['codigo'],
+                        'ven_codigo' => $venta->ven_codigo,
+                        'id_empresa' => $venta->id_empresa,
+                    ],
+                    [
+                        'det_ven_cantidad' => $libro['cantidad'],
+                        'det_ven_valor_u' => $libro['precio'],
+                        'updated_at' => now(),
+                    ]
+                );
+            }
+    
+            // Actualizar el pedido principal
+            PedidosLibroObsequio::where('id', $id_librosObsequios)->update(['total_unidades' => $cantidadTotal]);
+    
+            // Commit de la transacción
+            DB::commit();
+            return response()->json(["status" => "1", 'message' => 'Detalles actualizados correctamente'], 200);
+        } catch (\Exception $e) {
+            // Rollback de la transacción
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
+        }
+    }
+    
 
     public function getDescuentoInstitucion($pedido){
         $query = DB::SELECT("SELECT pa.*,  i.nombreInstitucion, c.nombre AS ciudad,
@@ -7233,25 +7336,58 @@ class PedidosController extends Controller
     }
 
     //FIN METODOS JEYSON
-    public function get_liquidaciones(Request $request){
+    // public function get_liquidaciones(Request $request){
+    //     $liquidaciones = DB::table('pedidos as p')
+    //     ->join('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+    //     ->join('usuario as usu', 'usu.idusuario', '=', 'p.id_asesor')
+    //     ->select(
+    //         'p.id_asesor',
+    //         'usu.iniciales as codigo',
+    //         DB::raw("CONCAT(usu.nombres, ' ', usu.apellidos) as vendedor"),
+    //         DB::raw("SUM(p.TotalVentaReal) as ventabruta"),
+    //         DB::raw("SUM(p.descuento) as Descuento"),
+    //         DB::raw("SUM(p.anticipo_aprobado) as anticipo"),
+    //         DB::raw("SUM(p.descuento - p.anticipo_aprobado) as liq_proyectada"),
+    //         DB::raw("SUM(p.totalPagado) as liq_Pagada"),
+    //         DB::raw("SUM(p.totalPendienteLiquidar) as liq_pendiente")
+    //     )
+    //     ->where('p.id_periodo', $request->periodo)
+    //     ->where('p.estado', 1)
+    //     ->groupBy('p.id_asesor', 'usu.iniciales', 'usu.nombres', 'usu.apellidos')
+    //     ->get();
+    //     return $liquidaciones;
+    // }
+    public function get_liquidaciones(Request $request) {
+        // Consultar las liquidaciones
         $liquidaciones = DB::table('pedidos as p')
-        ->join('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
-        ->join('usuario as usu', 'usu.idusuario', '=', 'p.id_asesor')
-        ->select(
-            'p.id_asesor',
-            'usu.iniciales as codigo',
-            DB::raw("CONCAT(usu.nombres, ' ', usu.apellidos) as vendedor"),
-            DB::raw("SUM(p.TotalVentaReal) as ventabruta"),
-            DB::raw("SUM(p.descuento) as Descuento"),
-            DB::raw("SUM(p.anticipo_aprobado) as anticipo"),
-            DB::raw("SUM(p.descuento - p.anticipo_aprobado) as liq_proyectada"),
-            DB::raw("SUM(p.totalPagado) as liq_Pagada"),
-            DB::raw("SUM(p.totalPendienteLiquidar) as liq_pendiente")
-        )
-        ->where('p.id_periodo', $request->periodo)
-        ->where('p.estado', 1)
-        ->groupBy('p.id_asesor', 'usu.iniciales', 'usu.nombres', 'usu.apellidos')
-        ->get();
+            ->join('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+            ->join('usuario as usu', 'usu.idusuario', '=', 'p.id_asesor')
+            ->select(
+                'p.id_asesor',
+                'usu.iniciales as codigo',
+                DB::raw("CONCAT(usu.nombres, ' ', usu.apellidos) as vendedor"),
+                DB::raw("SUM(p.TotalVentaReal) as ventabruta"),
+                DB::raw("SUM(p.totalValorComision) as Descuento"),
+                DB::raw("(
+                    SELECT SUM(l.doc_valor)
+                    FROM 1_4_documento_liq l
+                    WHERE l.tipo_pago_id = '4'
+                    AND l.periodo_id = {$request->periodo}
+                    AND l.id_pedido = p.id_pedido                
+                ) as anticipo"),
+                DB::raw("SUM(p.descuento - p.anticipo_aprobado) as liq_proyectada"),
+                DB::raw("SUM(p.totalPagado) as liq_Pagada"),
+                DB::raw("SUM(p.totalPendienteLiquidar) as liq_pendiente")
+            )
+            ->where('p.id_periodo', $request->periodo)
+            ->where('p.estado', 1)
+            ->groupBy('p.id_asesor', 'usu.iniciales', 'usu.nombres', 'usu.apellidos')
+            ->get();
+    
+                // AND l.estado = '1'
+    
+        // Retornar las liquidaciones sin agrupar por pedido
         return $liquidaciones;
     }
+    
 }

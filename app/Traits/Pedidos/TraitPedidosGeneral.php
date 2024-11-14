@@ -396,7 +396,6 @@ trait TraitPedidosGeneral
         WHERE p.tipo_venta = '$tipo_venta'
         AND p.estado = '1'
         AND p.id_periodo = '$id_periodo'
-        AND p.ca_codigo_agrupado IS NULL
         AND p.contrato_generado IS NOT NULL
         AND p.id_asesor = '$asesor'
         ORDER BY p.id_pedido DESC
@@ -428,16 +427,16 @@ trait TraitPedidosGeneral
         return $query;
     }
     public function tr_getPuntosVentaRegion($busqueda,$region,$id_periodo){
-        $query = DB::SELECT("SELECT i.idInstitucion, 
-            i.nombreInstitucion, 
-            i.ruc, 
-            i.email, 
+        $query = DB::SELECT("SELECT i.idInstitucion,
+            i.nombreInstitucion,
+            i.ruc,
+            i.email,
             i.telefonoInstitucion,
-            i.direccionInstitucion,  
-            c.nombre AS ciudad, 
-            MAX(CASE 
-                WHEN p.id_institucion IS NOT NULL THEN 1 
-                ELSE 0 
+            i.direccionInstitucion,
+            c.nombre AS ciudad,
+            MAX(CASE
+                WHEN p.id_institucion IS NOT NULL THEN 1
+                ELSE 0
             END) AS validate_pedidos,
         CONCAT(u.nombres,' ',u.apellidos) as representante
         FROM institucion i
@@ -447,7 +446,7 @@ trait TraitPedidosGeneral
         WHERE i.nombreInstitucion LIKE '%$busqueda%'
         AND i.region_idregion = '$region'
         AND i.estado_idEstado = '1'
-        GROUP BY 
+        GROUP BY
             i.idInstitucion, i.nombreInstitucion, i.ruc, i.email, i.telefonoInstitucion, i.direccionInstitucion, c.nombre
         ");
         return $query;
@@ -756,13 +755,13 @@ trait TraitPedidosGeneral
         $variasInstituciones    = $request->variasInstituciones ?? 0;
         $getInstitucionesId     = $request->getInstitucionesId ?? [];
         $tipo                   = $request->tipo ?? 0;
-    
+
         $condiciones = [
             0 => [],
             1 => ['d.estadoPerseo' => 0],
             2 => ['d.estadoPerseo' => 1],
         ];
-    
+
         $query = DB::table('f_detalle_venta_agrupado as v')
             ->leftJoin('f_venta_agrupado as d', function($join) {
                 $join->on('v.id_factura', '=', 'd.id_factura')
@@ -795,7 +794,7 @@ trait TraitPedidosGeneral
             ->groupBy('v.pro_codigo', 'ls.nombre', 'ls.idLibro', 'ls.year', 'ls.id_serie', 'a.area_idarea', 'p.codigos_combos')
             ->orderBy('ls.nombre', 'desc')
             ->get();
-    
+
         // Procesar los resultados para obtener el precio y multiplicar por la cantidad
         foreach ($query as $item) {
             // Obtener el precio del libro usando el repositorio
@@ -804,7 +803,7 @@ trait TraitPedidosGeneral
             // Multiplicar el precio por la cantidad
             $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
         }
-    
+
         return $query;
     }
 
@@ -898,21 +897,21 @@ trait TraitPedidosGeneral
 
     public function tr_get_val_pedidoInfo_new($pedido){
         try{
-            $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, 
-                                pv.id_pedido, 
-                                pv.pvn_cantidad AS valor, 
-                                ar.idarea AS id_area, 
-                                s.id_serie, 
-                                ls.year, 
-                                pv.pvn_tipo, 
-                                pv.created_at, 
-                                pv.updated_at, 
-                                l.idlibro, 
-                                p.descuento, 
-                                p.id_periodo, 
-                                p.anticipo, 
-                                p.comision, 
-                                l.nombrelibro as serieArea, 
+            $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id,
+                                pv.id_pedido,
+                                pv.pvn_cantidad AS valor,
+                                ar.idarea AS id_area,
+                                s.id_serie,
+                                ls.year,
+                                pv.pvn_tipo,
+                                pv.created_at,
+                                pv.updated_at,
+                                l.idlibro,
+                                p.descuento,
+                                p.id_periodo,
+                                p.anticipo,
+                                p.comision,
+                                l.nombrelibro as serieArea,
                                 s.nombre_serie,
                                 ls.version,
                                 asi.idasignatura,
@@ -949,7 +948,7 @@ trait TraitPedidosGeneral
                     $var_year = $item->year;
                     $var_idarea = $item->id_area;
                 }
-                
+
                 // Construye el array final
                 $final_result[] = [
                     "id"                => $item->id,

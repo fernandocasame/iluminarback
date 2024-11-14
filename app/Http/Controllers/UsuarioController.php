@@ -229,7 +229,7 @@ class UsuarioController extends Controller
    {
        set_time_limit(6000000);
        ini_set('max_execution_time', 6000000);
-      
+
        // $idInstitucion = $request->idInstitucion;
        // $fromDate = $request->fromDate;
        // $toDate = $request->toDate;
@@ -254,8 +254,8 @@ class UsuarioController extends Controller
        $periodoId = $request->periodo_id;
 
        $result = AsignaturaDocente::select(
-           'asignaturausuario.usuario_idusuario', 
-           'asignaturausuario.periodo_id', 
+           'asignaturausuario.usuario_idusuario',
+           'asignaturausuario.periodo_id',
            'usuario.nombres',
            'usuario.name_usuario',
            'usuario.apellidos',

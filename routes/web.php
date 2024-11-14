@@ -1059,8 +1059,23 @@ Route::post('PostRegistrar_modificar_Banco', 'BancoController@PostRegistrar_modi
 //FIN BANCOS
 //COBRANZAS
 Route::get('InstitucionesXCobranzas', 'AbonoController@InstitucionesXCobranzas');
+Route::get('obtenerDetallesDevolucion', 'AbonoController@obtenerDetallesDevolucion');
 Route::get('GetCuentasAll', 'BancoController@GetCuentasAll');
+Route::get('getClienteDocumentos', 'AbonoController@getClienteDocumentos');
 //FIN COBRANZAS
+//SEGUIMIENTO
+Route::get('obtenerCuentasPago', 'BancoController@obtenerCuentasPago');
+Route::get('obtenerAbonosCuentasNotas', 'BancoController@obtenerAbonosCuentasNotas');
+//FIN SEGUIMIENTO
+//LIBROS INSTITUCION
+Route::get('getinstitucion_libros', 'InstitucionController@getinstitucion_libros');
+Route::get('getInfoinstitucion_libros', 'InstitucionController@getInfoinstitucion_libros');
+Route::post('guardarLibrosInstitucion', 'InstitucionController@guardarLibrosInstitucion');
+Route::get('LibrosInstitucionBusqueda/{institucion}/{periodo}', 'LibroController@LibrosInstitucionBusqueda');
+Route::get('InstitucionLibrosInformacion/{institucion}', 'InstitucionController@InstitucionLibrosInformacion');
+Route::get('verifyCode', 'AbonoController@verifyCode');
+
+//FIN LIBROS INSTITUCION
 //CHEQUE
 Route::get('GetCheque_todo', 'BancoController@GetCheque_todo');
 Route::post('cheque_registro', 'BancoController@cheque_registro');
@@ -1144,6 +1159,12 @@ Route::post('ActivarDesactivar_formatopedidonew','FormatoController@ActivarDesac
 Route::post('eliminarAlcance_new', 'PedidosController@eliminarAlcance_new');
 Route::post('guardarGuiasBDMilton_new', 'PedidosController@guardarGuiasBDMilton_new');
 //FIN API NUEVAS FORMATO PEDIDO
+
+//INICIO APIS JEYSON LARA
+Route::get('GetProductosSoloStocks', '_14ProductoController@GetProductosSoloStocks');
+Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
+Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
+//FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
 Route::post('guardarAnticipoAprobadoContrato', 'PedidosController@guardarAnticipoAprobadoContrato');

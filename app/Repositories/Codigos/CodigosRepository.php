@@ -357,7 +357,7 @@ class  CodigosRepository extends BaseRepository
             $withCodigoUnion        = 1;
             $arrayCombinar          = [];
             $unionCorrecto          = false;
-            $messageIngreso         = "Problema con el código union $codigo_union";
+            $messageIngreso         = "";
             $arrayCombinar          = [ 'documento_devolucion' => $codigo_ven ];
             $estadoIngreso          = 0;
             ///estadoIngreso => 1 = ingresado; 2 = no se puedo ingresar el codigo de union;
@@ -480,15 +480,15 @@ class  CodigosRepository extends BaseRepository
                     }
                     //====PROFORMA============================================
                     //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
-                    if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1){
-                        $ifErrorProforma                = 0;
-                        $datosProforma                  = $this->validateProforma($ifdevuelto_proforma,$ifcodigo_proforma,$ifproforma_empresa);
-                        $ifErrorProforma                = $datosProforma["ifErrorProforma"];
-                        $messageIngreso                 = $datosProforma["messageProforma"];
-                        $ifsetProforma                  = $datosProforma["ifsetProforma"];
-                        if($ifsetProforma == 1 && $ifErrorProforma == 0)    { $unionCorrecto = true; }
-                        else                                                { $unionCorrecto = false; }
-                    }
+                    // if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1){
+                    //     $ifErrorProforma                = 0;
+                    //     $datosProforma                  = $this->validateProforma($ifdevuelto_proforma,$ifcodigo_proforma,$ifproforma_empresa);
+                    //     $ifErrorProforma                = $datosProforma["ifErrorProforma"];
+                    //     $messageIngreso                 = $datosProforma["messageProforma"];
+                    //     $ifsetProforma                  = $datosProforma["ifsetProforma"];
+                    //     if($ifsetProforma == 1 && $ifErrorProforma == 0)    { $unionCorrecto = true; }
+                    //     else                                                { $unionCorrecto = false; }
+                    // }
                     //====PROFORMA============================================
                     //==PROCESO====
                     ///correcto o que la proforma se vaya a estado 2 que es para asignar que devolvio despues de enviar de perseo
@@ -499,13 +499,11 @@ class  CodigosRepository extends BaseRepository
                         //PROFORMA
                         //regresar el stock
                         if($ifGuardarProforma == 1){
-                            if($ifsetProforma == 1){
-                                $getEstadoIngreso = $this->validacionIngresoDevolucionPrefactura($codigo_liquidacion,$proforma_empresa,$codigo_proforma);
-                                $estadoIngreso    = $getEstadoIngreso["estadoIngreso"];
-                                $messageIngreso   = $getEstadoIngreso["messageIngreso"];
-                            }
+                            $getEstadoIngreso = $this->validacionIngresoDevolucionPrefactura($codigo_liquidacion,$proforma_empresa,$codigo_proforma);
+                            $estadoIngreso    = $getEstadoIngreso["estadoIngreso"];
+                            $messageIngreso   = $getEstadoIngreso["messageIngreso"];
+                            
                         }
-                        
                         if($estadoIngreso == 1 || $ifGuardarProforma == 2){
                             //PROFORMA
                             $codigoU = DB::table('codigoslibros')

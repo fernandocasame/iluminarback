@@ -813,6 +813,149 @@ class InstitucionController extends Controller
 
         return $lista;
     }
+    public function getinstitucion_libros(Request $request)
+    {
+        $lista = DB::SELECT("SELECT l.*, ls.nombre FROM librosinstituciones_detalle l
+        INNER JOIN librosinstituciones li ON li.li_id = l.li_id
+        LEFT JOIN libros_series ls ON l.lid_idLibro= ls.idLibro
+        WHERE li.li_idInstitucion = '$request->institucion'
+        AND li.li_periodo = '$request->periodo' ");
+        return $lista;
+    }
+
+    public function getInfoinstitucion_libros(Request $request)
+    {
+        $lista = DB::SELECT("SELECT li.* FROM librosinstituciones li
+        WHERE li.li_idInstitucion = '$request->institucion'
+        AND li.li_periodo = '$request->periodo' ");
+        return $lista;
+    }
+
+    public function guardarLibrosInstitucion(Request $request)
+    {
+        // Validación de los datos recibidos
+        $request->validate([
+            'codigo_institucion' => 'required|integer',
+            'periodo_id' => 'required|integer',
+            'libros' => 'required|array',
+            'libros.*.idlibro' => 'required|integer',
+            'libros.*.codigo' => 'required|string',
+            'libros.*.nombrelibro' => 'required|string',
+        ]);
+
+        // Iniciar la transacción
+        DB::beginTransaction();
+
+        try {
+            // Verificar si ya existe un registro en librosinstituciones con los mismos valores
+            $existingRecord = DB::table('librosinstituciones')
+                ->where('li_idInstitucion', $request->codigo_institucion)
+                ->where('li_periodo', $request->periodo_id)
+                ->first();
+
+            if ($existingRecord) {
+                // Si ya existe, obtenemos el ID de la institución
+                $librosInstitucionId = $existingRecord->li_id;
+
+                  // Actualizamos los campos 'li_codigo' y 'expires_at' en caso de que ya exista el registro
+                DB::table('librosinstituciones')
+                ->where('li_id', $librosInstitucionId)
+                ->update([
+                    'li_codigo' => $request->codigo,
+                    'expires_at' => $request->expires,
+                ]);
+
+                // Verificar los libros que ya están asociados a esta institución
+                $existingBooks = DB::table('librosinstituciones_detalle')
+                    ->where('li_id', $librosInstitucionId)
+                    ->pluck('lid_producto'); // Traemos solo los códigos de productos existentes
+
+                // Primero, eliminar los libros que ya no están en el registro
+                $booksToDelete = $existingBooks->diff(collect(array_column($request->libros, 'codigo')));
+
+                if ($booksToDelete->isNotEmpty()) {
+                    DB::table('librosinstituciones_detalle')
+                        ->where('li_id', $librosInstitucionId)
+                        ->whereIn('lid_producto', $booksToDelete->toArray())
+                        ->delete();
+                }
+
+                // Insertar los nuevos libros que no están asociados
+                foreach ($request->libros as $libro) {
+                    // Verificar si este libro ya existe en los detalles
+                    if (!in_array($libro['codigo'], $existingBooks->toArray())) {
+                        // Insertamos solo los nuevos detalles
+                        DB::table('librosinstituciones_detalle')->insert([
+                            'li_id' => $librosInstitucionId, // Usar el ID de la institución existente
+                            'lid_idLibro' => $libro['idlibro'],
+                            'lid_producto' => $libro['codigo'],
+                        ]);
+                    }
+                }
+
+                // Confirmar transacción si todo es correcto
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Detalles actualizados correctamente.',
+                ]);
+
+            } else {
+                // Si no existe, insertamos el registro en la tabla librosinstituciones
+                $librosInstitucionId = DB::table('librosinstituciones')->insertGetId([
+                    'li_idInstitucion' => $request->codigo_institucion,
+                    'li_periodo' => $request->periodo_id,
+                    'li_codigo' => $request->codigo,
+                    'expires_at' => $request->expires,
+                ]);
+
+                if ($librosInstitucionId <= 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'No se pudo generar un ID para la institución.',
+                    ], 500);
+                }
+
+                // Insertar los detalles para los nuevos registros
+                foreach ($request->libros as $libro) {
+                    DB::table('librosinstituciones_detalle')->insert([
+                        'li_id' => $librosInstitucionId,
+                        'lid_idLibro' => $libro['idlibro'],
+                        'lid_producto' => $libro['codigo'],
+                    ]);
+                }
+
+                // Confirmar la transacción
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Información guardada con éxito.',
+                ]);
+            }
+
+        } catch (Exception $e) {
+            // Si ocurre un error, revertir la transacción
+            DB::rollBack();
+
+            // Devolver una respuesta de error
+            return response()->json([
+                'success' => false,
+                'message' => 'Hubo un problema al guardar la información.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function InstitucionLibrosInformacion($institucion)
+    {
+        $lista = DB::SELECT("SELECT li.idInstitucion, li.region_idregion,li.nombreInstitucion FROM institucion li
+        WHERE li.idInstitucion = '$institucion'");
+        return $lista;
+    }
+
     //se debe habilitar cuando la zona sea obligatoria
     // public function institucion_zona(Request $request)
     // {

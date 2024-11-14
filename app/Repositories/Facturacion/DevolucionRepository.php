@@ -72,6 +72,35 @@ class  DevolucionRepository extends BaseRepository
             ->first();
 
         return $disponiblePrefactura;
-
+    }
+    public function devolucionCliente($idCliente,$idPeriodo)
+    {
+        $query = DB::SELECT("SELECT h.*, l.nombrelibro
+            FROM codigoslibros_devolucion_son h
+            LEFT JOIN libro l ON h.id_libro = l.idlibro
+            LEFT JOIN codigoslibros_devolucion_header p ON p.id = h.codigoslibros_devolucion_id
+            where h.estado <> '0'
+            AND p.id_cliente = ?
+            AND p.periodo_id = ?
+        ",[$idCliente,$idPeriodo]);
+        return $query;
+    }
+    public function save_son_devolucion_facturador($datos){
+        //validar que no existe el pro_codigo la id_empresay el codigoslibros_devolucion_header_facturador_id
+        $validar = CodigosLibrosDevolucionSonFacturador::where('pro_codigo',$datos->pro_codigo)->where('codigoslibros_devolucion_header_facturador_id',$datos->documentoPadre->id)->where('id_empresa',$datos->id_empresa)->first();
+        if($validar){
+            return $validar;
+        }
+        $devolucionH = new CodigosLibrosDevolucionSonFacturador();
+        $devolucionH->codigoslibros_devolucion_header_facturador_id = $datos->documentoPadre->id;
+        $devolucionH->id_empresa                                    = $datos->id_empresa;
+        $devolucionH->pro_codigo                                    = $datos->pro_codigo;
+        $devolucionH->cantidad                                      = $datos->cantidad;
+        $devolucionH->precio                                        = $datos->precio;
+        $devolucionH->id_libro                                      = $datos->id_libro;
+        $devolucionH->descuento                                     = $datos->descuento;
+        $devolucionH->observacion_codigo                            = $datos->observacion_codigo;
+        $devolucionH->save();
+        return $devolucionH;
     }
 }

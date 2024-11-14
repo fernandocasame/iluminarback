@@ -35,7 +35,8 @@ class BancoController extends Controller
         -- WHERE chq_institucion = $request->institucion
         WHERE chq_cliente = $request->cliente
         AND chq_periodo = $request->periodo
-        AND chq_empresa = $request->empresa");
+        AND chq_empresa = $request->empresa
+        ORDER BY chq.created_at DESC ");
         return $query;
     }
 
@@ -207,8 +208,9 @@ class BancoController extends Controller
             'ban_codigo' => 'required|integer',
             'cue_pag_numero' => 'required|integer',
             'cue_pag_nombre' => 'required|string',
+            'cue_pag_tipo_cuenta' => 'required|integer',
         ]);
-
+    
         if ($request->has('editar') && $request->editar === 'yes') {
             // Actualizar la cuenta existente
             $cuentaExistente = CuentaBancaria::where('cue_pag_codigo', $request->cue_pag_codigo)
@@ -219,8 +221,9 @@ class BancoController extends Controller
                     'cue_pag_nombre' => $request->cue_pag_nombre,
                     'cue_pag_numero' => $request->cue_pag_numero,
                     'ban_codigo' => $request->ban_codigo,
+                    'cue_pag_tipo_cuenta' => $request->cue_pag_tipo_cuenta,
                 ]);
-
+    
                 return response()->json([
                     'status' => 1,
                     'message' => 'Cuenta actualizada correctamente',
@@ -237,7 +240,7 @@ class BancoController extends Controller
             $cuentaExistente = CuentaBancaria::where('cue_pag_numero', $request->cue_pag_numero)
                                             ->where('ban_codigo', $request->ban_codigo)
                                             ->exists();
-
+    
             if ($cuentaExistente) {
                 return response()->json([
                     'status' => 0,
@@ -250,9 +253,10 @@ class BancoController extends Controller
                     'cue_pag_numero' => $request->cue_pag_numero,
                     'cue_pag_descripcion' => $request->cue_pag_descripcion,
                     'cue_pag_nombre' => $request->cue_pag_nombre,
+                    'cue_pag_tipo_cuenta' => $request->cue_pag_tipo_cuenta,
                     'user_created' => $request->user_created,
                 ]);
-
+    
                 return response()->json([
                     'status' => 1,
                     'message' => 'Cuenta registrada correctamente',
@@ -306,4 +310,32 @@ class BancoController extends Controller
             return response()->json(['error' => 'Error al eliminar la cuenta: ' . $e->getMessage()], 500);
         }
     }
+    
+    
+    public function obtenerCuentasPago()
+    {
+        $cuentasPago = DB::table('1_1_cuenta_pago as cp')
+            ->select('cp.cue_pag_codigo', 'cp.cue_pag_numero', 'cp.cue_pag_nombre')
+            ->where('cp.cue_pag_tipo_cuenta', 1)
+            ->get();
+
+        return response()->json($cuentasPago);
+    }
+
+    public function obtenerAbonosCuentasNotas(Request $request)
+    {
+        $fechaInicio = $request->fecha_inicio;
+        $fechaFinal = $request->fecha_final;
+
+        $abonos = DB::table('abono as a')
+            ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', 'a.*')
+            ->where('cp.cue_pag_tipo_cuenta', 1)
+            ->where('a.abono_estado', 0)
+            ->whereBetween(DB::raw('DATE(a.abono_fecha)'), [$fechaInicio, $fechaFinal])
+            ->get();
+
+        return response()->json($abonos);
+    }
+
 }

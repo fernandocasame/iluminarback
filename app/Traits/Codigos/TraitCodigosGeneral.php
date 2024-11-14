@@ -350,7 +350,7 @@ trait TraitCodigosGeneral{
         $historico->save();
         return "Guardado en historico";
     }
-    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion){
+    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion,$estado_codigo){
         //validar que si el codigo ya existe no guardar 
         $validate = CodigosLibrosDevolucionSon::where('codigo',$codigo)->where('id_cliente',$id_cliente)->where('codigoslibros_devolucion_id',$id_devolucion)->first();
         if($validate){
@@ -375,6 +375,7 @@ trait TraitCodigosGeneral{
             $devolucionH->documento_regalado_liquidado  = $regalado_liquidado;
             $devolucionH->precio                        = $precio;
             $devolucionH->tipo_importacion              = $tipo_importacion;
+            $devolucionH->estado_codigo                 = $estado_codigo;
             $devolucionH->save();
             return "Guardado en devolucion hijo";
         }

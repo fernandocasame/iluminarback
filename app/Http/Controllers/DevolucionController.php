@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\CodigosLibros;
 use App\Models\CodigosLibrosDevolucionHeader;
+use App\Models\CodigosLibrosDevolucionHeaderFacturador;
 use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\DetalleVentas;
+use App\Models\f_tipo_documento;
 use App\Repositories\Facturacion\DevolucionRepository;
 use App\Repositories\Facturacion\ProformaRepository;
 use App\Repositories\pedidos\PedidosRepository;
@@ -14,6 +16,7 @@ use App\Traits\Codigos\TraitCodigosGeneral;
 use Facade\FlareClient\Http\Response;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use stdClass;
 
 class DevolucionController extends Controller
 {
@@ -40,6 +43,7 @@ class DevolucionController extends Controller
         if($request->getCodigosxDocumentoDevolucion)     { return $this->getCodigosxDocumentoDevolucion($request); }
         if($request->historicoDevolucionPreFacturas)     { return $this->historicoDevolucionPreFacturas($request); }
         if($request->getDocumentosDevolucion)            { return $this->getDocumentosDevolucion($request); }
+        if($request->getDevolucionSon)                   { return $this->getDevolucionSon($request); }
        if($request->todoDevolucionCliente)  { return $this->todoDevolucionCliente($request); }
        if($request->devolucionDetalle)  { return $this->devolucionDetalle($request); }
        if($request->CargarDevolucion)  { return $this->CargarDevolucion($request); }
@@ -154,35 +158,43 @@ class DevolucionController extends Controller
         $agrupar      = $request->input('agrupar');
         $porcliente   = $request->input('porcliente');
         $getCodigos = CodigosLibrosDevolucionSon::query()
-            ->leftJoin('codigoslibros', 'codigoslibros.codigo', '=', 'codigoslibros_devolucion_son.codigo')
-            ->leftJoin('libro', 'libro.idlibro', '=', 'codigoslibros.libro_idlibro')
-            ->leftJoin('libros_series', 'libros_series.idLibro', '=', 'libro.idlibro')
-            ->leftJoin('empresas', 'empresas.id', 'codigoslibros_devolucion_son.id_empresa')     
-            ->leftJoin('institucion', 'institucion.idInstitucion', 'codigoslibros_devolucion_son.id_cliente')       
-            ->leftJoin('codigoslibros_devolucion_header', 'codigoslibros_devolucion_header.id', 'codigoslibros_devolucion_son.codigoslibros_devolucion_id')
-            ->leftJoin('periodoescolar','periodoescolar.idperiodoescolar','codigoslibros_devolucion_son.id_periodo')
-            ->where('codigoslibros_devolucion_id', $id_documento)
-            ->where('codigoslibros_devolucion_son.prueba_diagnostico', '0')
-            ->when($revisados, function ($query) use ($revisados) {
-                $query->where('codigoslibros_devolucion_son.estado', 1);
-            })
-            ->when($finalizados, function ($query) use ($finalizados) {
-                $query->where('codigoslibros_devolucion_son.estado', 2);
-            })
-            ->select(
-                'codigoslibros_devolucion_son.*', 
-                'codigoslibros.estado_liquidacion',
-                'codigoslibros.liquidado_regalado', 
-                'codigoslibros.estado as estadoActualCodigo',
-                'libro.nombrelibro', 
-                'libros_series.codigo_liquidacion',
-                'empresas.descripcion_corta', 
-                'institucion.nombreInstitucion', 
-                'institucion.idInstitucion as id_cliente',
-                'periodoescolar.periodoescolar'
-            )
-            ->get();
-    
+        ->leftJoin('codigoslibros', 'codigoslibros.codigo', '=', 'codigoslibros_devolucion_son.codigo')
+        ->leftJoin('libro', 'libro.idlibro', '=', 'codigoslibros.libro_idlibro')
+        ->leftJoin('libros_series', 'libros_series.idLibro', '=', 'libro.idlibro')
+        ->leftJoin('empresas', 'empresas.id', '=', 'codigoslibros_devolucion_son.id_empresa')
+        ->leftJoin('institucion', 'institucion.idInstitucion', '=', 'codigoslibros_devolucion_son.id_cliente')
+        ->leftJoin('codigoslibros_devolucion_header', 'codigoslibros_devolucion_header.id', '=', 'codigoslibros_devolucion_son.codigoslibros_devolucion_id')
+        ->leftJoin('periodoescolar', 'periodoescolar.idperiodoescolar', '=', 'codigoslibros_devolucion_son.id_periodo')
+        // Aquí añadimos el join con f_venta
+        ->leftJoin('f_venta', function($join) {
+            $join->on('f_venta.id_empresa', '=', 'codigoslibros_devolucion_son.id_empresa')
+                ->on('f_venta.ven_codigo', '=', 'codigoslibros_devolucion_son.documento');
+        })
+        ->where('codigoslibros_devolucion_id', $id_documento)
+        ->where('codigoslibros_devolucion_son.prueba_diagnostico', '0')
+        ->when($revisados, function ($query) use ($revisados) {
+            $query->where('codigoslibros_devolucion_son.estado', 1);
+        })
+        ->when($finalizados, function ($query) use ($finalizados) {
+            $query->where('codigoslibros_devolucion_son.estado', 2);
+        })
+        ->select(
+            'codigoslibros_devolucion_son.*',
+            'codigoslibros.estado_liquidacion',
+            'codigoslibros.liquidado_regalado',
+            'codigoslibros.estado as estadoActualCodigo',
+            'libro.nombrelibro',
+            'libros_series.codigo_liquidacion',
+            'empresas.descripcion_corta',
+            'institucion.nombreInstitucion',
+            'institucion.idInstitucion as id_cliente',
+            'periodoescolar.periodoescolar',
+            // Agrega aquí los campos de f_venta que necesites
+            'f_venta.ven_desc_por'
+        )
+        ->get();
+
+
         if ($agrupar == 1) {
             // Agrupar por nombre libro y contar cuántas veces se repite
             $resultado = collect($getCodigos)->groupBy('nombrelibro')->map(function ($item) {
@@ -209,7 +221,7 @@ class DevolucionController extends Controller
                 $resultado = $agrupados;
             }
         }
-    
+
         return $resultado;
     }
     //api:get/devoluciones?historicoDevolucionPreFacturas=yes
@@ -225,7 +237,7 @@ class DevolucionController extends Controller
         LEFT JOIN institucion i ON ch.id_cliente = i.idInstitucion
         WHERE s.estado = '1'
         AND s.prueba_diagnostico = '0'
-        AND s.documento IS NOT NULL 
+        AND s.documento IS NOT NULL
         ORDER BY s.id desc
         ");
         return $query;
@@ -247,16 +259,13 @@ class DevolucionController extends Controller
                 $query->where('h.estado', '0');
             })
             ->get();
-        
+
         return $results;
     }
-    //api:get/devoluciones?devolucionCliente=yes
-    public function devolucionCliente(Request $request)
+    //api:get/devoluciones?getDevolucionSon=1&id_cliente=1&id_periodo=25
+    public function getDevolucionSon(Request $request)
     {
-        $query = DB::SELECT("SELECT DISTINCT i.nombreInstitucion AS cliente, cl.id_cliente FROM codigoslibros_devolucion_header cl
-            INNER JOIN institucion i ON i.idInstitucion = cl.id_cliente
-            WHERE i.nombreInstitucion LIKE '%$request->busqueda%'
-        ");
+        $query = $this->devolucionRepository->devolucionCliente($request->id_cliente,$request->id_periodo);
         return $query;
     }
     //api:get/devoluciones?todoDevolucionCliente=yes
@@ -356,7 +365,7 @@ class DevolucionController extends Controller
             COUNT(DISTINCT dfv.pro_codigo) AS item, CONCAT(us.nombres, ' ', us.apellidos) AS responsable,
             (SELECT SUM(det_ven_cantidad) FROM f_detalle_venta WHERE ven_codigo = fv.ven_codigo AND id_empresa = fv.id_empresa) AS libros,
             fv.ruc_cliente AS cedula, usa.email, usa.telefono,fv.idtipodoc, em.id AS empresa_id, fv.ven_tipo_inst, fv.ven_idproforma, fv.ven_observacion,
-            fv.ven_subtotal, fv.ven_desc_por, fv.ven_descuento, fv.ven_iva, fv.ven_transporte
+            fv.ven_subtotal, fv.ven_desc_por, fv.ven_descuento, fv.ven_iva, fv.ven_transporte, fv.ven_p_libros_obsequios
             FROM f_venta fv
             LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
             LEFT JOIN p_libros_obsequios plo ON plo.id = fv.ven_p_libros_obsequios
@@ -492,29 +501,20 @@ class DevolucionController extends Controller
             DB::beginTransaction();
 
             $id_documento   = $request->input('id_documento');
-            $revision       = $request->input('revision');
-            $finalizacion   = $request->input('finalizacion');
             $id_usuario     = $request->input('id_usuario');
 
-            if ($revision) {
-                $updateData['estado'] = 1;
-                $updateData['user_created_revisado'] = $id_usuario;
-                $updateData['fecha_revisado'] = now();
-            }
+            $updateData['estado'] = 2;
+            $updateData['user_created_finalizado']  = $id_usuario;
+            $updateData['fecha_finalizacion']       = now();
 
-            if ($finalizacion) {
-                $updateData['estado'] = 2;
-                $updateData['user_created_finalizado'] = $id_usuario;
-                $updateData['fecha_finalizacion'] = now();
-            }
 
             // Actualizar el encabezado
             CodigosLibrosDevolucionHeader::where('id', $id_documento)->update($updateData);
 
             // Actualizar la tabla codigoslibros_devolucion_son
             CodigosLibrosDevolucionSon::where('codigoslibros_devolucion_id', $id_documento)
-                ->where('estado', '<>', '0')
-                ->update(['estado' => $revision ? 1 : 2]);
+                ->where('estado', '=', '1')
+                ->update(['estado' =>  2]);
 
             // Confirmar transacción
             DB::commit();
@@ -617,7 +617,7 @@ class DevolucionController extends Controller
                                 "pro_codigo"                => $item->codigo_liquidacion,
                                 "id_institucion"            => $id_institucion,
                                 "id_periodo"                => $id_periodo,
-                                "id_empresa"                => $codigo_empresa   
+                                "id_empresa"                => $codigo_empresa
                             ];
                             $cantidadDisponible = $this->devolucionRepository->getDisponibilidadCodigoPrefactura($datos);
                             if ($cantidadDisponible < 1) {
@@ -730,7 +730,7 @@ class DevolucionController extends Controller
             foreach ($codigos as $codigo) {
                 CodigosLibros::where('codigo', $codigo->codigo)->update(['documento_devolucion' => null,'permitir_devolver_nota' => 0]);
             }
-            
+
             // Eliminar los hijos
             CodigosLibrosDevolucionSon::where('codigoslibros_devolucion_id', $id_documento)->delete();
 
@@ -792,5 +792,42 @@ class DevolucionController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    public function Post_modificar_cabecera_devolucion(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            // Buscar el devolucionedicioncabecera por su codigo_devolucion
+            $devolucionedicioncabecera = CodigosLibrosDevolucionHeader::where('codigo_devolucion', $request->codigo_devolucion)->first();
+
+            // Verificar si el registro existe
+            if (!$devolucionedicioncabecera) {
+                DB::rollback();
+                return response()->json(["status" => "0", 'message' => 'No tiene id de devolucion'], 404);
+            }
+
+            // Asignar los datos del devolucionedicioncabecera
+            $devolucionedicioncabecera->observacion = $request->observacion;
+            $devolucionedicioncabecera->cantidadCajas = $request->cantidadCajas;
+            $devolucionedicioncabecera->cantidadPaquetes = $request->cantidadPaquetes;
+            $devolucionedicioncabecera->user_edit_cabecera = $request->user_edit_cabecera;
+            $devolucionedicioncabecera->updated_at = now();
+
+            // Guardar el devolucionedicioncabecera
+            $devolucionedicioncabecera->save();
+
+            // Verificar si el producto se guardó correctamente
+            if ($devolucionedicioncabecera->wasChanged()) {
+                DB::commit();
+                return response()->json(["status" => "1", "message" => "Se guardó correctamente"]);
+            } else {
+                DB::rollback();
+                return response()->json(["status" => "0", "message" => "No se pudo actualizar"]);
+            }
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
+        }
     }
 }
