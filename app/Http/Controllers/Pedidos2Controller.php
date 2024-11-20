@@ -64,6 +64,7 @@ class Pedidos2Controller extends Controller
         if($request->getReporteFacturadoXAsesores)  { return $this->getReporteFacturadoXAsesores($request); }
         if($request->getInfoFacturadoXyear)         { return $this->getInfoFacturadoXyear($request); }
         if($request->getInfoVendidoXyear)           { return $this->getInfoVendidoXyear($request); }
+        if($request->getInfoVendidoFacturadoXyear)           { return $this->getInfoVendidoFacturadoXyear($request); }
     }
     //API:GET/pedidos2/pedidos?getLibrosFormato=yes&periodo_id=22
     /**
@@ -674,6 +675,70 @@ class Pedidos2Controller extends Controller
         
         return $result;
     }
+
+    public function getInfoVendidoFacturadoXyear($request) {
+        $year = $request->year;
+        $infoVendido = $this->getInfoVendidoXyear($request);
+        $infoFacturado = $this->getInfoFacturadoXyear($request);
+    
+        foreach ($infoVendido['datosProlipa']['documentos']['facturas']['detalles'] as &$facturaDetalle) {
+            $pro_codigo = $facturaDetalle['pro_codigo'];
+            $encontrado = false;
+    
+            foreach ($infoFacturado['datosProlipa']['detalles'] as $facturadoDetalle) {
+                if ($facturadoDetalle['pro_codigo'] == $pro_codigo) {
+                    $facturaDetalle['cantidad_facturada'] = $facturadoDetalle['cantidad'] ?? 0;
+                    $facturaDetalle['total_pendiente'] = round(($facturaDetalle['cantidad'] - $facturaDetalle['cantidad_facturada']) * $facturaDetalle['precio_unitario'], 2) ?? 0;
+                    $encontrado = true;
+                    break;
+                }
+            }
+    
+            if (!$encontrado) {
+                $facturaDetalle['cantidad_facturada'] = 0;
+                $facturaDetalle['total_pendiente'] = round($facturaDetalle['cantidad'] * $facturaDetalle['precio_unitario'], 2);
+            }
+        }
+    
+        foreach (['actas', 'notas'] as $tipoDocumento) {
+            foreach ($infoVendido['datosProlipa']['documentos'][$tipoDocumento]['detalles'] as &$detalle) {
+                $detalle['cantidad_facturada'] = 0;
+                $detalle['total_pendiente'] = 0;
+            }
+        }
+    
+        foreach ($infoVendido['datosCalmed']['documentos']['facturas']['detalles'] as &$facturaDetalle) {
+            $pro_codigo = $facturaDetalle['pro_codigo'];
+            $encontrado = false;
+    
+            foreach ($infoFacturado['datosCalmed']['detalles'] as $facturadoDetalle) {
+                if ($facturadoDetalle['pro_codigo'] == $pro_codigo) {
+                    $facturaDetalle['cantidad_facturada'] = $facturadoDetalle['cantidad'];
+                    $facturaDetalle['total_pendiente'] = round(($facturaDetalle['cantidad'] - $facturaDetalle['cantidad_facturada']) * $facturaDetalle['precio_unitario'], 2);
+                    $encontrado = true;
+                    break;
+                }
+            }
+    
+            if (!$encontrado) {
+                $facturaDetalle['cantidad_facturada'] = 0;
+                $facturaDetalle['total_pendiente'] = round($facturaDetalle['cantidad'] * $facturaDetalle['precio_unitario'], 2);
+            }
+        }
+    
+        foreach (['actas', 'notas'] as $tipoDocumento) {
+            foreach ($infoVendido['datosCalmed']['documentos'][$tipoDocumento]['detalles'] as &$detalle) {
+                $detalle['cantidad_facturada'] = 0;
+                $detalle['total_pendiente'] = 0;
+            }
+        }
+    
+        return $infoVendido;
+    }
+    
+    
+    
+    
    
    
    
@@ -1481,6 +1546,114 @@ class Pedidos2Controller extends Controller
             $validate[$key] = $this->validarIfExistsLibro($item,$libroSolicitados);
         }
         return $validate;
+    }
+
+    //api:get/pedidosDespacho_new?ca_codigo_agrupado=1265&id_periodo=23
+    public function pedidosDespacho_new(Request $request){
+        $ca_codigo_agrupado = $request->id_despacho;
+        $id_periodo  = $request->id_periodo;
+        $arrayLibros = [];
+        //get id_pedidos de despacho
+        $query       = $this->tr_pedidosXDespacho($ca_codigo_agrupado,$id_periodo);
+        // return $query;
+        if(empty($query)){
+            return ["status" => "0", "message" => "No se encontraron pedidos en el despacho"];
+        }
+        $arrayIds    = [];
+        //guardar en un array los id de pedidos
+        foreach($query as $key => $item){
+            if($item->contrato_generado!=null){
+                $arrayIds[] = (String)$item->id_pedido;
+            }
+         }
+        if(empty($arrayIds)){
+            //response codigo 404
+            return ["status" => "0", "message" => "No se encontraron pedidos para este despacho"];
+        }
+        //convierte en string el array
+        $arrayIds = implode(",",$arrayIds);
+        $arrayLibros = $this->geAllLibrosxAsesor_new(0,$id_periodo,1,$arrayIds);
+        $ca_codigo_agrupado = $request->id_despacho;
+        $id_periodo  = $request->id_periodo;
+        $query = $this->tr_pedidosXDespacho($ca_codigo_agrupado,$id_periodo);
+        $datos = [];
+        foreach($query as $key => $item){
+            $validate               = [];
+            if($item->contrato_generado!=null){
+                $validate               = $this->obtenerValores_new($arrayLibros,$item->id_pedido);
+            }
+            $datos[$key] = [
+                'id_pedido'         => $item->id_pedido,
+                'contrato_generado' => $item->contrato_generado,
+                'nombreInstitucion' => $item->nombreInstitucion,
+                'ciudad'            => $item->ciudad,
+                'librosFormato'     => $validate,
+            ];
+        }
+        //del arreglo datos voy a recorrer el arrayLibros y sumar la propiedad valor que esta en librosFormato
+        $resultado = [];
+        foreach($arrayLibros as $key => $item){
+            //del array de datos en la propiedad librosFormato voy a filtrar por el libro_id y sumar el valor
+            //y sumar el valor
+            $total = 0;
+            foreach($datos as $k => $tr){
+                $libro = collect($tr['librosFormato'])->where('libro_id',$item->libro_id)->first();
+                if($libro){
+                    $total += $libro['valor'];
+
+                }
+            }
+            $resultado[$key] = [
+                "nombrelibro"        => $item->nombrelibro,
+                "nombre_serie"       => $item->nombre_serie,
+                "precio"             => $item->precio,
+                "codigo_liquidacion" => $item->codigo,
+                "libro_id"           => $item->libro_id,
+                "valor"              => $total,
+                "stock"              => $item->stock,
+                "cantidad"           => 0,
+                "id_serie"           => $item->id_serie,
+                "descripcion"        => $item->descripcion,
+            ];
+        }
+        return $resultado;
+    }
+
+    //API:GET/pedidos2/pedidos?getLibrosXInstitucionesAsesor_new=yes&id_periodo=23&tipo_venta=1&id_asesor=1
+    public function getLibrosXInstitucionesAsesor_new($id_periodo,$tipo_venta,$asesor){
+        $query = $this->tr_getInstitucionesVentaXTipoVentaAsesor($id_periodo,$tipo_venta,$asesor);
+        $id_pedidos = "";
+        //crear un coleccion y pluck de id_pedido
+        $id_pedidos = collect($query)->pluck('id_pedido');
+        //convertir en string
+        $id_pedidos = implode(",",$id_pedidos->toArray());
+        $query = $this->geAllLibrosxAsesor_new(0,$id_periodo,1,$id_pedidos);
+        return $query;
+    }
+
+    //API:POST/pedidos2/pedidos?getValoresLibrosContratosInstitucionesAsesor_new
+    public function getValoresLibrosContratosInstitucionesAsesor_new($request){
+        $arrayLibros = [];
+        $arrayLibros = json_decode($request->arrayLibros);
+        $id_periodo  = $request->id_periodo;
+        $tipo_venta  = $request->tipo_venta;
+        $id_asesor   = $request->id_asesor;
+        $query = $this->tr_getInstitucionesVentaXTipoVentaAsesor($id_periodo,$tipo_venta,$id_asesor);
+        $datos = [];
+        foreach($query as $key => $item){
+            $validate               = [];
+            $validate               = $this->obtenerValores_new($arrayLibros,$item->id_pedido);
+            $datos[$key] = [
+                'id_pedido'         => $item->id_pedido,
+                'id_asesor'         => $item->id_asesor,
+                'asesor'            => $item->asesor,
+                'contrato_generado' => $item->contrato_generado,
+                'nombreInstitucion' => $item->nombreInstitucion,
+                'ciudad'            => $item->ciudad,
+                'librosFormato'     => $validate,
+            ];
+        }
+         return $datos;
     }
     //FIN METODOS JEYSON
 }
