@@ -64,7 +64,9 @@ class Pedidos2Controller extends Controller
         if($request->getReporteFacturadoXAsesores)  { return $this->getReporteFacturadoXAsesores($request); }
         if($request->getInfoFacturadoXyear)         { return $this->getInfoFacturadoXyear($request); }
         if($request->getInfoVendidoXyear)           { return $this->getInfoVendidoXyear($request); }
-        if($request->getInfoVendidoFacturadoXyear)           { return $this->getInfoVendidoFacturadoXyear($request); }
+        if($request->getInfoVendidoFacturadoXyear)  { return $this->getInfoVendidoFacturadoXyear($request); }
+        if($request->getCobradoXyear)               { return $this->getCobradoXyear($request); }
+        
     }
     //API:GET/pedidos2/pedidos?getLibrosFormato=yes&periodo_id=22
     /**
@@ -736,7 +738,28 @@ class Pedidos2Controller extends Controller
         return $infoVendido;
     }
     
+    public function getCobradoXyear($request) {
+        $year = $request->year;
     
+        $abonos = DB::table('abono as a')
+            ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', 'a.*')
+            ->where('a.abono_estado', 0)
+            ->where('a.abono_periodo', '<>',20)
+            ->whereYear('a.abono_fecha', $year)
+            ->get();
+
+        foreach ($abonos as $key => $value) {
+            $institucion = DB::table('f_venta as v')
+                ->join('institucion as i', 'i.idInstitucion', '=', 'v.institucion_id')
+                ->select('i.idInstitucion', 'i.nombreInstitucion')
+                ->where('v.ruc_cliente', $value->abono_ruc_cliente)
+                ->first();
+                $abonos[$key]->institucion = $institucion->nombreInstitucion;
+        }
+    
+        return response()->json($abonos);
+    }
     
     
    
