@@ -500,7 +500,7 @@ class InstitucionController extends Controller
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
             ic.estado as EstadoConfiguracion, ic.periodo_configurado,i.codigo_mitlon_coincidencias,
             pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion,
-            i.punto_venta
+            i.punto_venta,i.maximo_porcentaje_autorizado, i.ruc, i.ifcodigoEvaluacion
             FROM institucion i
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN region r ON i.region_idregion = r.idregion
@@ -518,7 +518,7 @@ class InstitucionController extends Controller
             u.apellidos AS apellido_asesor, i.fecha_registro, r.nombreregion, i.codigo_institucion_milton,
             ic.estado as EstadoConfiguracion, ic.periodo_configurado,i.codigo_mitlon_coincidencias,
             pec.periodoescolar as periodoNombreConfigurado,i.vendedorInstitucion,u.iniciales,i.cantidad_cambio_ventana_evaluacion,
-            i.punto_venta
+            i.punto_venta,i.maximo_porcentaje_autorizado, i.ruc, i.ifcodigoEvaluacion
             FROM institucion i
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
             LEFT JOIN region r ON i.region_idregion = r.idregion
@@ -574,7 +574,10 @@ class InstitucionController extends Controller
                         "iniciales"             => $item->iniciales,
                         "region"                => $item->region_idregion,
                         "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion,
-                        "punto_venta" => $item->punto_venta
+                        "punto_venta" => $item->punto_venta,
+                        "maximo_porcentaje_autorizado" => $item->maximo_porcentaje_autorizado,
+                        "ruc" => $item->ruc,
+                        "ifcodigoEvaluacion" => $item->ifcodigoEvaluacion
                     ];
                 }else{
                     $datos[$key]=[
@@ -601,7 +604,10 @@ class InstitucionController extends Controller
                         "iniciales"             => $item->iniciales,
                         "region"                => $item->region_idregion,
                         "cantidad_cambio_ventana_evaluacion" => $item->cantidad_cambio_ventana_evaluacion,
-                        "punto_venta" => $item->punto_venta
+                        "punto_venta" => $item->punto_venta,
+                        "maximo_porcentaje_autorizado" => $item->maximo_porcentaje_autorizado,
+                        "ruc" => $item->ruc,
+                        "ifcodigoEvaluacion" => $item->ifcodigoEvaluacion
                     ];
                 }
             }
@@ -813,6 +819,7 @@ class InstitucionController extends Controller
 
         return $lista;
     }
+
     public function getinstitucion_libros(Request $request)
     {
         $lista = DB::SELECT("SELECT l.*, ls.nombre FROM librosinstituciones_detalle l
@@ -862,6 +869,7 @@ class InstitucionController extends Controller
                 ->where('li_id', $librosInstitucionId)
                 ->update([
                     'li_codigo' => $request->codigo,
+                    'li_url' => $request->url,
                     'expires_at' => $request->expires,
                 ]);
 
@@ -907,6 +915,7 @@ class InstitucionController extends Controller
                     'li_idInstitucion' => $request->codigo_institucion,
                     'li_periodo' => $request->periodo_id,
                     'li_codigo' => $request->codigo,
+                    'li_url' => $request->url,
                     'expires_at' => $request->expires,
                 ]);
 
@@ -955,6 +964,9 @@ class InstitucionController extends Controller
         WHERE li.idInstitucion = '$institucion'");
         return $lista;
     }
+
+
+
 
     //se debe habilitar cuando la zona sea obligatoria
     // public function institucion_zona(Request $request)

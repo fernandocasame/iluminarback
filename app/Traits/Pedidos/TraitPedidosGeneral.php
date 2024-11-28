@@ -128,7 +128,8 @@ trait TraitPedidosGeneral
         ph.fecha_generar_contrato,
         (p.TotalVentaReal - ((p.TotalVentaReal * p.descuento)/100)) AS ven_neta,
         (p.TotalVentaReal * p.descuento)/100 as valorDescuento,
-        ps.id_grupo_finaliza, des.ca_descripcion as despacho
+        ps.id_grupo_finaliza, des.ca_descripcion as despacho,
+        CONCAT(editComsion.nombres, " ", editComsion.apellidos) AS asesor_editComision
         '))
         ->leftjoin('usuario as u',          'p.id_asesor',          'u.idusuario')
         ->leftjoin('usuario as uf',         'p.id_usuario_verif',   'uf.idusuario')
@@ -137,6 +138,7 @@ trait TraitPedidosGeneral
         ->leftjoin('periodoescolar as pe',  'pe.idperiodoescolar',  'p.id_periodo')
         ->leftjoin('pedidos_historico as ph','p.id_pedido',         'ph.id_pedido')
         ->leftjoin('pedidos_solicitudes_gerencia as ps','p.id_solicitud_gerencia_comision','ps.id')
+        ->leftJoin('usuario as editComsion',   'ps.user_finaliza',     'editComsion.idusuario')
         ->leftjoin('f_contratos_agrupados as des','p.ca_codigo_agrupado','des.ca_codigo_agrupado')
         ->where('p.tipo','=','0');
         //fitlro por x id

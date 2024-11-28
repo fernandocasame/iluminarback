@@ -40,6 +40,13 @@ class CodigosLibrosDevolucionHeader extends Model
     {
         return $this->belongsTo(Periodo::class, 'periodo_id');
     }
+
+    public function devolucionSonSinEmpresa()
+    {
+        return $this->hasMany(CodigosLibrosDevolucionSon::class, 'codigoslibros_devolucion_id', 'id')
+                    ->whereNull('id_empresa');
+    }
+
     //casts
     protected $casts = [
         'created_at' => 'datetime',

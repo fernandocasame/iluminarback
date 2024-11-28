@@ -1532,7 +1532,7 @@ class VerificacionControllerAnterior extends Controller
         return $query;
     }
 
-    //INICIO METODOS JEYSON 
+    //INICIO METODOS JEYSON
     public function getAllCodigosXContrato_new($request){
         //limpiar cache
         Cache::flush();
@@ -1592,4 +1592,67 @@ class VerificacionControllerAnterior extends Controller
         return $datos;
      }
     //FIN METODOS JEYSON
+    //api:get/metodosGetVerificaciones
+    public function metodosGetVerificaciones(Request $request){
+       if($request->getVerificaciones){
+           return $this->getVerificaciones($request);
+       }
+    }
+    // api:get/metodosGetVerificaciones?getVerificaciones=1&id_asesor=4179&pendientesNot=1&soloLongitud=1
+    public function getVerificaciones($request){
+        $id_asesor      = $request->id_asesor;
+        $pendientesNot  = $request->pendientesNot;
+        $soloLongitud   = $request->soloLongitud;
+        $verificaciones = DB::table('verificaciones as v')
+        ->select('v.num_verificacion','v.id', 'v.contrato', 'v.fecha_subir_evidencia','v.file_evidencia', 'i.nombreInstitucion',
+        'v.fecha_subir_factura','v.file_factura','v.ifnotificado',
+         DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor')
+        )
+        ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
+        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+        ->leftJoin('usuario as u','u.idusuario','=','i.asesor_id')
+        ->whereNotNull('v.file_evidencia')
+        ->where('p.estado', '1')
+        ->when($id_asesor, function ($query) use ($id_asesor) {
+            $query->where('i.asesor_id', $id_asesor);
+        })
+        ->when($pendientesNot, function ($query) {
+            $query->where('v.ifnotificado', '0');
+        })
+        ->orderByDesc('v.id')
+        ->get();
+        if($soloLongitud){
+            //count($verificaciones);
+            return count($verificaciones);
+        }
+        return $verificaciones;
+    }
+    //api:post/metodosPostVerificaciones
+    public function metodosPostVerificaciones(Request $request){
+        if($request->guardarNotificacionVerificacion){ return $this->guardarNotificacionVerificacion($request); }
+    }
+    //api:post/metodosPostVerificaciones?guardarNotificacionVerificacion=1
+    public function guardarNotificacionVerificacion($request){
+        try{
+            //transaccion
+            DB::beginTransaction();
+            $arrayNotificaciones = json_decode($request->data_verificacion);
+            $contador            = 0;
+            foreach($arrayNotificaciones as $key => $item){
+                $getid = $item->id;
+                Verificacion::where('id', $getid)->update([
+                    'ifnotificado' => 1
+                ]);
+                $contador++;
+            }
+            DB::commit();
+            return[
+                "guardados" => $contador,
+            ];
+
+        }catch(\Exception $e){
+            DB::rollback();
+            return response()->json(["error"=>"0", "message" => $e->getMessage()], 500);
+        }
+    }
 }

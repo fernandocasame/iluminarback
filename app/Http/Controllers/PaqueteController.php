@@ -84,7 +84,7 @@ class PaqueteController extends Controller
         $codigoConProblemas         = collect();
         $arregloProblemaPaquetes    = [];
         $contadorErrPaquetes        = 0;
-    
+
         //====PROCESO===================================
         DB::beginTransaction(); // Inicia la transacción
         try {
@@ -97,7 +97,7 @@ class PaqueteController extends Controller
                 $noExisteA = 0;
                 $noExisteD = 0;
                 $codigoPaquete = strtoupper($item->codigoPaquete);
-    
+
                 // VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
                 $ExistsPaquete = $this->getPaquete($codigoPaquete);
                 if (!empty($ExistsPaquete)) {
@@ -107,22 +107,22 @@ class PaqueteController extends Controller
                         $errorA = 1;
                         $errorD = 1;
                         $mensajeError = "";
-    
+
                         // Validación
                         $validarA = $this->getCodigos($codigoActivacion, 0);
                         $validarD = $this->getCodigos($codigoDiagnostico, 0);
                         $comentario = "Se agregó al paquete " . $codigoPaquete;
-    
+
                         //======si ambos codigos existen========
                         if (count($validarA) > 0 && count($validarD) > 0) {
                             // Activación
                             $ifcodigo_paqueteA = $validarA[0]->codigo_paquete;
                             $codigo_unionA = strtoupper($validarA[0]->codigo_union);
-    
+
                             // Diagnóstico
                             $ifcodigo_paqueteD = $validarD[0]->codigo_paquete;
                             $codigo_unionD = strtoupper($validarD[0]->codigo_union);
-    
+
                             //===VALIDACION====
                             if ($ifcodigo_paqueteA == null && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) {
                                 $errorA = 0;
@@ -130,7 +130,7 @@ class PaqueteController extends Controller
                             if ($ifcodigo_paqueteD == null && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0"))) {
                                 $errorD = 0;
                             }
-    
+
                             //===MENSAJE VALIDACION====
                             if ($errorA == 1 && $errorD == 0) {
                                 $mensajeError = "Problema con el código de activación";
@@ -145,7 +145,7 @@ class PaqueteController extends Controller
                                 $codigoConProblemas->push($validarA);
                                 $codigoConProblemas->push($validarD);
                             }
-    
+
                             // SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
                             if ($errorA == 0 && $errorD == 0) {
                                 $old_valuesA = CodigosLibros::Where('codigo', $codigoActivacion)->get();
@@ -160,19 +160,19 @@ class PaqueteController extends Controller
                                 }
                                 else{
                                     $problemasconCodigo[$contadorProblemasCodigos] = [
-                                        "codigo"        => $codigoActivacion,
-                                        "codigoUnion"   => $codigoDiagnostico,
-                                        "problema"      => "No se guardaron los codigos"
+                                        "codigoActivacion"  => $codigoActivacion,
+                                        "codigoDiagnostico" => $codigoDiagnostico,
+                                        "problema"          => "No se guardaron los codigos"
                                     ];
                                     $contadorProblemasCodigos++;
                                 }
-                               
+
                             } else {
                                 // SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
                                 $problemasconCodigo[$contadorProblemasCodigos] = [
-                                    "codigo"        => $codigoActivacion,
-                                    "codigoUnion"   => $codigoDiagnostico,
-                                    "problema"      => $mensajeError
+                                    "codigoActivacion"    => $codigoActivacion,
+                                    "codigoDiagnostico"   => $codigoDiagnostico,
+                                    "problema"            => $mensajeError
                                 ];
                                 $contadorProblemasCodigos++;
                             }
@@ -192,24 +192,25 @@ class PaqueteController extends Controller
                                 $mensajeError = "Ambos códigos no existen";
                             }
                             $problemasconCodigo[$contadorProblemasCodigos] = [
-                                "codigo" => $codigoActivacion,
-                                "codigoUnion" => $codigoDiagnostico,
-                                "problema" => $mensajeError
+                                "codigoActivacion"  => $codigoActivacion,
+                                "codigoDiagnostico" => $codigoDiagnostico,
+                                "problema"          => $mensajeError
                             ];
                             $contadorProblemasCodigos++;
                         }
                     }
                     //si contadorA  es mayor a cero marco como utilizado
-                    if($contadorA > 0){ $this->changeUsePaquete($codigoPaquete); }
+                    if($contadorA > 1){ $this->changeUsePaquete($codigoPaquete); }
                     // Codigos resumen
-                    $arregloResumen[$contadorResumen] = [
-                        "codigoPaquete" => $codigoPaquete,
-                        "codigosHijos" => $problemasconCodigo,
-                        "mensaje" => empty($ExistsPaquete) ? 1 : '0',
-                        "ingresoA" => $contadorA,
-                        "ingresoD" => $contadorD,
-                        "noExisteA" => $noExisteA,
-                        "noExisteD" => $noExisteD
+                    $arregloResumen[$contadorResumen]   = [
+                        "codigoPaquete"                 => $codigoPaquete,
+                        "codigosHijos"                  => $problemasconCodigo,
+                        "mensaje"                       => empty($ExistsPaquete) ? 1 : '0',
+                        "ingresoA"                      => $contadorA,
+                        "ingresoD"                      => $contadorD,
+                        "noExisteA"                     => $noExisteA,
+                        "noExisteD"                     => $noExisteD,
+                        "contadorProblemasCodigos"      => $contadorProblemasCodigos,
                     ];
                     $contadorResumen++;
                 } else {
@@ -221,9 +222,9 @@ class PaqueteController extends Controller
                     $contadorErrPaquetes++;
                 }
             }
-    
+
             DB::commit(); // Confirma la transacción
-    
+
             if (count($codigoConProblemas) == 0) {
                 return [
                     "arregloResumen" => $arregloResumen,
@@ -245,7 +246,7 @@ class PaqueteController extends Controller
     public function guardarPaquete2(Request $request) {
         set_time_limit(600000);
         ini_set('max_execution_time', 600000);
-        
+
         $miArrayDeObjetos           = json_decode($request->data_codigos);
         //variables
         $usuario_editor             = $request->id_usuario;
@@ -256,10 +257,10 @@ class PaqueteController extends Controller
         $contadorErrPaquetes        = 0;
         $contadorResumen            = 0;
         $institucion_id             = 0;
-    
+
         try {
             DB::beginTransaction();
-    
+
             //====PROCESO===================================
             foreach ($miArrayDeObjetos as $key => $item) {
                 //variables
@@ -270,7 +271,7 @@ class PaqueteController extends Controller
                 $noExisteA = 0;
                 $noExisteB = 0;
                 $codigoPaquete = strtoupper($item->codigoPaquete);
-    
+
                 //VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
                 $ExistsPaquete = $this->getPaquete($codigoPaquete);
                 if (!empty($ExistsPaquete)) {
@@ -279,24 +280,24 @@ class PaqueteController extends Controller
                         $errorA = 1;
                         $errorB = 1;
                         $comentario = "Se agregó al paquete " . $codigoPaquete;
-    
+
                         //validar si el codigo existe
                         $validarA = CodigosLibros::where('codigo', $codigoA)->get();
                         if (count($validarA) > 0) {
                             $codigoB = strtoupper($validarA[0]->codigo_union);
                             $validarB = CodigosLibros::where('codigo', $codigoB)->get();
-                            
+
                             if (count($validarB) > 0) {
                                 //VARIABLES PARA EL PROCESO
                                 $ifcodigo_paqueteA  = strtoupper($validarA[0]->codigo_paquete);
                                 $codigo_unionA      = strtoupper($validarA[0]->codigo_union);
                                 $ifcodigo_paqueteB  = strtoupper($validarB[0]->codigo_paquete);
                                 $codigo_unionB      = strtoupper($validarB[0]->codigo_union);
-                                
+
                                 //===VALIDACION====
                                 if ($ifcodigo_paqueteA == null && (($codigo_unionA == $codigoB) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) $errorA = 0;
                                 if ($ifcodigo_paqueteB == null && (($codigo_unionB == $codigoA) || ($codigo_unionB == null || $codigo_unionB == "" || $codigo_unionB == "0"))) $errorB = 0;
-    
+
                                 //===MENSAJE VALIDACION====
                                 if ($errorA == 1 && $errorB == 0) {
                                     $mensajeError = "Problema con el código de activación";
@@ -311,14 +312,14 @@ class PaqueteController extends Controller
                                     $codigoConProblemas->push($validarA);
                                     $codigoConProblemas->push($validarB);
                                 }
-    
+
                                 //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
                                 if ($errorA == 0 && $errorB == 0) {
                                     $old_valuesA    = $validarA;
                                     $ingresoA       = $this->updatecodigosPaquete($codigoPaquete, $codigoA, $codigoB);
                                     $old_valuesB    = $validarB;
                                     $ingresoB       = $this->updatecodigosPaquete($codigoPaquete, $codigoB, $codigoA);
-                                    
+
                                     if($ingresoA && $ingresoB){
                                         $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null);
                                         $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null);
@@ -327,8 +328,8 @@ class PaqueteController extends Controller
                                     }
                                     else{
                                         $problemasconCodigo[$contadorProblemasCodigos] = [
-                                            "codigo"        => $codigoA,
-                                            "codigoUnion"   => $codigoB,
+                                            "codigoActivacion"  => $codigoA,
+                                            "codigoDiagnostico" => $codigoB,
                                             "problema"      => "No se guardaron los codigos"
                                         ];
                                         $contadorProblemasCodigos++;
@@ -336,8 +337,8 @@ class PaqueteController extends Controller
                                 } else {
                                     //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
                                     $problemasconCodigo[$contadorProblemasCodigos] = [
-                                        "codigo"        => $codigoA,
-                                        "codigoUnion"   => $codigoB,
+                                        "codigoActivacion"    => $codigoA,
+                                        "codigoDiagnostico"   => $codigoB,
                                         "problema"      => $mensajeError
                                     ];
                                     $contadorProblemasCodigos++;
@@ -346,9 +347,9 @@ class PaqueteController extends Controller
                                 $noExisteB++;
                                 $mensajeError = "No existe el código de unión";
                                 $problemasconCodigo[$contadorProblemasCodigos] = [
-                                    "codigo" => $codigoA,
-                                    "codigoUnion" => $codigoB,
-                                    "problema" => $mensajeError
+                                    "codigoActivacion"  => $codigoA,
+                                    "codigoDiagnostico" => $codigoB,
+                                    "problema"          => $mensajeError
                                 ];
                                 $contadorProblemasCodigos++;
                             }
@@ -356,22 +357,23 @@ class PaqueteController extends Controller
                             $noExisteA++;
                             $mensajeError = "No existe el código";
                             $problemasconCodigo[$contadorProblemasCodigos] = [
-                                "codigo" => $codigoA,
-                                "codigoUnion" => "",
-                                "problema" => $mensajeError
+                                "codigoActivacion"  => $codigoA,
+                                "codigoDiagnostico" => "",
+                                "problema"          => $mensajeError
                             ];
                             $contadorProblemasCodigos++;
                         }
                     }
                     //codigos resumen
                     $arregloResumen[$contadorResumen] = [
-                        "codigoPaquete" => $codigoPaquete,
-                        "codigosHijos"  => $problemasconCodigo,
-                        "mensaje"       => empty($ExistsPaquete) ? 1 : '0',
-                        "ingresoA"      => $contadorA,
-                        "ingresoD"      => $contadorB,
-                        "noExisteA"     => $noExisteA,
-                        "noExisteD"     => $noExisteB
+                        "codigoPaquete"             => $codigoPaquete,
+                        "codigosHijos"              => $problemasconCodigo,
+                        "mensaje"                   => empty($ExistsPaquete) ? 1 : '0',
+                        "ingresoA"                  => $contadorA,
+                        "ingresoD"                  => $contadorB,
+                        "noExisteA"                 => $noExisteA,
+                        "noExisteD"                 => $noExisteB,
+                        "contadorProblemasCodigos"  => $contadorProblemasCodigos,
                     ];
                     $contadorResumen++;
                 } else {
@@ -388,9 +390,9 @@ class PaqueteController extends Controller
                     $this->changeUsePaquete($codigoPaquete);
                 }
             }
-    
+
             DB::commit(); // Commit the transaction
-    
+
             if (count($codigoConProblemas) == 0) {
                 return [
                     "arregloResumen"            => $arregloResumen,
@@ -411,8 +413,8 @@ class PaqueteController extends Controller
             DB::rollBack(); // Rollback the transaction
             return response()->json(['status' => '0', 'message' => 'Ocurrió un error al guardar el paquete: ' . $e->getMessage()], 200);
         }
-    }    
-    
+    }
+
     public function changeUsePaquete($codigo){
         $paq = CodigosPaquete::findOrFail($codigo);
         $paq->estado = "0";
@@ -479,7 +481,7 @@ class PaqueteController extends Controller
             $noExisteA                  = 0;
             $noExisteD                  = 0;
             $mensajePadre               = "";
-            $codigoPaquete              = strtoupper($item->codigoPaquete); 
+            $codigoPaquete              = strtoupper($item->codigoPaquete);
             //validar
             $getExistsPaquete   = $this->getExistsPaquete($codigoPaquete);
             if(!empty($getExistsPaquete)){
@@ -613,17 +615,18 @@ class PaqueteController extends Controller
                     ];
                     $contadorErrPaquetes++;
                 }
-                    
+
                 //codigos resumen
                 $arregloResumen[$contadorResumen] = [
-                    "codigoPaquete"     => $codigoPaquete,
-                    "codigosHijos"      => $problemasconCodigo,
-                    "mensaje"           => empty($getExistsPaquete) ? 1 : '0',
-                    "mensajePadre"      => $mensajePadre,
-                    "ingresoA"          => $contadorA,
-                    "ingresoD"          => $contadorD,
-                    "noExisteA"         => $noExisteA,
-                    "noExisteD"         => $noExisteD
+                    "codigoPaquete"             => $codigoPaquete,
+                    "codigosHijos"              => $problemasconCodigo,
+                    "mensaje"                   => empty($getExistsPaquete) ? 1 : '0',
+                    "mensajePadre"              => $mensajePadre,
+                    "ingresoA"                  => $contadorA,
+                    "ingresoD"                  => $contadorD,
+                    "noExisteA"                 => $noExisteA,
+                    "noExisteD"                 => $noExisteD,
+                    "contadorProblemasCodigos"  => $contadorProblemasCodigos,
                 ];
                 $contadorResumen++;
             }else{
@@ -781,7 +784,7 @@ class PaqueteController extends Controller
         return $datos;
     }
     public function getCodigosXPaquete($paquete){
-        $query = DB::SELECT("SELECT codigo,libro FROM codigoslibros c
+        $query = DB::SELECT("SELECT codigo,libro,codigo_proforma,factura,combo FROM codigoslibros c
         WHERE c.codigo_paquete = '$paquete'
         ");
         return $query;
@@ -954,13 +957,14 @@ class PaqueteController extends Controller
                 }
                 //codigos resumen
                 $arregloResumen[$contadorResumen] = [
-                    "codigoPaquete"     => $item->codigoPaquete,
-                    "codigosHijos"      => $problemasconCodigo,
-                    "mensaje"           => empty($getExistsPaquete) ? 1 : '0',
-                    "ingresoA"          => $contadorA,
-                    "ingresoD"          => $contadorD,
-                    "noExisteA"         => $noExisteA,
-                    "noExisteD"         => $noExisteD
+                    "codigoPaquete"             => $item->codigoPaquete,
+                    "codigosHijos"              => $problemasconCodigo,
+                    "mensaje"                   => empty($getExistsPaquete) ? 1 : '0',
+                    "ingresoA"                  => $contadorA,
+                    "ingresoD"                  => $contadorD,
+                    "noExisteA"                 => $noExisteA,
+                    "noExisteD"                 => $noExisteD,
+                    "contadorProblemasCodigos"  => $contadorProblemasCodigos,
                 ];
                 $contadorResumen++;
             }else{
@@ -1147,18 +1151,19 @@ class PaqueteController extends Controller
                             }
                         }
                     }else{
-                        $mensajePadre = "El paquete no tiene codigos";         
+                        $mensajePadre = "El paquete no tiene codigos";
                     }
                     //codigos resumen
                     $arregloResumen[$contadorResumen] = [
-                        "codigoPaquete"     => $item->codigoPaquete,
-                        "codigosHijos"      => $problemasconCodigo,
-                        "mensajePadre"      => $mensajePadre,
-                        "mensaje"           => empty($getExistsPaquete) ? 1 : '0',
-                        "ingresoA"          => $contadorA,
-                        "ingresoD"          => $contadorD,
-                        "noExisteA"         => $noExisteA,
-                        "noExisteD"         => $noExisteD,
+                        "codigoPaquete"             => $item->codigoPaquete,
+                        "codigosHijos"              => $problemasconCodigo,
+                        "mensajePadre"              => $mensajePadre,
+                        "mensaje"                   => empty($getExistsPaquete) ? 1 : '0',
+                        "ingresoA"                  => $contadorA,
+                        "ingresoD"                  => $contadorD,
+                        "noExisteA"                 => $noExisteA,
+                        "noExisteD"                 => $noExisteD,
+                        "contadorProblemasCodigos"  => $contadorProblemasCodigos,
                     ];
                     $contadorResumen++;
                 }else{
@@ -1351,15 +1356,15 @@ class PaqueteController extends Controller
                                     $contadorProblemasCodigos++;
                                 }
                             } else {
-                                if (empty($validarA) && !empty($validarD)) { 
-                                    $noExisteA++; 
+                                if (empty($validarA) && !empty($validarD)) {
+                                    $noExisteA++;
                                 }
-                                if (!empty($validarA) && empty($validarD)) { 
-                                    $noExisteD++; 
+                                if (!empty($validarA) && empty($validarD)) {
+                                    $noExisteD++;
                                 }
-                                if (empty($validarA) && empty($validarD)) { 
-                                    $noExisteA++; 
-                                    $noExisteD++; 
+                                if (empty($validarA) && empty($validarD)) {
+                                    $noExisteA++;
+                                    $noExisteD++;
                                 }
                                 $problemasconCodigo[$contadorProblemasCodigos] = [
                                     "codigoActivacion" => $codigoActivacion,
@@ -1374,15 +1379,16 @@ class PaqueteController extends Controller
                     }
 
                     // Summary record
-                    $arregloResumen[$contadorResumen] = [
-                        "codigoPaquete" => $codigoPaquete,
-                        "codigosHijos" => $problemasconCodigo,
-                        "mensaje" => empty($getExistsPaquete) ? 1 : '0',
-                        "mensajePadre" => $mensajePadre,
-                        "ingresoA" => $contadorA,
-                        "ingresoD" => $contadorD,
-                        "noExisteA" => $noExisteA,
-                        "noExisteD" => $noExisteD
+                    $arregloResumen[$contadorResumen]   = [
+                        "codigoPaquete"                 => $codigoPaquete,
+                        "codigosHijos"                  => $problemasconCodigo,
+                        "mensaje"                       => empty($getExistsPaquete) ? 1 : '0',
+                        "mensajePadre"                  => $mensajePadre,
+                        "ingresoA"                      => $contadorA,
+                        "ingresoD"                      => $contadorD,
+                        "noExisteA"                     => $noExisteA,
+                        "noExisteD"                     => $noExisteD,
+                        "contadorProblemasCodigos"      => $contadorProblemasCodigos,
                     ];
                     $contadorResumen++;
                 } else {
@@ -1398,9 +1404,9 @@ class PaqueteController extends Controller
             DB::commit();
 
             return [
-                "arregloResumen" => $arregloResumen,
-                "codigoConProblemas" => $codigoConProblemas->isEmpty() ? [] : $codigoConProblemas->flatten(10),
-                "arregloErroresPaquetes" => $arregloProblemaPaquetes,
+                "arregloResumen"            => $arregloResumen,
+                "codigoConProblemas"        => $codigoConProblemas->isEmpty() ? [] : $codigoConProblemas->flatten(10),
+                "arregloErroresPaquetes"    => $arregloProblemaPaquetes,
             ];
         } catch (\Exception $e) {
             // Rollback transaction on error
@@ -1413,7 +1419,7 @@ class PaqueteController extends Controller
             ];
         }
     }
-    
+
     //API:POST/paquetes/ingreso
     public function importPaqueteIngreso(Request $request){
         set_time_limit(6000000);

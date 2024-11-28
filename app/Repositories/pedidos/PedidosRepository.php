@@ -468,5 +468,22 @@ class  PedidosRepository extends BaseRepository
         }
         return $result;
     }
+    
+    public function getPrecioXLibro_new($id_serie, $libro_idlibro, $area_idarea, $periodo, $year) {
+        $precio = 0;
+    
+        // Obtén el valor del campo `pfn_pvp`
+        $pfn_pvp_result = DB::table('pedidos_formato_new')
+            ->where('idperiodoescolar', $periodo)
+            ->where('idlibro', $libro_idlibro)
+            ->value('pfn_pvp');
+    
+        // Verifica si se obtuvo un resultado
+        if (!is_null($pfn_pvp_result)) {
+            $precio = (float) $pfn_pvp_result;
+        }
+    
+        return $precio;
+    }
     //FIN METODO JEYSON
 }

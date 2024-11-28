@@ -46,6 +46,8 @@ class  PaquetesRepository extends BaseRepository
         $ifproforma_empresaA             = $validarA[0]->proforma_empresa;
         //validar si el codigo tiene proforma codigo_proforma
         $ifcodigo_proformaA             = $validarA[0]->codigo_proforma;
+        //venta estado
+        $ifventa_estadoA             = $validarA[0]->venta_estado;
         ///*//////===================Diagnostico=======*/////
         //validar si el codigo ya esta liquidado
         $ifLiquidadoD                = $validarD[0]->estado_liquidacion;
@@ -67,6 +69,8 @@ class  PaquetesRepository extends BaseRepository
         $ifproforma_empresaD            = $validarD[0]->proforma_empresa;
         //validar si el codigo tiene proforma codigo_proforma
         $ifcodigo_proformaD             = $validarD[0]->codigo_proforma;
+        //venta estado
+        $ifventa_estadoD                = $validarD[0]->venta_estado;
         if($request->factura == null || $request->factura == "")   $factura = $facturaA;
         else  $factura = $request->factura;
         //===PRIMERA VALIDACION====
@@ -123,8 +127,8 @@ class  PaquetesRepository extends BaseRepository
             $errorD = 1;
             //=====USAN Y LIQUIDAN=========================
             if($tipoProceso == '0'){
-                if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))  && $ifliquidado_regaladoA == '0') $errorA = 0;
-                if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "") && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && $ifliquidado_regaladoD == '0')     $errorD = 0;
+                if(($ifid_periodoA  == $periodo_id || $ifid_periodoA == 0 ||  $ifid_periodoA == null  ||  $ifid_periodoA == "")  && $ifventa_estadoA == 0   && ($ifBcEstadoA == '1')  && $ifLiquidadoA == '1' && $ifBloqueadoA !=2 &&  (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))  && $ifliquidado_regaladoA == '0') $errorA = 0;
+                if(($ifid_periodoD  == $periodo_id || $ifid_periodoD == 0 ||  $ifid_periodoD == null  ||  $ifid_periodoD == "")  && $ifventa_estadoD == 0   && ($ifBcEstadoD == '1')  && $ifLiquidadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && $ifliquidado_regaladoD == '0')     $errorD = 0;
                 //si el codigo del paquete esta regalado tiene guia  o esta bloqueado no se edita estos campos
                 if($ifLiquidadoA  == '2' || $ifLiquidadoA == '4' || $ifBloqueadoA == 2)  { $errorA = 0; $errorA = 0; }
                 if($ifLiquidadoD  == '2' || $ifLiquidadoD == '4' || $ifBloqueadoD == 2)  { $errorD = 0; $errorD = 0; }
@@ -136,8 +140,8 @@ class  PaquetesRepository extends BaseRepository
             }
             //======REGALADO NO ENTRA A LA LIQUIDACION============
             if($tipoProceso == '1' || $tipoProceso == '5'){
-                if( $ifLiquidadoA == '1' && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
-                if( $ifLiquidadoD == '1' && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
+                if( $ifLiquidadoA == '1' && $ifventa_estadoA == 0 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
+                if( $ifLiquidadoD == '1' && $ifventa_estadoD == 0 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
                 //validacion profomas
                 if($ifErrorProformaA) $errorA = 1;
                 if($ifErrorProformaD) $errorD = 1;
@@ -145,8 +149,8 @@ class  PaquetesRepository extends BaseRepository
             }
             //======REGALADO Y BLOQUEADO(No usan y no liquidan)=============
             if($tipoProceso == '2' || $tipoProceso == '6'){
-                if( ($ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
-                if( ($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
+                if( ($ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifventa_estadoA == 0 && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
+                if( ($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifventa_estadoD == 0 && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion)  || ($codigo_unionD == null || $codigo_unionD == "" || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
                 //validacion profomas
                 if($ifErrorProformaA) $errorA = 1;
                 if($ifErrorProformaD) $errorD = 1;
@@ -154,8 +158,8 @@ class  PaquetesRepository extends BaseRepository
             }
             //===== BLOQUEADO(No usan y no liquidan)=============
             if($tipoProceso == '3' || $tipoProceso == '7'){
-                if( ($ifLiquidadoA !='0' && $ifLiquidadoA !='4') && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
-                if( ($ifLiquidadoD !='0' && $ifLiquidadoD !='4') && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == ""  || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
+                if( ($ifLiquidadoA !='0' && $ifLiquidadoA !='4')  && $ifventa_estadoA == 0  && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
+                if( ($ifLiquidadoD !='0' && $ifLiquidadoD !='4')  && $ifventa_estadoD == 0  && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == ""  || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
                 //validacion profomas
                 if($ifErrorProformaA) $errorA = 1;
                 if($ifErrorProformaD) $errorD = 1;
@@ -163,8 +167,8 @@ class  PaquetesRepository extends BaseRepository
             }
             //===== GUIA=============
             if($tipoProceso == '4' || $tipoProceso == '8'){
-                if( ($ifLiquidadoA == '1' || $ifLiquidadoA == '4') && $ifBcEstadoA == '1' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
-                if( ($ifLiquidadoD == '1' || $ifLiquidadoD == '4') && $ifBcEstadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == ""  || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
+                if( ($ifLiquidadoA == '1' || $ifLiquidadoA == '4')  && $ifventa_estadoA == 0 && $ifBcEstadoA == '1' && $ifBloqueadoA !=2 && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0")) && ($ifliquidado_regaladoA == '0') )  $errorA = 0;
+                if( ($ifLiquidadoD == '1' || $ifLiquidadoD == '4')  && $ifventa_estadoD == 0 && $ifBcEstadoD == '1' && $ifBloqueadoD !=2 && (($codigo_unionD == $codigoActivacion) || ($codigo_unionD == null || $codigo_unionD == ""  || $codigo_unionD == "0")) && ($ifliquidado_regaladoD == '0')  ) $errorD = 0;
                 //validacion profomas
                 if($ifErrorProformaA) $errorA = 1;
                 if($ifErrorProformaD) $errorD = 1;

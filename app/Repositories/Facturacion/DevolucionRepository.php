@@ -2,6 +2,7 @@
 namespace App\Repositories\Facturacion;
 
 use App\Models\CodigosLibrosDevolucionHeader;
+use App\Models\CodigosLibrosDevolucionSonFacturador;
 use App\Repositories\BaseRepository;
 use Illuminate\Support\Facades\DB;
 class  DevolucionRepository extends BaseRepository
@@ -73,6 +74,39 @@ class  DevolucionRepository extends BaseRepository
 
         return $disponiblePrefactura;
     }
+    public function detallePrefactura($ven_codigo,$id_empresa,$id_institucion,$combos = 0)
+    {
+        $disponiblePrefactura = \DB::table('f_detalle_venta as dg')
+            ->join('f_venta as dv', 'dg.ven_codigo', '=', 'dv.ven_codigo')
+            ->leftJoin('libros_series as ls', 'ls.codigo_liquidacion', '=', 'dg.pro_codigo')
+            ->leftJoin('1_4_cal_producto as pro', 'pro.pro_codigo', '=', 'dg.pro_codigo')
+            ->where('dg.ven_codigo', $ven_codigo)
+            ->where('dv.id_empresa', $id_empresa)
+            ->where('dv.institucion_id', $id_institucion)
+            ->where('dv.idtipodoc', '1')
+            ->where('dv.estadoPerseo', '0')
+            ->when($combos == 1, function($query) use ($combos) {
+                $query->where('pro.ifcombo', '=', 1);
+            })
+            ->selectRaw('dg.*, ls.nombre as nombrelibro, pro.ifcombo, pro.codigos_combos, CONCAT(ls.nombre," ", pro.pro_codigo) as nombrePro,
+            ls.idLibro
+            ')
+            ->get();
+
+        return $disponiblePrefactura;
+    }
+    public function getCodigosCombosDocumentoDevolucion($id_documento){
+        $query = DB::SELECT("SELECT s.* , ls.nombre AS nombrelibro, pro.codigos_combos, e.descripcion_corta AS empresa
+        FROM codigoslibros_devolucion_son s
+        LEFT JOIN libros_series ls ON ls.codigo_liquidacion = s.pro_codigo
+        LEFT JOIN  1_4_cal_producto pro  ON pro.pro_codigo = ls.codigo_liquidacion
+        LEFT JOIN empresas e ON e.id  = s.id_empresa
+        WHERE s.tipo_codigo = '1'
+        AND s.codigoslibros_devolucion_id = '$id_documento'
+        ORDER BY s.id desc
+        ");
+        return $query;
+    }
     public function devolucionCliente($idCliente,$idPeriodo)
     {
         $query = DB::SELECT("SELECT h.*, l.nombrelibro
@@ -87,17 +121,18 @@ class  DevolucionRepository extends BaseRepository
     }
     public function save_son_devolucion_facturador($datos){
         //validar que no existe el pro_codigo la id_empresay el codigoslibros_devolucion_header_facturador_id
-        $validar = CodigosLibrosDevolucionSonFacturador::where('pro_codigo',$datos->pro_codigo)->where('codigoslibros_devolucion_header_facturador_id',$datos->documentoPadre->id)->where('id_empresa',$datos->id_empresa)->first();
+        $validar = CodigosLibrosDevolucionSonFacturador::where('pro_codigo',$datos->pro_codigo)
+        ->where('codigoslibros_devolucion_header_facturador_id',$datos->documentoPadre)
+        ->where('id_empresa',$datos->id_empresa)->first();
         if($validar){
             return $validar;
         }
         $devolucionH = new CodigosLibrosDevolucionSonFacturador();
-        $devolucionH->codigoslibros_devolucion_header_facturador_id = $datos->documentoPadre->id;
+        $devolucionH->codigoslibros_devolucion_header_facturador_id = $datos->documentoPadre;
         $devolucionH->id_empresa                                    = $datos->id_empresa;
         $devolucionH->pro_codigo                                    = $datos->pro_codigo;
         $devolucionH->cantidad                                      = $datos->cantidad;
         $devolucionH->precio                                        = $datos->precio;
-        $devolucionH->id_libro                                      = $datos->id_libro;
         $devolucionH->descuento                                     = $datos->descuento;
         $devolucionH->observacion_codigo                            = $datos->observacion_codigo;
         $devolucionH->save();

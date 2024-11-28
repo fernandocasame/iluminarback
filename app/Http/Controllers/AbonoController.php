@@ -1158,6 +1158,7 @@ class AbonoController extends Controller
                 'ven_valor' => $venta->ven_valor,
                 'descuento_porcentaje' => $venta->ven_desc_por,
                 'valor_desvuento' => $venta->ven_descuento,
+                'idtipodoc'=> $venta->idtipodoc,
             ];
         }
     
@@ -1237,90 +1238,162 @@ class AbonoController extends Controller
         $documento = $request->input('documento');
 
        // Ejecutamos la consulta en la base de datos para obtener los detalles de devolución
-    $detallesDevolucion = DB::table('codigoslibros_devolucion_header as cdh')
-    ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
-    ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
-    ->where('cls.documento', '=', $documento)
-    ->groupBy('cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
-    ->select('cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion', DB::raw('ROUND(SUM(cls.precio), 2) as total_precio'))
-    ->get();
+        $detallesDevolucion = DB::table('codigoslibros_devolucion_header as cdh')
+        ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
+        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
+        ->where('cls.documento', '=', $documento)
+        ->groupBy('cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
+        ->select('cdh.id', 'cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion', DB::raw('ROUND(SUM(cls.precio), 2) as total_precio'))
+        ->get();
 
-// Convertimos la colección a un arreglo
-$detallesDevolucionArray = $detallesDevolucion->toArray();
+        // Convertimos la colección a un arreglo
+        $detallesDevolucionArray = $detallesDevolucion->toArray();
 
-// Recorrer cada uno de los detalles de devolución
-foreach ($detallesDevolucionArray as $key => $item) {
-    // Consultar las ventas relacionadas con el documento
-    $fVentas = DB::table('f_venta as fv')
-        ->join('f_detalle_venta as fdv', function($join) {
-            $join->on('fdv.ven_codigo', '=', 'fv.ven_codigo')
-                 ->on('fdv.id_empresa', '=', 'fv.id_empresa');
-        })
-        ->where('fv.ven_codigo', '=', $item->documento)
-        ->where('fv.id_empresa', '=', $item->id_empresa)
-        ->where('fv.est_ven_codigo', '<>', 3)
-        ->where('fdv.det_ven_dev', '>', 0)
-        ->first();  // Usamos `first()` para obtener el primer resultado
+        // Recorrer cada uno de los detalles de devolución
+        foreach ($detallesDevolucionArray as $key => $item) {
+            // Consultar las ventas relacionadas con el documento
+            $fVentas = DB::table('f_venta as fv')
+                ->join('f_detalle_venta as fdv', function($join) {
+                    $join->on('fdv.ven_codigo', '=', 'fv.ven_codigo')
+                        ->on('fdv.id_empresa', '=', 'fv.id_empresa');
+                })
+                ->where('fv.ven_codigo', '=', $item->documento)
+                ->where('fv.id_empresa', '=', $item->id_empresa)
+                ->where('fv.est_ven_codigo', '<>', 3)
+                ->where('fdv.det_ven_dev', '>', 0)
+                ->first();  // Usamos `first()` para obtener el primer resultado
 
-    // Verificamos si se obtuvo un resultado de la venta
-    if ($fVentas) {
-        $detallesDevolucionArray[$key]->descuento = $fVentas->ven_desc_por;
-        // Calcular el valor con descuento para este detalle de devolución
-        $detallesDevolucionArray[$key]->ValorConDescuento = round($item->total_precio - (($item->total_precio * $fVentas->ven_desc_por) / 100), 2);
-    } else {
-        // Si no hay una venta asociada, asignamos 0 al descuento y el valor con descuento
-        $detallesDevolucionArray[$key]->descuento = 0;
-        $detallesDevolucionArray[$key]->total_precio = round($item->total_precio, 2);
-    }
-}
+            // Verificamos si se obtuvo un resultado de la venta
+            if ($fVentas) {
+                $detallesDevolucionArray[$key]->descuento = $fVentas->ven_desc_por;
+                // Calcular el valor con descuento para este detalle de devolución
+                $detallesDevolucionArray[$key]->ValorConDescuento = round($item->total_precio - (($item->total_precio * $fVentas->ven_desc_por) / 100), 2);
+            } else {
+                // Si no hay una venta asociada, asignamos 0 al descuento y el valor con descuento
+                $detallesDevolucionArray[$key]->descuento = 0;
+                $detallesDevolucionArray[$key]->total_precio = round($item->total_precio, 2);
+            }
+        }
+        $detallesDevolucionArray =collect($detallesDevolucionArray);
 
-// Retornamos los detalles de devolución como un arreglo
-return $detallesDevolucionArray;
+        foreach ($detallesDevolucionArray as $key => $item) {
+            // Obtener los códigos relacionados con la devolución
+            $codigos = DB::table('codigoslibros_devolucion_son as cls')            
+                ->where('cls.codigoslibros_devolucion_id', '=', $item->id)
+                ->where('cls.documento', '=', $item->documento)
+                ->select('cls.codigo', 'cls.codigo_union','cls.pro_codigo')
+                ->get();
+            
+            $detallesDevolucionArray[$key]->codigos = $codigos;
+        
+            // Filtrar códigos únicos por pro_codigo (eliminamos duplicados)
+            $codigosUnicos = $codigos->unique('pro_codigo');
+            
+            // Inicializamos un arreglo vacío para almacenar los detalles de venta
+            $detalleVenta = [];
+        
+            // Iteramos sobre los códigos únicos para obtener los detalles de venta
+            foreach ($codigosUnicos as $codigo) {
+                // Consultamos el detalle de venta para cada código de producto
+                $detallesDeVentaPorCodigo = DB::table('f_detalle_venta as fdv')            
+                    ->where('fdv.ven_codigo', '=', $item->documento)
+                    ->where('fdv.id_empresa', '=', $item->id_empresa)
+                    ->where('fdv.pro_codigo', '=', $codigo->pro_codigo)
+                    ->select('fdv.pro_codigo','fdv.det_ven_cantidad', 'fdv.det_ven_dev', 'fdv.det_ven_valor_u')
+                    ->get();
+        
+                // Agregar los detalles de venta encontrados a detalleVenta
+                $detalleVenta = array_merge($detalleVenta, $detallesDeVentaPorCodigo->toArray());
+            }
+        
+            // Asignamos todos los detalles de venta encontrados a la propiedad detalleVenta
+            $detallesDevolucionArray[$key]->detalleVenta = $detalleVenta;
+        }
+
+        // Retornamos los detalles de devolución como un arreglo
+        return $detallesDevolucionArray;
     }
 
 
 
     public function verifyCode(Request $request)
-{
-    // Obtener el parámetro 'codigo' y 'referer' de la solicitud
-    $codigo = $request->input('code');
-    $referer = $request->input('referer'); // Se espera el 'referer' en los parámetros de la URL
+    {
+        $codigo = $request->input('code');
+        $referer = $request->input('referer'); 
 
-    // Si no encuentras el referer, también puedes buscar en las cookies
-    if (!$referer) {
-        $referer = $request->cookie('referer');  // Obtener la cookie si no está en los parámetros
-    }
+        if (!$codigo) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El código no fue proporcionado.'
+            ]);
+        }
 
-    // Verifica que el código haya sido proporcionado
-    if (!$codigo) {
-        return response()->json([
-            'success' => false,
-            'message' => 'El código no fue proporcionado.'
-        ]);
-    }
+        if (!$referer) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El código no fue proporcionado.'
+            ]);
+        }
 
-    // Buscar los datos del código en la base de datos
-    $datosCodigo = DB::table('librosinstituciones as li')
+        $datosCodigoUrl = DB::table('librosinstituciones as li')
         ->where('li.li_codigo', $codigo)
-        ->where('p.estado', '=', '1')
-        ->leftJoin('periodoescolar as p', 'p.idperiodoescolar', '=', 'li.li_periodo')
-        ->select('li.li_idInstitucion', 'li.li_periodo')
+        ->select('li_url')
         ->first();
 
-    // Verifica si se encontraron datos
-    if ($datosCodigo) {
-        return response()->json([
-            'success' => true,
-            'message' => 'Código verificado exitosamente.',
-            'datos' => $datosCodigo, // Devuelve los datos encontrados
-        ]);
-    } else {
-        return response()->json([
-            'success' => false,
-            'message' => 'El código no es válido.',
-        ]);
+        if (!$datosCodigoUrl) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El código no es válido.'
+            ]);
+        }
+
+        if (!$datosCodigoUrl->li_url && $referer) {
+            DB::table('librosinstituciones as li')
+                ->where('li.li_codigo', $codigo)
+                ->update([
+                    'li_url' => $referer,
+                ]);
+        }else{
+
+            if ($datosCodigoUrl->li_url !== $referer) {
+                DB::table('librosinstituciones as li')
+                    ->where('li.li_codigo', $codigo)
+                    ->update([
+                        'li_url_variacion' => $referer,
+                    ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La URL proporcionada es diferente, variación registrada.',
+                ]);
+            } 
+
+            DB::table('librosinstituciones as li')
+            ->where('li.li_codigo', $codigo)
+            ->where('li.li_url', $referer)
+            ->increment('li_entradas');
+        }
+
+        $datosCodigo = DB::table('librosinstituciones as li')
+            ->where('li.li_codigo', $codigo)
+            ->where('li.li_url', $referer)
+            ->where('p.estado', '=', '1')
+            ->leftJoin('periodoescolar as p', 'p.idperiodoescolar', '=', 'li.li_periodo')
+            ->select('li.li_idInstitucion', 'li.li_periodo')
+            ->first();
+
+        if ($datosCodigo) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Código verificado exitosamente.',
+                'datos' => $datosCodigo,
+            ]);
+        } else {
+            return response()->json([
+                'success' => false,
+                'message' => 'El código no es válido.',
+            ]);
+        }
     }
-}
 
     public function getClienteDocumentos(Request $request){
         $cliente = $request->input('cliente');

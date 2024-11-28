@@ -326,15 +326,24 @@ class BancoController extends Controller
     {
         $fechaInicio = $request->fecha_inicio;
         $fechaFinal = $request->fecha_final;
-
+    
         $abonos = DB::table('abono as a')
             ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
-            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', 'a.*')
+            ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
             ->where('cp.cue_pag_tipo_cuenta', 1)
             ->where('a.abono_estado', 0)
             ->whereBetween(DB::raw('DATE(a.abono_fecha)'), [$fechaInicio, $fechaFinal])
             ->get();
-
+        foreach ($abonos as $key => $value) {
+            $institucion = DB::table('f_venta as v')
+                ->join('institucion as i', 'i.idInstitucion', '=', 'v.institucion_id')
+                ->select('i.idInstitucion', 'i.nombreInstitucion')
+                ->where('v.ruc_cliente', $value->abono_ruc_cliente)
+                ->first();
+                $abonos[$key]->institucion = $institucion->nombreInstitucion;
+        }
+    
         return response()->json($abonos);
     }
 
