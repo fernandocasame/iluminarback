@@ -1845,15 +1845,24 @@ class CodigoLibrosController extends Controller
                         $ifcodigo_liquidacion       = $validar[0]->codigo_liquidacion;
                         //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
                         $EstatusProceso             = false;
-                        if($request->dLiquidado ==  '1'){
+                        if($request->ifLiquidado == '0' || $ifliquidado_regalado == '1'){
                             $setContrato            = $ifContrato;
                             $verificacion_liquidada = $ifVerificacion;
                             //VALIDACION AUNQUE ESTE LIQUIDADO
-                            if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
+                            $EstatusProceso = true;
                         }else{
                             //VALIDACION QUE NO SEA LIQUIDADO
-                            if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
+                            $EstatusProceso = true;
                         }
+                        // if($request->dLiquidado ==  '1'){
+                        //     $setContrato            = $ifContrato;
+                        //     $verificacion_liquidada = $ifVerificacion;
+                        //     //VALIDACION AUNQUE ESTE LIQUIDADO
+                        //     if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
+                        // }else{
+                        //     //VALIDACION QUE NO SEA LIQUIDADO
+                        //     if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
+                        // }
                         //====PROFORMA============================================
                         //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
                         if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1 && ($ifCombo == null || $ifCombo == "")){

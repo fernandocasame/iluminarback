@@ -21,7 +21,8 @@ class CodigosLibrosDevolucionSon extends Model
         'id_periodo',
         'id_libro',
         'precio',
-        'tipo_codigo'
+        'tipo_codigo',
+        'combo',
     ];
     //relacion con la tabla codigos
     public function codigos()
