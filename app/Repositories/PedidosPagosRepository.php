@@ -30,7 +30,8 @@ class  PedidosPagosRepository extends BaseRepository
         $pagos = PedidosDocumentosLiq::with([
             'tipoPagos',
             'formaPagos',
-            'pedidoPagosHijo'
+            'pedidoPagosHijo',
+            'userCierre:idusuario,nombres,apellidos'
         ])
         ->where('ven_codigo',$contrato)
         ->where('forma_pago_id','>','0')

@@ -122,6 +122,22 @@ trait TraitPedidosGeneral
             WHERE o.id_pedido = p.id_pedido
             AND o.estado_libros_obsequios = "8"
         ) as contadorObsequiosAbiertosEnviados,
+
+        (
+            SELECT COUNT(l.doc_codigo) AS contadorPendientesConvenio
+            FROM 1_4_documento_liq l
+            WHERE l.tipo_pago_id = "4"
+            AND l.estado ="0"
+            AND l.id_pedido = p.id_pedido
+        ) AS contadorPendientesConvenio,
+        (
+            SELECT COUNT(l.doc_codigo) AS contadorPendientesAnticipos
+            FROM 1_4_documento_liq l
+            WHERE l.tipo_pago_id = "1"
+            AND l.estado ="0"
+            AND l.ifAntAprobado = "1"
+            AND l.id_pedido = p.id_pedido
+        ) AS contadorPendientesAnticipos,
         pe.periodoescolar as periodo,pe.codigo_contrato,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
         i.region_idregion as region,uf.cod_usuario,
@@ -985,6 +1001,115 @@ trait TraitPedidosGeneral
         catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
+    }
+
+    public function tr_metodoFacturacion_new($request){
+        $periodo                = $request->periodo ?? 0;
+        $empresa                = $request->empresa ?? 0;
+        $variasInstituciones    = $request->variasInstituciones ?? 0;
+        $getInstitucionesId     = $request->getInstitucionesId ?? [];
+        $result = DB::table('f_detalle_venta as v')
+        ->leftJoin('f_venta as d', function($join) {
+            $join->on('v.ven_codigo', '=', 'd.ven_codigo')
+                 ->on('v.id_empresa', '=', 'd.id_empresa');
+        })
+        ->leftJoin('1_4_cal_producto as p', 'v.pro_codigo', '=', 'p.pro_codigo')
+        ->leftJoin('libros_series as ls', 'ls.codigo_liquidacion', '=', 'p.pro_codigo')
+        ->leftJoin('libro as l', 'l.idlibro', '=', 'ls.idLibro')
+        ->leftJoin('asignatura as a', 'a.idasignatura', '=', 'l.asignatura_idasignatura')
+        ->select(
+            'v.pro_codigo as codigo',
+            'p.pro_nombre as nombrelibro',
+            'ls.idLibro as libro_idlibro',
+            'ls.year',
+            'ls.id_serie',
+            'a.area_idarea',
+            'p.codigos_combos',
+            'p.ifcombo',
+            DB::raw('SUM(v.det_ven_cantidad) as cantidad'),
+            DB::raw('SUM(v.det_ven_dev) as cantidad_devuelta'),
+            DB::raw('SUM(v.det_ven_cantidad) - SUM(v.det_ven_dev) as cantidadTotal')
+        )
+        ->where('d.periodo_id', $periodo)
+        ->when($empresa > 0, function ($query) use ($empresa) {
+            $query->where('d.id_empresa', '=', $empresa)
+            ->where('v.id_empresa', '=', $empresa);
+        })
+        //when y wherein de getInstitucionesId
+        ->when($variasInstituciones > 0, function ($query) use ($getInstitucionesId) {
+            $query->whereIn('d.institucion_id', $getInstitucionesId)
+            ->where('idtipodoc','<>','2');
+        })
+        ->where('d.est_ven_codigo','<>','3')
+        ->groupBy('v.pro_codigo', 'p.pro_nombre', 'ls.idLibro', 'ls.year', 'ls.id_serie', 'a.area_idarea', 'p.codigos_combos')
+        ->get();
+        // Procesar los resultados para obtener el precio y multiplicar por la cantidad
+        foreach ($result as $item) {
+            // Obtener el precio del libro usando el repositorio
+            $precio             = $this->pedidosRepository->getPrecioXLibro_new($item->id_serie, $item->libro_idlibro, $item->area_idarea, $periodo, $item->year);
+            $item->precio       = $precio;
+            // Multiplicar el precio por la cantidad
+            $item->precio_total = number_format($precio * $item->cantidadTotal, 2, '.', '');
+        }
+        return $result;
+    }
+
+    public function tr_metodoFacturado_new($request){
+        $periodo                = $request->periodo ?? 0;
+        $empresa                = $request->empresa ?? 0;
+        $variasInstituciones    = $request->variasInstituciones ?? 0;
+        $getInstitucionesId     = $request->getInstitucionesId ?? [];
+        $tipo                   = $request->tipo ?? 0;
+
+        $condiciones = [
+            0 => [],
+            1 => ['d.estadoPerseo' => 0],
+            2 => ['d.estadoPerseo' => 1],
+        ];
+
+        $query = DB::table('f_detalle_venta_agrupado as v')
+            ->leftJoin('f_venta_agrupado as d', function($join) {
+                $join->on('v.id_factura', '=', 'd.id_factura')
+                    ->on('v.id_empresa', '=', 'd.id_empresa');
+            })
+            ->leftJoin('1_4_cal_producto as p', 'v.pro_codigo', '=', 'p.pro_codigo')
+            ->leftJoin('libros_series as ls', 'ls.codigo_liquidacion', '=', 'p.pro_codigo')
+            ->leftJoin('libro as l', 'l.idlibro', '=', 'ls.idLibro')
+            ->leftJoin('asignatura as a', 'a.idasignatura', '=', 'l.asignatura_idasignatura')
+            ->select(
+                'v.pro_codigo as codigo',
+                'ls.nombre as nombrelibro',
+                'ls.idLibro as libro_idlibro',
+                'ls.year',
+                'ls.id_serie',
+                'a.area_idarea',
+                'p.codigos_combos',
+                'p.ifcombo',
+                DB::raw('SUM(v.det_ven_cantidad) as cantidad'),
+            )
+            ->where('d.periodo_id', $periodo)
+            ->when($empresa > 0, function ($query) use ($empresa) {
+                $query->where('d.id_empresa', '=', $empresa)
+                    ->where('v.id_empresa', '=', $empresa);
+            })
+            ->when($variasInstituciones > 0, function ($query) use ($getInstitucionesId) {
+                $query->whereIn('d.institucion_id', $getInstitucionesId);
+            })
+            ->where($condiciones[$tipo])
+            ->groupBy('v.pro_codigo', 'ls.nombre', 'ls.idLibro', 'ls.year', 'ls.id_serie', 'a.area_idarea', 'p.codigos_combos')
+            ->orderBy('ls.nombre', 'desc')
+            ->get();
+
+        // Procesar los resultados para obtener el precio y multiplicar por la cantidad
+        foreach ($query as $item) {
+            // Obtener el precio del libro usando el repositorio
+            $precio             = $this->pedidosRepository->getPrecioXLibro_new($item->id_serie, $item->libro_idlibro, $item->area_idarea, $periodo, $item->year);
+            $item->precio       = $precio;
+            // Multiplicar el precio por la cantidad
+            $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
+        }
+
+        return $query;
     }
     //TRAIT JEYSON FIN
 }

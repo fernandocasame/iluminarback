@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Models\CodigosLibros;
 use App\Models\CodigosLibrosDevolucionSon;
+use App\Models\CombosCodigos;
 use App\Models\LibroSerie;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use Illuminate\Http\Request;
@@ -278,5 +279,236 @@ class ComboController extends Controller
     public function destroy($id)
     {
         //
+    }
+
+    //api:post/guardarAsignacionCodigo
+    public function guardarAsignacionCodigo(Request $request)
+    {
+        set_time_limit(600000);
+        ini_set('max_execution_time', 600000);
+
+        $miArrayDeObjetos           = json_decode($request->data_codigos);
+        //variables
+        $usuario_editor             = $request->id_usuario;
+        $periodo_id                 = $request->periodo_id;
+        $arregloProblemaCombos      = [];
+        $arregloResumen             = [];
+        $codigoConProblemas         = collect();
+        $contadorErrCombos          = 0;
+        $contadorResumen            = 0;
+        $institucion_id             = 0;
+        $variosCodigos              =  $request->varios_codigos;
+
+        try {
+            DB::beginTransaction();
+
+            //====PROCESO===================================
+            foreach ($miArrayDeObjetos as $key => $item) {
+                //variables
+                $problemasconCodigo         = [];
+                $contadorProblemasCodigos   = 0;
+                $contadorA                  = 0;
+                $contadorB                  = 0;
+                $noExisteA                  = 0;
+                $noExisteB                  = 0;
+                $codigoCombo = strtoupper($item->codigoCombo);
+
+                //VALIDAR QUE EL CODIGO DE COMBO EXISTE
+                $ExistsCombo = $this->getExistsCombo($codigoCombo);
+                if (!empty($ExistsCombo)) {
+                    foreach ($item->codigosHijos as $key2 => $tr) {
+                        $codigoA                = '';
+                        $codigoB                = '';
+                        $libroSeleccionado      = $tr->libroSeleccionado;
+                        $tipoRegalado           = $tr->tipoRegalado;
+                        $errorA                 = 1;
+                        $errorB                 = 1;
+                        $comentario             = "Se agregó al combo " . $codigoCombo;
+                        if($variosCodigos == '1'){
+                            $codigoA            = strtoupper($tr->codigoActivacion);
+                            $codigoB            = strtoupper($tr->codigoDiagnostico);
+                        }
+                        if($variosCodigos == '0'){
+                            $codigoA            = strtoupper($tr->codigo);
+                        }
+
+                        //validar si el codigo existe
+                        $validarA = CodigosLibros::where('codigo', $codigoA)->get();
+                        if (count($validarA) > 0) {
+                            if($variosCodigos == 0){ $codigoB = strtoupper($validarA[0]->codigo_union); }
+                            $validarB           = CodigosLibros::where('codigo', $codigoB)->get();
+                            if (count($validarB) > 0) {
+                                //VARIABLES PARA EL PROCESO
+                                //CODIGO A
+                                $ifcodigo_comboA        = strtoupper($validarA[0]->codigo_combo);
+                                $codigo_unionA          = strtoupper($validarA[0]->codigo_union);
+                                $if_estado_liquidacionA = $validarA[0]->estado_liquidacion;
+                                //CODIGO B
+                                $ifcodigo_comboB        = strtoupper($validarB[0]->codigo_combo);
+                                $codigo_unionB          = strtoupper($validarB[0]->codigo_union);
+                                $if_estado_liquidacionB = $validarB[0]->estado_liquidacion;
+
+                                //===VALIDACION COMBO NORMAL====
+                                if (($ifcodigo_comboA == null || $ifcodigo_comboA == $codigoCombo) && (($codigo_unionA == $codigoB) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) { $mensajeError = CodigosLibros::CODIGO_ACTIVACION;  $errorA = 0; }
+                                if (($ifcodigo_comboB == null || $ifcodigo_comboB == $codigoCombo) && (($codigo_unionB == $codigoA) || ($codigo_unionB == null || $codigo_unionB == "" || $codigo_unionB == "0"))) { $mensajeError = CodigosLibros::CODIGO_DIAGNOSTICA; $errorB = 0; }
+
+                                //===VALIDACION SI ES libroSeleccionado 1 porque se va a colocar como regalado===
+                                if($libroSeleccionado == '1'){
+                                    //codigo A
+                                    if($if_estado_liquidacionA == 0){ $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorA = 1; }
+                                    if($if_estado_liquidacionA == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorA = 1; }
+                                    if($if_estado_liquidacionA == 4){ $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorA = 1; }
+                                    //codigo B
+                                    if($if_estado_liquidacionB == 0){ $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorB = 1; }
+                                    if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
+                                    if($if_estado_liquidacionB == 4){ $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
+                                }
+                                //===MENSAJE VALIDACION====
+                                if ($errorA == 1 && $errorB == 0) {
+                                    $codigoConProblemas->push($validarA);
+                                }
+                                if ($errorA == 0 && $errorB == 1) {
+                                    $codigoConProblemas->push($validarB);
+                                }
+                                if ($errorA == 1 && $errorB == 1) {
+                                    $mensajeError = "Ambos códigos tienen problemas";
+                                    $codigoConProblemas->push($validarA);
+                                    $codigoConProblemas->push($validarB);
+                                }
+                                //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
+                                if ($errorA == 0 && $errorB == 0) {
+                                    $old_valuesA    = $validarA;
+                                    $ingresoA       = $this->updatecodigosCombo($codigoCombo, $codigoA, $codigoB, $libroSeleccionado, $tipoRegalado);
+                                    $old_valuesB    = $validarB;
+                                    $ingresoB       = $this->updatecodigosCombo($codigoCombo, $codigoB, $codigoA, $libroSeleccionado, $tipoRegalado);
+
+                                    if($ingresoA && $ingresoB){
+                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null);
+                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null);
+                                        $contadorA++;
+                                        $contadorB++;
+                                    }
+                                    else{
+                                        $problemasconCodigo[$contadorProblemasCodigos] = [
+                                            "codigoActivacion"  => $codigoA,
+                                            "codigoDiagnostico" => $codigoB,
+                                            "problema"          => "No se guardaron los codigos"
+                                        ];
+                                        $contadorProblemasCodigos++;
+                                    }
+                                } else {
+                                    //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
+                                    $problemasconCodigo[$contadorProblemasCodigos] = [
+                                        "codigoActivacion"      => $codigoA,
+                                        "codigoDiagnostico"     => $codigoB,
+                                        "problema"              => $mensajeError
+                                    ];
+                                    $contadorProblemasCodigos++;
+                                }
+                            } else {
+                                $noExisteB++;
+                                $mensajeError = "No existe el código de unión";
+                                $problemasconCodigo[$contadorProblemasCodigos] = [
+                                    "codigoActivacion"  => $codigoA,
+                                    "codigoDiagnostico" => $codigoB,
+                                    "problema"          => $mensajeError
+                                ];
+                                $contadorProblemasCodigos++;
+                            }
+                        } else {
+                            $noExisteA++;
+                            $mensajeError = "No existe el código";
+                            $problemasconCodigo[$contadorProblemasCodigos] = [
+                                "codigoActivacion"  => $codigoA,
+                                "codigoDiagnostico" => "",
+                                "problema"          => $mensajeError
+                            ];
+                            $contadorProblemasCodigos++;
+                        }
+                    }
+                    //codigos resumen
+                    $arregloResumen[$contadorResumen] = [
+                        "codigoPaquete"             => $codigoCombo,
+                        "codigosHijos"              => $problemasconCodigo,
+                        "mensaje"                   => empty($ExistsCombo) ? 1 : '0',
+                        "ingresoA"                  => $contadorA,
+                        "ingresoD"                  => $contadorB,
+                        "noExisteA"                 => $noExisteA,
+                        "noExisteD"                 => $noExisteB,
+                        "contadorProblemasCodigos"  => $contadorProblemasCodigos,
+                    ];
+                    $contadorResumen++;
+                } else {
+                    $arregloProblemaCombos[$contadorErrCombos] = [
+                        "combo"     => $codigoCombo,
+                        "problema"  => 'Combo no existe'
+                    ];
+                    $contadorErrCombos++;
+                }
+                //si contadorA es mayor a cero marco el combo como usado
+                // if($contadorA > 0){
+                //     //colocar el combo como utilizado
+                //     $this->changeUseCombo($codigoCombo);
+                // }
+            }
+
+            DB::commit(); // Commit the transaction
+
+            if (count($codigoConProblemas) == 0) {
+                return [
+                    "arregloResumen"            => $arregloResumen,
+                    "codigoConProblemas"        => [],
+                    "arregloErroresCombos"      => $arregloProblemaCombos,
+                ];
+            } else {
+                $getProblemas = [];
+                $arraySinCorchetes = array_map(function ($item) { return json_decode(json_encode($item)); }, $codigoConProblemas->all());
+                $getProblemas = array_merge(...$arraySinCorchetes);
+                return [
+                    "arregloResumen"            => $arregloResumen,
+                    "codigoConProblemas"        => $getProblemas,
+                    "arregloErroresCombos"      => $arregloProblemaCombos,
+                ];
+            }
+        } catch (\Exception $e) {
+            DB::rollBack(); // Rollback the transaction
+            return response()->json(['status' => '0', 'message' => 'Ocurrió un error al guardar el combo: ' . $e->getMessage()], 200);
+        }
+    }
+    public function getCombo($combo){
+        $query = DB::SELECT("SELECT * FROM codigos_combos p
+        WHERE p.codigo = '$combo'
+        AND p.estado   = '1'
+        ");
+        return $query;
+    }
+    public function getExistsCombo($combo){
+        $query = DB::SELECT("SELECT * FROM codigos_combos p WHERE p.codigo = '$combo'");
+        return $query;
+    }
+    public function changeUseCombo($codigo){
+        $combo = CombosCodigos::findOrFail($codigo);
+        $combo->estado = "0";
+        $combo->save();
+    }
+    public function updatecodigosCombo($codigoCombo,$codigo,$codigo_union, $libroSeleccionado, $tipoRegalado){
+        $codigoLibro = CodigosLibros::where('codigo', '=', $codigo)->first();
+
+        if ($codigoLibro) {
+            $codigoLibro->codigo_combo              = $codigoCombo;
+            // $codigoLibro->fecha_registro_paquete    = $fecha;
+            $codigoLibro->codigo_union              = $codigo_union;
+            if($libroSeleccionado == '1'){
+                $codigoLibro->estado_liquidacion    = '2';
+                //tipoRegalado = 1 => regalado ; 2 => regalado y bloqueado
+                if($tipoRegalado == '2')            { $codigoLibro->estado = '2'; }
+            }
+            // Guarda los cambios
+            $guardado = $codigoLibro->save();
+
+            return $guardado ? 1 : 0; // Retorna 1 si se guardó, 0 si no
+        } else {
+            return 0; // Retorna 0 si no se encontró el código
+        }
     }
 }

@@ -2130,6 +2130,8 @@ class CodigoLibrosController extends Controller
                     $ifVerificacion             = $validar[0]->verificacion;
                     //codigo de combo
                     $ifCombo                    = $validar[0]->combo;
+                    //codigo_combo
+                    $ifCodigoCombo              = $validar[0]->codigo_combo;
                     //codigo de factura
                     $ifFactura                  = $validar[0]->factura;
                     //tipo_venta
@@ -2181,7 +2183,7 @@ class CodigoLibrosController extends Controller
                                 //====CODIGO UNION=====
                                 $this->GuardarEnHistorico(0,$id_cliente,$periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,$newValuesCodigoDiagnostico,$setContrato,$verificacion_liquidada);
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO LIBRO
-                                $this->tr_GuardarDevolucionHijos($id_devolucion,$item->codigo,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,0,$codigo_union,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio,$tipo_importacion,$estado_codigo);
+                                $this->tr_GuardarDevolucionHijos($id_devolucion,$item->codigo,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,0,$codigo_union,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio,$tipo_importacion,$estado_codigo,$ifCodigoCombo);
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO UNION
                                 // $this->tr_GuardarDevolucionHijos($id_devolucion,$codigo_union,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,1,$item->codigo,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio);
                             }
@@ -3726,7 +3728,7 @@ class CodigoLibrosController extends Controller
             ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
             ->select('codigoslibros.codigo', 'codigoslibros.bc_periodo', 'codigoslibros.bc_institucion',
             'codigoslibros.venta_lista_institucion','codigoslibros.libro_idlibro','codigoslibros.documento_devolucion',
-            'codigoslibros.combo','codigoslibros.proforma_empresa','codigoslibros.codigo_proforma',
+            'codigoslibros.combo','codigoslibros.codigo_combo','codigoslibros.proforma_empresa','codigoslibros.codigo_proforma',
             'codigoslibros.estado_liquidacion','codigoslibros.liquidado_regalado', 'codigoslibros.venta_estado',
             'codigoslibros.codigo_paquete','codigoslibros.permitir_devolver_nota',
             'codigoslibros.prueba_diagnostica',
@@ -3906,7 +3908,7 @@ class CodigoLibrosController extends Controller
             ->select(
                 'codigoslibros.codigo', 'codigoslibros.bc_periodo', 'codigoslibros.bc_institucion',
                 'codigoslibros.venta_lista_institucion', 'codigoslibros.libro_idlibro', 'codigoslibros.documento_devolucion',
-                'codigoslibros.combo', 'codigoslibros.proforma_empresa', 'codigoslibros.codigo_proforma',
+                'codigoslibros.combo','codigoslibros.codigo_combo', 'codigoslibros.proforma_empresa', 'codigoslibros.codigo_proforma',
                 'codigoslibros.estado_liquidacion', 'codigoslibros.liquidado_regalado', 'codigoslibros.venta_estado',
                 'codigoslibros.codigo_paquete', 'ls.codigo_liquidacion', 'ls.nombre as nombrelibro',
                 'codigoslibros.permitir_devolver_nota',

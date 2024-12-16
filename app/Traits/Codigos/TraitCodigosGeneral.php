@@ -58,7 +58,7 @@ trait TraitCodigosGeneral{
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,
         c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma, ls.codigo_liquidacion,
-        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo
+        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo, c.codigo_combo
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -122,7 +122,7 @@ trait TraitCodigosGeneral{
         p.periodoescolar as periodo,
         pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
         c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma,
-        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo'
+        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo,c.codigo_combo'
         ))
         ->leftJoin('usuario as  u',         'c.idusuario',                  'u.idusuario')
         ->leftJoin('usuario as  ase',       'c.asesor_id',                  'ase.idusuario')
@@ -209,7 +209,8 @@ trait TraitCodigosGeneral{
                 "codigo_liquidacion"            => $item->codigo_liquidacion,
                 'devuelto_proforma'             => $item->devuelto_proforma,
                 "asesor"                        => $item->asesor,
-                'combo'                         => $item->combo
+                'combo'                         => $item->combo,
+                'codigo_combo'                  => $item->codigo_combo
             ];
         }
         return $datos;
@@ -350,7 +351,7 @@ trait TraitCodigosGeneral{
         $historico->save();
         return "Guardado en historico";
     }
-    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion,$estado_codigo){
+    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion,$estado_codigo,$codigo_combo){
         //validar que si el codigo ya existe no guardar
         $validate = CodigosLibrosDevolucionSon::where('codigo',$codigo)->where('id_cliente',$id_cliente)->where('codigoslibros_devolucion_id',$id_devolucion)->first();
         if($validate){
@@ -376,6 +377,7 @@ trait TraitCodigosGeneral{
             $devolucionH->precio                        = $precio;
             $devolucionH->tipo_importacion              = $tipo_importacion;
             $devolucionH->estado_codigo                 = $estado_codigo;
+            $devolucionH->codigo_combo                  = $codigo_combo;
             $devolucionH->save();
             return "Guardado en devolucion hijo";
         }

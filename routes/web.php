@@ -1071,7 +1071,15 @@ Route::get('getClienteDocumentos', 'AbonoController@getClienteDocumentos');
 //SEGUIMIENTO
 Route::get('obtenerCuentasPago', 'BancoController@obtenerCuentasPago');
 Route::get('obtenerAbonosCuentasNotas', 'BancoController@obtenerAbonosCuentasNotas');
+Route::get('obtenerAbonosCuentas', 'BancoController@obtenerAbonosCuentas');
+Route::post('cambioEstadoCuentas', 'BancoController@cambioEstadoCuentas');
 //FIN SEGUIMIENTO
+//PREFACTURAS A NOTAS
+Route::post('cambioCodigosPrefacturasANota', 'VentasController@cambioCodigosPrefacturasANota');
+Route::post('cambioPrefacturasANota', 'VentasController@cambioPrefacturasANota');
+Route::get('getNotasIntercambio','VentasController@getNotasIntercambio');
+Route::get('Get_PREFacturaCodigos','VentasController@Get_PREFacturaCodigos');
+//FIN PREFACTURAS A NOTAS
 //PEDIDOS
 Route::post('anularPedido', 'VentasController@anularPedido');
 //FIN PEDIDOS
@@ -1171,9 +1179,17 @@ Route::post('guardarGuiasBDMilton_new', 'PedidosController@guardarGuiasBDMilton_
 //FIN API NUEVAS FORMATO PEDIDO
 
 //INICIO APIS JEYSON LARA
+Route::get('GetProductoStockHistorico', '_14ProductoStockHistoricoController@GetProductoStockHistorico');
 Route::get('GetProductosSoloStocks', '_14ProductoController@GetProductosSoloStocks');
+Route::get('Getstockproductosrestablecer', '_14ProductoController@Getstockproductosrestablecer');
+Route::get('GetSumarTodo_Productos', '_14ProductoController@GetSumarTodo_Productos');
+Route::get('GetSumarTodo_ProductosFinal', '_14ProductoController@GetSumarTodo_ProductosFinal');
+Route::get('Getstockproductosrestablecer_SINACTUALIZAR', '_14ProductoController@Getstockproductosrestablecer_SINACTUALIZAR');
+Route::get('GetSacarAreasxSerieProducto', 'SeriesController@GetSacarAreasxSerieProducto');
+Route::get('GetObtenerProductosxSerieoArea', 'SeriesController@GetObtenerProductosxSerieoArea');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
+Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
 //FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -1880,7 +1896,7 @@ Route::get('Get_PREFactura','VentasController@Get_PREFactura');
 Route::get('getCantidadFacturada','VentasController@getCantidadFacturada');
 Route::post('PostFacturarReal', 'VentasController@PostFacturarReal');
 Route::post('updateDocument', 'VentasController@updateDocument');
-Route::post('notasMoverToPrefactura', 'VentasController@notasMoverToPrefactura');
+Route::post('notasMoverToPrefactura', 'PrefacturaController@notasMoverToPrefactura');
 Route::get('metodosGetVentas','VentasController@metodosGetVentas');
 Route::get('metodosPostVentas','VentasController@metodosPostVentas');
 //venta
@@ -1970,4 +1986,6 @@ Route::post('metodosPostCodigos','CodigoLibrosController@metodosPostCodigos');
 Route::group([], function () {
     // Definición manual de rutas para el controlador EvaluacionEstudianteController
     Route::resource('/combos', 'ComboController');
+    Route::post('guardarAsignacionVariosCodigos','ComboController@guardarAsignacionVariosCodigos');
+    Route::post('guardarAsignacionCodigo','ComboController@guardarAsignacionCodigo');
 });

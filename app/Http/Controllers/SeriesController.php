@@ -719,5 +719,106 @@ class SeriesController extends Controller
         return $query;
     }
 
+    public function GetSacarAreasxSerieProducto(Request $request){
+        $id_serie = $request->query('id_serie');  // O también puedes usar $request->input('id_serie')
+        $query = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea
+        FROM libro li
+        LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
+        LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+        LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
+        LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+        LEFT JOIN series se ON ls.id_serie = se.id_serie
+        WHERE ar.idarea IS NOT NULL AND se.id_serie = $id_serie
+        ORDER BY ar.nombrearea ASC");
+        return $query;
+    }
+
+    public function GetObtenerProductosxSerieoArea(Request $request){
+        $id_serie = $request->query('id_serie');  // O también puedes usar $request->input('id_serie')
+        $idarea = $request->query('idarea');
+        $tipo_producto = $request->query('tipo_producto', 1); // Valor predeterminado a 3
+        if($id_serie && $idarea){
+            $query = DB::SELECT("SELECT pro.pro_codigo
+            FROM libro li
+            LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
+            LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
+            LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+            LEFT JOIN series se ON ls.id_serie = se.id_serie
+            WHERE (pro.pro_codigo IS NOT NULL AND pro.pro_codigo NOT LIKE 'G%') AND se.id_serie = $id_serie AND ar.idarea = $idarea
+            ORDER BY pro.pro_nombre");
+        }else if($id_serie && !$idarea){
+            $query = DB::SELECT("SELECT pro.pro_codigo
+            FROM libro li
+            LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
+            LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
+            LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+            LEFT JOIN series se ON ls.id_serie = se.id_serie
+            WHERE (pro.pro_codigo IS NOT NULL AND pro.pro_codigo NOT LIKE 'G%') AND se.id_serie = $id_serie
+            ORDER BY pro.pro_nombre");
+        }
+        if (!$query) {
+            return response()->json(['error' => 'No se encontraron productos'], 404);
+        }
+        // Crear un array con los códigos obtenidos
+        $codigos = array_map(fn($item) => $item->pro_codigo, $query);
+
+        if (empty($codigos)) {
+            return response()->json(['error' => 'No se encontraron códigos'], 404);
+        }
+        // Crear un array para almacenar los resultados finales
+        $productosFinales = [];
+        // Recorrer los códigos y realizar consultas individuales según tipo_producto
+        foreach ($codigos as $codigo) {
+            if ($tipo_producto == 2) {
+                // Buscar código original
+                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                    FROM 1_4_cal_producto pro
+                    WHERE pro.pro_codigo = ?", [$codigo]);
+            } else if ($tipo_producto == 3) {
+                // Buscar código con 'G' al inicio
+                $codigoConG = "G" . $codigo;
+                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                    FROM 1_4_cal_producto pro
+                    WHERE pro.pro_codigo = ?", [$codigoConG]);
+            } else if ($tipo_producto == 1) {
+                // Buscar código original y con 'G' al inicio
+                $codigoConG = "G" . $codigo;
+                $productoDetallesOriginal = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                    FROM 1_4_cal_producto pro
+                    WHERE pro.pro_codigo = ?", [$codigo]);
+
+                $productoDetallesConG = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                    FROM 1_4_cal_producto pro
+                    WHERE pro.pro_codigo = ?", [$codigoConG]);
+
+                // Inicializar un array para controlar los códigos ya añadidos
+                $codigosAgregados = [];
+
+                // Si existen ambos, añadirlos al array final
+                if (!empty($productoDetallesOriginal) && !in_array($productoDetallesOriginal[0]->pro_codigo, $codigosAgregados)) {
+                    $productosFinales[] = $productoDetallesOriginal[0]; // Añadir código original
+                    $codigosAgregados[] = $productoDetallesOriginal[0]->pro_codigo; // Registrar el código como añadido
+                }
+
+                if (!empty($productoDetallesConG) && !in_array($productoDetallesConG[0]->pro_codigo, $codigosAgregados)) {
+                    $productosFinales[] = $productoDetallesConG[0]; // Añadir código con 'G' al inicio
+                    $codigosAgregados[] = $productoDetallesConG[0]->pro_codigo; // Registrar el código como añadido
+                }
+            } else {
+                // Si no es un tipo_producto válido, continuar
+                continue;
+            }
+
+            // Si hay resultados, añadirlos al array final
+            if (!empty($productoDetalles)) {
+                $productosFinales[] = $productoDetalles[0]; // Tomar el primer resultado
+            }
+        }
+
+        return response()->json($productosFinales);
+    }
+
     //FIN METODOS JEYSON
 }

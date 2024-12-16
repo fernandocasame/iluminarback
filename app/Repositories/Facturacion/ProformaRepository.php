@@ -1,10 +1,13 @@
 <?php
 namespace App\Repositories\Facturacion;
 
+use App\Models\_14Producto;
 use App\Models\Proforma;
 use App\Models\VentasHistoricoNotasMove;
 use App\Repositories\BaseRepository;
 use DB;
+use Exception;
+
 class  ProformaRepository extends BaseRepository
 {
     public function __construct(Proforma $proforma)
@@ -91,5 +94,108 @@ class  ProformaRepository extends BaseRepository
         $VentasHistoricoNotasMove->user_created     = $datos->user_created;
         $VentasHistoricoNotasMove->save();
     }
+    //aumentar stock en las notas y disminuir en las prefacturas
+    public function sumaStock($datos, $noAfectarReserva = 0)
+    {
+        try {
+            $codigo_liquidacion         = $datos->codigo_liquidacion;
+            $proforma_empresa           = $datos->proforma_empresa;
+            $valorNew                   = $datos->cantidad;
+            $documentoPrefactura        = $datos->documentoPrefactura;
+
+            // Obtener stock
+            $getStock                   = _14Producto::obtenerProducto($codigo_liquidacion);
+            if (!$getStock) {
+                throw new Exception('Producto no encontrado');
+            }
+            $stockAnteriorReserva       = $getStock->pro_reservar;
+
+            // Prolipa
+            if ($proforma_empresa == 1) {
+                if ($documentoPrefactura == 0) {
+                    $stockEmpresa = $getStock->pro_stock;
+                }
+                if ($documentoPrefactura == 1) {
+                    $stockEmpresa = $getStock->pro_deposito;
+                }
+            }
+
+            // Calmed
+            if ($proforma_empresa == 3) {
+                if ($documentoPrefactura == 0) {
+                    $stockEmpresa = $getStock->pro_stockCalmed;
+                }
+                if ($documentoPrefactura == 1) {
+                    $stockEmpresa = $getStock->pro_depositoCalmed;
+                }
+            }
+
+            $nuevoStockReserva          = $stockAnteriorReserva + $valorNew;
+            $nuevoStockEmpresa          = $stockEmpresa + $valorNew;
+
+            // Actualizar stock en la tabla de productos
+            if ($noAfectarReserva == 1) {
+                _14Producto::updateStockNoReserva($codigo_liquidacion, $proforma_empresa, $nuevoStockEmpresa, $documentoPrefactura);
+            } else {
+                _14Producto::updateStock($codigo_liquidacion, $proforma_empresa, $nuevoStockReserva, $nuevoStockEmpresa, $documentoPrefactura);
+            }
+
+        } catch (Exception $e) {
+            // Manejar la excepción, logearla o lanzar una nueva
+            throw new Exception('Error al procesar la suma de stock: ' . $e->getMessage());
+        }
+    }
+
+    public function restaStock($datos, $noAfectarReserva = 0)
+    {
+        try {
+            $codigo_liquidacion         = $datos->codigo_liquidacion;
+            $proforma_empresa           = $datos->proforma_empresa;
+            $valorNew                   = $datos->cantidad;
+            $documentoPrefactura        = $datos->documentoPrefactura;
+
+            // Obtener stock
+            $getStock                   = _14Producto::obtenerProducto($codigo_liquidacion);
+            if (!$getStock) {
+                throw new Exception('Producto no encontrado');
+            }
+            $stockAnteriorReserva       = $getStock->pro_reservar;
+
+            // Prolipa
+            if ($proforma_empresa == 1) {
+                if ($documentoPrefactura == 0) {
+                    $stockEmpresa = $getStock->pro_stock;
+                }
+                if ($documentoPrefactura == 1) {
+                    $stockEmpresa = $getStock->pro_deposito;
+                }
+            }
+
+            // Calmed
+            if ($proforma_empresa == 3) {
+                if ($documentoPrefactura == 0) {
+                    $stockEmpresa = $getStock->pro_stockCalmed;
+                }
+                if ($documentoPrefactura == 1) {
+                    $stockEmpresa = $getStock->pro_depositoCalmed;
+                }
+            }
+
+            $nuevoStockReserva          = $stockAnteriorReserva - $valorNew;
+            $nuevoStockEmpresa          = $stockEmpresa - $valorNew;
+
+            // Actualizar stock en la tabla de productos
+            if ($noAfectarReserva == 1) {
+                _14Producto::updateStockNoReserva($codigo_liquidacion, $proforma_empresa, $nuevoStockEmpresa, $documentoPrefactura);
+            } else {
+                _14Producto::updateStock($codigo_liquidacion, $proforma_empresa, $nuevoStockReserva, $nuevoStockEmpresa, $documentoPrefactura);
+            }
+
+        } catch (Exception $e) {
+            // Aquí puedes manejar la excepción, logearla o incluso lanzar una nueva
+            throw new Exception('Error al procesar la resta de stock: ' . $e->getMessage());
+        }
+    }
+
 }
 ?>

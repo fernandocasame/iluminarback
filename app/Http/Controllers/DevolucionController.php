@@ -8,6 +8,7 @@ use App\Models\CodigosLibros;
 use App\Models\CodigosLibrosDevolucionHeader;
 use App\Models\CodigosLibrosDevolucionHeaderFacturador;
 use App\Models\CodigosLibrosDevolucionSon;
+use App\Models\CodigosLibrosDevolucionSonFacturador;
 use App\Models\DetalleVentas;
 use App\Models\f_tipo_documento;
 use App\Models\Periodo;
@@ -46,6 +47,7 @@ class DevolucionController extends Controller
     {
         if($request->listadoProformasAgrupadas)             { return $this->listadoProformasAgrupadas($request); }
         if($request->filtroDocumentosDevueltos)             { return $this->filtroDocumentosDevueltos($request); }
+        if($request->getCodigosDevolucionTodos)             { return $this->getCodigosDevolucionTodos($request); }
         if($request->getCodigosxDocumentoDevolucion)        { return $this->getCodigosxDocumentoDevolucion($request); }
         if($request->historicoDevolucionPreFacturas)        { return $this->historicoDevolucionPreFacturas($request); }
         if($request->getDocumentosDevolucion)               { return $this->getDocumentosDevolucion($request); }
@@ -94,6 +96,26 @@ class DevolucionController extends Controller
         $resultado = $resultado->where('ifPedidoPerseo','0')->values();
         return $resultado;
     }
+    //api:get/devoluciones?getCodigosDevolucionTodos=1&idDevolucion=41
+    public function getCodigosDevolucionTodos($request)
+    {
+        $idDevolucion = $request->input('idDevolucion');
+        $getCodigosDevolucionTodos = CodigosLibrosDevolucionSon::query()
+        ->where('codigoslibros_devolucion_id',$idDevolucion)
+        ->select('codigo','combo','pro_codigo','factura','documento','id_empresa')
+        ->get();
+        //si es id_empresa null colocar sin empresa si es 1 colocar Prolipa si es 3 Calmed
+        foreach ($getCodigosDevolucionTodos as $key => $value) {
+            if($value->id_empresa == null){
+                $getCodigosDevolucionTodos[$key]->descripcion_empresa= 'Sin empresa';
+            }elseif($value->id_empresa == 1){
+                $getCodigosDevolucionTodos[$key]->descripcion_empresa= 'Prolipa';
+            }elseif($value->id_empresa == 3){
+                $getCodigosDevolucionTodos[$key]->descripcion_empresa= 'Calmed';
+            }
+        }
+        return $getCodigosDevolucionTodos;
+    }
     //api:get/devoluciones?filtroDocumentosDevueltos=1&fechaInicio=2024-10-01&fechaFin=2024-10-06
     public function filtroDocumentosDevueltos(Request $request)
     {
@@ -102,6 +124,7 @@ class DevolucionController extends Controller
         $id_cliente     = $request->input('id_cliente');
         $revisados      = $request->input('revisados');
         $finalizados    = $request->input('finalizados');
+        $documentos     = $request->input('documentos');
 
         if ($fechaFin) {
             $fechaFin = date('Y-m-d', strtotime($fechaFin)) . ' 23:59:59';
@@ -137,39 +160,70 @@ class DevolucionController extends Controller
             $query->where('estado', 2)
             ->orderBy('updated_at', 'desc');
         })
+        ->when($documentos, function ($query) use ($documentos) {
+            $query->where('codigo_devolucion', 'like', '%' . $documentos . '%');
+        })
         ->get()
         ->map(function ($documento) {
+            $hijos = null;
+            $cantidadCreados        = 0;
+            $cantidadSonRevisados   = 0;
+            $cantidadSonFinalizados = 0;
+            //obtener codigoslibros_devolucion_son creados , revisados y finalizados la cantidad 
+            $hijos = DB::SELECT("
+                SELECT
+                    COUNT(CASE WHEN codigoslibros_devolucion_son.estado = 0 THEN 1 END) AS cantidadCreados,
+                    COUNT(CASE WHEN codigoslibros_devolucion_son.estado = 1 THEN 1 END) AS cantidadSonRevisados,
+                    COUNT(CASE WHEN codigoslibros_devolucion_son.estado = 2 THEN 1 END) AS cantidadSonFinalizados
+                FROM codigoslibros_devolucion_son
+                WHERE codigoslibros_devolucion_id = ?
+                AND codigoslibros_devolucion_son.estado IN (0, 1, 2)
+                AND codigoslibros_devolucion_son.tipo_codigo = '0'
+            ", [$documento->id]);
+            
+            if (!empty($hijos) && isset($hijos[0])) {
+                $cantidadCreados             = $hijos[0]->cantidadCreados;
+                $cantidadSonRevisados        = $hijos[0]->cantidadSonRevisados;
+                $cantidadSonFinalizados      = $hijos[0]->cantidadSonFinalizados;
+            } else {
+                // Valores predeterminados si no hay resultados
+                $cantidadCreados            = 0;
+                $cantidadSonRevisados       = 0;
+                $cantidadSonFinalizados     = 0;
+            }
             return [
-                'id'                    => $documento->id,
-                'id_cliente'            => $documento->id_cliente,
-                'periodo_id'            => $documento->periodo_id,
-                'codigo_devolucion'     => $documento->codigo_devolucion,
-                'observacion'           => $documento->observacion,
-                'codigo_nota_credito'   => $documento->codigo_nota_credito,
-                'created_at'            => $documento->created_at_formatted,
-                'estado'                => $documento->estado,
-                'fecha_revisado'        => $documento->fecha_revisado,
-                'fecha_finalizacion'    => $documento->fecha_finalizacion,
-                'institucion'           => $documento->institucion,
-                'cantidadCajas'         => $documento->cantidadCajas,
-                'cantidadPaquetes'      => $documento->cantidadPaquetes,
-                'tipo_importacion'      => $documento->tipo_importacion,
-                'usuario'               => [
-                    'nombres'           => $documento->usuario->nombres ?? null,
-                    'apellidos'         => $documento->usuario->apellidos ?? null
+                'id'                        => $documento->id,
+                'id_cliente'                => $documento->id_cliente,
+                'periodo_id'                => $documento->periodo_id,
+                'codigo_devolucion'         => $documento->codigo_devolucion,
+                'observacion'               => $documento->observacion,
+                'codigo_nota_credito'       => $documento->codigo_nota_credito,
+                'created_at'                => $documento->created_at_formatted,
+                'estado'                    => $documento->estado,
+                'fecha_revisado'            => $documento->fecha_revisado,
+                'fecha_finalizacion'        => $documento->fecha_finalizacion,
+                'institucion'               => $documento->institucion,
+                'cantidadCajas'             => $documento->cantidadCajas,
+                'cantidadPaquetes'          => $documento->cantidadPaquetes,
+                'tipo_importacion'          => $documento->tipo_importacion,
+                'usuario'                   => [
+                    'nombres'               => $documento->usuario->nombres ?? null,
+                    'apellidos'             => $documento->usuario->apellidos ?? null
                 ],
-                'usuario_revision'      => [
-                    'nombres'           => $documento->usuarioRevision->nombres ?? null,
-                    'apellidos'         => $documento->usuarioRevision->apellidos ?? null
+                'usuario_revision'          => [
+                    'nombres'               => $documento->usuarioRevision->nombres ?? null,
+                    'apellidos'             => $documento->usuarioRevision->apellidos ?? null
                 ],
-                'usuario_finalizacion'  => [
-                    'nombres'           => $documento->usuarioFinalizacion->nombres ?? null,
-                    'apellidos'         => $documento->usuarioFinalizacion->apellidos ?? null
+                'usuario_finalizacion'      => [
+                    'nombres'               => $documento->usuarioFinalizacion->nombres ?? null,
+                    'apellidos'             => $documento->usuarioFinalizacion->apellidos ?? null
                 ],
-                'cantidadHijos'         => count($documento->devolucionSon),
-                'cantidadHijosSInempresa'         => count($documento->devolucionSonSinEmpresa),
-                'periodo'               => $documento->periodo->periodoescolar,
-                // 'devolucionSon'         => $documento->devolucionSon,
+                'cantidadCreados'           => $cantidadCreados,
+                'cantidadSonRevisados'      => $cantidadSonRevisados,
+                'cantidadSonFinalizados'    => $cantidadSonFinalizados,
+                'cantidadHijos'             => count($documento->devolucionSon),
+                'cantidadHijosSInempresa'   => count($documento->devolucionSonSinEmpresa),
+                'periodo'                   => $documento->periodo->periodoescolar,
             ];
         });
 
@@ -629,6 +683,13 @@ class DevolucionController extends Controller
                             //VALIDACION QUE NO SEA LIQUIDADO
                             if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
                         }
+                        if(!$EstatusProceso){
+                            //codigo A
+                            if($ifLiquidado == 0){ $messageIngreso = CodigosLibros::CODIGO_LIQUIDADO; }
+                            if($ifLiquidado == 3){ $messageIngreso = CodigosLibros::CODIGO_DEVUELTO;  }
+                            if($ifLiquidado == 4){ $messageIngreso = CodigosLibros::CODIGO_GUIA;      }
+                            if($ifliquidado_regalado == 1){ $messageIngreso = CodigosLibros::CODIGO_LIQUIDADO_REGALADO; }
+                        }
                         //SI ES COMBO NO SE VALIDA PORQUE SE COLOCA DESDE EL MODULO DE COMBOS
                         //====PROFORMA============================================
                         //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
@@ -740,59 +801,71 @@ class DevolucionController extends Controller
     //api:post/devoluciones?updateDocumentoDevolucion=1
     public function updateDocumentoDevolucion($request) {
         try {
-            $arrayEmpresas          = json_decode($request->arrayEmpresas);
-            $iniciales              = $request->iniciales;
-            $id_cliente             = $request->id_cliente;
-            $periodo_id             = $request->periodo_id;
-            $id_documento           = $request->id_documento;
-            $id_usuario             = $request->input('id_usuario');
+            $arrayEmpresas                                  = json_decode($request->arrayEmpresas);
+            $iniciales                                      = $request->iniciales;
+            $id_cliente                                     = $request->id_cliente;
+            $periodo_id                                     = $request->periodo_id;
+            $id_documento                                   = $request->id_documento;
+            $id_usuario                                     = $request->input('id_usuario');
 
             if($iniciales == null || $iniciales == "" || $iniciales == "null"){ return ["status" => "0", "message" => "No se pudo obtener la iniciales del usuario"]; }
-            $codigo_contrato                = Periodo::where('idperiodoescolar', $periodo_id)->value('codigo_contrato');
-            if (!$codigo_contrato)          { return ["status" => "0", "message" => "No se pudo obtener el codigo del contrato"]; }
+            $codigo_contrato                                = Periodo::where('idperiodoescolar', $periodo_id)->value('codigo_contrato');
+            if (!$codigo_contrato)                          { return ["status" => "0", "message" => "No se pudo obtener el codigo del contrato"]; }
             // Transacción
             DB::beginTransaction();
+            //eliminar los hijos
+            CodigosLibrosDevolucionSonFacturador::where('codigoslibros_devolucion_header_id', $id_documento)->delete();
             //CREAR DOCUMENTO DE DEVOLUCION FACTURADOR
             foreach($arrayEmpresas as $key => $item) {
-                $id_empresa                     = $item->id_empresa;
-                $secuencia                      = 0;
-                $letraE                         = '';
-                $getSecuencia                   = f_tipo_documento::obtenerSecuencia("DEVOLUCION-CODIGO-FACTURACION");
-                if(!$getSecuencia)              { return ["status" => "0", "message" => "No se pudo obtener la secuencia de guias"]; }
-                $letra                          = $getSecuencia->tdo_letra;
-                if($id_empresa == 0)            { $secuencia                      = $getSecuencia->tdo_secuencial_SinEmpresa; $letraE = 'SE'; }
-                if($id_empresa == 1)            { $secuencia                      = $getSecuencia->tdo_secuencial_Prolipa; $letraE = 'P'; }
-                if($id_empresa == 3)            { $secuencia                      = $getSecuencia->tdo_secuencial_calmed; $letraE = 'GC'; }
-                $secuencia                      = $secuencia + 1;
-                $format_id_pedido               = f_tipo_documento::formatSecuencia($secuencia);
-                $codigo_ven                     = $letra.'-'.$letraE.'-'. $codigo_contrato .'-'. $iniciales.'-'. $format_id_pedido;
+                $ifInsertar                                 = 0;
+                $id_empresa                                 = $item->id_empresa;
+                $id_devolucion                              = 0;
+                $secuencia                                  = 0;
+                $letraE                                     = '';
+                $getSecuencia                               = f_tipo_documento::obtenerSecuencia("DEVOLUCION-CODIGO-FACTURACION");
+                if(!$getSecuencia)                          { return ["status" => "0", "message" => "No se pudo obtener la secuencia de guias"]; }
+                $letra                                      = $getSecuencia->tdo_letra;
+                if($id_empresa == 0)                        { $secuencia                      = $getSecuencia->tdo_secuencial_SinEmpresa; $letraE = 'SE'; }
+                if($id_empresa == 1)                        { $secuencia                      = $getSecuencia->tdo_secuencial_Prolipa; $letraE = 'P'; }
+                if($id_empresa == 3)                        { $secuencia                      = $getSecuencia->tdo_secuencial_calmed; $letraE = 'GC'; }
+                $secuencia                                  = $secuencia + 1;
+                $format_id_pedido                           = f_tipo_documento::formatSecuencia($secuencia);
+                $codigo_ven                                 = $letra.'-'.$letraE.'-'. $codigo_contrato .'-'. $iniciales.'-'. $format_id_pedido;
                 //ACTUALIZAR LA SECUENCIA
-                $tipoDocumento                  = f_tipo_documento::find(15); // Encuentra el registro con tdo_id = 14
+                $tipoDocumento                              = f_tipo_documento::find(15); // Encuentra el registro con tdo_id = 15
                 if ($tipoDocumento) {
-                    if($id_empresa == 0)            { $tipoDocumento->tdo_secuencial_SinEmpresa = $secuencia; }
-                    if($id_empresa == 1)            { $tipoDocumento->tdo_secuencial_Prolipa    = $secuencia; }
-                    if($id_empresa == 3)            { $tipoDocumento->tdo_secuencial_calmed     = $secuencia; }
-                    $tipoDocumento->save();         // Guarda los cambios
-                    $devolucion                         = new CodigosLibrosDevolucionHeaderFacturador();
-                    $devolucion->ven_codigo             = $codigo_ven;
-                    $devolucion->id_empresa             = $id_empresa;
+                    if($id_empresa == 0)                    { $tipoDocumento->tdo_secuencial_SinEmpresa = $secuencia; }
+                    if($id_empresa == 1)                    { $tipoDocumento->tdo_secuencial_Prolipa    = $secuencia; }
+                    if($id_empresa == 3)                    { $tipoDocumento->tdo_secuencial_calmed     = $secuencia; }
+                    //validar si mi codigoslibros_devolucion_header_id ya existe y tiene la misma empresa no creo
+                    $validarDocumento                        = CodigosLibrosDevolucionHeaderFacturador::where('codigoslibros_devolucion_header_id', $id_documento)->where('id_empresa', $id_empresa)->first();
+                    if($validarDocumento)                    { $ifInsertar = 0; } //No creo nada
+                    else                                     { $tipoDocumento->save(); $ifInsertar = 1; } //guardar secuencia
+
+                    $devolucion                             = new CodigosLibrosDevolucionHeaderFacturador();
+                    $devolucion->ven_codigo                 = $codigo_ven;
+                    $devolucion->id_empresa                 = $id_empresa;
                     //0 porque el cliente ahora se guarda en cada codigo individual
-                    $devolucion->id_cliente             = $id_cliente;
-                    $devolucion->user_created           = $id_usuario;
-                    $devolucion->periodo_id             = $periodo_id;
+                    $devolucion->id_cliente                 = $id_cliente;
+                    $devolucion->user_created               = $id_usuario;
+                    $devolucion->periodo_id                 = $periodo_id;
                     $devolucion->codigoslibros_devolucion_header_id = $id_documento;
-                    $devolucion->save();
-                    $id_devolucion                      = $devolucion->id;
+                    //validar si mi codigoslibros_devolucion_header_id ya existe y tiene la misma empresa no creo
+                    if($ifInsertar == 0)                     { $id_devolucion         = $validarDocumento->id; }
+                    else                                     { $devolucion->save();   $id_devolucion = $devolucion->id; }
+                    if($id_devolucion == 0)                  { return ["status" => "0", "message" => "No se pudo guardar el documento de devolución"]; }
+
                     foreach($item->arrayCodigos as $key => $item2) {
                         //GUARDAR HIJOS DEL DOCUMENTO FACTURADOR
                         $datos = new stdClass();
-                        $datos->documentoPadre          = $id_devolucion;
-                        $datos->id_empresa              = $id_empresa ?? 0;
-                        $datos->pro_codigo              = $item2->codigo;
-                        $datos->cantidad                = $item2->cantidad;
-                        $datos->precio                  = $item2->precio;
-                        $datos->descuento               = $item2->ven_desc_por ?? 0;
-                        $datos->observacion_codigo      = $item2->observacion_codigo;
+                        $datos->documentoPadre                      = $id_devolucion;
+                        $datos->codigoslibros_devolucion_header_id  = $id_documento;
+                        $datos->id_empresa                          = $id_empresa ?? 0;
+                        $datos->pro_codigo                          = $item2->codigo;
+                        $datos->cantidad                            = $item2->cantidad;
+                        $datos->precio                              = $item2->precio;
+                        $datos->descuento                           = $item2->ven_desc_por ?? 0;
+                        $datos->observacion_codigo                  = $item2->observacion_codigo;
                         $this->devolucionRepository->save_son_devolucion_facturador($datos);
                     }
                 }else {
@@ -974,6 +1047,25 @@ class DevolucionController extends Controller
                                         "user_created"      => $id_usuario
                                     ];
                                     $this->proformaRepository->saveHistoricoNotasMove($datos);
+                                    //disminuir stock en las notas
+                                    $datosStockNota = (Object)[
+                                        "codigo_liquidacion"  => $item->codigo_liquidacion,
+                                        "cantidad"            => 1,
+                                        "proforma_empresa"    => $codigo_empresa,
+                                        "documentoPrefactura" => 1
+                                    ];
+                                    //aumentar stock en prefacturas
+                                    $datosStockPrefactura = (Object)[
+                                        "codigo_liquidacion"  => $item->codigo_liquidacion,
+                                        "cantidad"            => 1,
+                                        "proforma_empresa"    => $codigo_empresa,
+                                        "documentoPrefactura" => 0
+                                    ];
+                                    //NOTA EL disminuir NO SE CAMBIA PORQUE SOLO SE INTERCAMBIA LOS VALORES DE NOTAS SE DESCUENTA Y SE MUEVAN A LA PREFACTURA
+                                    //metodo dismunuir stock en notas
+                                    $this->proformaRepository->restaStock($datosStockNota,1);
+                                    //metodo aumentar stock en prefacturas
+                                    $this->proformaRepository->sumaStock($datosStockPrefactura,1);
                                     $cambiados++;
                                 }else{
                                     // No hay pre facturas disponibles
@@ -1092,16 +1184,16 @@ class DevolucionController extends Controller
                 //prolipa
                 if($id_empresa == 1)  {
                     //si es documento de prefactura
-                    if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_stock; }
+                    if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stock; }
                     //si es documento de notas
-                    if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_deposito; }
+                    if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_deposito; }
                 }
                 //calmed
                 if($id_empresa == 3)  {
                     //si es documento de prefactura
-                    if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_stockCalmed; }
+                    if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stockCalmed; }
                     //si es documento de notas
-                    if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_depositoCalmed; }
+                    if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_depositoCalmed; }
                 }
                 $nuevoStockReserva          = $stockAnteriorReserva + $cantidadPendiente;
                 $nuevoStockEmpresa          = $stockEmpresa + $cantidadPendiente;

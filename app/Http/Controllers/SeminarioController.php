@@ -8,7 +8,8 @@ use App\Models\SeminarioEncuesta;
 use App\Models\SeminarioHasUsuario;
 use App\Models\Seminarios;
 use Illuminate\Http\Request;
-use DB;
+// use DB;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Collection;
 class SeminarioController extends Controller
 {
@@ -635,7 +636,6 @@ class SeminarioController extends Controller
         $instituciones = DB::SELECT("SELECT DISTINCT i.idInstitucion AS id_institucion, CONCAT(i.nombreInstitucion, ' - ', c.nombre) AS nombre_institucion, p.idperiodoescolar, p.estado FROM institucion i, periodoescolar_has_institucion phi, periodoescolar p, ciudad c WHERE i.idInstitucion = phi.institucion_idInstitucion AND i.ciudad_id = c.idciudad AND phi.periodoescolar_idperiodoescolar = p.idperiodoescolar AND p.estado = '1' AND i.estado_idEstado = 1 ORDER BY c.nombre");
         return $instituciones;
     }
-
     public function guardar_seminario(Request $request){
         //CAPACITACIONES
         $getCantidadCapacitaciones = DB::SELECT("SELECT * FROM seminarios_configuracion");
@@ -662,8 +662,6 @@ class SeminarioController extends Controller
                 $capacitacion->label                     = 'Baja';
                 $capacitacion->classes                   = "event-success";
                 $capacitacion->tipo                      = $request->tipo;
-                $capacitacion->hora_inicio               = $request->hora_inicio;
-                $capacitacion->hora_fin                  = $request->hora_fin;
                 $capacitacion->tema_id                   = $request->tema_id;
             }
            //si crean una insitucion temporal
@@ -677,11 +675,6 @@ class SeminarioController extends Controller
                 $capacitacion->id_institucion = $request->institucion_id;
                 $capacitacion->institucion_id_temporal = "";
                 $capacitacion->nombre_institucion_temporal = "";
-                // //para traer el periodo
-                // $buscarPeriodo = $this->traerPeriodo($request->institucion_id);
-                // if($buscarPeriodo["status"] == "1"){
-                //     $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
-                // }
             }
            $capacitacion->periodo_id                    = $request->periodo_id;
            $capacitacion->descripcion                   = $request->fecha_inicio;
@@ -689,14 +682,17 @@ class SeminarioController extends Controller
            $capacitacion->estado_institucion_temporal   = $request->estado_institucion_temporal;
            $capacitacion->fecha_inicio                  = $request->fecha_inicio;
            $capacitacion->fecha_fin                     = $request->fecha_fin;
+           $capacitacion->hora_inicio                   = $request->hora_inicio;
+           $capacitacion->hora_fin                      = $request->hora_fin;
            $capacitacion->cant_asistentes               = $request->cant_asistentes;
            $capacitacion->observacion_admin             = $request->observacion;
            $capacitacion->link_reunion                  = $request->link_reunion;
            $capacitacion->estado_capacitacion           = $request->estado_capacitacion;
            $capacitacion->asistencia_activa             = $request->asistencia_activa;
            $capacitacion->capacitador                   = $request->capacitador;
+           $capacitacion->editor_id                     = $request->editor_id;
            $capacitacion->save();
-          return $this->crearCapacitadores($request,$capacitacion);
+           return $this->crearCapacitadores($request,$capacitacion);
            if($capacitacion){
             return ["status" => "1","message" => "Se actualizo correctamente"];
            }else{
@@ -706,10 +702,10 @@ class SeminarioController extends Controller
         }
         //SEMINARIOS
         if( $request->id_seminario ){
-            DB::UPDATE("UPDATE `seminarios` SET `nombre`=?,`descripcion`=?,`fecha_inicio`=?,`fecha_fin`=?,`id_institucion`=?, `link_reunion`=?,`capacitador`=?,`cant_asistentes`=?,`asistencia_activa`=?,`tipo_webinar`=?,`link_recurso`=?,`clave_recurso`=? WHERE `id_seminario` = ?", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->id_institucion,$request->link_reunion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->link_recurso,$request->clave_recurso,$request->id_seminario]);
+            DB::UPDATE("UPDATE `seminarios` SET `nombre`=?,`descripcion`=?,`fecha_inicio`=?,`fecha_fin`=?,`id_institucion`=?, `link_reunion`=?,`capacitador`=?,`cant_asistentes`=?,`asistencia_activa`=?,`tipo_webinar`=?,`link_recurso`=?,`clave_recurso`=?,`editor_id`=? WHERE `id_seminario` = ?", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->id_institucion,$request->link_reunion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->link_recurso,$request->clave_recurso,$request->editor_id,$request->id_seminario]);
         }
         else{
-            DB::INSERT("INSERT INTO `seminarios`(`nombre`, `descripcion`, `fecha_inicio`, `fecha_fin`, `link_reunion`, `id_institucion`, `capacitador`, `cant_asistentes`, `asistencia_activa`, `tipo_webinar`,`periodo_id`, `link_recurso`,`clave_recurso`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->link_reunion,$request->id_institucion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->periodo_id,$request->link_recurso,$request->clave_recurso]);
+            DB::INSERT("INSERT INTO `seminarios`(`nombre`, `descripcion`, `fecha_inicio`, `fecha_fin`, `link_reunion`, `id_institucion`, `capacitador`, `cant_asistentes`, `asistencia_activa`, `tipo_webinar`,`periodo_id`, `link_recurso`,`clave_recurso`,`editor_id`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", [$request->nombre,$request->descripcion,$request->fecha_inicio,$request->fecha_fin,$request->link_reunion,$request->id_institucion,$request->capacitador,$request->cant_asistentes,$request->asistencia_activa,$request->tipo_webinar,$request->periodo_id,$request->link_recurso,$request->clave_recurso,$request->editor_id]);
         }
     }
     public function buscarCapacitacionesXCapacitador($idusuario,$fecha,$id_seminario){

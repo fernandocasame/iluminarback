@@ -165,6 +165,7 @@ class  CodigosRepository extends BaseRepository
             'combo'                     => null,
             'documento_devolucion'      => null,
             'permitir_devolver_nota'    => '0',
+            'codigo_combo'              => null,
         ];
         $arrayPaquete = [
             'codigo_paquete'            => null,
@@ -450,7 +451,7 @@ class  CodigosRepository extends BaseRepository
                     $documento = Ventas::where('ven_codigo', $codigo_proforma)->where('id_empresa', $proforma_empresa)->first();
                     //idtipodoc => 1 es prefactura; 2 = notas
                     $idtipodoc = $documento->idtipodoc;
-                    $documentoPrefactura = $idtipodoc == 1 ? 0 : 1;
+                    $documentoPrefactura = $idtipodoc == '1' ? '0' : '1';
                     $det_ven_dev = $getDevolucion[0]->det_ven_dev;
                     $nuevoValorDevolucion = $det_ven_dev + 1;
 
@@ -467,16 +468,16 @@ class  CodigosRepository extends BaseRepository
                         //prolipa
                         if($proforma_empresa == 1)  {
                             //si es documento de prefactura
-                            if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_stock; }
+                            if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stock; }
                             //si es documento de notas
-                            if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_deposito; }
+                            if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_deposito; }
                         }
                         //calmed
                         if($proforma_empresa == 3)  {
                             //si es documento de prefactura
-                            if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_stockCalmed; }
+                            if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stockCalmed; }
                             //si es documento de notas
-                            if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_depositoCalmed; }
+                            if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_depositoCalmed; }
                         }
                         $nuevoStockReserva          = $stockAnteriorReserva + $valorNew;
                         $nuevoStockEmpresa          = $stockEmpresa + $valorNew;

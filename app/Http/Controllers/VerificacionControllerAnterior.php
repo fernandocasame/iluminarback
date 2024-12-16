@@ -1625,6 +1625,23 @@ class VerificacionControllerAnterior extends Controller
             //count($verificaciones);
             return count($verificaciones);
         }
+        //obtener solicitudes de verificación
+        foreach ($verificaciones as $key => $value) {
+            $arraySolicitudes = [];
+            $posicionArray = 0;
+            $getNumeroVerificacion = $value->num_verificacion;
+            $posicionArray = $getNumeroVerificacion - 1;
+
+            $solicitudes = DB::SELECT("SELECT * FROM temporadas_verificacion_historico h WHERE h.contrato = '$value->contrato'");
+
+            if (isset($solicitudes[$posicionArray])) {
+                $arraySolicitudes[0] = $solicitudes[$posicionArray];
+            } else {
+                $arraySolicitudes = [];
+            }
+
+            $value->solicitudes = $arraySolicitudes;
+        }
         return $verificaciones;
     }
     //api:post/metodosPostVerificaciones

@@ -315,8 +315,8 @@ class BancoController extends Controller
     public function obtenerCuentasPago()
     {
         $cuentasPago = DB::table('1_1_cuenta_pago as cp')
-            ->select('cp.cue_pag_codigo', 'cp.cue_pag_numero', 'cp.cue_pag_nombre')
-            ->where('cp.cue_pag_tipo_cuenta', 1)
+            ->where('cp.cue_pag_estado', 0)
+            ->select('cp.cue_pag_codigo', 'cp.cue_pag_numero', 'cp.cue_pag_nombre', 'cp.cue_pag_tipo_cuenta')
             ->get();
 
         return response()->json($cuentasPago);
@@ -326,13 +326,15 @@ class BancoController extends Controller
     {
         $fechaInicio = $request->fecha_inicio;
         $fechaFinal = $request->fecha_final;
+        $cuenta = $request->cuenta;
     
         $abonos = DB::table('abono as a')
             ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
             ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
             ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
             ->where('cp.cue_pag_tipo_cuenta', 1)
-            ->where('a.abono_estado', 0)
+            ->where('cp.cue_pag_codigo', $cuenta)
+            ->where('a.abono_estado','<>',1)
             ->whereBetween(DB::raw('DATE(a.abono_fecha)'), [$fechaInicio, $fechaFinal])
             ->get();
         foreach ($abonos as $key => $value) {
@@ -346,5 +348,78 @@ class BancoController extends Controller
     
         return response()->json($abonos);
     }
+    
+    public function obtenerAbonosCuentas(Request $request)
+    {
+        $fechaInicio = $request->fecha_inicio;
+        $fechaFinal = $request->fecha_final;
+        $cuenta = $request->cuenta;
+        $busqueda = $request->busqueda;
+        
+        // Inicia la consulta base
+        $abonos = DB::table('abono as a')
+            ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
+            ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
+            ->where('cp.cue_pag_codigo', $cuenta)
+            ->whereBetween(DB::raw('DATE(a.abono_fecha)'), [$fechaInicio, $fechaFinal]);
+
+        // Condicionales para el estado de abono
+        if ($busqueda == 'Pendientes') {
+            $abonos->where('a.abono_estado', 0);
+        }
+
+        if ($busqueda == 'Verificados') {
+            $abonos->where('a.abono_estado', 2);
+        }
+
+        // Ejecuta la consulta
+        $abonos = $abonos->get();
+
+        // Recorre los resultados para agregar la institución
+        foreach ($abonos as $key => $value) {
+            $institucion = DB::table('f_venta as v')
+                ->join('institucion as i', 'i.idInstitucion', '=', 'v.institucion_id')
+                ->select('i.idInstitucion', 'i.nombreInstitucion')
+                ->where('v.ruc_cliente', $value->abono_ruc_cliente)
+                ->first();
+
+            // Si existe una institución, se asigna
+            if ($institucion) {
+                $abonos[$key]->institucion = $institucion->nombreInstitucion;
+            }
+        }
+
+        return response()->json($abonos);
+    }
+    public function cambioEstadoCuentas(Request $request)
+    {
+        // Verifica si el array de abonos seleccionados está presente
+        $abonosSeleccionados = $request->input('cuentas');
+        $estado = $request->estado;
+        $usuario = $request->usuario;
+        
+        if (empty($abonosSeleccionados)) {
+            return response()->json(['message' => 'No se seleccionaron abonos'], 400);
+        }
+
+        try {
+            // Realiza el update en la tabla 'abono' para los abonos seleccionados
+            DB::table('abono')
+            ->whereIn('abono_id', $abonosSeleccionados)
+            ->update([
+                'abono_estado' => $estado, 
+                'usuario_verificador' => $usuario, 
+                'fecha_verificacion' => now()
+            ]); // Establece el estado a 'Verificado Gerencia' (2)
+
+            // Si todo va bien, retorna una respuesta exitosa
+            return response()->json(['message' => 'Estado de los abonos actualizado correctamente'], 200);
+        } catch (\Exception $e) {
+            // Si ocurre un error, devuelve un mensaje de error
+            return response()->json(['message' => 'Error al actualizar los abonos', 'error' => $e->getMessage()], 500);
+        }
+    }
+
 
 }

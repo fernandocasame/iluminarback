@@ -129,6 +129,7 @@ class  DevolucionRepository extends BaseRepository
         }
         $devolucionH = new CodigosLibrosDevolucionSonFacturador();
         $devolucionH->codigoslibros_devolucion_header_facturador_id = $datos->documentoPadre;
+        $devolucionH->codigoslibros_devolucion_header_id            = $datos->codigoslibros_devolucion_header_id;
         $devolucionH->id_empresa                                    = $datos->id_empresa;
         $devolucionH->pro_codigo                                    = $datos->pro_codigo;
         $devolucionH->cantidad                                      = $datos->cantidad;
