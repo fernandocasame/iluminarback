@@ -2,6 +2,7 @@
 namespace App\Repositories\Facturacion;
 
 use App\Models\CodigosLibrosDevolucionHeader;
+use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\CodigosLibrosDevolucionSonFacturador;
 use App\Repositories\BaseRepository;
 use Illuminate\Support\Facades\DB;
@@ -138,5 +139,34 @@ class  DevolucionRepository extends BaseRepository
         $devolucionH->observacion_codigo                            = $datos->observacion_codigo;
         $devolucionH->save();
         return $devolucionH;
+    }
+    public function prefacturaLibreXCodigo($id_empresa, $id_institucion, $id_periodo, $pro_codigo,$cantidadNecesaria=0)
+    {
+        $query = DB::table('f_venta as v')
+            ->leftJoin('f_detalle_venta as dv', function ($join) {
+                $join->on('dv.ven_codigo', '=', 'v.ven_codigo')
+                    ->on('dv.id_empresa', '=', 'v.id_empresa');
+            })
+            ->select(
+                'dv.*',
+                DB::raw('(COALESCE(dv.det_ven_cantidad, 0) - COALESCE(dv.det_ven_dev, 0)) AS disponible')
+            )
+            ->where('v.institucion_id', $id_institucion)
+            ->where('v.id_empresa', $id_empresa)
+            ->where('v.periodo_id', $id_periodo)
+            ->where('v.est_ven_codigo', '<>', '3')
+            ->whereNull('v.doc_intercambio')
+            ->where('v.idtipodoc', '1')
+            ->where('dv.pro_codigo', $pro_codigo)
+            ->whereNull('dv.doc_intercambio')
+            ->having('disponible', '>', $cantidadNecesaria)
+            ->get();
+    
+        return $query;
+    }
+    public function validateComboCreado($combo,$id_empresa,$id_devolucion)
+    {
+        $query = CodigosLibrosDevolucionSon::where('pro_codigo', $combo)->where('id_empresa', $id_empresa)->where('codigoslibros_devolucion_id', $id_devolucion)->get();
+        return $query;
     }
 }

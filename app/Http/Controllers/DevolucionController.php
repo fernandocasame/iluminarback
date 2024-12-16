@@ -11,6 +11,7 @@ use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\CodigosLibrosDevolucionSonFacturador;
 use App\Models\DetalleVentas;
 use App\Models\f_tipo_documento;
+use App\Models\LibroSerie;
 use App\Models\Periodo;
 use App\Models\Ventas;
 use App\Repositories\Codigos\CodigosRepository;
@@ -55,6 +56,7 @@ class DevolucionController extends Controller
         if($request->getDocumentosFinalizados)              { return $this->getDocumentosFinalizados($request); }
         if($request->getDetalleVentaXPrefactura)            { return $this->getDetalleVentaXPrefactura($request); }
         if($request->getCodigosCombosDocumentoDevolucion)   { return $this->getCodigosCombosDocumentoDevolucion($request); }
+        if($request->generateCombos)                        { return $this->generateCombos($request); }
        if($request->todoDevolucionCliente)  { return $this->todoDevolucionCliente($request); }
        if($request->devolucionDetalle)  { return $this->devolucionDetalle($request); }
        if($request->CargarDevolucion)  { return $this->CargarDevolucion($request); }
@@ -102,7 +104,7 @@ class DevolucionController extends Controller
         $idDevolucion = $request->input('idDevolucion');
         $getCodigosDevolucionTodos = CodigosLibrosDevolucionSon::query()
         ->where('codigoslibros_devolucion_id',$idDevolucion)
-        ->select('codigo','combo','pro_codigo','factura','documento','id_empresa')
+        ->select('codigo','combo','codigo_combo','pro_codigo','factura','documento','id_empresa','estado')
         ->get();
         //si es id_empresa null colocar sin empresa si es 1 colocar Prolipa si es 3 Calmed
         foreach ($getCodigosDevolucionTodos as $key => $value) {
@@ -112,6 +114,14 @@ class DevolucionController extends Controller
                 $getCodigosDevolucionTodos[$key]->descripcion_empresa= 'Prolipa';
             }elseif($value->id_empresa == 3){
                 $getCodigosDevolucionTodos[$key]->descripcion_empresa= 'Calmed';
+            }
+            //validar estado si es 0 es creado, 1 es revisado, 2 es finalizado
+            if($value->estado == 0){
+                $getCodigosDevolucionTodos[$key]->estadoCodigoDoc = 'Creado';
+            }elseif($value->estado == 1){
+                $getCodigosDevolucionTodos[$key]->estadoCodigoDoc = 'Revisado';
+            }elseif($value->estado == 2){
+                $getCodigosDevolucionTodos[$key]->estadoCodigoDoc = 'Finalizado';
             }
         }
         return $getCodigosDevolucionTodos;
@@ -399,6 +409,114 @@ class DevolucionController extends Controller
         }
         return $query;
     }
+    //api:get/devoluciones?generateCombos=1&id_devolucion=119
+    public function generateCombos($request)
+    {
+        try {
+            $arrayCombosNoDisponibles = [];
+            $contador = 0;
+            //transacaccion
+            DB::beginTransaction();
+            // Validar entrada
+            $id_devolucion = $request->input('id_devolucion');
+            if (!$id_devolucion) {
+                return response()->json(['status' => '0', 'message' => 'El id_devolucion es requerido.'], 200);
+            }
+            //obtener padre
+            $padre = CodigosLibrosDevolucionHeader::where('id', $id_devolucion)->first();
+            if(!$padre){
+                return response()->json(['status' => '0', 'message' => 'No se pudo obtener el padre del documento.'], 200);
+            }
+            $id_cliente = $padre->id_cliente;
+            $id_periodo = $padre->periodo_id;
+            // Obtener datos
+            $getCombos = CodigosLibrosDevolucionSon::query()
+                ->where('codigoslibros_devolucion_id', $id_devolucion)
+                ->where('tipo_codigo', '0')
+                ->whereNotNull('id_empresa') // Filtramos por id_empresa no nulo
+                ->select('pro_codigo', 'combo', 'codigo_combo', 'factura', 'documento', 'id_empresa')
+                ->get();
+
+            // Agrupar por combo y id_empresa
+            $result = $getCombos->groupBy(function ($item) {
+                return $item->combo . '-' . $item->id_empresa;
+            })->map(function ($items, $key) {
+                [$combo, $id_empresa] = explode('-', $key);
+
+                // Agrupar por codigo_combo y construir los hijos
+                $hijos = $items->groupBy('codigo_combo')->map(function ($subItems, $codigoCombo) {
+                    $subhijos = $subItems->map(function ($item) {
+                        return [
+                            'pro_codigo' => $item->pro_codigo,
+                            'factura' => $item->factura,
+                            'documento' => $item->documento,
+                        ];
+                    })->toArray();
+
+                    return [
+                        'codigo_combo' => $codigoCombo,
+                        'cantidad_subhijos' => count($subhijos),
+                        'subhijos' => $subhijos,
+                    ];
+                })->values()->toArray();
+
+
+                return [
+                    'combo' => $combo,
+                    'id_empresa' => $id_empresa,
+                    'cantidad_hijos' => count($hijos), // Número total de hijos 
+                    'hijos' => $hijos,
+                ];
+            })->values()->toArray();
+            //GUARDAR EN TABLA CODIGOS LIBROS SON
+            foreach($result as $key => $item){
+                //buscar el combo en la tabla libro series
+                $id_empresa                                 = $item['id_empresa'];
+                $combo                                      = $item['combo'];
+                $cantidadNecesaria                          = $item['cantidad_hijos'];
+                //validar si el combo ya esta creado no crear
+                $validateCreate                              = $this->devolucionRepository->validateComboCreado($combo,$id_empresa,$id_devolucion);
+                if($validateCreate->count() > 0)             { continue; }
+                $getLibro = LibroSerie::where('codigo_liquidacion', $combo)->first();
+                //si no existe el combo mando una alerta
+                if(!$getLibro)                              { return response()->json(['status' => '0', 'message' => 'No se pudo obtener el combo '.$combo], 200); }  
+                $id_libro                                   = $getLibro->idLibro;   
+                //obtener disponibilidad del combo en alguna prefactura
+                $getDisponibilidadPrefactura                = $this->devolucionRepository->prefacturaLibreXCodigo($id_empresa,$id_cliente,$id_periodo,$combo,$cantidadNecesaria);
+                if($getDisponibilidadPrefactura->count() == 0){
+                    $arrayCombosNoDisponibles[]              = $item;
+                    continue;
+                }
+                //si existe disponibilidad guardar combo
+                $datosCombo                                 = $getDisponibilidadPrefactura[0];
+                $guardarCombo                               = new CodigosLibrosDevolucionSon();
+                $guardarCombo->codigoslibros_devolucion_id  = $id_devolucion;
+                $guardarCombo->id_empresa                   = $id_empresa;
+                $guardarCombo->pro_codigo                   = $combo;
+                $guardarCombo->combo_cantidad               = $cantidadNecesaria;
+                $guardarCombo->tipo_codigo                  = 1;
+                $guardarCombo->id_cliente                   = $id_cliente;
+                $guardarCombo->id_periodo                   = $id_periodo;
+                $guardarCombo->id_libro                     = $id_libro;
+                $guardarCombo->precio                       = $datosCombo->det_ven_valor_u;
+                $guardarCombo->save();
+                if($guardarCombo){
+                    $contador++;
+                }
+            }
+            DB::commit();
+            return [
+                "contador" => $contador,
+                "noDisponibles" => $arrayCombosNoDisponibles
+            ];
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['status' => '0', 'message' => 'Error al generar combos: ' . $e->getMessage()], 500);
+        }
+    }
+
+
+
     //api:get/devoluciones?todoDevolucionCliente=yes
     public function todoDevolucionCliente($request)
     {
