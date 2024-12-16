@@ -984,4 +984,29 @@ class InstitucionController extends Controller
     //        return "No se pudo guardar/actualizar";
     //    }
     // }
+    //METODOS JEYSON INICIO
+    public function MoverInstitucionxAsesor(Request $request)
+    {
+        // return $request;
+        DB::beginTransaction();
+        $Id_Asesor_Seleccionado = $request->input('Id_Asesor_Seleccionado');
+        $Cedula_Asesor_Seleccionado = $request->input('Cedula_Asesor_Seleccionado');
+        $InstitucionesAMover = $request->input('InstitucionesAMover', []);
+        try {
+            // Si hay instituciones, moverlas
+            foreach ($InstitucionesAMover as $institucionmover) {
+                //Producto
+                $actualizarasesorde_institucion = Institucion::find($institucionmover['id_institucion']);
+                $actualizarasesorde_institucion->asesor_id = $Id_Asesor_Seleccionado;
+                $actualizarasesorde_institucion->vendedorInstitucion = $Cedula_Asesor_Seleccionado;
+                $actualizarasesorde_institucion->save();
+            }
+            DB::commit();
+            return response()->json(["status" => "1", 'message' => 'Compra Finalizada correctamente'], 200);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al finalizar la compra: ' . $e->getMessage()], 500);
+        }
+    }
+    //METODOS JEYSON FIN
 }
