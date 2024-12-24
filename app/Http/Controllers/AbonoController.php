@@ -1069,7 +1069,7 @@ class AbonoController extends Controller
     $detallesDevolucion = DB::table('codigoslibros_devolucion_header as cdh')
         ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
         ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
-        ->whereRaw('cdh.estado','<>', 0)
+        ->where('cdh.estado','<>', 0)
         ->where('cls.documento', '=', $documento)
         ->where('cls.id_empresa', '=', $empresa)
         ->groupBy('cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
