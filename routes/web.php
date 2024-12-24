@@ -1073,6 +1073,7 @@ Route::get('obtenerCuentasPago', 'BancoController@obtenerCuentasPago');
 Route::get('obtenerAbonosCuentasNotas', 'BancoController@obtenerAbonosCuentasNotas');
 Route::get('obtenerAbonosCuentas', 'BancoController@obtenerAbonosCuentas');
 Route::post('cambioEstadoCuentas', 'BancoController@cambioEstadoCuentas');
+Route::get('clientesVentas', 'BancoController@clientesVentas');
 //FIN SEGUIMIENTO
 //PREFACTURAS A NOTAS
 Route::post('cambioCodigosPrefacturasANota', 'VentasController@cambioCodigosPrefacturasANota');
@@ -1180,6 +1181,7 @@ Route::post('guardarGuiasBDMilton_new', 'PedidosController@guardarGuiasBDMilton_
 
 //INICIO APIS JEYSON LARA
 Route::get('GetProductoStockHistorico', '_14ProductoStockHistoricoController@GetProductoStockHistorico');
+Route::get('GetProductoStockHistoricoxFecha', '_14ProductoStockHistoricoController@GetProductoStockHistoricoxFecha');
 Route::get('GetProductosSoloStocks', '_14ProductoController@GetProductosSoloStocks');
 Route::get('Getstockproductosrestablecer', '_14ProductoController@Getstockproductosrestablecer');
 Route::get('GetSumarTodo_Productos', '_14ProductoController@GetSumarTodo_Productos');
@@ -1988,4 +1990,9 @@ Route::group([], function () {
     Route::resource('/combos', 'ComboController');
     Route::post('guardarAsignacionVariosCodigos','ComboController@guardarAsignacionVariosCodigos');
     Route::post('guardarAsignacionCodigo','ComboController@guardarAsignacionCodigo');
+});
+//NOTIFICACIONES
+Route::group([], function () {
+    // Definición manual de rutas para el controlador EvaluacionEstudianteController
+    Route::resource('/notificaciones', 'NotificacionController');
 });

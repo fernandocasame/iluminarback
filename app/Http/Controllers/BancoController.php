@@ -355,40 +355,76 @@ class BancoController extends Controller
         $fechaFinal = $request->fecha_final;
         $cuenta = $request->cuenta;
         $busqueda = $request->busqueda;
-        
-        // Inicia la consulta base
-        $abonos = DB::table('abono as a')
+        if($fechaInicio && $fechaFinal ){
+            // Inicia la consulta base
+            $abonos = DB::table('abono as a')
             ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
             ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
             ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
             ->where('cp.cue_pag_codigo', $cuenta)
             ->whereBetween(DB::raw('DATE(a.abono_fecha)'), [$fechaInicio, $fechaFinal]);
 
-        // Condicionales para el estado de abono
-        if ($busqueda == 'Pendientes') {
-            $abonos->where('a.abono_estado', 0);
-        }
+            // Condicionales para el estado de abono
+            if ($busqueda == 'Pendientes') {
+                $abonos->where('a.abono_estado', 0);
+            }
 
-        if ($busqueda == 'Verificados') {
-            $abonos->where('a.abono_estado', 2);
-        }
+            if ($busqueda == 'Verificados') {
+                $abonos->where('a.abono_estado', 2);
+            }
 
-        // Ejecuta la consulta
-        $abonos = $abonos->get();
+            // Ejecuta la consulta
+            $abonos = $abonos->get();
 
-        // Recorre los resultados para agregar la institución
-        foreach ($abonos as $key => $value) {
-            $institucion = DB::table('f_venta as v')
-                ->join('institucion as i', 'i.idInstitucion', '=', 'v.institucion_id')
-                ->select('i.idInstitucion', 'i.nombreInstitucion')
-                ->where('v.ruc_cliente', $value->abono_ruc_cliente)
-                ->first();
+            // Recorre los resultados para agregar la institución
+            foreach ($abonos as $key => $value) {
+                $institucion = DB::table('f_venta as v')
+                    ->join('institucion as i', 'i.idInstitucion', '=', 'v.institucion_id')
+                    ->select('i.idInstitucion', 'i.nombreInstitucion')
+                    ->where('v.ruc_cliente', $value->abono_ruc_cliente)
+                    ->first();
 
-            // Si existe una institución, se asigna
-            if ($institucion) {
-                $abonos[$key]->institucion = $institucion->nombreInstitucion;
+                // Si existe una institución, se asigna
+                if ($institucion) {
+                    $abonos[$key]->institucion = $institucion->nombreInstitucion;
+                }
+            }
+        }else{
+            // Inicia la consulta base
+            $abonos = DB::table('abono as a')
+            ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
+            ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
+            ->where('cp.cue_pag_codigo', $cuenta);
+
+            // Condicionales para el estado de abono
+            if ($busqueda == 'Pendientes') {
+                $abonos->where('a.abono_estado', 0);
+            }
+
+            if ($busqueda == 'Verificados') {
+                $abonos->where('a.abono_estado', 2);
+            }
+
+            // Ejecuta la consulta
+            $abonos = $abonos->get();
+
+            // Recorre los resultados para agregar la institución
+            foreach ($abonos as $key => $value) {
+                $institucion = DB::table('f_venta as v')
+                    ->join('institucion as i', 'i.idInstitucion', '=', 'v.institucion_id')
+                    ->select('i.idInstitucion', 'i.nombreInstitucion')
+                    ->where('v.ruc_cliente', $value->abono_ruc_cliente)
+                    ->first();
+
+                // Si existe una institución, se asigna
+                if ($institucion) {
+                    $abonos[$key]->institucion = $institucion->nombreInstitucion;
+                }
             }
         }
+        
+        
 
         return response()->json($abonos);
     }
@@ -420,6 +456,116 @@ class BancoController extends Controller
             return response()->json(['message' => 'Error al actualizar los abonos', 'error' => $e->getMessage()], 500);
         }
     }
+
+public function clientesVentas(Request $request)
+{
+    // 1. Obtener las instituciones distintas con el primer SELECT
+    $clientes = DB::table('institucion')
+        ->join('f_venta_agrupado as f', 'f.institucion_id', '=', 'institucion.idInstitucion')
+        ->leftJoin('usuario as u', 'u.idusuario', '=', 'f.ven_cliente')
+        ->where('f.periodo_id', $request->periodo)
+        ->where('f.id_empresa', $request->empresa)
+        ->where('f.est_ven_codigo', 0)
+        ->select('f.institucion_id as clientes', 'institucion.nombreInstitucion as institucion', 'u.cedula as ruc')
+        ->distinct()
+        ->get();
+
+    // Verificar si se obtuvieron resultados
+    if ($clientes->isEmpty()) {
+        return response()->json(['error' => 'No se encontraron clientes.'], 404);
+    }
+
+    // Aquí guardamos los resultados
+    $resultados = [];
+
+    // Recorrer los clientes
+    foreach ($clientes as $cliente) {
+        // 2. Obtener los detalles de venta para el cliente sin usar SUM
+        $detalleVenta = DB::table('f_venta as fv')
+            ->join('f_detalle_venta as fdv', function ($join) {
+                $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
+                    ->on('fv.ven_codigo', '=', 'fdv.ven_codigo');
+            })
+            ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
+            ->where('fv.est_ven_codigo', '<>', 3)
+            ->where('fv.institucion_id', $cliente->clientes)
+            ->where('fv.id_empresa', $request->empresa)
+            ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad', 'fdv.det_ven_valor_u', 'fdv.det_ven_dev')
+            ->get();
+
+        // 3. Obtener los detalles de venta agrupados para el cliente
+        $detalleVentaAgrupado = DB::table('f_venta_agrupado as fv')
+            ->join('f_detalle_venta_agrupado as fdv', function ($join) {
+                $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
+                    ->on('fv.id_factura', '=', 'fdv.id_factura');
+            })
+            ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
+            ->where('fv.est_ven_codigo', 0)
+            ->where('fv.institucion_id', $cliente->clientes)
+            ->where('fv.id_empresa', $request->empresa)
+            ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad as det_ven_cantidad_facturada')
+            ->get();
+
+        // Inicializamos el array para combinar los resultados
+        $detalleVentaCombinado = [];
+
+        // Combinar los datos de detalleVenta sin sumar en la consulta
+        foreach ($detalleVenta as $venta) {
+            $proCodigo = $venta->pro_codigo;
+            if (!isset($detalleVentaCombinado[$proCodigo])) {
+                $detalleVentaCombinado[$proCodigo] = [
+                    'pro_codigo' => $proCodigo,
+                    'nombre' => $venta->nombre,
+                    'det_ven_cantidad' => 0,
+                    'det_ven_valor_u' => $venta->det_ven_valor_u,
+                    'det_ven_dev' => 0,
+                    'det_ven_cantidad_facturada' => 0, // Inicializamos como 0
+                ];
+            }
+            // Acumulamos las cantidades y devoluciones
+            $detalleVentaCombinado[$proCodigo]['det_ven_cantidad'] += $venta->det_ven_cantidad;
+            $detalleVentaCombinado[$proCodigo]['det_ven_dev'] += $venta->det_ven_dev;
+        }
+
+        // Ahora agregamos la información de detalleVentaAgrupado
+        foreach ($detalleVentaAgrupado as $factura) {
+            $proCodigo = $factura->pro_codigo;
+            // Si el producto ya existe en el array, actualizamos la cantidad facturada
+            if (isset($detalleVentaCombinado[$proCodigo])) {
+                $detalleVentaCombinado[$proCodigo]['det_ven_cantidad_facturada'] += $factura->det_ven_cantidad_facturada;
+            }
+        }
+
+        // Filtramos los productos según la condición
+        $detalleVentaFinal = [];
+        foreach ($detalleVentaCombinado as $producto) {
+            $detVenCantidad = $producto['det_ven_cantidad'];
+            $detVenDev = $producto['det_ven_dev'];
+            $detVenCantidadFacturada = $producto['det_ven_cantidad_facturada'];
+
+            // Verificamos la condición de cantidad - devoluciones > cantidad facturada
+            if (($detVenCantidad - $detVenDev) < $detVenCantidadFacturada) {
+                $detalleVentaFinal[] = $producto;
+            }
+        }
+
+        // Agregar los resultados al array final
+        $resultados[] = [
+            'cliente' => $cliente->clientes,
+            'institucion' => $cliente->institucion,
+            'ruc' => $cliente->ruc,
+            'detalle_venta' => $detalleVentaFinal,
+        ];
+    }
+
+    // Retornar los resultados como una respuesta JSON
+    return response()->json($resultados);
+}
+
+    
+    
+    
+    
 
 
 }

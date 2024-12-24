@@ -166,6 +166,7 @@ class  CodigosRepository extends BaseRepository
             'documento_devolucion'      => null,
             'permitir_devolver_nota'    => '0',
             'codigo_combo'              => null,
+            'quitar_de_reporte'         => null,
         ];
         $arrayPaquete = [
             'codigo_paquete'            => null,

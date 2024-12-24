@@ -2774,6 +2774,7 @@ class CodigoLibrosController extends Controller
         ->update([
             'estado_liquidacion'    => '3',
             'bc_estado'             => '1',
+            'quitar_de_reporte'        => '1', // no se visualizará en el reporte de facturacion, pero el estudiante si puede seguir usando en su módulo
         ]);
     }
     public function cambiarEstadoCodigos($request){
@@ -3671,42 +3672,11 @@ class CodigoLibrosController extends Controller
     public function metodosPostCodigos(Request $request){
         if($request->getPrevisualizarCodigos)               { return $this->getPrevisualizarCodigos($request); }
         if($request->getPrevisualizarPaquetes)              { return $this->getPrevisualizarPaquetes($request); }
-
+        if($request->getPrevisualizarCodigosTablaSon)       { return $this->getPrevisualizarCodigosTablaSon($request); }
+        if($request->getPrevisualizarPaquetesTablaSon)      { return $this->getPrevisualizarPaquetesTablaSon($request); }
     }
     //api:post/metodosPostCodigos?getPrevisualizarCodigos=1
     public function getPrevisualizarCodigos($request){
-        // $data = '
-        //     [
-        //         {
-        //             "codigo": "SMLL3-P493HD2"
-        //         },
-        //         {
-        //             "codigo": "SMLL3-K8GA4WZ"
-        //         },
-        //         {
-        //             "codigo": "SMLL3-NM47MU8"
-        //         },
-        //         {
-        //             "codigo": "SMLL3-BT8572A"
-        //         },
-        //         {
-        //             "codigo": "SMLL3-63Z5SEP"
-        //         },
-        //         {
-        //             "codigo": "APRUEBA03"
-        //         },
-        //         {
-        //             "codigo": "APRUEBA14"
-        //         },
-        //         {
-        //             "codigo": "APRUEBA66"
-        //         },
-        //         {
-        //             "codigo": "fff"
-        //         }
-        //     ]
-        // ';
-        // $codigos = json_decode($data, true); // Convertir a array asociativo
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $codigos                = json_decode($request->data_codigos);
@@ -3845,28 +3815,85 @@ class CodigoLibrosController extends Controller
         ];
         return $resultados;
     }
+    //api:post/metodosPostCodigos?getPrevisualizarCodigosTablaSon=1
+    public function getPrevisualizarCodigosTablaSon($request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $codigos                = json_decode($request->data_codigos);
+        $mostrarSoloCodigos     = $request->mostrarSoloCodigos;
+        // Verificar si se decodificó correctamente
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return ['error' => 'Invalid JSON data'];
+        }
+        // Extraer solo los códigos a buscar
+        $codigosABuscar = array_column($codigos, 'codigo');
+        // Filtrar la colección usando whereIn y hacer un LEFT JOIN
+        $resultados = CodigosLibrosDevolucionSon::whereIn('codigo', $codigosABuscar)
+            // ->where('proforma_empresa', $empresa['idEmpresa'])
+            ->leftJoin('institucion', 'codigoslibros_devolucion_son.id_cliente', '=', 'institucion.idInstitucion')
+            ->leftJoin('periodoescolar as pe', 'codigoslibros_devolucion_son.id_periodo', '=', 'pe.idperiodoescolar')
+            ->leftJoin('libros_series as ls', 'codigoslibros_devolucion_son.id_libro', '=', 'ls.idLibro')
+            ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
+            ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
+            ->leftjoin('codigoslibros_devolucion_header as ch', 'codigoslibros_devolucion_son.codigoslibros_devolucion_id', '=', 'ch.id')
+            ->select('codigoslibros_devolucion_son.codigo', 'codigoslibros_devolucion_son.id_periodo as bc_periodo', 'codigoslibros_devolucion_son.id_cliente',
+            'codigoslibros_devolucion_son.id_libro','ch.codigo_devolucion as documento_devolucion',
+            'codigoslibros_devolucion_son.combo','codigoslibros_devolucion_son.codigo_combo','codigoslibros_devolucion_son.id_empresa','codigoslibros_devolucion_son.documento as codigo_proforma',
+            'codigoslibros_devolucion_son.documento_estado_liquidacion as estado_liquidacion','codigoslibros_devolucion_son.documento_regalado_liquidado as liquidado_regalado', 'codigoslibros_devolucion_son.tipo_venta as venta_estado',
+            'codigoslibros_devolucion_son.codigo_paquete',
+            'codigoslibros_devolucion_son.prueba_diagnostico',
+            'ls.codigo_liquidacion','ls.nombre as nombrelibro',
+            'institucion.nombreInstitucion','pe.periodoescolar',
+                'ls.id_serie','a.area_idarea','ls.year'
+            )
+            ->get();
+        //traer el precio
+        foreach ($resultados as $item) {
+            $periodo = $item->bc_periodo;
+            $codigo_proforma = $item->codigo_proforma;
+            if($periodo == null || $periodo == 0){
+                $item->precio = 0;
+            }else{
+                // Obtener el precio del libro usando el repositorio
+                $precio             = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->id_libro, $item->area_idarea, $periodo, $item->year);
+                $item->precio       = $precio;
+            }
+            //PERSEO
+            if($codigo_proforma == null || $codigo_proforma == ""){
+                $item->proformaEnviadaPerseo = 0;
+            }else{
+                $venta = Ventas::where('ven_codigo', $codigo_proforma)->where('id_empresa', $item->proforma_empresa)->first();
+                if($venta){
+                    $estadoPerseo = $venta->estadoPerseo;
+                    if($estadoPerseo == 0){
+                        $item->proformaEnviadaPerseo = 0;
+                    }else{
+                        $item->proformaEnviadaPerseo = 1;
+                    }
+                }else{
+                    $item->proformaEnviadaPerseo = 0;
+                }
+            }
+        }
+
+        // Extraer los códigos encontrados
+        $codigosEncontrados         = $resultados->pluck('codigo')->toArray();
+        // Determinar los códigos que no fueron encontrados
+        $codigosNoEncontrados       = array_values(array_diff($codigosABuscar, $codigosEncontrados));
+        //solo traer los codigos con prueba diagnostico cero
+        $resultados                 = $resultados->where('prueba_diagnostica',0)->values();
+        if($mostrarSoloCodigos){
+            return [
+                "encontrados"    => $resultados,
+                "no_encontrados" => $codigosNoEncontrados
+            ];
+        }
+    }
     //api:post/metodosPostCodigos?getPrevisualizarPaquetes=1
     public function getPrevisualizarPaquetes($request) {
 
         // Inicializamos arrays para almacenar los paquetes encontrados y no encontrados
         $arrayPaquetesNoEncontrados = [];
-
-        // Simulación de JSON con códigos de paquetes
-        // $data = '
-        //     [
-        //         {
-        //             "codigo": "PAQ-224Y39"
-        //         },
-        //         {
-        //             "codigo": "PAQ-225K7Y"
-        //         },
-        //         {
-        //             "codigo": "ffff"
-        //         }
-        //     ]
-        // ';
-
-        // $paquetes = json_decode($data, true); // Convertir a array asociativo
 
         // Configurar tiempo de ejecución
         set_time_limit(6000000);
@@ -4020,6 +4047,96 @@ class CodigoLibrosController extends Controller
         ];
     }
 
+    //api:post/metodosPostCodigos?getPrevisualizarPaquetesTableSon=1
+    public function getPrevisualizarPaquetesTableSon($request) {
+        // Inicializamos arrays para almacenar los paquetes encontrados y no encontrados
+        $arrayPaquetesNoEncontrados = [];
+
+        // Configurar tiempo de ejecución
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+
+        // Verificar si se decodificó correctamente
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return ['error' => 'Invalid JSON data'];
+        }
+        $paquetes       = json_decode($request->data_codigos);
+        // Extraer solo los códigos a buscar
+        $paquetesBuscar = array_column($paquetes, 'codigo');
+        $mostrarSoloCodigos     = $request->mostrarSoloCodigos;
+
+        // Buscar códigos en la base de datos
+        $codigosPaquete = CodigosPaquete::whereIn('codigo', $paquetesBuscar)->get();
+
+        // Extraer los códigos encontrados
+        $paquetesEncontrados = $codigosPaquete->pluck('codigo')->toArray();
+
+        // Guardar en array paquetes encontrados
+        $arrayPaquetesEncontrados = $paquetesEncontrados;
+
+        // Determinar los códigos que no fueron encontrados
+        $paquetesNoEncontrados = array_values(array_diff($paquetesBuscar, $paquetesEncontrados));
+
+        // Almacenar en array paquetes no encontrados
+        $arrayPaquetesNoEncontrados = $paquetesNoEncontrados;
+
+        // Realizar la consulta con joins, añadiendo el filtro de prueba_diagnostica
+        $resultados = CodigosLibrosDevolucionSon::whereIn('codigo_paquete', $paquetesEncontrados)
+            ->leftJoin('institucion', 'codigoslibros_devolucion_son.id_cliente', '=', 'institucion.idInstitucion')
+            ->leftJoin('periodoescolar as pe', 'codigoslibros_devolucion_son.id_periodo', '=', 'pe.idperiodoescolar')
+            ->leftJoin('libros_series as ls', 'codigoslibros_devolucion_son.id_libro', '=', 'ls.idLibro')
+            ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
+            ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
+            ->leftjoin('codigoslibros_devolucion_header as ch', 'codigoslibros_devolucion_son.codigoslibros_devolucion_id', '=', 'ch.id')
+            ->select('codigoslibros_devolucion_son.codigo', 'codigoslibros_devolucion_son.id_periodo as bc_periodo', 'codigoslibros_devolucion_son.id_cliente',
+            'codigoslibros_devolucion_son.id_libro','ch.codigo_devolucion as documento_devolucion',
+            'codigoslibros_devolucion_son.combo','codigoslibros_devolucion_son.codigo_combo','codigoslibros_devolucion_son.id_empresa','codigoslibros_devolucion_son.documento as codigo_proforma',
+            'codigoslibros_devolucion_son.documento_estado_liquidacion as estado_liquidacion','codigoslibros_devolucion_son.documento_regalado_liquidado as liquidado_regalado', 'codigoslibros_devolucion_son.tipo_venta as venta_estado',
+            'codigoslibros_devolucion_son.codigo_paquete',
+            'codigoslibros_devolucion_son.prueba_diagnostico',
+            'ls.codigo_liquidacion','ls.nombre as nombrelibro',
+            'institucion.nombreInstitucion','pe.periodoescolar',
+                'ls.id_serie','a.area_idarea','ls.year'
+            )
+            ->get();
+
+        // Traer el precio del libro
+        foreach ($resultados as $item) {
+            $periodo = $item->bc_periodo;
+            $codigo_proforma = $item->codigo_proforma;
+            if ($periodo == null || $periodo == 0) {
+                $item->precio = 0;
+            } else {
+                // Obtener el precio del libro usando el repositorio
+                $precio = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->id_libro, $item->area_idarea, $periodo, $item->year);
+                $item->precio = $precio;
+            }
+            //PERSEO
+            if($codigo_proforma == null || $codigo_proforma == ""){
+                $item->proformaEnviadaPerseo = 0;
+            }else{
+                $venta = Ventas::where('ven_codigo', $codigo_proforma)->where('id_empresa', $item->proforma_empresa)->first();
+                if($venta){
+                    $estadoPerseo = $venta->estadoPerseo;
+                    if($estadoPerseo == 0){
+                        $item->proformaEnviadaPerseo = 0;
+                    }else{
+                        $item->proformaEnviadaPerseo = 1;
+                    }
+                }else{
+                    $item->proformaEnviadaPerseo = 0;
+                }
+            }
+        }
+        //MOSTRAR SOLO LOS CODIGOS
+        if($mostrarSoloCodigos){
+            return [
+                'paquetesEncontrados'   => $paquetesEncontrados,
+                'no_encontrados'        => $arrayPaquetesNoEncontrados,
+                'encontrados'           => $resultados,
+            ];
+        }
+    }
     //api:post/codigos/asignarCombos
     public function asignarCombos(Request $request) {
         set_time_limit(6000000);
@@ -4078,6 +4195,7 @@ class CodigoLibrosController extends Controller
         $bloqueados         = $request->input('bloqueados');
         $puntoVenta         = $request->input('puntoVenta');
         $puntoVentaActivos  = $request->input('puntoVentaActivos');
+        $serie              = $request->input('serie');
         // Realizar la consulta
         $arrayCodigosActivos = CodigosLibros::select(
             'libros_series.codigo_liquidacion AS codigo',
@@ -4126,6 +4244,10 @@ class CodigoLibrosController extends Controller
                             ->orWhere('codigoslibros.estado_liquidacion', '1')
                             ->orWhere('codigoslibros.estado_liquidacion', '2');
                   });
+        })
+        ->when($serie, function ($query) {
+            $query->where('libros_series.id_serie', request('serie'))
+            ->where('estado_liquidacion','<>','3');
         })
         ->groupBy('libros_series.codigo_liquidacion', 'libros_series.nombre', 'codigoslibros.serie', 'codigoslibros.libro_idlibro', 'libros_series.year', 'libros_series.id_serie', 'asignatura.area_idarea')
         ->get();

@@ -58,7 +58,7 @@ trait TraitCodigosGeneral{
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,
         c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma, ls.codigo_liquidacion,
-        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo, c.codigo_combo
+        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo, c.codigo_combo, c.documento_devolucion
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -122,7 +122,7 @@ trait TraitCodigosGeneral{
         p.periodoescolar as periodo,
         pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
         c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma,
-        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo,c.codigo_combo'
+        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo,c.codigo_combo,c.documento_devolucion'
         ))
         ->leftJoin('usuario as  u',         'c.idusuario',                  'u.idusuario')
         ->leftJoin('usuario as  ase',       'c.asesor_id',                  'ase.idusuario')
@@ -207,10 +207,11 @@ trait TraitCodigosGeneral{
                 "codigo_proforma"               => $item->codigo_proforma,
                 "proforma_empresa"              => $item->proforma_empresa,
                 "codigo_liquidacion"            => $item->codigo_liquidacion,
-                'devuelto_proforma'             => $item->devuelto_proforma,
                 "asesor"                        => $item->asesor,
                 'combo'                         => $item->combo,
-                'codigo_combo'                  => $item->codigo_combo
+                'codigo_combo'                  => $item->codigo_combo,
+                'documento_devolucion'          => $item->documento_devolucion,
+                'devuelto_proforma'             => $item->devuelto_proforma
             ];
         }
         return $datos;
@@ -348,6 +349,22 @@ trait TraitCodigosGeneral{
         $historico->new_values              =  $new_values;
         $historico->devueltos_liquidados    = $devueltos_liquidados;
         $historico->verificacion_liquidada  = $verificacion_liquidada;
+        $historico->save();
+        return "Guardado en historico";
+    }
+    public function GuardarEnHistoricoTablaSon ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values,$devueltos_liquidados=null,$verificacion_liquidada=null){
+        $historico = new HistoricoCodigos();
+        $historico->id_usuario              =  $id_usuario;
+        $historico->usuario_editor          =  $institucion_id;
+        $historico->id_periodo              =  $periodo_id;
+        $historico->codigo_libro            =  $codigo;
+        $historico->idInstitucion           =  $usuario_editor;
+        $historico->observacion             =  $comentario;
+        $historico->old_values              =  $old_values;
+        $historico->new_values              =  $new_values;
+        $historico->devueltos_liquidados    = $devueltos_liquidados;
+        $historico->verificacion_liquidada  = $verificacion_liquidada;
+        $historico->tipo_tabla              = 1;
         $historico->save();
         return "Guardado en historico";
     }

@@ -1069,6 +1069,7 @@ class AbonoController extends Controller
     $detallesDevolucion = DB::table('codigoslibros_devolucion_header as cdh')
         ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
         ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
+        ->whereRaw('cdh.estado','<>', 0)
         ->where('cls.documento', '=', $documento)
         ->where('cls.id_empresa', '=', $empresa)
         ->groupBy('cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
@@ -1298,6 +1299,100 @@ class AbonoController extends Controller
         return response()->json($ventas);
     }
 
+    // public function obtenerDetallesDevolucion(Request $request)
+    // {
+    //     // Validamos que el parámetro 'documento' esté presente
+    //     $request->validate([
+    //         'documento' => 'required|string',
+    //     ]);
+
+    //     // Recuperamos el documento desde el parámetro de la solicitud
+    //     $documento = $request->input('documento');
+    //     $empresa = $request->input('empresa');
+
+    //    // Ejecutamos la consulta en la base de datos para obtener los detalles de devolución
+    //     $detallesDevolucion = DB::table('codigoslibros_devolucion_header as cdh')
+    //     ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
+    //     ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
+    //     ->where('cdh.estado','<>', 0)
+    //     ->where('cls.tipo_codigo', '=', 0)
+    //     ->where('cls.documento', '=', $documento)
+    //     ->where('cls.id_empresa', '=', $empresa)
+    //     ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
+    //     ->select('cdh.id', 'cdh.codigo_devolucion','cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion', DB::raw('ROUND(SUM(cls.precio), 2) as total_precio'))
+    //     ->get();
+
+    //     // Convertimos la colección a un arreglo
+    //     $detallesDevolucionArray = $detallesDevolucion->toArray();
+
+    //     // Recorrer cada uno de los detalles de devolución
+    //     foreach ($detallesDevolucionArray as $key => $item) {
+    //         // Consultar las ventas relacionadas con el documento
+    //         $fVentas = DB::table('f_venta as fv')
+    //             ->join('f_detalle_venta as fdv', function($join) {
+    //                 $join->on('fdv.ven_codigo', '=', 'fv.ven_codigo')
+    //                     ->on('fdv.id_empresa', '=', 'fv.id_empresa');
+    //             })
+    //             ->where('fv.ven_codigo', '=', $item->documento)
+    //             ->where('fv.id_empresa', '=', $empresa)
+    //             ->where('fv.est_ven_codigo', '<>', 3)
+    //             ->where('fdv.det_ven_dev', '>', 0)
+    //             ->first();  // Usamos `first()` para obtener el primer resultado
+
+    //         // Verificamos si se obtuvo un resultado de la venta
+    //         if ($fVentas) {
+    //             $detallesDevolucionArray[$key]->descuento = $fVentas->ven_desc_por;
+    //             // Calcular el valor con descuento para este detalle de devolución
+    //             $detallesDevolucionArray[$key]->ValorConDescuento = round($item->total_precio - (($item->total_precio * $fVentas->ven_desc_por) / 100), 2);
+    //         } else {
+    //             // Si no hay una venta asociada, asignamos 0 al descuento y el valor con descuento
+    //             $detallesDevolucionArray[$key]->descuento = 0;
+    //             $detallesDevolucionArray[$key]->total_precio = round($item->total_precio, 2);
+    //         }
+    //     }
+    //     $detallesDevolucionArray =collect($detallesDevolucionArray);
+
+    //     foreach ($detallesDevolucionArray as $key => $item) {
+    //         // Obtener los códigos relacionados con la devolución
+    //         $codigos = DB::table('codigoslibros_devolucion_son as cls')
+    //             ->join('codigoslibros_devolucion_header as cdh', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
+    //             ->where('cdh.estado','<>', 0)
+    //             ->where('cls.tipo_codigo', '=', 0)
+    //             ->where('cls.codigoslibros_devolucion_id', '=', $item->id)
+    //             ->where('cls.documento', '=', $item->documento)
+    //             ->select('cls.codigo', 'cls.codigo_union','cls.pro_codigo', 'cls.tipo_codigo')
+    //             ->get();
+
+    //         $detallesDevolucionArray[$key]->codigos = $codigos;
+
+    //         // Filtrar códigos únicos por pro_codigo (eliminamos duplicados)
+    //         $codigosUnicos = $codigos->unique('pro_codigo');
+
+    //         // Inicializamos un arreglo vacío para almacenar los detalles de venta
+    //         $detalleVenta = [];
+
+    //         // Iteramos sobre los códigos únicos para obtener los detalles de venta
+    //         foreach ($codigosUnicos as $codigo) {
+    //             // Consultamos el detalle de venta para cada código de producto
+    //             $detallesDeVentaPorCodigo = DB::table('f_detalle_venta as fdv')
+    //                 ->where('fdv.ven_codigo', '=', $item->documento)
+    //                 ->where('fdv.id_empresa', '=', $item->id_empresa)
+    //                 ->where('fdv.pro_codigo', '=', $codigo->pro_codigo)
+    //                 ->select('fdv.pro_codigo','fdv.det_ven_cantidad', 'fdv.det_ven_dev', 'fdv.det_ven_valor_u')
+    //                 ->get();
+
+    //             // Agregar los detalles de venta encontrados a detalleVenta
+    //             $detalleVenta = array_merge($detalleVenta, $detallesDeVentaPorCodigo->toArray());
+    //         }
+
+    //         // Asignamos todos los detalles de venta encontrados a la propiedad detalleVenta
+    //         $detallesDevolucionArray[$key]->detalleVenta = $detalleVenta;
+    //     }
+
+    //     // Retornamos los detalles de devolución como un arreglo
+    //     return $detallesDevolucionArray;
+    // }
+
     public function obtenerDetallesDevolucion(Request $request)
     {
         // Validamos que el parámetro 'documento' esté presente
@@ -1309,15 +1404,52 @@ class AbonoController extends Controller
         $documento = $request->input('documento');
         $empresa = $request->input('empresa');
 
-       // Ejecutamos la consulta en la base de datos para obtener los detalles de devolución
-        $detallesDevolucion = DB::table('codigoslibros_devolucion_header as cdh')
-        ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
-        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
-        ->where('cls.documento', '=', $documento)
-        ->where('cls.id_empresa', '=', $empresa)
-        ->groupBy('cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
-        ->select('cdh.id', 'cdh.codigo_devolucion', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion', DB::raw('ROUND(SUM(cls.precio), 2) as total_precio'))
-        ->get();
+        //tipo combo
+        $detallesDevolucionTipo1 = DB::table('codigoslibros_devolucion_header as cdh')
+            ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
+            ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
+            ->where('cdh.estado', '<>', 0)
+            ->where('cls.documento', '=', $documento)
+            ->where('cls.id_empresa', '=', $empresa)
+            ->where('cls.tipo_codigo', '=', 1)  // Solo tipo_codigo = 1
+            ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
+            ->select(
+                'cdh.id',
+                'cdh.codigo_devolucion',
+                'cdh.estado',
+                'cls.documento',
+                'cls.id_empresa',
+                'cls.id_cliente',
+                'i.nombreInstitucion',
+                DB::raw('ROUND(SUM(cls.precio * cls.combo_cantidad_devuelta), 2) as total_precio') // Multiplicamos por combo_cantidad_devuelta
+            )
+            ->get();
+
+        //tipo normal
+        $detallesDevolucionTipo0 = DB::table('codigoslibros_devolucion_header as cdh')
+            ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
+            ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
+            ->where('cdh.estado', '<>', 0)
+            ->where('cls.documento', '=', $documento)
+            ->where('cls.id_empresa', '=', $empresa)
+            ->where('cls.tipo_codigo', '=', 0)  // Solo tipo_codigo = 0
+            ->whereNull('cls.combo')
+            ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
+            ->select(
+                'cdh.id',
+                'cdh.codigo_devolucion',
+                'cdh.estado',
+                'cls.documento',
+                'cls.id_empresa',
+                'cls.id_cliente',
+                'i.nombreInstitucion',
+                DB::raw('ROUND(SUM(cls.precio), 2) as total_precio') // No multiplicamos, solo usamos el precio
+            )
+            ->get();
+            
+        $detallesDevolucion = $detallesDevolucionTipo1->merge($detallesDevolucionTipo0);
+
+
 
         // Convertimos la colección a un arreglo
         $detallesDevolucionArray = $detallesDevolucion->toArray();
@@ -1340,43 +1472,75 @@ class AbonoController extends Controller
             if ($fVentas) {
                 $detallesDevolucionArray[$key]->descuento = $fVentas->ven_desc_por;
                 // Calcular el valor con descuento para este detalle de devolución
-                $detallesDevolucionArray[$key]->ValorConDescuento = round($item->total_precio - (($item->total_precio * $fVentas->ven_desc_por) / 100), 2);
+                $detallesDevolucionArray[$key]->ValorConDescuento = round(round($item->total_precio, 2) - round((round($item->total_precio, 2) * $fVentas->ven_desc_por) / 100, 2), 2);
             } else {
                 // Si no hay una venta asociada, asignamos 0 al descuento y el valor con descuento
                 $detallesDevolucionArray[$key]->descuento = 0;
                 $detallesDevolucionArray[$key]->total_precio = round($item->total_precio, 2);
             }
         }
-        $detallesDevolucionArray =collect($detallesDevolucionArray);
+        $detallesDevolucionArray = collect($detallesDevolucionArray);
 
         foreach ($detallesDevolucionArray as $key => $item) {
             // Obtener los códigos relacionados con la devolución
             $codigos = DB::table('codigoslibros_devolucion_son as cls')
+                ->join('codigoslibros_devolucion_header as cdh', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
+                ->where('cdh.estado', '<>', 0)
                 ->where('cls.codigoslibros_devolucion_id', '=', $item->id)
                 ->where('cls.documento', '=', $item->documento)
-                ->select('cls.codigo', 'cls.codigo_union','cls.pro_codigo')
+                ->select('cls.codigo', 'cls.codigo_union', 'cls.pro_codigo', 'cls.tipo_codigo', 'cls.combo_cantidad_devuelta')
                 ->get();
 
-            $detallesDevolucionArray[$key]->codigos = $codigos;
+            // Aquí es donde ajustamos la lógica para repetir los códigos
+            $codigosModificados = collect();
+
+            foreach ($codigos as $codigo) {
+                // Verificamos si el tipo de código es 1, y si es así, lo repetimos
+                if ($codigo->tipo_codigo == 1) {
+                    // Repetir el código por la cantidad de devuelta
+                    for ($i = 0; $i < $codigo->combo_cantidad_devuelta; $i++) {
+                        $codigosModificados->push([
+                            'codigo' => $codigo->codigo,
+                            'codigo_union' => $codigo->codigo_union,
+                            'pro_codigo' => $codigo->pro_codigo,
+                            'tipo_codigo' => $codigo->tipo_codigo
+                        ]);
+                    }
+                } else {
+                    // Si no es tipo_codigo 1, simplemente agregamos el código sin cambios
+                    $codigosModificados->push([
+                        'codigo' => $codigo->codigo,
+                        'codigo_union' => $codigo->codigo_union,
+                        'pro_codigo' => $codigo->pro_codigo,
+                        'tipo_codigo' => $codigo->tipo_codigo
+                    ]);
+                }
+            }
+
+            // Asignamos los códigos modificados a la propiedad `codigos`
+            $detallesDevolucionArray[$key]->codigos = $codigosModificados;
 
             // Filtrar códigos únicos por pro_codigo (eliminamos duplicados)
-            $codigosUnicos = $codigos->unique('pro_codigo');
+            $codigosUnicos = $codigosModificados->unique('pro_codigo');
 
             // Inicializamos un arreglo vacío para almacenar los detalles de venta
             $detalleVenta = [];
 
             // Iteramos sobre los códigos únicos para obtener los detalles de venta
             foreach ($codigosUnicos as $codigo) {
-                // Consultamos el detalle de venta para cada código de producto
-                $detallesDeVentaPorCodigo = DB::table('f_detalle_venta as fdv')
-                    ->where('fdv.ven_codigo', '=', $item->documento)
-                    ->where('fdv.id_empresa', '=', $item->id_empresa)
-                    ->where('fdv.pro_codigo', '=', $codigo->pro_codigo)
-                    ->select('fdv.pro_codigo','fdv.det_ven_cantidad', 'fdv.det_ven_dev', 'fdv.det_ven_valor_u')
-                    ->get();
-
-                // Agregar los detalles de venta encontrados a detalleVenta
-                $detalleVenta = array_merge($detalleVenta, $detallesDeVentaPorCodigo->toArray());
+                // Verificar que el código es un objeto válido y tiene la propiedad 'pro_codigo'
+                if (isset($codigo->pro_codigo)) {
+                    // Consultamos el detalle de venta para cada código de producto
+                    $detallesDeVentaPorCodigo = DB::table('f_detalle_venta as fdv')
+                        ->where('fdv.ven_codigo', '=', $item->documento)
+                        ->where('fdv.id_empresa', '=', $item->id_empresa)
+                        ->where('fdv.pro_codigo', '=', $codigo->pro_codigo)
+                        ->select('fdv.pro_codigo', 'fdv.det_ven_cantidad', 'fdv.det_ven_dev', 'fdv.det_ven_valor_u')
+                        ->get();
+            
+                    // Agregar los detalles de venta encontrados a detalleVenta
+                    $detalleVenta = array_merge($detalleVenta, $detallesDeVentaPorCodigo->toArray());
+                }
             }
 
             // Asignamos todos los detalles de venta encontrados a la propiedad detalleVenta

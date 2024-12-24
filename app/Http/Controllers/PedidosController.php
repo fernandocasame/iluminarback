@@ -345,11 +345,11 @@ class PedidosController extends Controller
             if($request->generarNuevo == 'yes'){
                 //JEYSON METODOS
                 //Si se genera un pedido apartir de un  pedido anulado (cambiar id periodo inicio)mixinIdInicioFormatoNewData
-                if($request->periodo <= 4){
+                if($request->periodo <= 26){
                     //Si se genera un pedido apartir de un  pedido anulado
                     $this->changeBeneficiariosLibros($request->pedidoAnterior,$pedido->id_pedido);
                     // (cambiar id periodo inicio)mixinIdInicioFormatoNewData
-                }else if($request->periodo > 4){
+                }else if($request->periodo > 26){
                     $this->changeBeneficiariosLibros_new($request->pedidoAnterior,$pedido->id_pedido);
                 }
                 //CAMBIAR PEDIDO  EN PROCESO A PEDIDO CREADO-> actualizar la fecha de creacion de pedido
@@ -834,6 +834,15 @@ class PedidosController extends Controller
     public function anular_pedido_asesor($id_pedido, $id_usuario,$contrato)
     {
         try{
+            // Validación inicial para verificar si el pedido contiene agrupados
+            $verificacionagrupado = DB::SELECT("SELECT ca_codigo_agrupado FROM pedidos WHERE id_pedido = $id_pedido");
+
+            if (!empty($verificacionagrupado) && !empty($verificacionagrupado[0]->ca_codigo_agrupado)) {
+                return response()->json([
+                    "status" => "0",
+                    "message" => "Este pedido se encuentra agrupado, no se puede anular"
+                ]);
+            }
             //validar si tiene solicitudes  de verificaciones no se pueda anular
             $query = DB::SELECT("SELECT * FROM temporadas_verificacion_historico h
             WHERE h.contrato = '$contrato'
@@ -3776,7 +3785,7 @@ class PedidosController extends Controller
                 //===PROCESO======
                 //ACTUALIZAR DETALLE DE VENTA
                 //METODO MODIFICADO JEYSON (cambiar id periodo inicio)mixinIdInicioFormatoNewData
-            if ($id_periodo <= 4) {
+            if ($id_periodo <= 26) {
                 $nuevoIngreso       = $this->get_val_pedidoInfo_alcance($id_pedido,$id_alcance);
                 if(!empty($nuevoIngreso)){
                     // foreach($nuevoIngreso as $key => $item){
@@ -3839,7 +3848,7 @@ class PedidosController extends Controller
                     return ["status" => "0", "message" => "El alcance # $id_alcance del contrato $contrato no existe valores"];
                 }
                 // (cambiar id periodo inicio)mixinIdInicioFormatoNewData
-            }else if ($id_periodo > 4) {
+            }else if ($id_periodo > 26) {
                 $nuevoIngreso       = $this->get_val_pedidoInfo_alcance_new($id_pedido,$id_alcance);
                 if(!empty($nuevoIngreso)){
                     // foreach($nuevoIngreso as $key => $item){
@@ -7378,7 +7387,7 @@ class PedidosController extends Controller
     public function get_liquidaciones(Request $request) {
         // Definir el periodo de forma segura
         $periodo = $request->input('periodo');
-
+    
         // Realizar la consulta utilizando Query Builder para evitar inyección SQL
         $liquidaciones = DB::table('pedidos as p')
             ->select(
@@ -7413,7 +7422,7 @@ class PedidosController extends Controller
             AND a.estado_alcance = 1
             ",[$periodo,$item->id_pedido]);
             $item->alcances = $alcances[0]->ventaalcance;
-
+    
         }
         return response()->json($liquidaciones);
     }

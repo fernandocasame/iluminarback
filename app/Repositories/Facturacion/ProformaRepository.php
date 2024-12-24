@@ -22,7 +22,9 @@ class  ProformaRepository extends BaseRepository
     public function listadoProformasAgrupadas($institucion){
         $query = DB::SELECT("SELECT * FROM f_venta v
         WHERE v.institucion_id = ?
-        AND v.est_ven_codigo <> '3'",[$institucion]);
+        AND v.est_ven_codigo <> '3'
+        AND v.doc_intercambio IS NULL
+        ",[$institucion]);
         return $query;
     }
     public function prefacturaValidaForDevolver($preFactura,$empresa){

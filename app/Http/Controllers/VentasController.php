@@ -13,6 +13,7 @@ use App\Repositories\Facturacion\ProformaRepository;
 use DB;
 use App\Http\Controllers\Controller;
 use App\Models\CodigosLibros;
+use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\Pedidos;
 use App\Models\Periodo;
 use App\Models\User;
@@ -74,7 +75,7 @@ class VentasController extends Controller
           CONCAT(usa.nombres, ' ',usa.apellidos) as cliente, fv.*, ins.nombreInstitucion,ins.direccionInstitucion, ins.telefonoInstitucion, ins.asesor_id, concat(u.nombres,' ',u.apellidos) as asesor,
         usa.nombres, usa.apellidos, fpr.prof_observacion, fpr.idPuntoventa,
         COUNT(DISTINCT dfv.pro_codigo) AS item, CONCAT(us.nombres,' ',us.apellidos) AS responsable,
-        CONCAT(interc.nombres,' ',interc.apellidos) AS user_intercambio,
+        CONCAT(interc.nombres,' ',interc.apellidos) AS user_intercambio, CONCAT(ua.nombres,' ',ua.apellidos) AS usuario_anulado,
         (SELECT SUM(det_ven_cantidad)
          FROM f_detalle_venta
          WHERE ven_codigo = fv.ven_codigo and id_empresa=fv.id_empresa) AS libros,usa.cedula, usa.email,usa.telefono
@@ -88,6 +89,7 @@ class VentasController extends Controller
         LEFT JOIN usuario u ON ins.asesor_id = u.idusuario
         LEFT JOIN f_detalle_venta dfv ON fv.ven_codigo = dfv.ven_codigo and fv.id_empresa=dfv.id_empresa
         LEFT JOIN usuario as interc ON fv.user_intercambio = interc.idusuario
+        LEFT JOIN usuario ua ON fv.user_anulado = ua.idusuario
         WHERE fpr.idPuntoventa = '$request->prof_id' and fv.periodo_id=$request->periodo and (fv.idtipodoc=1 or fv.idtipodoc=3 or fv.idtipodoc=4)
         GROUP BY fv.ven_codigo,  usa.nombres, usa.apellidos, fpr.prof_observacion order by ven_fecha desc
         ");
@@ -672,6 +674,7 @@ class VentasController extends Controller
                 set_time_limit(6000000);
                 ini_set('max_execution_time', 6000000);
                 $miarray=json_decode($request->dat);
+                $id_usuario = $request->id_usuario;
                 DB::beginTransaction();
                 $venta = Ventas::where('ven_codigo', $request->ven_codigo)
                 ->where('id_empresa', $request->empresa)
@@ -680,6 +683,9 @@ class VentasController extends Controller
                         return "El ven_codigo no existe en la base de datos";
                     }
                     $venta->est_ven_codigo  = $request->est_ven_codigo;
+                    $venta->user_anulado    = $id_usuario;
+                    $venta->observacionAnulacion = $request->observacionAnulacion;
+                    $venta->fecha_anulacion = now();
                     $venta->save();
                     foreach($miarray as $key => $item){
                         //con pro_stock y  pro_reservar
@@ -1166,7 +1172,8 @@ ORDER BY f.ven_fecha;");
                pr.pedido_id,
                pr.idPuntoventa,
                pl.id_pedido AS pedido_id,
-              SUM(dv.det_ven_cantidad) AS cantidad_despacho
+              SUM(dv.det_ven_cantidad) AS cantidad_despacho,
+              CONCAT(ua.nombres,' ',ua.apellidos) AS usuario_anulado,
               FROM f_venta f
               INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
               INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
@@ -1180,6 +1187,7 @@ ORDER BY f.ven_fecha;");
               LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
               LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
               LEFT JOIN usuario as interc ON f.user_intercambio = interc.idusuario
+              LEFT JOIN usuario ua ON f.user_anulado = ua.idusuario
               WHERE f.est_ven_codigo = 1
               AND (f.ven_codigo like'%$request->parte_documento%' or f.ven_cliente like'%$request->parte_documento%'
               or i.nombreInstitucion like'%$request->parte_documento%')
@@ -1217,7 +1225,8 @@ ORDER BY f.ven_fecha;");
                pr.pedido_id,
                pr.idPuntoventa,
                pl.id_pedido AS pedido_id,
-              SUM(dv.det_ven_cantidad) AS cantidad_despacho
+              SUM(dv.det_ven_cantidad) AS cantidad_despacho,
+              CONCAT(au.nombres,' ',au.apellidos) AS usuario_anulado
               FROM f_venta f
               INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
               INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
@@ -1231,6 +1240,7 @@ ORDER BY f.ven_fecha;");
               LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
               LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
               LEFT JOIN usuario as interc ON f.user_intercambio = interc.idusuario
+              LEFT JOIN usuario au ON au.idusuario = f.user_anulado
               WHERE (f.ven_codigo like'%$request->parte_documento%' or f.ruc_cliente like'%$request->parte_documento%')
               and f.periodo_id=$request->periodo
               GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
@@ -1268,7 +1278,8 @@ ORDER BY f.ven_fecha;");
                pr.pedido_id,
                pr.idPuntoventa,
                pl.id_pedido AS pedido_id,
-              SUM(dv.det_ven_cantidad) AS cantidad_despacho
+              SUM(dv.det_ven_cantidad) AS cantidad_despacho,
+              CONCAT(au.nombres,' ',au.apellidos) AS usuario_anulado
               FROM f_venta f
               INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
               INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
@@ -1282,6 +1293,7 @@ ORDER BY f.ven_fecha;");
               LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
               LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
               LEFT JOIN usuario as interc ON f.user_intercambio = interc.idusuario
+              LEFT JOIN usuario au ON au.idusuario = f.user_anulado
               WHERE (f.ven_codigo like'%$request->parte_documento%' or f.ruc_cliente like'%$request->parte_documento%')
               GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
              us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
@@ -1854,7 +1866,8 @@ ORDER BY f.ven_fecha;");
     }
     //api:post/metodosPostVentas
     public function metodosPostVentas(Request $request){
-        if($request->importPrefacturas){ return $this->importPrefacturas($request); }
+        if($request->importPrefacturas)         { return $this->importPrefacturas($request); }
+        if($request->importPrefacturasTablaSon) { return $this->importPrefacturasTablaSon($request); }
     }
     //api:post/metodosPostVentas?importPrefacturas=1
     public function importPrefacturas($request)
@@ -1951,6 +1964,91 @@ ORDER BY f.ven_fecha;");
 
         // Registrar en histórico
         $this->GuardarEnHistorico(
+            0,
+            $bc_institucion,
+            $bc_periodo,
+            $item->codigo,
+            $id_usuario,
+            $comentario,
+            $codigo,
+            json_encode($codigo->getAttributes()), // Guardar todos los atributos del modelo
+            null,
+            null
+        );
+    }
+
+    //api:post/metodosPostVentas?importPrefacturasTablaSon=1
+    public function importPrefacturasTablaSon(Request $request)
+    {
+        try {
+            // Validación del request
+            $validatedData = $this->validate($request, [
+                'data_codigos'   => 'required|json',
+                'id_usuario'     => 'required|integer',
+            ]);
+            DB::beginTransaction();
+
+            $data               = json_decode($validatedData['data_codigos']);
+            $id_usuario         = $validatedData['id_usuario'];
+            $cambiados          = 0;
+            $codigosNoCambiados = [];
+
+            foreach ($data as $item) {
+                $codigo = CodigosLibrosDevolucionSon::where('codigo', $item->codigo)->where('estado','0')->first();
+                if (!$codigo) {
+                    $codigosNoCambiados[] = [
+                        "codigo"  => $item->codigo,
+                        "mensaje" => "Código no existe o no se encuentra en estado creado",
+                    ];
+                    continue;
+                }
+                $estado            = $codigo->estado;
+                //codigo no esta creado
+                if($estado != '0'){
+                    $codigosNoCambiados[] = [
+                        "codigo"  => $item->codigo,
+                        "mensaje" => "El código ya está no creado",
+                    ];
+                    continue;
+                }
+                //si el documento anterior es nulo o es al documento actual guardo el codigo
+                if (is_null($codigo->documento) || $codigo->documento == $item->documento) {
+                    $comentario ="Se agrego la documento $item->documento";
+                    $this->actualizarCodigoTablaSon($codigo, $item, $id_usuario, $comentario);
+                    $cambiados++;
+                } else {
+                    $codigosNoCambiados[] = [
+                        "codigo"  => $item->codigo,
+                        "mensaje" => "Ya existe una pre factura {$codigo->documento} en la pre factura {$item->documento}",
+                    ];
+                }
+            }
+
+            DB::commit();
+
+            return [
+                "cambiados"          => $cambiados,
+                "codigosNoCambiados" => $codigosNoCambiados,
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(["error" => true, "message" => $e->getMessage()], 500);
+        }
+    }
+
+    private function actualizarCodigoTablaSon($codigo, $item, $id_usuario, $comentario)
+    {
+        $bc_institucion = $codigo->id_cliente;
+        $bc_periodo     = $codigo->id_periodo;
+
+        // Actualizar el modelo actual
+        CodigosLibrosDevolucionSon::where('codigo', $item->codigo)->update([
+            'documento'       => $item->documento,
+            'id_empresa'      => $item->id_empresa,
+        ]);
+
+        // Registrar en histórico
+        $this->GuardarEnHistoricoTablaSon(
             0,
             $bc_institucion,
             $bc_periodo,
@@ -2126,6 +2224,7 @@ ORDER BY f.ven_fecha;");
                     DB::table('f_detalle_venta')
                         ->where('det_ven_codigo', $devolucion['DetalleId'])
                         ->update([
+                            'det_cant_intercambio' => DB::raw('det_ven_cantidad'),
                             'det_ven_cantidad' => DB::raw('det_ven_cantidad - ' . $devolucion['cantidadConvertir']),
                             'doc_intercambio' => $nuevoVenCodigo, // Asignar el nuevo ven_codigo
                         ]);
@@ -2156,6 +2255,9 @@ ORDER BY f.ven_fecha;");
                             'ven_subtotal' => $nuevoSubtotal,
                             'ven_descuento' => $valorDescuento,
                             'ven_valor' => $nuevoTotal,
+                            'user_intercambio' => $request->user_created,
+                            'fecha_intercambio' => now(),
+                            'doc_intercambio' => $nuevoVenCodigo,
                         ]);
 
                     // Obtener el código del producto y la empresa
@@ -2187,7 +2289,7 @@ ORDER BY f.ven_fecha;");
             }
 
            // Preparar las consultas de actualización en lugar de hacerlo dentro del ciclo
-            $updates = [];
+            // $updates = [];
             // foreach ($documentos as $documento) {
             //     $updates[] = [
             //         'codigo_proforma' => $documento->ven_codigo,
@@ -2238,31 +2340,43 @@ ORDER BY f.ven_fecha;");
             //     ->update(['codigo_proforma' => $nuevoVenCodigo]);
             // }
 
-            // Verifica que codigos_estado_1 sea un array antes de usarlo
-            $codigosEstado1 = array_column($codigos_estado_1, 'codigo');  // Extraemos los códigos de los detalles
-            if (!empty($codigosEstado1) && is_array($codigosEstado1)) {
-                DB::table('codigoslibros_devolucion_son')
-                    ->whereIn('codigo', $codigosEstado1)  // Aseguramos que sea un array
-                    ->where('estado', 0)
-                    ->update(['documento' => $nuevoVenCodigo]);
-            }
+            // Arrays para almacenar los códigos que se actualizaron y no se actualizaron
+            $actualizados = [];
+            $no_actualizados = [];
 
-            // Verifica que codigos_detalles tenga códigos de proforma válidos
-            $codigosProforma = [];
-            foreach ($codigos_detalles as $codigo_detalle) {
-                if (isset($codigo_detalle['codigo_proforma']) && is_array($codigo_detalle['codigo_proforma'])) {
-                    $codigosProforma = array_merge($codigosProforma, $codigo_detalle['codigo_proforma']);
-                } else {
-                    // Si no es un array, conviértelo a array (si solo hay un valor)
-                    $codigosProforma[] = $codigo_detalle['codigo_proforma'];
+            // Verificamos si hay detalles de códigos
+            if (!empty($codigos_detalles)) {
+                // Recorremos cada código detalle
+                foreach ($codigos_detalles as $codigo_detalle) {
+                    if (isset($codigo_detalle['codigo']) && isset($codigo_detalle['codigo_proforma'])) {
+                        // Intentamos hacer la actualización individualmente
+                        $updated = DB::table('codigoslibros')
+                            ->where('codigo', $codigo_detalle['codigo'])
+                            ->where('codigo_proforma', $codigo_detalle['codigo_proforma'])
+                            ->where('estado_liquidacion', '<>', 3)
+                            ->where('proforma_empresa', $empresa)
+                            ->update(['codigo_proforma' => $nuevoVenCodigo]);
+
+                        // Verificamos si la actualización fue exitosa
+                        if ($updated) {
+                            // Si se actualizó, agregamos al array de actualizados
+                            $actualizados[] = $codigo_detalle['codigo'];
+
+                            // Llamamos al método para guardar en el histórico (si lo necesitas)
+                            $mensajeHistorico = 'Se movió de la prefactura ' . $codigo_detalle['codigo_proforma'] . ' a la nota ' . $nuevoVenCodigo;
+                            $this->GuardarEnHistorico( 0, $id_ins_depacho, $request->periodo_id, $codigo_detalle['codigo'], $request->user_created, $mensajeHistorico, null, null, null, null);
+                        } else {
+                            // Si no se actualizó, agregamos al array de no actualizados
+                            $no_actualizados[] = $codigo_detalle['codigo'];
+                        }
+                    }
                 }
-            }
 
-            if (!empty($codigosProforma) && is_array($codigosProforma)) {
-                CodigosLibros::whereIn('codigo_proforma', $codigosProforma)
-                    ->where('estado_liquidacion', '<>', 3)
-                    ->where('proforma_empresa', $empresa)
-                    ->update(['codigo_proforma' => $nuevoVenCodigo]);
+                // Retornamos los resultados
+                $Datos =[
+                    'actualizados' => $actualizados,
+                    'no_actualizados' => $no_actualizados
+                ];
             }
 
             // ACTUALIZAR SECUENCIAL
@@ -2296,7 +2410,7 @@ ORDER BY f.ven_fecha;");
             // Si todo ha ido bien, hacemos commit
             DB::commit();
 
-            return response()->json(['message' => 'Prefacturas convertidas a notas correctamente.','status'=>'0']);
+            return response()->json(['message' => 'Prefacturas convertidas a notas correctamente.','status'=>'0', 'codigos' =>$Datos]);
 
         } catch (\Exception $e) {
             // Si ocurre un error, hacemos rollback

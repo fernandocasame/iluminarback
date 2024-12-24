@@ -11,6 +11,7 @@ use App\Models\TemporadaVerificacionHistorico;
 use App\Models\Verificacion;
 use App\Models\VerificacionHasInstitucion;
 use App\Models\VerificacionHistoricoCambios;
+use App\Models\NotificacionGeneral;
 use App\Repositories\pedidos\VerificacionRepository;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use App\Traits\Verificacion\TraitVerificacionGeneral;
@@ -1016,8 +1017,11 @@ class VerificacionControllerAnterior extends Controller
         }
     }
     //api:get/notificacionesVerificaciones
-    public function notificacionesVerificaciones(Request $request){
-        $idFacturador = $request->input("idFacturador",0);
+    public function notificacionesVerificaciones(Request $request)
+    {
+        $idFacturador = $request->input("idFacturador", 0);
+        
+        // Consulta principal
         $query = DB::table('pedidos as p')
             ->select(
                 DB::raw("CONCAT(u.nombres, ' ', u.apellidos) AS asesor"),
@@ -1026,8 +1030,9 @@ class VerificacionControllerAnterior extends Controller
                 'pe.region_idregion',
                 'c.nombre AS ciudad',
                 'p.contrato_generado',
-                'p.fecha_solicita_verificacion',
-                'p.tipo_venta'
+                'p.fecha_solicita_verificacion as fecha_solicita',
+                'p.tipo_venta',
+                DB::raw('CAST(100 AS UNSIGNED) AS tipo')
             )
             ->leftJoin('periodoescolar as pe', 'p.id_periodo', '=', 'pe.idperiodoescolar')
             ->leftJoin('usuario as u', 'p.id_asesor', '=', 'u.idusuario')
@@ -1036,7 +1041,7 @@ class VerificacionControllerAnterior extends Controller
             ->where('p.estado', '1')
             ->where('p.estado_verificacion', '1')
             ->when($idFacturador, function ($query) use ($idFacturador) {
-                $query->whereExists(function ($subquery) use ($idFacturador){
+                $query->whereExists(function ($subquery) use ($idFacturador) {
                     $subquery->select(DB::raw(1))
                         ->from('pedidos_asesores_facturador')
                         ->whereColumn('pedidos_asesores_facturador.id_asesor', 'p.id_asesor')
@@ -1044,25 +1049,57 @@ class VerificacionControllerAnterior extends Controller
                 });
             })
             ->orderBy('p.fecha_solicita_verificacion', 'desc')
-            ->get();
-
-        return $query;
-        // $query = DB::SELECT("SELECT
-        //     CONCAT(u.nombres,' ',u.apellidos) as asesor,
-        //     i.nombreInstitucion,
-        //     pe.region_idregion, c.nombre AS ciudad,
-        //     p.contrato_generado,p.fecha_solicita_verificacion,p.tipo_venta
-        //     FROM pedidos p
-        //     LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        //     LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-        //     LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        //     LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        //     WHERE p.estado = '1'
-        //     AND p.estado_verificacion ='1'
-        //     order by p.fecha_solicita_verificacion desc
-        // ");
-        return $query;
+            ->get()
+            ->toArray(); // Convertimos el resultado a array
+        
+        // Consulta secundaria
+        $notificacionFactura = DB::table('notificaciones_general')
+            ->where('tipo', '=', '0')
+            ->where('estado', '=', '0')
+            ->select('notificaciones_general.*', 'created_at as fecha_solicita')
+            ->get()
+            ->map(function ($item) {
+                if ($item->tipo == '0') {
+                    $padre = Verificacion::from('verificaciones as v')
+                        ->where('v.id', $item->id_padre)
+                        ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
+                        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+                        ->leftJoin('usuario as u', 'u.idusuario', '=', 'i.asesor_id')
+                        ->leftJoin('periodoescolar as pe', 'pe.idperiodoescolar', '=', 'p.id_periodo')
+                        ->leftJoin('ciudad as c', 'c.idciudad', '=', 'i.ciudad_id')
+                        ->select(
+                            'v.*',
+                            'p.id_asesor',
+                            'i.nombreInstitucion',
+                            DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
+                            'c.nombre as ciudad',
+                            'pe.region_idregion'
+                        )
+                        ->first();
+    
+                    // Asignamos los valores al item
+                    $item->contrato_generado = $padre ? $padre->contrato : null;
+                    $item->asesor = $padre ? $padre->asesor : null;
+                    $item->ciudad = $padre ? $padre->ciudad : null;
+                    $item->region_idregion = $padre ? $padre->region_idregion : null;
+                    $item->id_asesor = $padre ? $padre->id_asesor : null;
+                    $item->id_institucion = $padre ? $padre->id_institucion : null;
+                    $item->nombreInstitucion = $padre ? $padre->nombreInstitucion : null;
+                }
+                return $item;
+            })
+            ->toArray(); // Convertimos el resultado a array
+        
+        // Unimos ambos arrays y ordenamos por fecha_solicita
+        $resultado = collect(array_merge($query, $notificacionFactura))
+            ->sortByDesc('fecha_solicita') // Ordenamos por fecha_solicita de forma descendente
+            ->values()
+            ->all(); // Convertimos de nuevo a array simple
+    
+        return response()->json($resultado);
     }
+    
+
     //api para traer la trazabilidad de las verificaciones
     //api:get/getTrazabilidadVerificacion
     public function getTrazabilidadVerificacion(Request $request){
