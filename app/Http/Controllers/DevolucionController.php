@@ -58,14 +58,15 @@ class DevolucionController extends Controller
         if($request->getDetalleVentaXPrefactura)            { return $this->getDetalleVentaXPrefactura($request); }
         if($request->getCodigosCombosDocumentoDevolucion)   { return $this->getCodigosCombosDocumentoDevolucion($request); }
         if($request->generateCombos)                        { return $this->generateCombos($request); }
-       if($request->todoDevolucionCliente)  { return $this->todoDevolucionCliente($request); }
-       if($request->devolucionDetalle)  { return $this->devolucionDetalle($request); }
-       if($request->CargarDevolucion)  { return $this->CargarDevolucion($request); }
-       if($request->CargarDocumentos)  { return $this->CargarDocumentos($request); }
-       if($request->CargarDocumentosDetalles)  { return $this->CargarDocumentosDetalles($request); }
-       if($request->CargarDetallesDocumentos)  { return $this->CargarDetallesDocumentos($request); }
-       if($request->documentoExiste)  { return $this->verificarDocumento($request); }
-        if($request->documentoParaSinEmpresa)                { return $this->documentoParaSinEmpresa($request); }
+       if($request->todoDevolucionCliente)                  { return $this->todoDevolucionCliente($request); }
+       if($request->devolucionDetalle)                      { return $this->devolucionDetalle($request); }
+       if($request->CargarDevolucion)                       { return $this->CargarDevolucion($request); }
+       if($request->CargarDocumentos)                       { return $this->CargarDocumentos($request); }
+       if($request->CargarDocumentosDetalles)               { return $this->CargarDocumentosDetalles($request); }
+       if($request->CargarDocumentosDetallesGuias)          { return $this->CargarDocumentosDetallesGuias($request); }
+       if($request->CargarDetallesDocumentos)               { return $this->CargarDetallesDocumentos($request); }
+       if($request->documentoExiste)                        { return $this->verificarDocumento($request); }
+        if($request->documentoParaSinEmpresa)               { return $this->documentoParaSinEmpresa($request); }
 
 
     }
@@ -692,14 +693,30 @@ class DevolucionController extends Controller
     }
     public function CargarDocumentosDetalles(Request $request){
         $query = DB::SELECT("SELECT dv.det_ven_codigo, dv.pro_codigo, dv.det_ven_dev, dv.det_ven_cantidad, dv.det_ven_valor_u,
-            l.descripcionlibro, ls.nombre, s.nombre_serie, ls.id_serie FROM f_detalle_venta AS dv
-            INNER JOIN f_venta AS fv ON dv.ven_codigo=fv.ven_codigo
-            INNER JOIN libros_series AS ls ON dv.pro_codigo=ls.codigo_liquidacion
-            INNER JOIN series AS s ON ls.id_serie=s.id_serie
-            INNER JOIN libro l ON ls.idLibro = l.idlibro
-            WHERE dv.ven_codigo='$request->codigo' AND dv.id_empresa=fv.id_empresa
-            AND fv.id_empresa= $request->empresa ORDER BY dv.pro_codigo");
+            l.descripcionlibro, ls.nombre, s.nombre_serie, ls.id_serie
+            FROM f_detalle_venta AS dv
+            LEFT JOIN f_venta AS fv ON dv.ven_codigo=fv.ven_codigo
+            LEFT JOIN libros_series AS ls ON dv.pro_codigo=ls.codigo_liquidacion
+            LEFT JOIN series AS s ON ls.id_serie=s.id_serie
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            WHERE dv.ven_codigo='$request->codigo'
+            AND dv.id_empresa=fv.id_empresa
+            AND fv.id_empresa= $request->empresa
+            ORDER BY dv.pro_codigo");
       return $query;
+    }
+    public function CargarDocumentosDetallesGuias(Request $request){
+        $query = DB::SELECT("SELECT dv.det_ven_codigo, dv.pro_codigo as codigo_liquidacion,
+        dv.det_ven_dev, dv.det_ven_cantidad as valor, dv.det_ven_valor_u,
+        ls.pro_nombre as nombrelibro
+        FROM f_detalle_venta AS dv
+        LEFT JOIN f_venta AS fv ON dv.ven_codigo=fv.ven_codigo
+        LEFT JOIN 1_4_cal_producto AS ls ON dv.pro_codigo=ls.pro_codigo
+        WHERE dv.ven_codigo='$request->codigo'
+        AND dv.id_empresa=fv.id_empresa
+        AND fv.id_empresa= $request->empresa
+        ORDER BY dv.pro_codigo");
+        return $query;
     }
     public function CargarDetallesDocumentos(Request $request) {
         // Decodifica el JSON recibido en el parámetro 'documentos'
@@ -1207,6 +1224,10 @@ class DevolucionController extends Controller
                                     // guardar en historico
                                     $mensajeHistorico = 'Se movio de la nota ' . $codigo_proforma . ' a la prefactura ' . $getPrefactura->ven_codigo;
                                     $this->GuardarEnHistorico(0,$id_institucion,$id_periodo,$item->codigo,$id_usuario,$mensajeHistorico,null,null,null,null);
+                                    //actualizar nota
+                                    $this->devolucionRepository->updateValoresDocumentoF_venta($codigo_proforma,$codigo_empresa);
+                                    //actualizar prefactura
+                                    $this->devolucionRepository->updateValoresDocumentoF_venta($getPrefactura->ven_codigo,$codigo_empresa);
                                     //GUARDAR EN HISTORICO PARA NOTAS
                                     $datos = (Object)[
                                         "descripcion"       => $item->codigo_liquidacion,
@@ -1255,7 +1276,7 @@ class DevolucionController extends Controller
         } catch (\Exception $e) {
             // Si hay un error, se revierte la transacción
             DB::rollBack();
-            throw $e; // O manejar el error de forma apropiada
+            return response()->json(['status' => '0', 'message' =>  $e->getMessage()], 200);
         }
 
         return [
@@ -1614,6 +1635,7 @@ class DevolucionController extends Controller
             hh.*,
             h.codigo_devolucion,
             h.created_at AS fecha_creacionPadre,
+            h.fecha_finalizacion as fecha_finalizacionPadre,
             h.cantidadCajas,
             h.cantidadPaquetes,
             h.observacion,
@@ -1691,6 +1713,7 @@ class DevolucionController extends Controller
                 ->where('fv.institucion_id', $institucion)
                 ->where('fv.id_empresa', $empresa)
                 ->where('fv.est_ven_codigo','<>',3) // Excluir documentos anulados (estado 3)
+                ->where('fv.idtipodoc', '<>', 16) // Excluir documentos notas de credito
                 ->whereNull('fv.doc_intercambio') // Excluir documentos con intercambio
                 ->select('fv.ven_codigo', 'fv.id_empresa')
                 ->get();

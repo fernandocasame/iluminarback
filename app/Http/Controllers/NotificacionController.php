@@ -55,34 +55,38 @@ class NotificacionController extends Controller
             'id_periodo' => 'nullable',
             'estado' => 'nullable|in:0,1',
         ]);
-    
+
         // Verificar si ya existe una notificación con id_padre y estado 0
         $notificacion = NotificacionGeneral::where('id_padre', $validatedData['id_padre'])
-            ->where('estado', 0)
             ->first();
-    
+
         if ($notificacion) {
+            //si es estado 0  mostrar un mensaje con status 2 ya fue notificado a facturacion
+            if($notificacion->estado == 0){
+                return ["status" => "2", "message" => "Ya fue notificado a facturación"];
+            }
             // Actualizar la notificación existente
             $notificacion->fill([
-                'nombre' => $validatedData['nombre'],
-                'descripcion' => $validatedData['descripcion'],
-                'user_created' => $validatedData['user_created'],
-                'created_at' => now(),
+                'nombre'        => $validatedData['nombre'],
+                'descripcion'   => $validatedData['descripcion'],
+                'user_created'  => $validatedData['user_created'],
+                'created_at'    => now(),
+                'estado'        => $validatedData['estado'],
             ]);
-    
+
             $success = $notificacion->save();
         } else {
             // Crear una nueva notificación
             $notificacion = new NotificacionGeneral($validatedData);
             $success      = $notificacion->save();
         }
-    
+
         // Retornar la respuesta
         return $success
             ? ["status" => "1", "message" => "Se guardó correctamente la notificación"]
             : ["status" => "0", "message" => "No se pudo guardar la notificación"];
     }
-    
+
     //api:post/notificaciones?marcarComoLeida=1
     public function marcarComoLeida(Request $request)
     {
@@ -91,10 +95,10 @@ class NotificacionController extends Controller
             'id' => 'required',
             'id_usuario' => 'required',
         ]);
-    
+
         // Obtener la notificación
         $notificacion = NotificacionGeneral::find($validatedData['id']);
-    
+
         if ($notificacion) {
             // Marcar la notificación como leída
             $notificacion->estado           = 1;
@@ -104,7 +108,7 @@ class NotificacionController extends Controller
         } else {
             $success = false;
         }
-    
+
         // Retornar la respuesta
         return $success
             ? ["status" => "1", "message" => "Se marcó correctamente la notificación como leída"]

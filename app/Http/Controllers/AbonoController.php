@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Abono;
+use App\Models\EvidenciaGlobalFiles;
 use App\Models\AbonoHistorico;
 use App\Models\Cheque;
 use App\Rules\UniqueAbonoDocument;
@@ -85,7 +86,7 @@ class AbonoController extends Controller
             $abono->abono_totalFacturas = round($request->abono_totalFacturas, 2);
             $abono->user_created = $request->user_created;
             $abono->abono_periodo = $request->periodo;
-            $abono->abono_tipo = $request->abono_tipo;
+            $abono->abono_tipo = $request->abono_cuenta == '6' ? 4 : $request->abono_tipo;
             $abono->abono_documento = $request->abono_documento;
             $abono->abono_cuenta = $request->abono_cuenta;
             $abono->abono_fecha = $request->abono_fecha;
@@ -191,7 +192,11 @@ class AbonoController extends Controller
     {
         $tipoAbono = '';
         if ($tipo == 3) {
-            $tipoAbono = 'retencion';
+            $tipoAbono = 'Create Retencion';
+        } elseif ($tipo == 6) {
+            $tipoAbono = 'Edit Retencion';
+        } elseif ($tipo == 7) {
+            $tipoAbono = 'Cancellation Retencion';
         } elseif ($tipo == 2) {
             $tipoAbono = 'Create Abono Cheque';
         } elseif ($tipo == 0) {
@@ -267,8 +272,14 @@ class AbonoController extends Controller
             // Cambiar el estado del abono a anulado (asumiendo que 1 es el estado "anulado")
             $abono->abono_estado = 1;
 
-            // Guardar en histórico (aquí asumimos que este método existe y funciona correctamente)
-            $this->guardarAbonoHistorico($abono, 5, $validatedData['usuario']);
+            // Verificar si el parámetro 'anularretencion' existe en el request
+            if ($request->has('anularretencion') && $request->anularretencion == 'yes') {
+                // Si 'anularretencion' es 'yes', se usa el tipo 7
+                $this->guardarAbonoHistorico($abono, 7, $validatedData['usuario']);
+            } else {
+                // Guardar en histórico (aquí asumimos que este método existe y funciona correctamente)
+                $this->guardarAbonoHistorico($abono, 5, $validatedData['usuario']);
+            }
 
             // Guardar los cambios en la base de datos
             $abono->save();
@@ -577,7 +588,8 @@ class AbonoController extends Controller
         FROM f_venta fv
         LEFT JOIN empresas ep ON ep.id = fv.id_empresa
         WHERE fv.periodo_id='$request->periodo'
-        AND fv.est_ven_codigo <> 3");
+        AND fv.est_ven_codigo <> 3
+        AND fv.idtipodoc <> 16");
         return $query;
     }
     public function getClienteCobranzaxInstitucion(Request $request){
@@ -948,6 +960,7 @@ class AbonoController extends Controller
             ->where('fv.est_ven_codigo', '<>', 3)
             ->where('fv.periodo_id', '=', $request->periodo)
             ->where('fv.ven_desc_por', '<',100)
+            ->where('fv.idtipodoc', '<>', 16)
             ->select(
                 'fv.idtipodoc',
                 'ft.tdo_id',
@@ -991,7 +1004,8 @@ class AbonoController extends Controller
                     WHEN {$registro->idtipodoc} = 4 AND {$registro->punto_venta} = 1 THEN COALESCE(SUM(ab.abono_notas), 0)
                     WHEN {$registro->idtipodoc} = 1 AND {$registro->punto_venta} = 1 THEN COALESCE(SUM(ab.abono_facturas), 0)
                     ELSE 0
-                END AS abono_total"))
+                END AS abono_total,
+                 SUM(CASE WHEN ab.abono_tipo = 3 THEN ab.abono_valor_retencion ELSE 0 END) AS retencion_total"))
                 ->where('ab.abono_ruc_cliente', '=', $registro->ruc_cliente)
                 ->where('ab.abono_periodo', '=', $request->periodo)
                 ->where('ab.abono_empresa', '=', $registro->id_empresa)
@@ -1000,7 +1014,8 @@ class AbonoController extends Controller
 
             // Asignar el resultado al objeto
             $reporte[$key]->abono_total = $abono_tipo->abono_total*1 ?? 0;
-
+            $reporte[$key]->retencion_total = $abono_tipo->retencion_total * 1 ?? 0;
+            
             // Paso 3: Obtener el detalle de devolución
             $todos_los_documentos = explode(',', $registro->todos_los_documentos);
             $documentosDevoluciones = [];
@@ -1551,8 +1566,6 @@ class AbonoController extends Controller
         return $detallesDevolucionArray;
     }
 
-
-
     public function verifyCode(Request $request)
     {
         $codigo = $request->input('code');
@@ -1798,7 +1811,478 @@ class AbonoController extends Controller
         return response()->json($response);
     }
 
+    public function obtenerDatosClientes(Request $request)
+    {
+        $periodo = $request->periodo;
+    
+        // Obtener todos los clientes e instituciones desde f_venta (tabla base)
+        $clientesBase = DB::table('f_venta AS f')
+            ->leftJoin('institucion AS i', 'i.idInstitucion', '=', 'f.institucion_id')
+            ->leftJoin('usuario AS u', 'u.idusuario', '=', 'f.ven_cliente')
+            ->select(
+                'f.ven_cliente',
+                'f.institucion_id',
+                'f.ruc_cliente',
+                'f.ven_codigo',
+                'f.id_empresa',
+                'i.nombreInstitucion',
+                DB::raw('CONCAT(u.nombres, " ", u.apellidos) AS cliente')
+            )
+            ->where('f.est_ven_codigo', '<>', 3)
+            ->where('f.periodo_id', $periodo)
+            ->whereIn('f.idtipodoc', [1, 3, 4])
+            ->distinct()
+            ->get();
+    
+        // Consultas de totales (Prefacturas, Notas de Crédito, Notas, Abonos, Facturas)
+        $prefacturas = DB::table('f_venta')
+            ->select('ven_cliente', 'institucion_id', DB::raw('SUM(ven_valor) as total_prefacturas'))
+            ->where('idtipodoc', 1)
+            ->where('periodo_id', $periodo)
+            ->where('est_ven_codigo', '<>', 3)
+            ->groupBy('ven_cliente', 'institucion_id')
+            ->get();
+    
+        $notasCredito = DB::table('f_venta')
+            ->select('ven_cliente', 'institucion_id', DB::raw('SUM(ven_valor) as total_notas_credito'))
+            ->where('idtipodoc', 16)
+            ->where('periodo_id', $periodo)
+            ->where('est_ven_codigo', '<>', 3)
+            ->groupBy('ven_cliente', 'institucion_id')
+            ->get();
+    
+        $notas = DB::table('f_venta')
+            ->select('ven_cliente', 'institucion_id', DB::raw('SUM(ven_valor) as total_notas'))
+            ->whereIn('idtipodoc', [3, 4])
+            ->where('periodo_id', $periodo)
+            ->where('est_ven_codigo', '<>', 3)
+            ->groupBy('ven_cliente', 'institucion_id')
+            ->get();
+    
+        $abonos = DB::table('abono')
+            ->select('abono_ruc_cliente', DB::raw('SUM(abono_facturas) as abono_facturas'), DB::raw('SUM(abono_notas) as abono_notas'))
+            ->where('abono_estado', 0)
+            ->where('abono_cuenta','<>','6')
+            // ->whereNotIn('abono_cuenta', [3, 4])
+            ->where('abono_periodo', $periodo)
+            ->groupBy('abono_ruc_cliente')
+            ->get();
+        
+        $liquidaciones = DB::table('abono')
+        ->select('abono_ruc_cliente', DB::raw('SUM(abono_facturas) as abono_facturas'), DB::raw('SUM(abono_notas) as abono_notas'))
+        ->where('abono_estado', 0)
+        ->where('abono_cuenta', '6')
+        ->where('abono_periodo', $periodo)
+        ->groupBy('abono_ruc_cliente')
+        ->get();
 
+        $retenciones = DB::table('abono')
+        ->select('abono_ruc_cliente', DB::raw('SUM(abono_valor_retencion) as retencion_valor'))
+        ->where('abono_estado', 0)
+        ->where('abono_tipo', '3')
+        ->whereNotNull('abono_valor_retencion')
+        ->where('abono_periodo', $periodo)
+        ->groupBy('abono_ruc_cliente')
+        ->get();
+    
+        $facturas = DB::table('f_venta_agrupado')
+            ->select('ven_cliente', 'institucion_id', DB::raw('SUM(ven_valor) as total_facturas'))
+            ->where('periodo_id', $periodo)
+            ->where('est_ven_codigo', 0)
+            ->groupBy('ven_cliente', 'institucion_id')
+            ->get();
+    
+        // Crear un array único de combinaciones de ven_codigo y id_empresa
+        $documentosEmpresas = $clientesBase->map(function($cliente) {
+            return [
+                'ven_codigo' => $cliente->ven_codigo,
+                'id_empresa' => $cliente->id_empresa
+            ];
+        })->unique(function($item) {
+            return $item['ven_codigo'] . '-' . $item['id_empresa']; // Garantiza que sea único por combinación de ven_codigo e id_empresa
+        })->toArray();
+    
+        // Obtener las devoluciones para todos los documentos y empresas (únicos)
+        $devoluciones = DB::table('codigoslibros_devolucion_son as cls')
+            ->join('f_venta as fv', 'fv.ven_codigo', '=', 'cls.documento')
+            ->whereIn('cls.documento', array_column($documentosEmpresas, 'ven_codigo'))
+            ->whereIn('cls.id_empresa', array_column($documentosEmpresas, 'id_empresa'))
+            ->select(
+                'cls.documento',
+                'cls.id_empresa',
+                DB::raw('SUM(cls.precio * cls.combo_cantidad_devuelta) as total_precio_tipo1'),
+                DB::raw('SUM(cls.precio) as total_precio_tipo0'),
+                'fv.ven_desc_por',
+                'fv.institucion_id'
+            )
+            ->groupBy('cls.documento', 'cls.id_empresa', 'fv.ven_desc_por', 'fv.institucion_id')
+            ->get();
+    
+        // Agrupar documentos por cliente
+        $documentosPorCliente = [];
+        foreach ($clientesBase as $cliente) {
+            $clienteKey = $cliente->ven_cliente . '-' . $cliente->institucion_id;
+            
+            if (!isset($documentosPorCliente[$clienteKey])) {
+                $documentosPorCliente[$clienteKey] = [];
+            }
+
+            $documentosPorCliente[$clienteKey][] = [
+                'Ven_codigo' => $cliente->ven_codigo,
+                'empresa' => $cliente->id_empresa,
+            ];
+        }
+    
+        // Procesar datos combinados
+        $datosCombinados = [];
+        $clientesProcesados = [];  // Array para verificar si el cliente ya fue procesado
+
+        foreach ($clientesBase as $cliente) {
+            $clienteId = $cliente->ven_cliente;
+            $institucionId = $cliente->institucion_id;
+            $rucCliente = $cliente->ruc_cliente;
+            
+            // Verificar si el cliente ya fue procesado
+            $clienteKey = $clienteId . '-' . $institucionId;
+            if (isset($clientesProcesados[$clienteKey])) {
+                continue;  // Si ya fue procesado, saltar al siguiente
+            }
+
+            // Marcar cliente como procesado
+            $clientesProcesados[$clienteKey] = true;
+
+            // Obtener los documentos asociados al cliente
+            $documentos = $documentosPorCliente[$clienteKey];
+
+            // Consultar totales de cada cliente
+            $totalPrefacturas = $prefacturas->where('ven_cliente', $clienteId)->where('institucion_id', $institucionId)->sum('total_prefacturas');
+            $totalNotasCredito = $notasCredito->where('ven_cliente', $clienteId)->where('institucion_id', $institucionId)->sum('total_notas_credito');
+            $totalNotas = $notas->where('ven_cliente', $clienteId)->where('institucion_id', $institucionId)->sum('total_notas');
+            $abonoFacturas = $abonos->where('abono_ruc_cliente', $rucCliente)->sum('abono_facturas');
+            $abonoNotas = $abonos->where('abono_ruc_cliente', $rucCliente)->sum('abono_notas');
+            $liquidacionesFacturas = $liquidaciones->where('abono_ruc_cliente', $rucCliente)->sum('abono_facturas');
+            $liquidacionesNotas = $liquidaciones->where('abono_ruc_cliente', $rucCliente)->sum('abono_notas');
+            $totalFacturas = $facturas->where('ven_cliente', $clienteId)->where('institucion_id', $institucionId)->sum('total_facturas');
+            $totalretenciones = $retenciones->where('abono_ruc_cliente', $rucCliente)->sum('retencion_valor');
+
+            // Obtener los datos de devoluciones para este cliente y sus documentos
+            $devolucionCliente = $devoluciones->whereIn('documento', array_column($documentos, 'Ven_codigo'))
+                                            ->whereIn('id_empresa', array_column($documentos, 'empresa'))
+                                            ->where('institucion_id', $institucionId);
+
+            $totalDevoluciones = $devolucionCliente->sum(function($devolucion) {
+                return $devolucion->total_precio_tipo1 + $devolucion->total_precio_tipo0;
+            });
+
+            $valorConDescuentoDevoluciones = $devolucionCliente->sum(function($devolucion) {
+                $totalPrecio = $devolucion->total_precio_tipo1 + $devolucion->total_precio_tipo0;
+                return round($totalPrecio - ($totalPrecio * $devolucion->ven_desc_por / 100), 2);
+            });
+
+            // Agregar al arreglo de datos combinados
+            $datosCombinados[] = [
+                'ven_cliente' => $clienteId,
+                'institucion_id' => $institucionId,
+                'ruc_cliente' => $rucCliente,
+                'cliente' => $cliente->cliente,
+                'institucion' => $cliente->nombreInstitucion,
+                'total_prefacturas' => round($totalPrefacturas, 2),
+                'total_notas' => round($totalNotas, 2),
+                'total_notas_credito' => round($totalNotasCredito, 2),
+                'total_facturas' => round($totalFacturas, 2),
+                'abono_facturas' => round($abonoFacturas, 2),
+                'abono_notas' => round($abonoNotas, 2),
+                'liquidaciones_facturas' => round($liquidacionesFacturas, 2),
+                'liquidaciones_notas' => round($liquidacionesNotas, 2),
+                'total_devoluciones' => round($totalDevoluciones, 2),
+                'valor_con_descuento_devoluciones' => round($valorConDescuentoDevoluciones, 2),
+                'documentos' => $documentos,
+                'retenciones' => $totalretenciones,
+            ];
+        }
+
+    
+        // Filtrar los resultados
+        $datosFiltrados = array_filter($datosCombinados, function ($dato) {
+            return $dato['total_prefacturas'] > 0 || 
+                   $dato['total_notas'] > 0 || 
+                   $dato['total_notas_credito'] > 0 || 
+                   $dato['total_facturas'] > 0 || 
+                   $dato['abono_facturas'] > 0 || 
+                   $dato['abono_notas'] > 0 ||
+                   $dato['liquidaciones_facturas'] > 0 ||
+                   $dato['liquidaciones_notas'] > 0 ||
+                   $dato['total_devoluciones'] > 0;
+        });
+    
+        return array_values($datosFiltrados);
+    }
+    
+    public function obtenerResumenDevolucion(Request $request)
+    {
+        // Validamos que los parámetros 'documento' y 'empresa' estén presentes
+        $request->validate([
+            'documento' => 'required|string',
+            'empresa' => 'required|integer',
+        ]);
+    
+        $documento = $request->input('documento');
+        $empresa = $request->input('empresa');
+    
+        // Calcular el total_precio para tipo_codigo 1
+        $totalPrecioTipo1 = DB::table('codigoslibros_devolucion_son as cls')
+            ->where('cls.documento', '=', $documento)
+            ->where('cls.id_empresa', '=', $empresa)
+            ->where('cls.tipo_codigo', '=', 1)
+            ->sum(DB::raw('cls.precio * cls.combo_cantidad_devuelta'));
+    
+        // Calcular el total_precio para tipo_codigo 0
+        $totalPrecioTipo0 = DB::table('codigoslibros_devolucion_son as cls')
+            ->where('cls.documento', '=', $documento)
+            ->where('cls.id_empresa', '=', $empresa)
+            ->where('cls.tipo_codigo', '=', 0)
+            ->sum('cls.precio');
+    
+        // Total precio de la devolución
+        $totalPrecio = round($totalPrecioTipo1 + $totalPrecioTipo0, 2);
+    
+        // Obtener descuento del documento relacionado
+        $venta = DB::table('f_venta as fv')
+            ->where('fv.ven_codigo', '=', $documento)
+            ->where('fv.id_empresa', '=', $empresa)
+            ->where('fv.est_ven_codigo', '<>', 3)
+            ->select('fv.ven_desc_por', 'fv.institucion_id')
+            ->first();
+    
+        // Calcular ValorConDescuento
+        $valorConDescuento = $venta
+            ? round($totalPrecio - ($totalPrecio * $venta->ven_desc_por / 100), 2)
+            : $totalPrecio;
+    
+        return response()->json([
+            'id_empresa' => $empresa,
+            'institucion_id' => $venta ? $venta->institucion_id : null,
+            'total_precio' => $totalPrecio,
+            'ValorConDescuento' => $valorConDescuento,
+        ]);
+    }
+
+    //JEYSON METODOS INICIO
+    public function retencion_registro_update_new(Request $request)
+    {
+        DB::beginTransaction();
+        try {
+            $validator = Validator::make($request->all(), [
+                'abono_fecha' => 'required|date',
+                'abono_porcentaje' => 'required',
+                'abono_valor_retencion' => 'required|numeric',
+                'abono_periodo' => 'required',
+                'abono_tipo' => 'required',
+                'user_created' => 'required|numeric',
+                'referencia_retencion_factura' => 'required',
+                'idClientePerseo' => 'required',
+                'clienteCodigoPerseo' => 'required',
+                'abono_ruc_cliente' => 'required',
+                'abono_documento' => 'required',
+                'abono_concepto' => 'required',
+                'abono_empresa' => 'required',
+                'egf_archivo' => 'nullable|string',
+                'egft_id' => 'required|numeric',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json($validator->errors(), 400);
+            }
+
+            $referenciaRetencion = $request->referencia_retencion_factura;
+            // Determina la referencia a usar según la condición
+            if ($request->referencia_retencion_factura_anterior != 'vacio') {
+                $referenciaRetencion = ($request->referencia_retencion_factura != $request->referencia_retencion_factura_anterior)
+                    ? $request->referencia_retencion_factura_anterior
+                    : $request->referencia_retencion_factura;
+            }
+
+            // Realiza la consulta con la referencia determinada
+            $verificar_abono_documento = DB::select("SELECT ab.referencia_retencion_factura, em.descripcion_corta, ab.abono_ruc_cliente
+                FROM abono ab
+                INNER JOIN empresas em ON ab.abono_empresa = em.id
+                WHERE ab.abono_tipo = 3 
+                AND ab.abono_documento = :abono_documento
+                AND ab.abono_estado = :abono_estado
+                AND ab.referencia_retencion_factura <> :referencia_retencion_factura",
+                [
+                    'abono_documento' => $request->abono_documento,
+                    'abono_estado' => 0,
+                    'referencia_retencion_factura' => $referenciaRetencion,
+                ]
+            );
+
+            // Validar si se encontró un registro
+            if (!empty($verificar_abono_documento)) {
+                $referencia_retencion_factura = $verificar_abono_documento[0]->referencia_retencion_factura;
+                $descripcion_corta = $verificar_abono_documento[0]->descripcion_corta;
+                $abono_ruc_cliente = $verificar_abono_documento[0]->abono_ruc_cliente;
+                return response()->json([
+                    'status' => 0, // Status 0 para indicar que no se puede continuar
+                    'message' => "Este número de documento ya está registrado en la empresa $descripcion_corta cliente CI/RUC: $abono_ruc_cliente, en el documento: $referencia_retencion_factura.",
+                ], 200); // Código 400 para indicar un error en la solicitud
+            }
+
+            // Buscar o crear un registro en la tabla Abono
+            $retencionupdate = Abono::firstOrNew(['abono_id' => $request->abono_id]);
+
+            if (!$retencionupdate->exists) {
+                $verificacion_historico = 'new';
+                // Crear un nuevo registro en EvidenciaGlobalFiles si es un nuevo registro
+                $evidenciaGlobalFile = new EvidenciaGlobalFiles();
+                $evidenciaGlobalFile->egft_id = $request->egft_id;
+                $evidenciaGlobalFile->egf_archivo = $request->egf_archivo ?? null;
+                $evidenciaGlobalFile->egf_url = $request->egf_archivo 
+                    ? uniqid() . '_' . $request->egf_archivo 
+                    : null;
+                $evidenciaGlobalFile->user_created = $request->user_created;
+                $evidenciaGlobalFile->egf_tamano = $request->egf_tamano ?? null;
+                $evidenciaGlobalFile->save();
+
+                // Asignar el ID generado al registro de Abono
+                $retencionupdate->egf_id = $evidenciaGlobalFile->egf_id;
+                $retencionupdate->user_created = $request->user_created;
+                $retencionupdate->created_at = now();
+            } else {
+                $verificacion_historico = 'edit';
+                // Si es una actualización, buscar el registro de EvidenciaGlobalFiles asociado
+                $evidenciaGlobalFile = EvidenciaGlobalFiles::find($retencionupdate->egf_id);
+                // Actualizar solo si 'egf_archivo' está presente en el request
+                if ($evidenciaGlobalFile && $request->has('egf_archivo')) {
+                    $evidenciaGlobalFile->egf_archivo = $request->egf_archivo ?? null;
+                    $evidenciaGlobalFile->egf_url = $request->egf_archivo 
+                    ? uniqid() . '_' . $request->egf_archivo 
+                    : null;
+                    $evidenciaGlobalFile->egf_tamano = $request->egf_tamano ?? null;
+                    $evidenciaGlobalFile->updated_at = now();
+                    $evidenciaGlobalFile->save();
+                }
+            }
+
+            // Actualizar los datos en el registro de Abono
+            $retencionupdate->abono_fecha = $request->abono_fecha;
+            $retencionupdate->abono_porcentaje = $request->abono_porcentaje;
+            $retencionupdate->abono_valor_retencion = $request->abono_valor_retencion;
+            $retencionupdate->abono_periodo = $request->abono_periodo;
+            $retencionupdate->abono_tipo = $request->abono_tipo;
+            $retencionupdate->referencia_retencion_factura = $request->referencia_retencion_factura;
+            $retencionupdate->idClientePerseo = $request->idClientePerseo;
+            $retencionupdate->clienteCodigoPerseo = $request->clienteCodigoPerseo;
+            $retencionupdate->abono_ruc_cliente = $request->abono_ruc_cliente;
+            $retencionupdate->abono_documento = $request->abono_documento;
+            $retencionupdate->abono_concepto = $request->abono_concepto;
+            $retencionupdate->abono_empresa = $request->abono_empresa;
+            $retencionupdate->abono_cuenta = 8;
+            $retencionupdate->updated_at = now();
+            $retencionupdate->save();
+
+            // return $retencionupdate;
+            // Llamar a guardarAbonoHistorico según corresponda
+            if ($verificacion_historico == 'new') {
+                // Para registros nuevos
+                $retencionupdate->abono_notas = 0;
+                $retencionupdateObject = json_decode(json_encode($retencionupdate));
+                // Eliminar la propiedad 'tipo'
+                unset($retencionupdateObject->tipo);
+                // Añadir propiedades de evidenciaGlobalFile
+                $retencionupdateObject->egf_archivo = $evidenciaGlobalFile->egf_archivo ?? null;
+                $retencionupdateObject->egf_tamano = $evidenciaGlobalFile->egf_tamano ?? null;
+                $this->guardarAbonoHistorico($retencionupdateObject, 3, $request->user_created);
+            } else if($verificacion_historico == 'edit'){
+                // Para registros existentes
+                $retencionupdate->abono_notas = 0;
+                $retencionupdateObject = json_decode(json_encode($retencionupdate));
+                // Eliminar la propiedad 'tipo'
+                unset($retencionupdateObject->tipo);
+                // Añadir propiedades de evidenciaGlobalFile
+                $retencionupdateObject->egf_archivo = $evidenciaGlobalFile->egf_archivo ?? null;
+                $retencionupdateObject->egf_tamano = $evidenciaGlobalFile->egf_tamano ?? null;
+                $this->guardarAbonoHistorico($retencionupdateObject, 6, $request->user_created);
+            }else{
+                return 'No se ha guardado el historico';
+            }
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Registro procesado correctamente',
+                'status' => 1,
+                'abono_id' => $retencionupdate->abono_id,
+                'egf_id' => $retencionupdate->egf_id,
+                'egf_url' => $evidenciaGlobalFile->egf_url ?? null,
+            ]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function GetListadoRetenciones(Request $request)
+    {
+        $identificacion = $request->input('identificacion');
+        $id_empresa = $request->input('id_empresa');
+
+        $query = DB::SELECT("SELECT a.abono_id, a.egf_id, a.abono_fecha, a.abono_tipo, a.abono_porcentaje, a.abono_documento,
+                a.referencia_retencion_factura, a.referencia_retencion_factura as referencia_retencion_factura_anterior, a.abono_valor_retencion, a.abono_periodo, a.user_created,
+                a.idClientePerseo, a.clienteCodigoPerseo, a.abono_concepto, a.abono_ruc_cliente,
+                fva.ven_valor, fva.id_empresa, em.descripcion_corta, ins.nombreInstitucion, ins.direccionInstitucion, 
+                usa.nombres, usa.apellidos, egf.egf_url,
+                CONCAT(us.nombres, ' ', us.apellidos) AS nombrecreador, 
+                COUNT(DISTINCT dfv.pro_codigo) AS item, 
+                SUM(dfv.det_ven_cantidad) AS libros, a.abono_estado
+            FROM abono a 
+            INNER JOIN f_venta_agrupado fva ON a.referencia_retencion_factura = fva.id_factura
+            INNER JOIN usuario us ON a.user_created = us.idusuario
+            INNER JOIN institucion ins ON fva.institucion_id = ins.idInstitucion
+            INNER JOIN usuario usa ON fva.ven_cliente = usa.idusuario
+            INNER JOIN f_detalle_venta_agrupado dfv ON fva.id_factura = dfv.id_factura
+            INNER JOIN empresas em ON em.id = fva.id_empresa
+            INNER JOIN evidencia_global_files egf ON a.egf_id = egf.egf_id
+            WHERE a.abono_tipo = 3
+            AND a.abono_ruc_cliente = ?
+            AND fva.id_empresa = ?
+            GROUP BY a.abono_id, a.egf_id, a.abono_fecha, a.abono_tipo, a.abono_porcentaje, a.abono_documento,
+                    a.referencia_retencion_factura, a.abono_valor_retencion, a.abono_periodo, a.user_created,
+                    a.idClientePerseo, a.clienteCodigoPerseo, a.abono_concepto, a.abono_ruc_cliente,
+                    fva.ven_valor, fva.id_empresa, em.descripcion_corta, ins.nombreInstitucion, ins.direccionInstitucion, 
+                    usa.nombres, usa.apellidos, us.nombres, us.apellidos
+                    ORDER BY a.updated_at DESC
+        ", [$identificacion, $id_empresa]);
+
+        return $query;
+    }
+
+    public function GetVerificacionAbonoDocumento(Request $request)
+    {
+        $identificacion = $request->input('identificacion');
+        $id_empresa = $request->input('id_empresa');
+
+        $query = DB::SELECT("SELECT a.referencia_retencion_factura, a.abono_estado
+            FROM abono a 
+            INNER JOIN f_venta_agrupado fva ON a.referencia_retencion_factura = fva.id_factura
+            WHERE a.abono_tipo = 3
+            AND a.abono_ruc_cliente = ?
+            AND fva.id_empresa = ?", [$identificacion, $id_empresa]);
+
+        return $query;
+    }
+
+    public function GetEvidenciasGlobalxID(Request $request)
+    {
+        $egf_id = $request->input('egf_id');
+
+        $query = DB::SELECT("SELECT *
+            FROM evidencia_global_files egf
+            INNER JOIN evidencia_global_files_tipo egft ON egf.egft_id = egft.egft_id
+            WHERE egf.egf_id = ?", [$egf_id]);
+
+        return $query;
+    }
+    //JEYSON METODOS FIN
 
 
 

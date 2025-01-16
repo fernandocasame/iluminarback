@@ -10,6 +10,8 @@ use App\Repositories\BaseRepository;
 use App\Repositories\Facturacion\ProformaRepository;
 use App\Repositories\pedidos\PedidosRepository;
 use DB;
+use Schema;
+
 class  CodigosRepository extends BaseRepository
 {
     protected $proformaRepository;
@@ -167,6 +169,7 @@ class  CodigosRepository extends BaseRepository
             'permitir_devolver_nota'    => '0',
             'codigo_combo'              => null,
             'quitar_de_reporte'         => null,
+            'plus'                      => 0,
         ];
         $arrayPaquete = [
             'codigo_paquete'            => null,
@@ -214,107 +217,6 @@ class  CodigosRepository extends BaseRepository
         return $estadoIngreso;
     }
 
-    // public function updateActivacion($codigo, $codigo_union, $objectCodigoUnion, $ifOmitirA = false, $todo)
-    // {
-    //     // Si es regalado, guía o bloqueado, no se actualiza
-    //     if ($ifOmitirA) {
-    //         return 1;
-    //     }
-
-    //     $withCodigoUnion = $codigo_union !== '0' ? 1 : 0;
-    //     $arrayLimpiar = [
-    //         'idusuario' => "0",
-    //         'id_periodo' => "0",
-    //         'id_institucion' => null,
-    //         'bc_estado' => '1',
-    //         'estado' => '0',
-    //         'estado_liquidacion' => '1',
-    //         'venta_estado' => '0',
-    //         'bc_periodo' => null,
-    //         'bc_institucion' => null,
-    //         'bc_fecha_ingreso' => null,
-    //         'contrato' => null,
-    //         'verif1' => null,
-    //         'verif2' => null,
-    //         'verif3' => null,
-    //         'verif4' => null,
-    //         'verif5' => null,
-    //         'verif6' => null,
-    //         'verif7' => null,
-    //         'verif8' => null,
-    //         'verif9' => null,
-    //         'verif10' => null,
-    //         'venta_lista_institucion' => '0',
-    //         'porcentaje_descuento' => '0',
-    //         'factura' => null,
-    //         'liquidado_regalado' => '0',
-    //         'codigo_proforma' => null,
-    //         'proforma_empresa' => null,
-    //         'devuelto_proforma' => '0',
-    //         'asesor_id' => 0,
-    //         'combo' => null,
-    //         'documento_devolucion' => null,
-    //     ];
-
-    //     if ($todo == 1) {
-    //         $arrayCombinar = array_merge($arrayLimpiar, [
-    //             'codigo_paquete' => null,
-    //             'fecha_registro_paquete' => null,
-    //         ]);
-    //     } else {
-    //         $arrayCombinar = $arrayLimpiar;
-    //     }
-
-    //     // Actualizar el código de unión si existe
-    //     if ($withCodigoUnion) {
-    //         if (count($objectCodigoUnion) == 0) {
-    //             return 2; // Error: no se ingresó
-    //         }
-
-    //         $codigoUnionModel = CodigosLibros::where('codigo', $codigo_union)
-    //             ->where('estado_liquidacion', '<>', '0')
-    //             ->first();
-
-    //         if ($codigoUnionModel) {
-    //             foreach ($arrayCombinar as $key => $value) {
-    //                 $codigoUnionModel->$key = $value;
-    //             }
-    //             $codigoU = $codigoUnionModel->save();
-    //         } else {
-    //             return 0; // No se encontró el código de unión
-    //         }
-
-    //         // Actualizar el primer código
-    //         $codigoModel = CodigosLibros::where('codigo', $codigo)
-    //             ->where('estado_liquidacion', '<>', '0')
-    //             ->first();
-
-    //         if ($codigoModel) {
-    //             foreach ($arrayCombinar as $key => $value) {
-    //                 $codigoModel->$key = $value;
-    //             }
-    //             $codigoUpdate = $codigoModel->save();
-    //         } else {
-    //             return 0; // No se encontró el primer código
-    //         }
-    //     } else {
-    //         // Actualizar solo el primer código
-    //         $codigoModel = CodigosLibros::where('codigo', $codigo)
-    //             ->where('estado_liquidacion', '<>', '0')
-    //             ->first();
-
-    //         if ($codigoModel) {
-    //             foreach ($arrayCombinar as $key => $value) {
-    //                 $codigoModel->$key = $value;
-    //             }
-    //             $codigoUpdate = $codigoModel->save();
-    //         } else {
-    //             return 0; // No se encontró el primer código
-    //         }
-    //     }
-
-    //     return ($withCodigoUnion ? $codigoU : $codigoUpdate) ? 1 : 0;
-    // }
 
     public function updateDocumentoDevolucion($codigo,$codigo_union,$objectCodigoUnion,$request,$codigo_ven){
         try{
@@ -535,7 +437,6 @@ class  CodigosRepository extends BaseRepository
             "message" => trim($message), // Mensaje único
         ];
     }
-
 
 
     public function updateDevolucion($codigo,$codigo_union,$objectCodigoUnion,$request,$ifGuardarProforma=0,$codigo_liquidacion=null,$proforma_empresa=null,$codigo_proforma=null,$tipo_importacion=null){
@@ -834,6 +735,75 @@ class  CodigosRepository extends BaseRepository
         }
         return $query;
     }
+    public function getCodigosIndividuales($request)
+    {
+        try {
+            // Obtener los parámetros de la solicitud
+            $periodo        = $request->periodo_id;
+            $institucion    = $request->institucion_id;
+            $IdVerificacion = $request->IdVerificacion;
+            $verif          = "verif" . $request->verificacion_id;
+            $liquidados     = $request->liquidados;
+            $porInstitucion = $request->porInstitucion;
+            // Si $verif tiene un valor, validamos que la columna exista
+            if ($IdVerificacion && !Schema::hasColumn('codigoslibros', $verif)) {
+                throw new \Exception("La columna {$verif} no existe en la tabla codigoslibros.");
+            }
+
+            // Consulta con Eloquent
+            $detalles = CodigosLibros::from('codigoslibros as c') // Alias aplicado aquí
+                ->select([
+                    'c.codigo AS codigo_libro',
+                    'c.serie',
+                    'c.plus',
+                    'c.libro_idlibro',
+                    'c.estado_liquidacion',
+                    'c.estado',
+                    'c.bc_estado',
+                    'c.venta_estado',
+                    'c.liquidado_regalado',
+                    'c.bc_institucion',
+                    'c.contrato',
+                    'c.venta_lista_institucion',
+                    'ls.year',
+                    'ls.id_libro_plus',
+                    DB::raw("CASE WHEN c.plus = 1 THEN ls.id_libro_plus ELSE c.libro_idlibro END AS libro_idReal"), // Lógica para la nueva columna
+                    DB::raw("CASE WHEN c.plus = 1 THEN l_plus.nombre ELSE l.nombrelibro END AS nombrelibro"), // Lógica para la nueva columna
+                    DB::raw("CASE WHEN c.plus = 1 THEN l_plus.codigo_liquidacion ELSE ls.codigo_liquidacion END AS codigo"), // Lógica para la nueva columna
+                    DB::raw("CASE WHEN c.plus = 1 THEN l_plus.id_serie ELSE ls.id_serie END AS id_serie"), // Lógica para la nueva columna
+                    DB::raw("CASE WHEN c.plus = 1 THEN a_plus.area_idarea ELSE a.area_idarea END AS area_idarea"), // Lógica para la nueva columna
+                ])
+                ->leftJoin('libros_series as ls', 'ls.idLibro', '=', 'c.libro_idlibro')
+                ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
+                ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
+                ->leftJoin('libros_series as l_plus', 'ls.id_libro_plus', '=', 'l_plus.idLibro') // Join adicional para plus
+                ->leftJoin('libro as lib_plus', 'ls.id_libro_plus', '=', 'lib_plus.idlibro')
+                ->leftJoin('asignatura as a_plus', 'lib_plus.asignatura_idasignatura', '=', 'a_plus.idasignatura')
+                ->where('c.bc_periodo', $periodo)
+                ->where('c.prueba_diagnostica', '0')
+                ->when($liquidados, function ($query) use ($IdVerificacion, $institucion, $verif) {
+                    $query->where($verif, $IdVerificacion)
+                        ->where(function ($query) use ($institucion) {
+                            $query->where('c.bc_institucion', $institucion)
+                                ->orWhere('c.venta_lista_institucion', $institucion);
+                        });
+                })
+                ->when($porInstitucion, function ($query) use ($institucion) {
+                    $query->where(function ($query) use ($institucion) {
+                        $query->where('c.bc_institucion', $institucion)
+                            ->orWhere('c.venta_lista_institucion', $institucion);
+                    });
+                })
+                ->get();
+
+            return $detalles;
+
+        } catch (\Exception $e) {
+            // Lanza una excepción con el mensaje original para identificar el problema
+            throw new \Exception("Error al obtener los códigos individuales: " . $e->getMessage());
+        }
+    }
+
     public function getCodigosBodega($filtro, $periodo,$institucion=0,$asesor_id=0){
         $arrayCodigosActivos = CodigosLibros::select(
             'libros_series.codigo_liquidacion AS codigo',

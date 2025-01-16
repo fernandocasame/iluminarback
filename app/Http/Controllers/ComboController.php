@@ -19,11 +19,19 @@ class ComboController extends Controller
      */
     use TraitCodigosGeneral;
     //api:get/copmbos
-    public function index()
+    public function index(Request $request)
     {
-        return "hola mundo";
+        if($request->getComboConfigurado){ return $this->getComboConfigurado($request); }
     }
 
+    //api:get/combos?getComboConfigurado=1
+    public function getComboConfigurado($request)
+    {
+        $getCombos = DB::SELECT("SELECT * FROM codigos_configuracion
+        WHERE id = '2'
+        ");
+        return $getCombos;
+    }
     /**
      * Show the form for creating a new resource.
      *

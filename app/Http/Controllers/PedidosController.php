@@ -43,9 +43,11 @@ use App\Models\PedidoNotificacion;
 use App\Models\Abono;
 use App\Models\AbonoHistorico;
 use App\Models\Pedidos_val_area_new;
+use App\Models\PedidoValArea;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\PedidosPagosRepository;
 use App\Repositories\pedidos\ConvenioRepository;
+use App\Repositories\pedidos\GuiaRepository;
 use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Pedidos\TraitGuiasGeneral;
 use App\Traits\Pedidos\TraitPagosGeneral;
@@ -69,12 +71,14 @@ class PedidosController extends Controller
     private $convenioRepository;
     private $pedidosRepository;
     private $codigosRepository;
-    public function __construct(PedidosPagosRepository $pagoRepository, ConvenioRepository $convenioRepository,PedidosRepository $pedidosRepository,CodigosRepository $codigosRepository)
+    private $guiaRepository;
+    public function __construct(PedidosPagosRepository $pagoRepository, ConvenioRepository $convenioRepository,PedidosRepository $pedidosRepository,CodigosRepository $codigosRepository, GuiaRepository $guiaRepository)
     {
      $this->pagoRepository          = $pagoRepository;
      $this->convenioRepository      = $convenioRepository;
      $this->pedidosRepository       = $pedidosRepository;
      $this->codigosRepository       = $codigosRepository;
+     $this->guiaRepository          = $guiaRepository;
     }
     //api:get/pedidos
     public function index(Request $request)
@@ -1675,11 +1679,14 @@ class PedidosController extends Controller
     }
     public function get_pedidos_guias(Request $request){
         $guias = DB::SELECT("SELECT
-        p.*, CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
+        p.id_pedido, p.estado_entrega, p.estado, p.empresa_id, p.ven_codigo,p.id_periodo, p.id_asesor,
+        p.fecha_envio, p.total_unidades_guias, p.fecha_aprobado_facturacion,p.fecha_entrega_bodega, p.observacion,
+        CONCAT(u.nombres, ' ', u.apellidos, ' CI: ', u.cedula) AS asesor,
         CONCAT(u.nombres,' ',u.apellidos) as responsable, u.cedula,u.iniciales,u.cli_ins_codigo,
         pe.codigo_contrato, pe.region_idregion,
         CONCAT(fac.nombres,' ',fac.apellidos) as facturador, pe.periodoescolar as periodo,
         pe.pedido_facturacion, pe.pedido_bodega, pe.pedido_asesor, e.nombre as empresa
+
         FROM pedidos p
         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
         LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = p.id_periodo
@@ -1688,6 +1695,14 @@ class PedidosController extends Controller
         WHERE p.tipo = '1'
         ORDER BY p.id_pedido DESC
         ");
+        foreach($guias as $key => $item){
+            //traer Pendientes
+            $getPendientes = DB::SELECT("SELECT  v.ven_codigo,v.id_empresa, v.ven_fecha
+             FROM f_venta  v
+            WHERE v.id_pedido = $item->id_pedido
+            ");
+            $guias[$key]->pendientes = $getPendientes;
+        }
         return $guias;
     }
 
@@ -2172,6 +2187,16 @@ class PedidosController extends Controller
         }
         if($request->grupo == 'bodega'){
             $this->actualizarStockProlipa($request->acta,$request->asesor_id,0);
+            //SI HAY PEDIDOS PENDIENTES
+            $pendientes = $this->guiaRepository->getPendientes($request->id_pedido);
+            if(count($pendientes) > 0){
+                foreach($pendientes as $key => $item){
+                    $codigo         = $item->pro_codigo;
+                    $cantidad       = $item->cantidad;
+                    //GUARDAR EL STOCK EN BODEGA DE PROLIPA
+                    $this->saveStockBodegaProlipa(0,$request->asesor_id,$codigo,$cantidad);
+                }
+            }
             $pedido->fecha_entrega_bodega = $fechaActual;
         }
         //PEDIDO
@@ -4280,124 +4305,8 @@ class PedidosController extends Controller
         $detalle->tipo                      = $tipo;
         $detalle->save();
     }
-    //api:post//guardarGuiasBDMilton
-    public function guardarGuiasBDMilton(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        try {
-            //transaccion
-            DB::beginTransaction();
-            //variables
-            $asesor_id            = $request->asesor_id;
-            $id_pedido            = $request->id_pedido;
-            $id_periodo           = $request->id_periodo;
-            $codigo_contrato      = $request->codigo_contrato;
-            $cod_fact             = $request->codigo_usuario_fact;
-            $usuario_fact         = $request->usuario_fact;
-            $iniciales            = $request->iniciales;
-            $fechaActual          = date("Y-m-d H:i:s");
-            $secuencia            = 0;
-            $empresa_id           = $request->empresa_id;
-            $letra                = "";
-            //id general de prolipa para los vendedores
-            $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
-            WHERE s.id_periodo  = '$request->id_periodo'
-            AND s.asesor_id     = '$request->asesor_id'
-            -- AND s.institucion_facturacion = '22926'
-            ");
-            if(empty($query)){
-                $sec = new PedidosSecuencia();
-                $sec->asesor_id             = $asesor_id;
-                //guardar
-                $sec->sec_ven_nombre        = $codigo_contrato;
-                $sec->sec_ven_valor         = 0;
-                $sec->ven_d_codigo          = $iniciales;
-                $sec->asesor_id             = $asesor_id;
-                $sec->id_periodo            = $id_periodo;
-                $sec->cli_ins_codigo        = 0;
-                $sec->save();
-            }
-            //get secuencia
-            $getSecuencia                   = f_tipo_documento::obtenerSecuencia("GUIA");
-            if(!$getSecuencia)              { return ["status" => "0", "message" => "No se pudo obtener la secuencia de guias"]; }
-            //prolipa
-            if($empresa_id == 1)            { $secuencia = $getSecuencia->tdo_secuencial_Prolipa; $letra = "P"; }
-            //calmed
-            if($empresa_id == 3)            { $secuencia = $getSecuencia->tdo_secuencial_calmed; $letra = "C"; }
-            $secuencia                      = $secuencia + 1;
-            //format secuencia
-            $format_id_pedido               = f_tipo_documento::formatSecuencia($secuencia);
-            //codigo de la acta de guias
-            $codigo_ven                     = 'A-'.$letra.'-' . $codigo_contrato . '-' .$cod_fact . '-'. $format_id_pedido;
 
-            //================SAVE DETALLE DE LAS GUIAS======================
-            //obtener las guias por libros
-            $detalleGuias                   = $this->get_val_pedidoInfo($request->id_pedido);
-            //Si no hay nada en detalle de venta
-            if(empty($detalleGuias))        { return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];   }
 
-            //===ACTUALIZAR STOCK========
-            $resultado                      = $this->actualizarStockFacturacion($detalleGuias,$codigo_ven,$empresa_id);
-            if(isset($resultado["status"])) {
-                $estatus = $resultado["status"];  if($estatus == "0") { return $resultado; }
-            }
-            // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
-            $query                          = "UPDATE `pedidos` SET `ven_codigo` = '$codigo_ven', `id_usuario_verif` = $usuario_fact ,`fecha_aprobado_facturacion` = '$fechaActual', `estado_entrega` = '1', `empresa_id` = '$empresa_id' WHERE `id_pedido` = $id_pedido;";
-            DB::UPDATE($query);
-            //ACTUALIZAR LA SECUENCIA
-            f_tipo_documento::updateSecuencia("GUIA",$empresa_id,$secuencia);
-           //Commit
-            DB::commit();
-            return response()->json(['status' => '1', 'message' => 'Guías guardadas correctamente'], 200);
-         } catch (\Exception  $ex) {
-            //Rollback
-            DB::rollBack();
-            return ["status" => "0","message" => "Hubo problemas al guardar las guias".$ex];
-        }
-
-    }
-    //actualizar stock
-    public function actualizarStockFacturacion($arregloCodigos,$codigo_ven,$empresa_id){
-        $contador = 0;
-        try{
-            foreach($arregloCodigos as $key => $item){
-                $stockAnteriorReserva               = 0;
-                $stockEmpresa                       = 0;
-                $codigo                             = $arregloCodigos[$contador]["codigo_liquidacion"];
-                $codigoFact                         = "G".$codigo;
-
-                    $producto                       = _14Producto::obtenerProducto($codigoFact);
-                    $stockAnteriorReserva           = $producto->pro_reservar;
-                    //prolipa
-                    if($empresa_id == 1)            { $stockEmpresa  = $producto->pro_stock; }
-                    //calmed
-                    if($empresa_id == 3)            { $stockEmpresa  = $producto->pro_stockCalmed; }
-
-                //post stock
-                $valorNew                           = $arregloCodigos[$contador]["valor"];
-                $nuevoStockReserva                  = $stockAnteriorReserva - $valorNew;
-                $nuevoStockEmpresa                  = $stockEmpresa - $valorNew;
-                //actualizar stock en la tabla de productos
-                _14Producto::updateStock($codigoFact,$empresa_id,$nuevoStockReserva,$nuevoStockEmpresa);
-
-                //save Historico
-                $historico                          = new PedidoHistoricoActas();
-                $historico->cantidad                = $valorNew;
-                $historico->ven_codigo              = $codigo_ven;
-                $historico->pro_codigo              = $codigo;
-                $historico->stock_anterior          = $stockAnteriorReserva;
-                $historico->nuevo_stock             = $nuevoStockReserva;
-                $historico->stock_anterior_empresa  = $stockEmpresa;
-                $historico->nuevo_stock_empresa     = $nuevoStockEmpresa;
-                $historico->save();
-                $contador++;
-            }
-            return ["status" => "1", "message" => "Se guardo correctamente"];
-        } catch (\Exception $e) {
-            // Manejo de excepciones, devuelve un error JSON
-            return ["status" => "0", "message" => "".$e->getMessage()];
-        }
-    }
     public function actualizarStockProlipa($acta,$asesor_id,$tipo){
         //obtener valores de las actas para sumar al stock de prolipa
         //tipo 0 = peticion; 1 = devolucion;
@@ -4451,179 +4360,7 @@ class PedidosController extends Controller
         $stock->save();
     }
     //====================FIN APIS GUIAS=======================
-    //test2
-    public function guardarGuiasBDMilton2(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        try {
-            //variables
-            // $ven_codigo           = $request->ven_codigo;
-            // $id_pedido            = $request->id_pedido;
-            // $codigo_contrato      = $request->codigo_contrato;
-            // $cod_fact             = "FR";
-            // $usuario_fact         = 64394;
-            // $iniciales            = $request->iniciales;
-            // $total_venta          = 0;
-            // $anticipo             = 0;
-            // $descuento            = 0;
-            // $fecha_formato        = date("Y-m-d");
-            // $region_idregion      = $request->region_idregion;
-            // $cuenta               = "0";
-            // $fechaActual          = date("Y-m-d H:i:s");
-            // $id_periodo           = $request->id_periodo;
-            // $asesor_id            = $request->asesor_id;
 
-            $ven_codigo           = "A-C24-FR-000053933";
-            $id_pedido            = 658;
-            $codigo_contrato      = "C24";
-            $cod_fact             = "FR";
-            $usuario_fact         = 64394;
-            $iniciales            = "LJ";
-            $total_venta          = 0;
-            $anticipo             = 0;
-            $descuento            = 0;
-            $fecha_formato        = date("Y-m-d");
-            $region_idregion      = 2;
-            $cuenta               = "0";
-            $fechaActual          = date("Y-m-d H:i:s");
-            $id_periodo           = 24;
-            $asesor_id            = 26087;
-
-            $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
-            WHERE s.id_periodo = '$id_periodo'
-            AND s.asesor_id = '$asesor_id'
-            AND s.institucion_facturacion = '22926'
-            ");
-            if(empty($query)){
-                return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
-            }
-            //validar que tenga el cli_inscodigo
-            $getcli_ins_codigo = $query[0]->cli_ins_codigo;
-            if($getcli_ins_codigo == null || $getcli_ins_codigo == "null"){
-                return ["status" => "0", "message" => "No esta configurado el id de institucion de prolipa de facturacion"];
-            }
-            //get secuencia
-            $secuencia = Http::get('http://186.4.218.168:9095/api/f_Configuracion');
-            $json_secuencia_guia = json_decode($secuencia, true);
-            $getSecuencia   = $json_secuencia_guia[22]["conValorNum"];
-            // //VARIABLES
-             $cod_institucion      = $query[0]->cli_ins_codigo;
-            $secuencia = $getSecuencia;
-            if( $secuencia < 10 ){
-                $format_id_pedido = '000000' . $secuencia;
-            }
-            if( $secuencia >= 10 && $secuencia < 1000 ){
-                $format_id_pedido = '00000' . $secuencia;
-            }
-            if( $secuencia > 1000 ){
-                $format_id_pedido = '0000' . $secuencia;
-            }
-            // $codigo_ven = 'A-' . $codigo_contrato . '-' .$cod_fact . '-'. $format_id_pedido;
-            $codigo_ven = $ven_codigo;
-            //===ENVIAR A TABLA DE VENTA DE MILTON LAS GUIAS
-            $form_data = [
-                'veN_CODIGO'            => $codigo_ven, //codigo formato milton
-                'usU_CODIGO'            => strval($cod_fact),
-                'veN_D_CODIGO'          => $iniciales, // codigo del asesor
-                'clI_INS_CODIGO'        => floatval($cod_institucion),
-                'tiP_veN_CODIGO'        => 2, //Venta por lista
-                'esT_veN_CODIGO'        => 2, // por defecto
-                'veN_OBSERVACION'       => null,
-                'veN_VALOR'             => floatval($total_venta),
-                'veN_PAGADO'            => 0.00, // por defecto
-                'veN_ANTICIPO'          => floatval($anticipo),
-                'veN_DESCUENTO'         => floatval($descuento),
-                'veN_FECHA'             => $fecha_formato,
-                'veN_CONVERTIDO'        => '', // por defecto
-                'veN_TRANSPORTE'        => 0.00, // por defecto
-                'veN_ESTADO_TRANSPORTE' => false, // por defecto
-                'veN_FIRMADO'           => 'DS', // por defecto
-                'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
-                'cueN_NUMERO'           => strval($cuenta)
-            ];
-            $guias = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
-            $json_guias = json_decode($guias, true);
-            // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
-            // $query = "UPDATE `pedidos` SET `ven_codigo` = '$codigo_ven', `id_usuario_verif` = $usuario_fact ,`fecha_aprobado_facturacion` = '$fechaActual', `estado_entrega` = '1' WHERE `id_pedido` = $id_pedido;";
-            // DB::UPDATE($query);
-            //================SAVE DETALLE DE LAS GUIAS======================
-            //obtener las guias por libros
-            $detalleGuias = $this->get_val_pedidoInfo($id_pedido);
-            //Si no hay nada en detalle de venta
-            if(empty($detalleGuias)){
-                return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];
-            }
-            //variables
-            $iva = 0;
-            $precio = 0;
-            $descontar =0;
-            //GUARDAR DETALLE DE LAS GUIAS
-            for($i =0; $i< count($detalleGuias);$i++){
-                $form_data_detalleGuias = [
-                    "VEN_CODIGO"            => $codigo_ven,
-                    "PRO_CODIGO"            => "G".$detalleGuias[$i]["codigo_liquidacion"],
-                    "DET_VEN_CANTIDAD"      =>  intval($detalleGuias[$i]["valor"]),
-                    "DET_VEN_VALOR_U"       => floatval($precio),
-                    "DET_VEN_IVA"           => floatval($iva),
-                    "DET_VEN_DESCONTAR"     => intval($descontar),
-                    "DET_VEN_INICIO"        => false,
-                    "DET_VEN_CANTIDAD_REAL" => intval($detalleGuias[$i]["valor"]),
-                ];
-                $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleGuias);
-                $json_detalle = json_decode($detalle, true);
-            }
-            return $form_data;
-            //ACTUALIZAR EL ACTA DE LAS GUIAS
-            //post leer y aumentar secuencia + 1
-            // $form_data_Secuencia = [
-            //     "conCod"        => 23,
-            //     "conNombre"     => "actas",
-            //     "conValorNum"   => $getSecuencia + 1 ,
-            //     "conValorStr"   => null,
-            // ];
-            // $post_Secuencia = Http::post('http://186.4.218.168:9095/api/f_Configuracion', $form_data_Secuencia);
-            // $json_secuencia = json_decode($post_Secuencia, true);
-            //===ACTUALIZAR STOCK========
-        //    return $this->actualizarStockFacturacion($detalleGuias,$codigo_ven);
-            //return response()->json(['json_guias' => $json_guias, 'form_data' => $form_data]);
-         } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
-        }
-
-    }
-    public function actualizarStockFacturacionTest($arregloCodigos,$codigo_ven){
-        $contador = 0;
-        foreach($arregloCodigos as $key => $item){
-            $form_data_stock = [];
-            $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
-            //get stock
-            $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigo);
-            $json_stock     = json_decode($getStock, true);
-            $stockAnterior  = $json_stock["producto"][0]["proStock"];
-            //post stock
-            $valorNew       = $arregloCodigos[$contador]["valor"];
-            $nuevoStock     = $stockAnterior - $valorNew;
-            $form_data_stock = [
-                "proStock"     => $nuevoStock,
-            ];
-            //test
-            $postStock = Http::post('http://186.4.218.168:9095/api/f_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
-            //prod
-            //$postStock = Http::post('http://186.4.218.168:9095/api/f2_Producto/ActualizarStockProducto?proCodigo='.$codigo,$form_data_stock);
-            $json_StockPost = json_decode($postStock, true);
-            //save Historico
-            $historico = new PedidoHistoricoActas();
-            $historico->cantidad        = $valorNew;
-            $historico->ven_codigo      = $codigo_ven;
-            $historico->pro_codigo      = $codigo;
-            $historico->stock_anterior  = $stockAnterior;
-            $historico->nuevo_stock     = $nuevoStock;
-            $historico->save();
-            $contador++;
-        }
-        return "se guardo correctamente";
-
-    }
     public function getDetalle($id){
         $query = DB::SELECT("SELECT  pg.* , l.nombrelibro
         FROM pedidos_guias_devolucion_detalle pg
@@ -5911,10 +5648,10 @@ class PedidosController extends Controller
     // Determinar qué tipo de documento y letra secuencial utilizar
     if ($descuento == 100) {
         $tipoDocumento = f_tipo_documento::where('tdo_nombre', 'ACTA (A)')->first();
-        $letraSecuencial = "A";
+        $letraSecuencial = $tipoDocumento->tdo_letra;
     } else {
         $tipoDocumento = f_tipo_documento::where('tdo_nombre', 'NOTA DE VENTA (AI)')->first();
-        $letraSecuencial = "AI";
+        $letraSecuencial = $tipoDocumento->tdo_letra;
     }
 
     // Determinar qué secuencial utilizar según la empresa
@@ -6318,8 +6055,9 @@ class PedidosController extends Controller
         }
     }
     public function get_usuarios_institucion(Request $request){
-        $query = DB::SELECT("SELECT DISTINCT fv.ruc_cliente, fv.institucion_id
+        $query = DB::SELECT("SELECT DISTINCT fv.ruc_cliente, fv.institucion_id, fv.ven_cliente, CONCAT(u.nombres,' ',u.apellidos) AS nombre
             FROM f_venta fv
+            INNER JOIN usuario u ON u.cedula = fv.ruc_cliente
             WHERE fv.institucion_id ='$request->institucion'
             AND fv.est_ven_codigo <> 3
             AND fv.ven_p_libros_obsequios IS NULL ");
@@ -7112,85 +6850,62 @@ class PedidosController extends Controller
         return $this->tr_get_val_pedidoInfo_new($pedido);
     }
 
-    public function guardarGuiasBDMilton_new(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
+    public function guardarGuiasBDMilton_new(Request $request)
+    {
+        $request->validate([
+            'asesor_id'             => 'required|integer',
+            'id_pedido'             => 'required|integer',
+            'id_periodo'            => 'required|integer',
+            'codigo_contrato'       => 'required|string',
+            'codigo_usuario_fact'   => 'required|string',
+            'usuario_fact'          => 'required|integer',
+            'iniciales'             => 'required|string',
+            'empresa_id'            => 'required|integer',
+            'guias_send'            => 'required|json',
+            'ifnuevo'               => 'required|boolean',
+            'ifAprobarSinStock'     => 'required|boolean',
+            'ifAprobarPendientes'   => 'required|boolean',
+            'ven_codigoPadre'       => 'nullable|string',
+        ]);
+
         try {
-            //transaccion
             DB::beginTransaction();
-            //variables
-            $asesor_id            = $request->asesor_id;
-            $id_pedido            = $request->id_pedido;
-            $id_periodo           = $request->id_periodo;
-            $codigo_contrato      = $request->codigo_contrato;
-            $cod_fact             = $request->codigo_usuario_fact;
-            $usuario_fact         = $request->usuario_fact;
-            $iniciales            = $request->iniciales;
-            $fechaActual          = date("Y-m-d H:i:s");
-            $secuencia            = 0;
-            $empresa_id           = $request->empresa_id;
-            $letra                = "";
-            //id general de prolipa para los vendedores
-            $query = DB::SELECT("SELECT * FROM pedidos_secuencia s
-            WHERE s.id_periodo  = '$request->id_periodo'
-            AND s.asesor_id     = '$request->asesor_id'
-            -- AND s.institucion_facturacion = '22926'
-            ");
-            if(empty($query)){
-                $sec = new PedidosSecuencia();
-                $sec->asesor_id             = $asesor_id;
-                //guardar
-                $sec->sec_ven_nombre        = $codigo_contrato;
-                $sec->sec_ven_valor         = 0;
-                $sec->ven_d_codigo          = $iniciales;
-                $sec->asesor_id             = $asesor_id;
-                $sec->id_periodo            = $id_periodo;
-                $sec->cli_ins_codigo        = 0;
-                $sec->save();
-            }
-            //get secuencia
-            $getSecuencia                   = f_tipo_documento::obtenerSecuencia("GUIA");
-            if(!$getSecuencia)              { return ["status" => "0", "message" => "No se pudo obtener la secuencia de guias"]; }
-            //prolipa
-            if($empresa_id == 1)            { $secuencia = $getSecuencia->tdo_secuencial_Prolipa; $letra = "P"; }
-            //calmed
-            if($empresa_id == 3)            { $secuencia = $getSecuencia->tdo_secuencial_calmed; $letra = "C"; }
-            $secuencia                      = $secuencia + 1;
-            //format secuencia
-            $format_id_pedido               = f_tipo_documento::formatSecuencia($secuencia);
-            //codigo de la acta de guias
-            $codigo_ven                     = 'A-'.$letra.'-' . $codigo_contrato . '-' .$cod_fact . '-'. $format_id_pedido;
 
-            //================SAVE DETALLE DE LAS GUIAS======================
-            //obtener las guias por libros
-            $detalleGuias                   = $this->get_val_pedidoInfo_new($request->id_pedido);
-            // return [
-            //     'detalleGuias' => $detalleGuias,
-            //     'mensaje' => 'hola2'
-            // ];
-            //Si no hay nada en detalle de venta
-            if(empty($detalleGuias))        { return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];   }
-
-            //===ACTUALIZAR STOCK========
-            $resultado                      = $this->actualizarStockFacturacion($detalleGuias,$codigo_ven,$empresa_id);
-            if(isset($resultado["status"])) {
-                $estatus = $resultado["status"];  if($estatus == "0") { return $resultado; }
+            // Variables iniciales
+            $guias_send = json_decode($request->guias_send);
+            if (empty($guias_send)) {
+                throw new \Exception("No hay ningún libro para el detalle de venta");
             }
-            // //ACTUALIZAR VEN CODIGO - FECHA APROBACION-
-            $query                          = "UPDATE `pedidos` SET `ven_codigo` = '$codigo_ven', `id_usuario_verif` = $usuario_fact ,`fecha_aprobado_facturacion` = '$fechaActual', `estado_entrega` = '1', `empresa_id` = '$empresa_id' WHERE `id_pedido` = $id_pedido;";
-            DB::UPDATE($query);
-            //ACTUALIZAR LA SECUENCIA
-            f_tipo_documento::updateSecuencia("GUIA",$empresa_id,$secuencia);
-           //Commit
+
+            // Manejo de secuencia
+            $secuenciaData = $this->guiaRepository->obtenerSecuenciaxEmpresa($request->empresa_id);
+            if (!$secuenciaData) {
+                throw new \Exception("No se pudo obtener la secuencia de guías");
+            }
+
+            $codigo_ven = $this->guiaRepository->generarCodigoActa($request, $secuenciaData);
+            // Actualizar stock
+            $resultado = $this->guiaRepository->actualizarStockFacturacion($guias_send, $codigo_ven, $request->empresa_id,0,$request->id_pedido);
+            if (isset($resultado["status"]) && $resultado["status"] == "0") {
+                throw new \Exception($resultado["message"]);
+            }
+            // Actualizar pedido
+            $this->guiaRepository->actualizarGuia($request, $codigo_ven, $secuenciaData,0);
+
+            // Actualizar pendientes si es necesario
+            if ($request->ifAprobarSinStock == '1') {
+                $this->guiaRepository->actualizarPendientes($guias_send, $request->ifnuevo,0);
+            }
+
             DB::commit();
             return response()->json(['status' => '1', 'message' => 'Guías guardadas correctamente'], 200);
-         } catch (\Exception  $ex) {
-            //Rollback
+        } catch (\Exception $ex) {
             DB::rollBack();
-            return ["status" => "0","message" => "Hubo problemas al guardar las guias".$ex];
+            return ["status" => "0", "message" => "Error: " . $ex->getMessage()];
         }
-
     }
+
+
 
     public function get_val_pedidoLibrosObsequiosInfoTodo_new($pedido){
         $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, pv.id_pedido, pv.pvn_cantidad AS valor, ar.idarea AS id_area, s.id_serie, ls.year,

@@ -68,7 +68,7 @@ class Pedidos2Controller extends Controller
         if($request->getInfoVendidoXyear)           { return $this->getInfoVendidoXyear($request); }
         if($request->getInfoVendidoFacturadoXyear)  { return $this->getInfoVendidoFacturadoXyear($request); }
         if($request->getCobradoXyear)               { return $this->getCobradoXyear($request); }
-        
+
     }
     //API:GET/pedidos2/pedidos?getLibrosFormato=yes&periodo_id=22
     /**
@@ -184,16 +184,20 @@ class Pedidos2Controller extends Controller
         $query = DB::SELECT("SELECT pro_codigo,pro_reservar FROM 1_4_cal_producto WHERE pro_codigo = '$pro_codigo' ");
         return $query;
     }
-    //API:GET/pedidos2/pedidos?getPuntosVentaDespachados=1&periodo=25&idusuario=1
+    //API:GET/pedidos2/pedidos?getPuntosVentaDespachados=1&periodo=25&idusuario=1&tipoVenta=2
     public function getPuntosVentaDespachados($request){
         $periodo   = $request->periodo;
         $idusuario = $request->idusuario;
+        $tipoVenta = $request->input('tipoVenta', 2);
 
-        $clave = "getPuntosVentaDespachados".$periodo.$idusuario;
+        $clave = "getPuntosVentaDespachados".$periodo.$idusuario.$tipoVenta;
         if (Cache::has($clave)) {
             $response = Cache::get($clave);
         } else {
-            $query     = $this->tr_getPuntosVentasDespachos($periodo);
+            //directa
+            if($tipoVenta == '1'){ $query     = $this->tr_getPuntosVentasDirectasDespachos($periodo); }
+            //lista
+            if($tipoVenta == '2'){ $query     = $this->tr_getPuntosVentasDespachos($periodo); }
             $response = $query;
             Cache::put($clave,$response);
         }
@@ -308,11 +312,11 @@ class Pedidos2Controller extends Controller
     }
     //API:GET/pedidos2/pedidos?getReporteFacturacionAsesores=1&periodo_id=25
     public function getReporteFacturacionAsesores($request){
-      
+
 
         $periodo_id = $request->periodo_id;
         $query      = $this->tr_getAsesoresFacturacionXPeriodo($periodo_id);
-        
+
         foreach($query as $key => $item){
             $getInstituciones       = $this->tr_InstitucionesDespachadosFacturacionAsesor($periodo_id,$item->asesor_id);
             // Convertir a colección en caso de que no lo sea
@@ -348,12 +352,12 @@ class Pedidos2Controller extends Controller
             $item->totalPrecioCalmed     = collect($item->librosCalmed)->sum('precio_total');
         }
         return $query;
-        
+
     }
     public function getReporteFacturadoXAsesores($request){
         $periodo_id = $request->periodo_id;
         $query      = $this->tr_getAsesoresFacturadoXPeriodo($periodo_id);
-        
+
         foreach($query as $key => $item){
             $getInstituciones       = $this->tr_InstitucionesDespachadosFacturadoAsesor($periodo_id,$item->asesor_id);
             // Convertir a colección en caso de que no lo sea
@@ -391,16 +395,16 @@ class Pedidos2Controller extends Controller
             $item->totalPrecioCalmed     = collect($item->librosCalmed)->sum('precio_total');
         }
         return $query;
-        
+
     }
-    
+
     public function getInfoFacturadoXyear($request) {
         $year = $request->year;
-        
+
         $ventas = DB::table('f_venta_agrupado')
             ->whereYear('ven_fecha', $year)
             ->get();
-        
+
         $ventas = collect($ventas);
         $result = [
             'datosProlipa' => [
@@ -418,7 +422,7 @@ class Pedidos2Controller extends Controller
                 'descuento'     => 0,
             ],
         ];
-    
+
         foreach ($ventas as $venta) {
             // Obtener detalles de la venta
             $detalles = DB::table('f_detalle_venta_agrupado AS fda')
@@ -427,12 +431,12 @@ class Pedidos2Controller extends Controller
                 ->where('fda.id_empresa', $venta->id_empresa)
                 ->select('ls.nombre', 'fda.*')
                 ->get();
-            
+
             $detalles = collect($detalles);
-            
+
             // Calcular descuento si es necesario
             $descuento = $venta->ven_descuento ?? 0;
-    
+
             if ($venta->id_empresa == 1) {
                 $result['datosProlipa']['ventaBruta']    += $venta->ven_subtotal;
                 $result['datosProlipa']['ventaNeta']     += $venta->ven_valor;
@@ -448,7 +452,7 @@ class Pedidos2Controller extends Controller
                 $pro_codigo         = $detalle->pro_codigo;
                 $cantidad           = $detalle->det_ven_cantidad;
                 $precio_unitario    = $detalle->det_ven_valor_u;
-    
+
                 if ($venta->id_empresa == 1) { // Prolipa
                     if (!isset($result['datosProlipa']['detalles'][$pro_codigo])) {
                         $result['datosProlipa']['detalles'][$pro_codigo] = [
@@ -459,13 +463,13 @@ class Pedidos2Controller extends Controller
                             'total'             => 0,
                         ];
                     }
-    
+
                     $result['datosProlipa']['detalles'][$pro_codigo]['cantidad'] += $cantidad;
                     $result['datosProlipa']['detalles'][$pro_codigo]['total']    += round($cantidad * $precio_unitario, 2);
-    
+
                     // Sumar totales de Prolipa
                     $result['datosProlipa']['totalDetalles'] += $cantidad;
-    
+
                 } elseif ($venta->id_empresa == 3) { // Calmed
                     if (!isset($result['datosCalmed']['detalles'][$pro_codigo])) {
                         $result['datosCalmed']['detalles'][$pro_codigo] = [
@@ -476,38 +480,39 @@ class Pedidos2Controller extends Controller
                             'total'             => 0,
                         ];
                     }
-    
+
                     $result['datosCalmed']['detalles'][$pro_codigo]['cantidad'] += $cantidad;
                     $result['datosCalmed']['detalles'][$pro_codigo]['total']    += round($cantidad * $precio_unitario, 2);
-    
+
                     // Sumar totales de Calmed
                     $result['datosCalmed']['totalDetalles'] += $cantidad;
                 }
             }
         }
-    
+
         $result['datosProlipa']['ventaBruta'] = round($result['datosProlipa']['ventaBruta'], 2);
         $result['datosProlipa']['ventaNeta']  = round($result['datosProlipa']['ventaNeta'], 2);
         $result['datosProlipa']['descuento']  = round($result['datosProlipa']['descuento'], 2);
-        
+
         $result['datosCalmed']['ventaBruta']  = round($result['datosCalmed']['ventaBruta'], 2);
         $result['datosCalmed']['ventaNeta']   = round($result['datosCalmed']['ventaNeta'], 2);
         $result['datosCalmed']['descuento']   = round($result['datosCalmed']['descuento'], 2);
-    
+
         $result['datosProlipa']['detalles']   = array_values($result['datosProlipa']['detalles']);
         $result['datosCalmed']['detalles']    = array_values($result['datosCalmed']['detalles']);
-    
+
         return $result;
     }
 
     public function getInfoVendidoXyear($request) {
         $year = $request->year;
-        
+
         $ventas = DB::table('f_venta')
             ->where('est_ven_codigo','<>', 3)
+            ->where('idtipodoc', '<>', 16)
             ->whereYear('ven_fecha', $year)
             ->get();
-        
+
         $ventas = collect($ventas);
         $result = [
             'datosProlipa' => [
@@ -569,7 +574,7 @@ class Pedidos2Controller extends Controller
                 ],
             ],
         ];
-    
+
         foreach ($ventas as $venta) {
             // Obtener detalles de la venta
             $detalles = DB::table('f_detalle_venta AS fda')
@@ -578,12 +583,12 @@ class Pedidos2Controller extends Controller
                 ->where('fda.id_empresa', $venta->id_empresa)
                 ->select('ls.nombre', 'fda.*')
                 ->get();
-            
+
             $detalles = collect($detalles);
-            
+
             // Calcular descuento si es necesario
             $descuento = $venta->ven_descuento ?? 0;
-    
+
             // Definir el tipo de documento
             $tipoDocumento = '';
             switch ($venta->idtipodoc) {
@@ -598,7 +603,7 @@ class Pedidos2Controller extends Controller
                     $tipoDocumento = 'notas';
                     break;
             }
-    
+
             // Procesar según la empresa
             if ($venta->id_empresa == 1) {
                 $result['datosProlipa']['ventaBruta'] += $venta->ven_subtotal;
@@ -615,14 +620,14 @@ class Pedidos2Controller extends Controller
                 $result['datosCalmed']['documentos'][$tipoDocumento]['ventaNeta'] += round($venta->ven_valor, 2);
                 $result['datosCalmed']['documentos'][$tipoDocumento]['descuento'] += round($descuento, 2);
             }
-    
+
             // Procesar detalles
             foreach ($detalles as $detalle) {
                 $libro = $detalle->nombre;
                 $pro_codigo = $detalle->pro_codigo;
                 $cantidad = $detalle->det_ven_cantidad;
                 $precio_unitario = $detalle->det_ven_valor_u;
-    
+
                 // Sumar totales de Prolipa
                 if ($venta->id_empresa == 1) {
                     if (!isset($result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo])) {
@@ -634,12 +639,12 @@ class Pedidos2Controller extends Controller
                             'total'             => 0,
                         ];
                     }
-    
+
                     $result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['cantidad'] += $cantidad;
                     $result['datosProlipa']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['total'] += round($cantidad * $precio_unitario, 2);
                     $result['datosProlipa']['documentos'][$tipoDocumento]['totalDetalles'] += $cantidad;
                     // $result['datosProlipa']['documentos'][$tipoDocumento]['ventaBruta'] += round($cantidad * $precio_unitario, 2);
-    
+
                 // Sumar totales de Calmed
                 } elseif ($venta->id_empresa == 3) {
                     if (!isset($result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo])) {
@@ -651,7 +656,7 @@ class Pedidos2Controller extends Controller
                             'total'             => 0,
                         ];
                     }
-    
+
                     $result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['cantidad'] += $cantidad;
                     $result['datosCalmed']['documentos'][$tipoDocumento]['detalles'][$pro_codigo]['total'] += round($cantidad * $precio_unitario, 2);
                     $result['datosCalmed']['documentos'][$tipoDocumento]['totalDetalles'] += $cantidad;
@@ -659,24 +664,24 @@ class Pedidos2Controller extends Controller
                 }
             }
         }
-    
+
         // Redondear totales
         $result['datosProlipa']['ventaBruta'] = round($result['datosProlipa']['ventaBruta'], 2);
         $result['datosProlipa']['ventaNeta']  = round($result['datosProlipa']['ventaNeta'], 2);
         $result['datosProlipa']['descuento']  = round($result['datosProlipa']['descuento'], 2);
-        
+
         $result['datosCalmed']['ventaBruta']  = round($result['datosCalmed']['ventaBruta'], 2);
         $result['datosCalmed']['ventaNeta']   = round($result['datosCalmed']['ventaNeta'], 2);
         $result['datosCalmed']['descuento']   = round($result['datosCalmed']['descuento'], 2);
-    
+
         $result['datosProlipa']['documentos']['facturas']['detalles'] = array_values($result['datosProlipa']['documentos']['facturas']['detalles']);
         $result['datosProlipa']['documentos']['actas']['detalles'] = array_values($result['datosProlipa']['documentos']['actas']['detalles']);
         $result['datosProlipa']['documentos']['notas']['detalles'] = array_values($result['datosProlipa']['documentos']['notas']['detalles']);
-    
+
         $result['datosCalmed']['documentos']['facturas']['detalles'] = array_values($result['datosCalmed']['documentos']['facturas']['detalles']);
         $result['datosCalmed']['documentos']['actas']['detalles'] = array_values($result['datosCalmed']['documentos']['actas']['detalles']);
         $result['datosCalmed']['documentos']['notas']['detalles'] = array_values($result['datosCalmed']['documentos']['notas']['detalles']);
-        
+
         return $result;
     }
 
@@ -684,11 +689,11 @@ class Pedidos2Controller extends Controller
         $year = $request->year;
         $infoVendido = $this->getInfoVendidoXyear($request);
         $infoFacturado = $this->getInfoFacturadoXyear($request);
-    
+
         foreach ($infoVendido['datosProlipa']['documentos']['facturas']['detalles'] as &$facturaDetalle) {
             $pro_codigo = $facturaDetalle['pro_codigo'];
             $encontrado = false;
-    
+
             foreach ($infoFacturado['datosProlipa']['detalles'] as $facturadoDetalle) {
                 if ($facturadoDetalle['pro_codigo'] == $pro_codigo) {
                     $facturaDetalle['cantidad_facturada'] = $facturadoDetalle['cantidad'] ?? 0;
@@ -697,24 +702,24 @@ class Pedidos2Controller extends Controller
                     break;
                 }
             }
-    
+
             if (!$encontrado) {
                 $facturaDetalle['cantidad_facturada'] = 0;
                 $facturaDetalle['total_pendiente'] = round($facturaDetalle['cantidad'] * $facturaDetalle['precio_unitario'], 2);
             }
         }
-    
+
         foreach (['actas', 'notas'] as $tipoDocumento) {
             foreach ($infoVendido['datosProlipa']['documentos'][$tipoDocumento]['detalles'] as &$detalle) {
                 $detalle['cantidad_facturada'] = 0;
                 $detalle['total_pendiente'] = 0;
             }
         }
-    
+
         foreach ($infoVendido['datosCalmed']['documentos']['facturas']['detalles'] as &$facturaDetalle) {
             $pro_codigo = $facturaDetalle['pro_codigo'];
             $encontrado = false;
-    
+
             foreach ($infoFacturado['datosCalmed']['detalles'] as $facturadoDetalle) {
                 if ($facturadoDetalle['pro_codigo'] == $pro_codigo) {
                     $facturaDetalle['cantidad_facturada'] = $facturadoDetalle['cantidad'];
@@ -723,26 +728,26 @@ class Pedidos2Controller extends Controller
                     break;
                 }
             }
-    
+
             if (!$encontrado) {
                 $facturaDetalle['cantidad_facturada'] = 0;
                 $facturaDetalle['total_pendiente'] = round($facturaDetalle['cantidad'] * $facturaDetalle['precio_unitario'], 2);
             }
         }
-    
+
         foreach (['actas', 'notas'] as $tipoDocumento) {
             foreach ($infoVendido['datosCalmed']['documentos'][$tipoDocumento]['detalles'] as &$detalle) {
                 $detalle['cantidad_facturada'] = 0;
                 $detalle['total_pendiente'] = 0;
             }
         }
-    
+
         return $infoVendido;
     }
-    
+
     public function getCobradoXyear($request) {
         $year = $request->year;
-    
+
         $abonos = DB::table('abono as a')
             ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
             ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', 'a.*')
@@ -759,14 +764,14 @@ class Pedidos2Controller extends Controller
                 ->first();
                 $abonos[$key]->institucion = $institucion->nombreInstitucion;
         }
-    
+
         return response()->json($abonos);
     }
-    
-    
-   
-   
-   
+
+
+
+
+
     //API:GET/pedidos2/pedidos?geAllLibrosxAsesorEscuelas=1&asesor_id=4179&periodo_id=24
     public function geAllLibrosxAsesorEscuelas($asesor_id,$periodo_id){
         //traer las escuelas del asesor
@@ -1376,26 +1381,26 @@ class Pedidos2Controller extends Controller
             //quitar las comas y convertir en array
             $ids = explode(",",$parametro1);
             $val_pedido = DB::table('pedidos_val_area_new as pv')
-            ->selectRaw('DISTINCT pv.pvn_cantidad as valor, 
-                        CASE 
-                            WHEN se.id_serie = 6 THEN l.idlibro 
-                            ELSE ar.idarea 
-                        END as id_area, 
-                        se.id_serie, 
+            ->selectRaw('DISTINCT pv.pvn_cantidad as valor,
+                        CASE
+                            WHEN se.id_serie = 6 THEN l.idlibro
+                            ELSE ar.idarea
+                        END as id_area,
+                        se.id_serie,
                         CASE
                             WHEN se.id_serie = 6 THEN 0
                             ELSE ls.year
                         END as year,
-                        CASE 
+                        CASE
                             WHEN se.id_serie = 6 THEN l.idlibro
-                            ELSE 0 
+                            ELSE 0
                         END as plan_lector,
                         pv.pvn_tipo as alcance,
-                        p.id_periodo, 
+                        p.id_periodo,
                         CASE
                             WHEN se.id_serie = 6 THEN NULL
                             ELSE CONCAT(se.nombre_serie, " ", ar.nombrearea)
-                        END as serieArea, 
+                        END as serieArea,
                         se.nombre_serie,
                         ls.codigo_liquidacion as codigo,
                         l.nombrelibro,
@@ -1683,11 +1688,11 @@ class Pedidos2Controller extends Controller
 
     //API:GET/pedidos2/pedidos?getReporteFacturacionAsesores_new=1&periodo_id=25
     public function getReporteFacturacionAsesores_new($request){
-      
+
 
         $periodo_id = $request->periodo_id;
         $query      = $this->tr_getAsesoresFacturacionXPeriodo($periodo_id);
-        
+
         foreach($query as $key => $item){
             $getInstituciones       = $this->tr_InstitucionesDespachadosFacturacionAsesor($periodo_id,$item->asesor_id);
             // Convertir a colección en caso de que no lo sea
@@ -1723,13 +1728,13 @@ class Pedidos2Controller extends Controller
             $item->totalPrecioCalmed     = collect($item->librosCalmed)->sum('precio_total');
         }
         return $query;
-        
+
     }
 
     public function getReporteFacturadoXAsesores_new($request){
         $periodo_id = $request->periodo_id;
         $query      = $this->tr_getAsesoresFacturadoXPeriodo($periodo_id);
-        
+
         foreach($query as $key => $item){
             $getInstituciones       = $this->tr_InstitucionesDespachadosFacturadoAsesor($periodo_id,$item->asesor_id);
             // Convertir a colección en caso de que no lo sea
@@ -1767,7 +1772,7 @@ class Pedidos2Controller extends Controller
             $item->totalPrecioCalmed     = collect($item->librosCalmed)->sum('precio_total');
         }
         return $query;
-        
+
     }
     //FIN METODOS JEYSON
 }

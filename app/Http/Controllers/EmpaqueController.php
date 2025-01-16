@@ -52,7 +52,7 @@ class EmpaqueController extends Controller
         inner join empresas em on em.id=re.remi_idempresa
         WHERE DATE(e.empa_fecha) = ?
         and e.idempresa=re.remi_idempresa and (e.empa_estado=2 or e.empa_estado=0) and (re.remi_estado=2 or re.remi_estado=0)
-        group by re.remi_codigo, re.remi_idempresa, e.empa_codigo 
+        group by re.remi_codigo, re.remi_idempresa, e.empa_codigo
         ",[$fecha]);
         return $query;
     }
@@ -61,7 +61,7 @@ class EmpaqueController extends Controller
         // $query = DB::SELECT("SELECT re.*, e.*, fpr.prof_observacion, fv.ven_observacion, i.nombreInstitucion, fv.est_ven_codigo, em.descripcion_corta,
         //     (select sum(det_ven_cantidad_despacho) FROM f_detalle_venta dv WHERE dv.ven_codigo=fv.ven_codigo) as libros,
         //    i.ruc, (select count(det_empa_codigo) FROM rempaque_detallecopy dr WHERE dr.empa_codigo=e.empa_codigo) as cantidad,
-        //     CONCAT(u.nombres,' ',u.apellidos) AS cliente 
+        //     CONCAT(u.nombres,' ',u.apellidos) AS cliente
         // FROM remision_copy re
         // inner join rempacado e on e.remi_codigo=re.remi_codigo
         // inner join f_venta fv on fv.ven_codigo=re.remi_num_factura
@@ -70,15 +70,15 @@ class EmpaqueController extends Controller
         // inner join empresas em on em.id=re.remi_idempresa
         // LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
         // where re.remi_estado=1 and e.empa_estado=1 and e.idempresa=re.remi_idempresa
-        // group by re.remi_codigo, re.remi_idempresa, e.empa_codigo 
+        // group by re.remi_codigo, re.remi_idempresa, e.empa_codigo
         // order by  e.empa_fecha");
         // return $query;
 
-        //traer el padre  
-        $queryPadre = DB::select("SELECT r.*, 
-                e.descripcion_corta, 
-                rem.empa_codigo, 
-                rem.empa_fecha, 
+        //traer el padre
+        $queryPadre = DB::select("SELECT r.*,
+                e.descripcion_corta,
+                rem.empa_codigo,
+                rem.empa_fecha,
                 rem.empa_facturas,
                 rem.empa_estado,
                 rem.empa_libros,
@@ -90,7 +90,7 @@ class EmpaqueController extends Controller
             WHERE r.remi_estado = '1'
             AND rem.empa_estado = '1'
         ");
-        
+
         foreach ($queryPadre as $key => $value) {
             //detalle empaque
             $detalleEmpaque = DB::table('rempaque_detallecopy')
@@ -112,13 +112,13 @@ class EmpaqueController extends Controller
                 ->where('ven_codigo', $value->empa_facturas)
                 ->where('id_empresa', $value->remi_idempresa)
                 ->select(
-                    'institucion.ruc', 
-                    'institucion.email', 
+                    'institucion.ruc',
+                    'institucion.email',
                     'institucion.nombreInstitucion',
                     DB::raw("COALESCE(CONCAT_WS(' ', usuario.nombres, usuario.apellidos), 'Sin Cliente') AS cliente")
                 )
                 ->first();
-        
+
             // Asignamos los valores a $value
             if ($prefactura) {
                 $value->nombreInstitucion = $prefactura->nombreInstitucion;
@@ -128,9 +128,9 @@ class EmpaqueController extends Controller
                 $value->cliente = 'Sin Cliente';
             }
         }
-        
+
         return $queryPadre;
-        
+
     }
 
     public function getchofer()
@@ -190,7 +190,7 @@ class EmpaqueController extends Controller
                 $remision->remi_codigo = $request->remi_codigo;
                 $remision->remi_idempresa = $request->remi_idempresa;
                 $remision->remi_motivo = $request->remi_motivo;
-                $remision->remi_dir_partida = $request->remi_dir_partida; 
+                $remision->remi_dir_partida = $request->remi_dir_partida;
                 $remision->remi_destinatario = $request->remi_destinatario;
                 $remision->remi_ruc_destinatario = $request->remi_ruc_destinatario;
                 $remision->remi_direccion = $request->remi_direccion;
@@ -251,7 +251,7 @@ class EmpaqueController extends Controller
                 ->firstOrFail();
                 $venta->est_ven_codigo=$request->estado;
                 $venta->save();
-                
+
                 //EMPACADO
                 $emp = _1_4_Empacado::where('empa_codigo', $request->id_emp)
                 ->where('idempresa', $request->remi_idempresa)
@@ -289,7 +289,7 @@ class EmpaqueController extends Controller
                 //DETALLE DEL EMPACADO
                 $cont=1;
                 foreach($array as $key => $iten){
-                    for ($i=0; $i < $iten->cantidad; $i++) { 
+                    for ($i=0; $i < $iten->cantidad; $i++) {
                         $detalle = new EmpaqueDetalle();
                         $detalle->det_empa_codigo = $request->id_emp.'-'.$cont;
                         $detalle->empa_codigo=$request->id_emp;
@@ -355,7 +355,7 @@ class EmpaqueController extends Controller
                 $cont=1;
                 //DETALLE DEL EMPACADO;
                 foreach($array as $key => $iten){
-                    for ($i=0; $i < $iten->cantidad; $i++) { 
+                    for ($i=0; $i < $iten->cantidad; $i++) {
                         $detalle = new EmpaqueDetalle();
                         $detalle->det_empa_codigo = $request->id_emp.'-'.$cont;
                         $detalle->empa_codigo=$request->id_emp;
@@ -395,7 +395,7 @@ class EmpaqueController extends Controller
                 $venta =  Ventas::where('ven_codigo', $request->factura)
                 ->where('id_empresa', $request->remi_idempresa)
                 ->firstOrFail();
-                $query=DB::SELECT("SELECT count(pro_codigo) as cont FROM f_detalle_venta dv 
+                $query=DB::SELECT("SELECT count(pro_codigo) as cont FROM f_detalle_venta dv
                 WHERE dv.ven_codigo='$request->factura'
                 AND dv.id_empresa=$request->remi_idempresa");
                 $total = $query[0]->cont;
@@ -431,7 +431,7 @@ class EmpaqueController extends Controller
             try{
                 set_time_limit(6000000);
                 ini_set('max_execution_time', 6000000);
-    
+
                 DB::beginTransaction();
                     $remision = Remision::where('remi_codigo', $request->remi_codigo)
                     ->where('remi_idempresa', $request->remi_idempresa)
@@ -440,7 +440,7 @@ class EmpaqueController extends Controller
                     $remision->remi_guia_remision =  $request->guiaremision;
                     if($request->archivo)           { $remision->archivo = null; }
                     if($request->url)               { $remision->url     = null; }
-                    
+
                     $remision->remi_fecha_final = now();
                     $remision->updated_at = now();
                     $remision->remi_estado= 2;
@@ -469,7 +469,7 @@ class EmpaqueController extends Controller
             try{
                 set_time_limit(6000000);
                 ini_set('max_execution_time', 6000000);
-    
+
                 DB::beginTransaction();
                     $remision = Remision::where('remi_codigo', $request->remi_codigo)
                     ->where('remi_idempresa', $request->remi_idempresa)

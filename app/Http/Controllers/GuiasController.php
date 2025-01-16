@@ -13,6 +13,7 @@ use App\Models\PedidoHistoricoActas;
 use App\Models\PedidoGuiaTemp;
 use App\Models\Pedidos;
 use App\Models\PedidosGuiasBodega;
+use App\Repositories\pedidos\GuiaRepository;
 use App\Traits\Pedidos\TraitGuiasGeneral;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use Illuminate\Support\Facades\Http;
@@ -25,6 +26,11 @@ class GuiasController extends Controller
      */
     use TraitGuiasGeneral;
     use TraitPedidosGeneral;
+    protected $guiaRepository;
+    public function __construct(GuiaRepository $guiaRepository)
+    {
+        $this->guiaRepository = $guiaRepository;
+    }
     //API:get/guias
     public function index(Request $request)
     {
@@ -74,12 +80,14 @@ class GuiasController extends Controller
             $contador = 0;
             $form_data_stock = [];
             foreach($arregloCodigos as $key => $item){
-                $stockAnterior  = 0;
-                $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
-                $codigoFact     = "G".$codigo;
-                $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
+                $stockAnterior      = 0;
+                $id                 = $arregloCodigos[$contador]["id"];
+                $codigo             = $arregloCodigos[$contador]["codigo_liquidacion"];
+                $codigoFact         = "G".$codigo;
+                $nombrelibro        = $arregloCodigos[$contador]["nombrelibro"];
+                $cantidad_pendiente = $arregloCodigos[$contador]["cantidad_pendiente"];
                 //get stock
-                $getStock       = _14Producto::obtenerProducto($codigoFact);
+                $getStock           = _14Producto::obtenerProducto($codigoFact);
                 //prolipa
                 if($empresa == 1){
                     $stockAnterior  = $getStock->pro_stock;
@@ -88,21 +96,23 @@ class GuiasController extends Controller
                 if($empresa == 3){
                     $stockAnterior  = $getStock->pro_stockCalmed;
                 }
-                $valorNew       = $arregloCodigos[$contador]["valor"];
-                $nuevoStock     = $stockAnterior - $valorNew;
+                $valorNew           = $arregloCodigos[$contador]["valor"];
+                $nuevoStock         = $stockAnterior - $valorNew;
                 $form_data_stock[$contador] = [
-                "nombrelibro"    => $nombrelibro,
-                "stockAnterior"  => $stockAnterior,
-                "valorNew"       => $valorNew,
-                "nuevoStock"     => $nuevoStock,
-                "codigoFact"     => $codigoFact,
-                "codigo"         => $codigo
+                "id"                => $id,
+                "nombrelibro"       => $nombrelibro,
+                "stockAnterior"     => $stockAnterior,
+                "valorNew"          => $valorNew,
+                "nuevoStock"        => $nuevoStock,
+                "codigoFact"        => $codigoFact,
+                "codigo"            => $codigo,
+                "cantidad_pendiente" => $cantidad_pendiente
                 ];
                 $contador++;
             }
             return $form_data_stock;
         } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor". $ex->getMessage()];
         }
     }
     //PARA VER EL STOCK INGRESADO DE LA ACTA
@@ -145,28 +155,6 @@ class GuiasController extends Controller
                 }
                 $contador++;
             }
-            return $form_data_stock;
-            // foreach($arregloCodigos as $key => $item){
-            //     $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
-            //     $codigoFact     = "G".$codigo;
-            //     $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
-            //     //get stock
-            //     $getStock       = Http::get('http://186.4.218.168:9095/api/f2_Producto/Busquedaxprocodigo?pro_codigo='.$codigoFact);
-            //     $json_stock     = json_decode($getStock, true);
-            //     $stockAnterior  = $json_stock["producto"][0]["proStock"];
-            //     //post stock
-            //     $valorNew       = $arregloCodigos[$contador]["valor"];
-            //     $nuevoStock     = $stockAnterior - $valorNew;
-            //     $form_data_stock[$contador] = [
-            //     "nombrelibro"    => $nombrelibro,
-            //     "stockAnterior"  => $stockAnterior,
-            //     "valorNew"       => $valorNew,
-            //     "nuevoStock"     => $nuevoStock,
-            //     "codigoFact"     => $codigoFact,
-            //     "codigo"         => $codigo
-            //     ];
-            //     $contador++;
-            // }
             return $form_data_stock;
         } catch (\Exception  $ex) {
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
@@ -375,10 +363,107 @@ class GuiasController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
+    //api:post:/guias
     public function store(Request $request)
     {
-        //
+       if($request->guardarGuiasPendientes) { return $this->guardarGuiasPendientes($request); }
     }
+    //api:post/guias?guardarGuiasPendientes=1
+    public function guardarGuiasPendientes(Request $request)
+    {
+        set_time_limit(600);
+        ini_set('max_execution_time', 600);
+
+        $request->validate([
+            'asesor_id'             => 'required|integer',
+            'id_pedido'             => 'required|integer',
+            'id_periodo'            => 'required|integer',
+            'codigo_contrato'       => 'required|string',
+            'codigo_usuario_fact'   => 'required|string',
+            'usuario_fact'          => 'required|integer',
+            'iniciales'             => 'required|string',
+            'empresa_id'            => 'required|integer',
+            'guias_send'            => 'required|json',
+            'ifnuevo'               => 'required|boolean',
+            'ifAprobarSinStock'     => 'required|boolean',
+            'ifAprobarPendientes'   => 'required|boolean',
+            'ven_codigoPadre'       => 'nullable|string',
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            // Variables iniciales
+            $guias_send = json_decode($request->guias_send);
+            if (empty($guias_send)) {
+                throw new \Exception("No hay ningún libro para el detalle de venta");
+            }
+
+            //si el pedido se encuentra en estado_entrega 2 entonces ya no se puede agregar pendientes porque ya esta aprobado
+            $pedido = Pedidos::where('id_pedido', $request->id_pedido)->first();
+            if ($pedido->estado_entrega == '2') {
+                throw new \Exception("El pedido de guias ya se encuentra aprobado y no se puede agregar pendientes");
+            }
+
+            // Validar que haya pendientes
+            $validatePendientes = $this->guiaRepository->actualizarEstadoPendientes(
+                $request->id_pedido,
+                $request->ifnuevo,
+                $request->empresa_id
+            );
+
+            if ($validatePendientes == '0') {
+                throw new \Exception("Ya no hay pendientes para crear el acta de guías");
+            }
+
+            // Manejo de secuencia
+            $secuenciaData = $this->guiaRepository->obtenerSecuenciaxEmpresa($request->empresa_id);
+            if (!$secuenciaData) {
+                throw new \Exception("No se pudo obtener la secuencia de guías");
+            }
+
+            $codigo_ven = $this->guiaRepository->generarCodigoActa($request, $secuenciaData);
+
+            // Crear f_venta
+            $this->guiaRepository->crearVenta(
+                $codigo_ven,
+                $request->empresa_id,
+                $request->id_periodo,
+                $request->usuario_fact,
+                $request->id_pedido
+            );
+
+            // Crear f_detalle_venta
+            $this->guiaRepository->crearDetalleVenta(
+                $guias_send,
+                $codigo_ven,
+                $request->empresa_id,
+                $request->id_periodo,
+                $request->usuario_fact,
+                $request->id_pedido
+            );
+
+            // Actualizar stock
+            $resultado = $this->guiaRepository->actualizarStockFacturacion($guias_send, $codigo_ven, $request->empresa_id, 1, $request->id_pedido);
+            if (isset($resultado["status"]) && $resultado["status"] == "0") {
+                throw new \Exception($resultado["message"]);
+            }
+            // Actualizar pendientes si es necesario
+            $this->guiaRepository->actualizarPendientes($guias_send, $request->ifnuevo,1);
+
+            // Actualizar pedido
+            $this->guiaRepository->actualizarGuia($request, $codigo_ven, $secuenciaData, 1);
+
+            // Confirmar transacción
+            DB::commit();
+
+            return response()->json(['status' => '1', 'message' => 'Guías guardadas correctamente'], 200);
+        } catch (\Exception $ex) {
+            DB::rollBack();
+            return response()->json(["status" => "0", "message" => "Error: " . $ex->getMessage()], 200);
+        }
+    }
+
     //api:post/saveDevolucionGuiasBodega
     public function saveDevolucionGuiasBodega(Request $request){
         set_time_limit(6000000);
@@ -551,7 +636,7 @@ class GuiasController extends Controller
          ");
     }
 
-    //INICIO METODOS JEYSON 
+    //INICIO METODOS JEYSON
 
     public function get_val_pedidoInfo($pedido){
         //Este metodo esta redirigido al TraitPedidosGeneral.php
@@ -570,12 +655,14 @@ class GuiasController extends Controller
             $contador = 0;
             $form_data_stock = [];
             foreach($arregloCodigos as $key => $item){
-                $stockAnterior  = 0;
-                $codigo         = $arregloCodigos[$contador]["codigo_liquidacion"];
-                $codigoFact     = "G".$codigo;
-                $nombrelibro    = $arregloCodigos[$contador]["nombrelibro"];
+                $stockAnterior      = 0;
+                $id                 = $arregloCodigos[$contador]["id"];
+                $cantidad_pendiente = $arregloCodigos[$contador]["cantidad_pendiente"];
+                $codigo             = $arregloCodigos[$contador]["codigo_liquidacion"];
+                $codigoFact         = "G".$codigo;
+                $nombrelibro        = $arregloCodigos[$contador]["nombrelibro"];
                 //get stock
-                $getStock       = _14Producto::obtenerProducto($codigoFact);
+                $getStock           = _14Producto::obtenerProducto($codigoFact);
                 //prolipa
                 if($empresa == 1){
                     $stockAnterior  = $getStock->pro_stock;
@@ -584,21 +671,23 @@ class GuiasController extends Controller
                 if($empresa == 3){
                     $stockAnterior  = $getStock->pro_stockCalmed;
                 }
-                $valorNew       = $arregloCodigos[$contador]["valor"];
-                $nuevoStock     = $stockAnterior - $valorNew;
+                $valorNew           = $arregloCodigos[$contador]["valor"];
+                $nuevoStock         = $stockAnterior - $valorNew;
                 $form_data_stock[$contador] = [
-                "nombrelibro"    => $nombrelibro,
-                "stockAnterior"  => $stockAnterior,
-                "valorNew"       => $valorNew,
-                "nuevoStock"     => $nuevoStock,
-                "codigoFact"     => $codigoFact,
-                "codigo"         => $codigo
+                "id"                => $id,
+                "nombrelibro"       => $nombrelibro,
+                "stockAnterior"     => $stockAnterior,
+                "valorNew"          => $valorNew,
+                "nuevoStock"        => $nuevoStock,
+                "codigoFact"        => $codigoFact,
+                "codigo"            => $codigo,
+                "cantidad_pendiente" => $cantidad_pendiente
                 ];
                 $contador++;
             }
             return $form_data_stock;
         } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
+            return ["status" => "0","message" => $ex->getMessage()];
         }
     }
 

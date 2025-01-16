@@ -14,6 +14,7 @@ use App\Models\CodigosLibrosDevolucionHeader;
 use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\CodigosPaquete;
 use App\Models\f_tipo_documento;
+use App\Models\Facturacion\Inventario\ConfiguracionGeneral;
 use App\Models\HistoricoCodigos;
 use App\Models\Institucion;
 use App\Models\LibroSerie;
@@ -3050,6 +3051,7 @@ class CodigoLibrosController extends Controller
         $bloqueados         = $request->input('bloqueados');
         $puntoVenta         = $request->input('puntoVenta');
         $puntoVentaActivos  = $request->input('puntoVentaActivos');
+        $ventaDirecta       = $request->input('ventaDirecta');
         // Realizar la consulta
         $arrayCodigosActivos = CodigosLibros::select(
             'libros_series.codigo_liquidacion AS codigo',
@@ -3084,6 +3086,15 @@ class CodigoLibrosController extends Controller
         })
         ->when($puntoVenta, function ($query) {
             $query->where('codigoslibros.venta_lista_institucion', request('puntoVenta'))
+                  ->where(function ($query) {
+                      $query->where('codigoslibros.estado_liquidacion', '0')
+                            ->orWhere('codigoslibros.estado_liquidacion', '1')
+                            ->orWhere('codigoslibros.estado_liquidacion', '2')
+                            ->orWhere('codigoslibros.estado', '2');
+                  });
+        })
+        ->when($ventaDirecta, function ($query) {
+            $query->where('codigoslibros.bc_institucion', request('ventaDirecta'))
                   ->where(function ($query) {
                       $query->where('codigoslibros.estado_liquidacion', '0')
                             ->orWhere('codigoslibros.estado_liquidacion', '1')
@@ -3468,70 +3479,36 @@ class CodigoLibrosController extends Controller
     //api:get/metodosGetCodigos?getCodigosAgrupadoLiquidadoRegalados=1&periodo=24&institucion=1485
     public function getCodigosAgrupadoLiquidadoRegalados($request)
     {
+        try {
+            // Pasar el array directamente al repositorio
+            $results = $this->codigosRepository->getCodigosIndividuales($request);
+            // Agrupamos por nombrelibro y contamos los estados de liquidación
+            $conteo = $results->groupBy('nombrelibro')->map(function ($grupo) {
+                return [
+                    'libro' => $grupo->first()->nombrelibro, // Nombre del libro
+                    'codigo_liquidacion' => $grupo->first()->codigo, // Código de liquidación
+                    'liquidados' => $grupo->where('estado_liquidacion', '0')->count(), // Contar libros con estado 0
+                    'regalados' => $grupo->where('estado_liquidacion', '2')->count(), // Contar libros con estado 2
+                ];
+            })->values(); // Aseguramos que el resultado sea un array
 
-    // SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
-    // c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
-    // c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion,
-    // ls.year
-    // FROM codigoslibros c
-    // LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-    // LEFT JOIN libro l ON ls.idLibro = l.idlibro
-    // LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-    // WHERE c.bc_periodo          = 24
-    // AND c.prueba_diagnostica    = '0'
-    // AND (c.bc_institucion       = '503' OR c.venta_lista_institucion = '503')
-    // AND c.estado_liquidacion = '0'
+            // Ordenamos por nombre del libro
+            $conteoOrdenado = $conteo->sortBy('libro')->values(); // Ordenamos por 'libro'
 
-        $periodo        = $request->input('periodo');
-        $institucion    = $request->input('institucion');
-
-        // Obtener los resultados de la base de datos
-        $results = DB::table('codigoslibros as c')
-            ->select(
-                'ls.codigo_liquidacion as codigo',
-                'c.codigo as codigo_libro',
-                'c.serie',
-                'c.libro_idlibro',
-                'l.nombrelibro as nombrelibro',
-                'ls.id_serie',
-                'a.area_idarea',
-                'c.estado_liquidacion',
-                'c.estado',
-                'c.bc_estado',
-                'c.venta_estado',
-                'c.liquidado_regalado',
-                'c.bc_institucion',
-                'c.contrato',
-                'c.venta_lista_institucion',
-                'ls.year'
-            )
-            ->leftJoin('libros_series as ls', 'ls.idLibro', '=', 'c.libro_idlibro')
-            ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
-            ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
-            ->where('c.bc_periodo', $periodo)
-            ->where('c.prueba_diagnostica', '0')
-            ->where(function ($query) use ($institucion) {
-                $query->where('c.bc_institucion', $institucion)
-                    ->orWhere('c.venta_lista_institucion', $institucion);
-            })
-            ->get();
-        // Agrupamos por nombrelibro y contamos los estados de liquidación
-        $conteo = $results->groupBy('nombrelibro')->map(function ($grupo) {
             return [
-                'libro'                 => $grupo->first()->nombrelibro, // Nombre del libro
-                'codigo_liquidacion'    => $grupo->first()->codigo, // Código de liquidación
-                'liquidados'            => $grupo->where('estado_liquidacion', '0')->count(), // Contar libros con estado 0
-                'regalados'             => $grupo->where('estado_liquidacion', '2')->count(), // Contar libros con estado 2
+                'codigosAgrupado' => $conteoOrdenado,
+                'todos'           => $results
             ];
-        })->values(); // Aseguramos que el resultado sea un array
 
-        // Ordenamos por nombre del libro
-        $conteoOrdenado = $conteo->sortBy('libro')->values(); // Ordenamos por 'libro'
-        return [
-            'codigosAgrupado' => $conteoOrdenado,
-            'todos'           => $results
-        ];
+        } catch (\Exception $e) {
+            // Manejo de excepciones: loguear y devolver mensaje de error
+            return response()->json([
+                'status' => '0',
+                'message' => $e->getMessage()
+            ], 200);
+        }
     }
+
     //api:get/metodosGetCodigos?getReporteXTipoVenta=1&periodo=25&tipoVenta=1
     // public function getReporteXTipoVenta($request){
     //     $periodo            = $request->input('periodo');
@@ -3663,17 +3640,12 @@ class CodigoLibrosController extends Controller
         return $instituciones->values()->toArray();
     }
 
-
-
-
-
-
-
     public function metodosPostCodigos(Request $request){
         if($request->getPrevisualizarCodigos)               { return $this->getPrevisualizarCodigos($request); }
         if($request->getPrevisualizarPaquetes)              { return $this->getPrevisualizarPaquetes($request); }
         if($request->getPrevisualizarCodigosTablaSon)       { return $this->getPrevisualizarCodigosTablaSon($request); }
         if($request->getPrevisualizarPaquetesTablaSon)      { return $this->getPrevisualizarPaquetesTablaSon($request); }
+        if($request->saveImportPlus)                        { return $this->saveImportPlus($request); }
     }
     //api:post/metodosPostCodigos?getPrevisualizarCodigos=1
     public function getPrevisualizarCodigos($request){
@@ -3701,7 +3673,7 @@ class CodigoLibrosController extends Controller
             'codigoslibros.combo','codigoslibros.codigo_combo','codigoslibros.proforma_empresa','codigoslibros.codigo_proforma',
             'codigoslibros.estado_liquidacion','codigoslibros.liquidado_regalado', 'codigoslibros.venta_estado',
             'codigoslibros.codigo_paquete','codigoslibros.permitir_devolver_nota',
-            'codigoslibros.prueba_diagnostica',
+            'codigoslibros.prueba_diagnostica', 'codigoslibros.plus',
             'ls.codigo_liquidacion','ls.nombre as nombrelibro',
             'codigoslibros.estado', 'institucion.nombreInstitucion as institucionDirecta','i2.nombreInstitucion as institucionPuntoVenta','pe.periodoescolar',
                 'ls.id_serie','a.area_idarea','ls.year'
@@ -3938,7 +3910,7 @@ class CodigoLibrosController extends Controller
                 'codigoslibros.combo','codigoslibros.codigo_combo', 'codigoslibros.proforma_empresa', 'codigoslibros.codigo_proforma',
                 'codigoslibros.estado_liquidacion', 'codigoslibros.liquidado_regalado', 'codigoslibros.venta_estado',
                 'codigoslibros.codigo_paquete', 'ls.codigo_liquidacion', 'ls.nombre as nombrelibro',
-                'codigoslibros.permitir_devolver_nota',
+                'codigoslibros.permitir_devolver_nota', 'codigoslibros.plus',
                 'codigoslibros.estado', 'institucion.nombreInstitucion as institucionDirecta',
                 'i2.nombreInstitucion as institucionPuntoVenta', 'pe.periodoescolar',
                 'ls.id_serie', 'a.area_idarea', 'ls.year'
@@ -4047,8 +4019,8 @@ class CodigoLibrosController extends Controller
         ];
     }
 
-    //api:post/metodosPostCodigos?getPrevisualizarPaquetesTableSon=1
-    public function getPrevisualizarPaquetesTableSon($request) {
+    //api:post/metodosPostCodigos?getPrevisualizarPaquetesTablaSon=1
+    public function getPrevisualizarPaquetesTablaSon($request) {
         // Inicializamos arrays para almacenar los paquetes encontrados y no encontrados
         $arrayPaquetesNoEncontrados = [];
 
@@ -4137,6 +4109,104 @@ class CodigoLibrosController extends Controller
             ];
         }
     }
+
+    //api:post/metodosPostCodigos?saveImportPlus=1
+    public function saveImportPlus(Request $request)
+    {
+        set_time_limit(300);
+        ini_set('max_execution_time', 300);
+
+        $request->validate([
+            'data_codigos' => 'required|json',
+            'periodo_id'   => 'required|integer',
+            'id_usuario'   => 'required|integer',
+            'comentario'   => 'required|string',
+            'tipo'         => 'required|integer',
+        ]);
+
+        $codigos    = json_decode($request->data_codigos);
+        $periodo_id = $request->periodo_id;
+        $id_usuario = $request->id_usuario;
+        $comentario = $request->comentario;
+        $tipo       = $request->tipo;
+
+        $codigosNoCambiados         = [];
+        $contador                   = 0;
+
+        try {
+            DB::beginTransaction();
+
+            $configuracionGeneral = ConfiguracionGeneral::find(8);
+            if (!$configuracionGeneral) {
+                return response()->json(['status' => '0', 'message' => 'No se encontró la configuración general'], 200);
+            }
+
+            $id_serieConfigurada = $configuracionGeneral->id_seleccion;
+
+            $codigosDB = CodigosLibros::whereIn('codigo', array_column($codigos, 'codigo'))
+                ->leftJoin('libros_series', 'codigoslibros.libro_idlibro', '=', 'libros_series.idLibro')
+                ->select('codigoslibros.*', 'libros_series.id_serie')
+                ->get()
+                ->keyBy('codigo');
+
+            foreach ($codigos as $item) {
+                if (!isset($item->codigo)) {
+                    $item->mensaje        = "El código no existe";
+                    $codigosNoCambiados[] = $item->codigo ?? 'Desconocido';
+                    continue;
+                }
+
+                $codigo = $codigosDB[$item->codigo] ?? null;
+
+                if ($codigo) {
+                    if ($codigo->id_serie != $id_serieConfigurada) {
+                        $item->mensaje = "El código no pertenece a la serie plus configurada";
+                        $codigosNoCambiados[] = $item;
+                        continue;
+                    }
+
+                    $codigo->plus = ($tipo == 0) ? 1 : 0;
+                    $codigo->save();
+
+                    if ($codigo->codigo_union) {
+                        $codigoUnion = CodigosLibros::where('codigo', $codigo->codigo_union)->first();
+                        if ($codigoUnion) {
+                            $codigoUnion->plus = ($tipo == 0) ? 1 : 0;
+                            $codigoUnion->save();
+                            $this->GuardarEnHistorico(0, 0, $periodo_id, $codigo->codigo, $id_usuario, $comentario, $codigoUnion, json_encode($codigoUnion->getAttributes()));
+                        }
+                    }
+
+                    $contador++;
+                    $this->GuardarEnHistorico(0, 0, $periodo_id, $codigo->codigo, $id_usuario, $comentario, $codigo, json_encode($codigo->getAttributes()));
+                } else {
+                    $item->mensaje        = "El código no existe";
+                    $codigosNoCambiados[] = $item->codigo;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status'                => '1',
+                'message'               => 'Se guardaron correctamente',
+                'codigosNoCambiados'    => $codigosNoCambiados,
+                'totalCodigos'          => count($codigos),
+                'cambiados'             => $contador,
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => '0',
+                'message' => 'Hubo un error: ' . $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+            ], 200);
+        }
+    }
+
+
     //api:post/codigos/asignarCombos
     public function asignarCombos(Request $request) {
         set_time_limit(6000000);
@@ -4196,6 +4266,13 @@ class CodigoLibrosController extends Controller
         $puntoVenta         = $request->input('puntoVenta');
         $puntoVentaActivos  = $request->input('puntoVentaActivos');
         $serie              = $request->input('serie');
+        $plus               = 0;
+        if($serie){
+            $getPlus = ConfiguracionGeneral::where('id_seleccion_padre',$serie)->first();
+            if($getPlus){
+                $plus = $getPlus->id_seleccion;
+            }
+        }
         // Realizar la consulta
         $arrayCodigosActivos = CodigosLibros::select(
             'libros_series.codigo_liquidacion AS codigo',
@@ -4245,9 +4322,15 @@ class CodigoLibrosController extends Controller
                             ->orWhere('codigoslibros.estado_liquidacion', '2');
                   });
         })
-        ->when($serie, function ($query) {
+        ->when($serie && $plus == 0, function ($query) {
             $query->where('libros_series.id_serie', request('serie'))
-            ->where('estado_liquidacion','<>','3');
+            ->where('estado_liquidacion','<>','3')
+            ->where('plus','0');
+        })
+        ->when($serie && $plus > 0, function ($query) use ($plus) {
+            $query->where('libros_series.id_serie', $plus)
+            ->where('estado_liquidacion','<>','3')
+            ->where('plus','1');
         })
         ->groupBy('libros_series.codigo_liquidacion', 'libros_series.nombre', 'codigoslibros.serie', 'codigoslibros.libro_idlibro', 'libros_series.year', 'libros_series.id_serie', 'asignatura.area_idarea')
         ->get();

@@ -1046,7 +1046,7 @@ Route::get('reporteVariacionVentas', 'AbonoController@reporteVariacionVentas');
 Route::get('clientesAbonoNoDocumentos', 'AbonoController@clientesAbonoNoDocumentos');
 Route::get('getSalesAndPayments', 'AbonoController@getSalesAndPayments');
 Route::get('obtenerVentas', 'AbonoController@obtenerVentas');
-
+Route::get('obtenerDatosClientes', 'AbonoController@obtenerDatosClientes');
 //FIN ABONO
 //CUENTA DE BANCO
 Route::post('cuenta_registro', 'BancoController@cuenta_registro');
@@ -1065,6 +1065,7 @@ Route::post('PostRegistrar_modificar_Banco', 'BancoController@PostRegistrar_modi
 //COBRANZAS
 Route::get('InstitucionesXCobranzas', 'AbonoController@InstitucionesXCobranzas');
 Route::get('obtenerDetallesDevolucion', 'AbonoController@obtenerDetallesDevolucion');
+Route::get('obtenerResumenDevolucion', 'AbonoController@obtenerResumenDevolucion');
 Route::get('GetCuentasAll', 'BancoController@GetCuentasAll');
 Route::get('getClienteDocumentos', 'AbonoController@getClienteDocumentos');
 //FIN COBRANZAS
@@ -1074,6 +1075,8 @@ Route::get('obtenerAbonosCuentasNotas', 'BancoController@obtenerAbonosCuentasNot
 Route::get('obtenerAbonosCuentas', 'BancoController@obtenerAbonosCuentas');
 Route::post('cambioEstadoCuentas', 'BancoController@cambioEstadoCuentas');
 Route::get('clientesVentas', 'BancoController@clientesVentas');
+Route::get('clientesVentasALL', 'BancoController@clientesVentasALL');
+Route::get('obtenerCuentasXCobrar', 'BancoController@obtenerCuentasXCobrar');
 //FIN SEGUIMIENTO
 //PREFACTURAS A NOTAS
 Route::post('cambioCodigosPrefacturasANota', 'VentasController@cambioCodigosPrefacturasANota');
@@ -1170,6 +1173,7 @@ Route::get('deletePedidoGuia_new/{id}', 'PedidosController@deletePedidoGuia_new'
 Route::get('get_val_pedidoLibrosObsequiosInfoTodo_new/{pedido}', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodo_new');
 Route::get('get_val_pedidoLibrosObsequiosInfoTodoSinPedido_new', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodoSinPedido_new');
 Route::get('pedidosDespacho_new', 'Pedidos2Controller@pedidosDespacho_new');
+Route::get('getSeries_new','SeriesController@getSeries_new');
 Route::post('traspasarFormatoPedidos_New', 'SeriesController@traspasarFormatoPedidos_New');
 Route::post('PostRegistrar_modificar_pedidosNew', 'PedidosController@PostRegistrar_modificar_pedidosNew');
 Route::post('PostRegistrar_modificar_pedidos_alcanceNew', 'PedidosController@PostRegistrar_modificar_pedidos_alcanceNew');
@@ -1189,9 +1193,17 @@ Route::get('GetSumarTodo_ProductosFinal', '_14ProductoController@GetSumarTodo_Pr
 Route::get('Getstockproductosrestablecer_SINACTUALIZAR', '_14ProductoController@Getstockproductosrestablecer_SINACTUALIZAR');
 Route::get('GetSacarAreasxSerieProducto', 'SeriesController@GetSacarAreasxSerieProducto');
 Route::get('GetObtenerProductosxSerieoArea', 'SeriesController@GetObtenerProductosxSerieoArea');
+Route::get('GetFacturasxAgrupa_SoloEnviados','VentasController@GetFacturasxAgrupa_SoloEnviados');
+Route::get('GetListadoRetenciones','AbonoController@GetListadoRetenciones');
+Route::get('GetVerificacionAbonoDocumento','AbonoController@GetVerificacionAbonoDocumento');
+Route::get('GetEvidenciasGlobalxID','AbonoController@GetEvidenciasGlobalxID');
+Route::get('GetPorcentajeRetencion','AbonoRetencionPorcentajeController@GetPorcentajeRetencion');
+Route::get('GetPorcentajeRetencion','AbonoRetencionPorcentajeController@GetPorcentajeRetencion');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
 Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
+Route::post('retencion_registro_update_new', 'AbonoController@retencion_registro_update_new');
+Route::post('Post_ActualizarPorcentaje_Venta','AdminController@Post_ActualizarPorcentaje_Venta');
 //FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -1387,8 +1399,6 @@ Route::get('getAlcancesFinalizadosPendientes','PedidosController@getAlcancesFina
 //APIS DE GUIAS
 Route::resource('guias','GuiasController');
 Route::post('guias/cambiar','GuiasController@changeGuiaSTOCK');
-Route::post('guardarGuiasBDMilton','PedidosController@guardarGuiasBDMilton');
-Route::get('guardarGuiasBDMilton2','PedidosController@guardarGuiasBDMilton2');
 Route::get('getStockProlipa','PedidosController@getStockProlipa');
 Route::get('getStockProlipaDevolucion','PedidosController@getStockProlipaDevolucion');
 Route::get('getEntregasGuias','PedidosController@getEntregasGuias');
@@ -1563,7 +1573,7 @@ Route::group(['prefix' => 'grafitex'], function () {
 Route::get('getAllRegalados/{institucion}/{periodo}','TemporadaController@getAllRegalados');
 Route::get('getRegalados/{institucion}/{periodo}/{num_verificacion}/{idverificacion}','TemporadaController@getRegalados');
 Route::post('saveRegaladosXVerificacion','TemporadaController@saveRegaladosXVerificacion');
-Route::get('showRegalados/{institucion}/{periodo}/{libro}/{num_verificacion}/{idverificacion}','TemporadaController@showRegalados');
+Route::get('showRegalados/{institucion}/{periodo}/{libro}/{num_verificacion}/{idverificacion}/{plus}', 'TemporadaController@showRegalados');
 Route::get('getliquidadosDevueltos/{contrato}','TemporadaController@getliquidadosDevueltos');
 Route::post('CleanRegalado', 'TemporadaController@CleanRegalado');
 Route::post('updateVentaReal', 'TemporadaController@updateVentaReal');
@@ -1728,6 +1738,7 @@ Route::get('listaInsitucion_asignacionAsesor', 'f_asignacion_asesor_institucionC
 //FIN ASIGNACION ASESIR INSTITUCION
 
 //INICIO TIPO DOCUMENTO
+Route::get('tipoDocumentoXId/{id}', 'f_tipo_documentoController@tipoDocumentoXId');
 Route::get('GetTipoDocumento_todo', 'f_tipo_documentoController@GetTipoDocumento_todo');
 Route::get('GetTipoDocumento_secuenciaxid', 'f_tipo_documentoController@GetTipoDocumento_secuenciaxid');
 Route::post('PostRegistrar_modificar_tipo_documento', 'f_tipo_documentoController@PostRegistrar_modificar_tipo_documento');

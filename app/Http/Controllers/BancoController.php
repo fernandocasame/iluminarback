@@ -360,7 +360,12 @@ class BancoController extends Controller
             $abonos = DB::table('abono as a')
             ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
             ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
-            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
+            ->leftJoin('evidencia_global_files as egf', 'egf.egf_id', '=', 'a.egf_id') // Unión con evidencia_global_files
+            ->leftJoin('evidencia_global_files_tipo as egft', 'egft.egft_id', '=', 'egf.egft_id') // Unión con evidencia_global_files_tipo
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*',
+            'egf.egf_url', // Campo adicional de evidencia_global_files
+            'egft.egft_nombre' // Campo adicional de evidencia_global_files_tipo
+            )
             ->where('cp.cue_pag_codigo', $cuenta)
             ->whereBetween(DB::raw('DATE(a.abono_fecha)'), [$fechaInicio, $fechaFinal]);
 
@@ -394,7 +399,12 @@ class BancoController extends Controller
             $abonos = DB::table('abono as a')
             ->join('1_1_cuenta_pago as cp', 'cp.cue_pag_codigo', '=', 'a.abono_cuenta')
             ->join('usuario as usu', 'usu.cedula', '=', 'a.abono_ruc_cliente')
-            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*')
+            ->leftJoin('evidencia_global_files as egf', 'egf.egf_id', '=', 'a.egf_id') // Unión con evidencia_global_files
+            ->leftJoin('evidencia_global_files_tipo as egft', 'egft.egft_id', '=', 'egf.egft_id') // Unión con evidencia_global_files_tipo
+            ->select('cp.cue_pag_numero', 'cp.cue_pag_nombre', DB::raw('concat(usu.nombres, " ", usu.apellidos) as cliente'), 'a.*',
+            'egf.egf_url', // Campo adicional de evidencia_global_files
+            'egft.egft_nombre' // Campo adicional de evidencia_global_files_tipo
+            )
             ->where('cp.cue_pag_codigo', $cuenta);
 
             // Condicionales para el estado de abono
@@ -457,115 +467,311 @@ class BancoController extends Controller
         }
     }
 
-public function clientesVentas(Request $request)
-{
-    // 1. Obtener las instituciones distintas con el primer SELECT
-    $clientes = DB::table('institucion')
-        ->join('f_venta_agrupado as f', 'f.institucion_id', '=', 'institucion.idInstitucion')
-        ->leftJoin('usuario as u', 'u.idusuario', '=', 'f.ven_cliente')
-        ->where('f.periodo_id', $request->periodo)
-        ->where('f.id_empresa', $request->empresa)
-        ->where('f.est_ven_codigo', 0)
-        ->select('f.institucion_id as clientes', 'institucion.nombreInstitucion as institucion', 'u.cedula as ruc')
-        ->distinct()
-        ->get();
+    public function clientesVentas(Request $request)
+    {
+        // 1. Obtener las instituciones distintas con el primer SELECT
+        $clientes = DB::table('institucion')
+            ->join('f_venta_agrupado as f', 'f.institucion_id', '=', 'institucion.idInstitucion')
+            ->leftJoin('usuario as u', 'u.idusuario', '=', 'f.ven_cliente')
+            ->where('f.periodo_id', $request->periodo)
+            ->where('f.id_empresa', $request->empresa)
+            ->where('f.est_ven_codigo', 0)
+            ->select('f.institucion_id as clientes', 'institucion.nombreInstitucion as institucion', 'u.cedula as ruc')
+            ->distinct()
+            ->get();
 
-    // Verificar si se obtuvieron resultados
-    if ($clientes->isEmpty()) {
-        return response()->json(['error' => 'No se encontraron clientes.'], 404);
+        // Verificar si se obtuvieron resultados
+        if ($clientes->isEmpty()) {
+            return response()->json(['error' => 'No se encontraron clientes.'], 404);
+        }
+
+        // Aquí guardamos los resultados
+        $resultados = [];
+
+        // Recorrer los clientes
+        foreach ($clientes as $cliente) {
+            // 2. Obtener los detalles de venta para el cliente sin usar SUM
+            $detalleVenta = DB::table('f_venta as fv')
+                ->join('f_detalle_venta as fdv', function ($join) {
+                    $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
+                        ->on('fv.ven_codigo', '=', 'fdv.ven_codigo');
+                })
+                ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
+                ->where('fv.est_ven_codigo', '<>', 3)
+                ->where('fv.institucion_id', $cliente->clientes)
+                ->where('fv.id_empresa', $request->empresa)
+                ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad', 'fdv.det_ven_valor_u', 'fdv.det_ven_dev')
+                ->get();
+
+            // 3. Obtener los detalles de venta agrupados para el cliente
+            $detalleVentaAgrupado = DB::table('f_venta_agrupado as fv')
+                ->join('f_detalle_venta_agrupado as fdv', function ($join) {
+                    $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
+                        ->on('fv.id_factura', '=', 'fdv.id_factura');
+                })
+                ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
+                ->where('fv.est_ven_codigo', 0)
+                ->where('fv.institucion_id', $cliente->clientes)
+                ->where('fv.id_empresa', $request->empresa)
+                ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad as det_ven_cantidad_facturada')
+                ->get();
+
+            // Inicializamos el array para combinar los resultados
+            $detalleVentaCombinado = [];
+
+            // Combinar los datos de detalleVenta sin sumar en la consulta
+            foreach ($detalleVenta as $venta) {
+                $proCodigo = $venta->pro_codigo;
+                if (!isset($detalleVentaCombinado[$proCodigo])) {
+                    $detalleVentaCombinado[$proCodigo] = [
+                        'pro_codigo' => $proCodigo,
+                        'nombre' => $venta->nombre,
+                        'det_ven_cantidad' => 0,
+                        'det_ven_valor_u' => $venta->det_ven_valor_u,
+                        'det_ven_dev' => 0,
+                        'det_ven_cantidad_facturada' => 0, // Inicializamos como 0
+                    ];
+                }
+                // Acumulamos las cantidades y devoluciones
+                $detalleVentaCombinado[$proCodigo]['det_ven_cantidad'] += $venta->det_ven_cantidad;
+                $detalleVentaCombinado[$proCodigo]['det_ven_dev'] += $venta->det_ven_dev;
+            }
+
+            // Ahora agregamos la información de detalleVentaAgrupado
+            foreach ($detalleVentaAgrupado as $factura) {
+                $proCodigo = $factura->pro_codigo;
+                // Si el producto ya existe en el array, actualizamos la cantidad facturada
+                if (isset($detalleVentaCombinado[$proCodigo])) {
+                    $detalleVentaCombinado[$proCodigo]['det_ven_cantidad_facturada'] += $factura->det_ven_cantidad_facturada;
+                }
+            }
+
+            // Filtramos los productos según la condición
+            $detalleVentaFinal = [];
+            foreach ($detalleVentaCombinado as $producto) {
+                $detVenCantidad = $producto['det_ven_cantidad'];
+                $detVenDev = $producto['det_ven_dev'];
+                $detVenCantidadFacturada = $producto['det_ven_cantidad_facturada'];
+
+                // Verificamos la condición de cantidad - devoluciones > cantidad facturada
+                if (($detVenCantidad - $detVenDev) < $detVenCantidadFacturada) {
+                    $detalleVentaFinal[] = $producto;
+                }
+            }
+
+            // Agregar los resultados al array final
+            $resultados[] = [
+                'cliente' => $cliente->clientes,
+                'institucion' => $cliente->institucion,
+                'ruc' => $cliente->ruc,
+                'detalle_venta' => $detalleVentaFinal,
+            ];
+        }
+
+        // Retornar los resultados como una respuesta JSON
+        return response()->json($resultados);
     }
 
-    // Aquí guardamos los resultados
-    $resultados = [];
-
-    // Recorrer los clientes
-    foreach ($clientes as $cliente) {
-        // 2. Obtener los detalles de venta para el cliente sin usar SUM
-        $detalleVenta = DB::table('f_venta as fv')
-            ->join('f_detalle_venta as fdv', function ($join) {
-                $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
-                    ->on('fv.ven_codigo', '=', 'fdv.ven_codigo');
-            })
-            ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
-            ->where('fv.est_ven_codigo', '<>', 3)
-            ->where('fv.institucion_id', $cliente->clientes)
-            ->where('fv.id_empresa', $request->empresa)
-            ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad', 'fdv.det_ven_valor_u', 'fdv.det_ven_dev')
+    public function clientesVentasALL(Request $request)
+    {
+        // 1. Obtener las instituciones distintas con el primer SELECT
+        $clientes = DB::table('institucion')
+            ->join('f_venta_agrupado as f', 'f.institucion_id', '=', 'institucion.idInstitucion')
+            ->leftJoin('usuario as u', 'u.idusuario', '=', 'f.ven_cliente')
+            ->where('f.periodo_id', $request->periodo)
+            ->where('f.id_empresa', $request->empresa)
+            ->where('f.est_ven_codigo', 0)
+            ->select('f.institucion_id as clientes', 'institucion.nombreInstitucion as institucion', 'u.cedula as ruc')
+            ->distinct()
             ->get();
 
-        // 3. Obtener los detalles de venta agrupados para el cliente
-        $detalleVentaAgrupado = DB::table('f_venta_agrupado as fv')
-            ->join('f_detalle_venta_agrupado as fdv', function ($join) {
-                $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
-                    ->on('fv.id_factura', '=', 'fdv.id_factura');
-            })
-            ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
-            ->where('fv.est_ven_codigo', 0)
-            ->where('fv.institucion_id', $cliente->clientes)
-            ->where('fv.id_empresa', $request->empresa)
-            ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad as det_ven_cantidad_facturada')
-            ->get();
-
-        // Inicializamos el array para combinar los resultados
-        $detalleVentaCombinado = [];
-
-        // Combinar los datos de detalleVenta sin sumar en la consulta
-        foreach ($detalleVenta as $venta) {
-            $proCodigo = $venta->pro_codigo;
-            if (!isset($detalleVentaCombinado[$proCodigo])) {
-                $detalleVentaCombinado[$proCodigo] = [
-                    'pro_codigo' => $proCodigo,
-                    'nombre' => $venta->nombre,
-                    'det_ven_cantidad' => 0,
-                    'det_ven_valor_u' => $venta->det_ven_valor_u,
-                    'det_ven_dev' => 0,
-                    'det_ven_cantidad_facturada' => 0, // Inicializamos como 0
-                ];
-            }
-            // Acumulamos las cantidades y devoluciones
-            $detalleVentaCombinado[$proCodigo]['det_ven_cantidad'] += $venta->det_ven_cantidad;
-            $detalleVentaCombinado[$proCodigo]['det_ven_dev'] += $venta->det_ven_dev;
+        // Verificar si se obtuvieron resultados
+        if ($clientes->isEmpty()) {
+            return response()->json(['error' => 'No se encontraron clientes.'], 404);
         }
 
-        // Ahora agregamos la información de detalleVentaAgrupado
-        foreach ($detalleVentaAgrupado as $factura) {
-            $proCodigo = $factura->pro_codigo;
-            // Si el producto ya existe en el array, actualizamos la cantidad facturada
-            if (isset($detalleVentaCombinado[$proCodigo])) {
-                $detalleVentaCombinado[$proCodigo]['det_ven_cantidad_facturada'] += $factura->det_ven_cantidad_facturada;
+        // Aquí guardamos los resultados
+        $resultados = [];
+
+        // Recorrer los clientes
+        foreach ($clientes as $cliente) {
+            // 2. Obtener los detalles de venta para el cliente sin usar SUM
+            $detalleVenta = DB::table('f_venta as fv')
+                ->join('f_detalle_venta as fdv', function ($join) {
+                    $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
+                        ->on('fv.ven_codigo', '=', 'fdv.ven_codigo');
+                })
+                ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
+                ->where('fv.est_ven_codigo', '<>', 3)
+                ->where('fv.institucion_id', $cliente->clientes)
+                ->where('fv.id_empresa', $request->empresa)
+                ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad', 'fdv.det_ven_valor_u', 'fdv.det_ven_dev')
+                ->get();
+
+            // 3. Obtener los detalles de venta agrupados para el cliente
+            $detalleVentaAgrupado = DB::table('f_venta_agrupado as fv')
+                ->join('f_detalle_venta_agrupado as fdv', function ($join) {
+                    $join->on('fdv.id_empresa', '=', 'fv.id_empresa')
+                        ->on('fv.id_factura', '=', 'fdv.id_factura');
+                })
+                ->leftJoin('libros_series as l', 'fdv.pro_codigo', '=', 'l.codigo_liquidacion')
+                ->where('fv.est_ven_codigo', 0)
+                ->where('fv.institucion_id', $cliente->clientes)
+                ->where('fv.id_empresa', $request->empresa)
+                ->select('fdv.pro_codigo', 'l.nombre', 'fdv.det_ven_cantidad as det_ven_cantidad_facturada')
+                ->get();
+
+            // Inicializamos el array para combinar los resultados
+            $detalleVentaCombinado = [];
+
+            // Combinar los datos de detalleVenta sin sumar en la consulta
+            foreach ($detalleVenta as $venta) {
+                $proCodigo = $venta->pro_codigo;
+                if (!isset($detalleVentaCombinado[$proCodigo])) {
+                    $detalleVentaCombinado[$proCodigo] = [
+                        'pro_codigo' => $proCodigo,
+                        'nombre' => $venta->nombre,
+                        'det_ven_cantidad' => 0,
+                        'det_ven_valor_u' => $venta->det_ven_valor_u,
+                        'det_ven_dev' => 0,
+                        'det_ven_cantidad_facturada' => 0, // Inicializamos como 0
+                    ];
+                }
+                // Acumulamos las cantidades y devoluciones
+                $detalleVentaCombinado[$proCodigo]['det_ven_cantidad'] += $venta->det_ven_cantidad;
+                $detalleVentaCombinado[$proCodigo]['det_ven_dev'] += $venta->det_ven_dev;
             }
-        }
 
-        // Filtramos los productos según la condición
-        $detalleVentaFinal = [];
-        foreach ($detalleVentaCombinado as $producto) {
-            $detVenCantidad = $producto['det_ven_cantidad'];
-            $detVenDev = $producto['det_ven_dev'];
-            $detVenCantidadFacturada = $producto['det_ven_cantidad_facturada'];
+            // Ahora agregamos la información de detalleVentaAgrupado
+            foreach ($detalleVentaAgrupado as $factura) {
+                $proCodigo = $factura->pro_codigo;
+                // Si el producto ya existe en el array, actualizamos la cantidad facturada
+                if (isset($detalleVentaCombinado[$proCodigo])) {
+                    $detalleVentaCombinado[$proCodigo]['det_ven_cantidad_facturada'] += $factura->det_ven_cantidad_facturada;
+                }
+            }
 
-            // Verificamos la condición de cantidad - devoluciones > cantidad facturada
-            if (($detVenCantidad - $detVenDev) < $detVenCantidadFacturada) {
+            // Filtramos los productos según la condición
+            $detalleVentaFinal = [];
+            foreach ($detalleVentaCombinado as $producto) {
+                $detVenCantidad = $producto['det_ven_cantidad'];
+                $detVenDev = $producto['det_ven_dev'];
+                $detVenCantidadFacturada = $producto['det_ven_cantidad_facturada'];
+
                 $detalleVentaFinal[] = $producto;
             }
+
+            // Agregar los resultados al array final
+            $resultados[] = [
+                'cliente' => $cliente->clientes,
+                'institucion' => $cliente->institucion,
+                'ruc' => $cliente->ruc,
+                'detalle_venta' => $detalleVentaFinal,
+            ];
         }
 
-        // Agregar los resultados al array final
-        $resultados[] = [
-            'cliente' => $cliente->clientes,
-            'institucion' => $cliente->institucion,
-            'ruc' => $cliente->ruc,
-            'detalle_venta' => $detalleVentaFinal,
-        ];
+        // Retornar los resultados como una respuesta JSON
+        return response()->json($resultados);
     }
-
-    // Retornar los resultados como una respuesta JSON
-    return response()->json($resultados);
-}
-
-    
-    
-    
     
 
+    public function obtenerCuentasXCobrar(Request $request)
+    {
+        // Recibir el año y periodo desde el request
+        $year = $request->input('year');
+
+        // Construir el rango de fechas
+        $fechaInicio = $year . '-01-01';
+        $fechaFin = $year . '-12-31';
+
+        // Consulta SQL para la empresa 1 (Prolipa)
+        $queryProlipa = "
+            SELECT 
+                f.ven_cliente, 
+                u.cedula, 
+                CONCAT(u.nombres, ' ', u.apellidos) AS cliente,
+                f.institucion_id,
+                i.nombreInstitucion,
+                SUM(f.ven_valor) AS totalFacturado,
+                (
+                    SELECT COALESCE(SUM(a.abono_facturas), 0)
+                    FROM abono AS a
+                    WHERE a.abono_ruc_cliente = u.cedula
+                    AND a.abono_empresa = 1
+                    AND a.abono_estado = 0
+                    AND DATE(a.abono_fecha) BETWEEN ? AND ?
+                ) AS totalCobrado,
+                f.id_empresa
+            FROM f_venta_agrupado AS f
+            INNER JOIN institucion AS i ON i.idInstitucion = f.institucion_id
+            INNER JOIN usuario AS u ON u.idusuario = f.ven_cliente
+            WHERE DATE(f.ven_fecha) BETWEEN ? AND ?
+            AND f.estadoPerseo = 1
+            AND f.id_empresa = 1
+            GROUP BY f.ven_cliente, f.institucion_id, f.id_empresa
+        ";
+
+        // Ejecutar la consulta para la empresa Prolipa
+        $resultadosProlipa = DB::select($queryProlipa, [
+            $fechaInicio, $fechaFin, $fechaInicio, $fechaFin
+        ]);
+
+        // Transformar los resultados para Prolipa
+        $resultadosProlipa = array_map(function ($item) {
+            // Añadir el tipo de empresa
+            $item->totalCobrado = (float) $item->totalCobrado;  // Asegurar que el totalCobrado sea un float
+            $item->empresa = 'Prolipa';  // Añadir el nombre de la empresa
+            return $item;
+        }, $resultadosProlipa);
+
+        // Consulta SQL para la empresa 3 (Calmed)
+        $queryCalmed = "
+            SELECT 
+                f.ven_cliente, 
+                u.cedula, 
+                CONCAT(u.nombres, ' ', u.apellidos) AS cliente,
+                f.institucion_id,
+                i.nombreInstitucion,
+                SUM(f.ven_valor) AS totalFacturado,
+                (
+                    SELECT COALESCE(SUM(a.abono_facturas), 0)
+                    FROM abono AS a
+                    WHERE a.abono_ruc_cliente = u.cedula
+                    AND a.abono_empresa = 3
+                    AND a.abono_estado = 0
+                    AND DATE(a.abono_fecha) BETWEEN ? AND ?
+                ) AS totalCobrado,
+                f.id_empresa
+            FROM f_venta_agrupado AS f
+            INNER JOIN institucion AS i ON i.idInstitucion = f.institucion_id
+            INNER JOIN usuario AS u ON u.idusuario = f.ven_cliente
+            WHERE DATE(f.ven_fecha) BETWEEN ? AND ?
+            AND f.estadoPerseo = 1
+            AND f.id_empresa = 3
+            GROUP BY f.ven_cliente, f.institucion_id, f.id_empresa
+        ";
+
+        // Ejecutar la consulta para la empresa Calmed
+        $resultadosCalmed = DB::select($queryCalmed, [
+            $fechaInicio, $fechaFin, $fechaInicio, $fechaFin
+        ]);
+
+        // Transformar los resultados para Calmed
+        $resultadosCalmed = array_map(function ($item) {
+            // Añadir el tipo de empresa
+            $item->totalCobrado = (float) $item->totalCobrado;  // Asegurar que el totalCobrado sea un float
+            $item->empresa = 'Calmed';  // Añadir el nombre de la empresa
+            return $item;
+        }, $resultadosCalmed);
+
+        // Organizar los resultados en el formato requerido
+        $resultados = [
+            'prolipa' => $resultadosProlipa,
+            'calmed' => $resultadosCalmed
+        ];
+
+        // Devolver los resultados en una respuesta JSON
+        return response()->json($resultados);
+    }
 
 }

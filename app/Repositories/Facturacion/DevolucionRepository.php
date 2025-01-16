@@ -192,4 +192,98 @@ class  DevolucionRepository extends BaseRepository
         $query = CodigosLibrosDevolucionSon::where('pro_codigo', $combo)->where('id_empresa', $id_empresa)->where('codigoslibros_devolucion_id', $id_devolucion)->get();
         return $query;
     }
+    //actualizar valores de un documento f_venta
+    public function updateValoresDocumentoF_venta($ven_codigo, $id_empresa)
+    {
+        try {
+            // Iniciar transacción
+            DB::beginTransaction();
+
+            // Calcular el nuevo subtotal de la venta
+            $nuevoSubtotal = DB::table('f_detalle_venta')
+                ->where('ven_codigo', $ven_codigo)
+                ->where('id_empresa', $id_empresa)
+                ->sum(DB::raw('det_ven_cantidad * det_ven_valor_u'));
+
+            // Obtener el porcentaje de descuento
+            $descuentoPorcentaje = DB::table('f_venta')
+                ->where('ven_codigo', $ven_codigo)
+                ->where('id_empresa', $id_empresa)
+                ->value('ven_desc_por'); // Porcentaje de descuento
+
+            // Calcular el valor del descuento
+            $valorDescuento = ($descuentoPorcentaje / 100) * $nuevoSubtotal;
+
+            // Calcular el nuevo valor total
+            $nuevoTotal = $nuevoSubtotal - $valorDescuento;
+
+            // Actualizar f_venta con el nuevo subtotal, descuento y total
+            DB::table('f_venta')
+                ->where('ven_codigo', $ven_codigo)
+                ->where('id_empresa', $id_empresa)
+                ->update([
+                    'ven_subtotal'  => $nuevoSubtotal,
+                    'ven_descuento' => $valorDescuento,
+                    'ven_valor'     => $nuevoTotal,
+                ]);
+
+            // Confirmar transacción
+            DB::commit();
+        } catch (\Exception $e) {
+            // Revertir transacción en caso de error
+            DB::rollBack();
+
+            // Lanzar una excepción personalizada
+            throw new \Exception("No se pudo actualizar los valores del documento f_venta.");
+        }
+    }
+
+    public function updateValoresDocumentoF_proforma($ven_codigo, $id_empresa)
+    {
+        try {
+            // Iniciar transacción
+            DB::beginTransaction();
+            // return "holoa¿¿a";
+            // Calcular el nuevo subtotal de la venta
+            $nuevoSubtotal = DB::table('f_venta as v')
+            ->join('f_proforma as p', 'v.ven_idproforma', '=', 'p.prof_id')
+            ->join('f_detalle_proforma as dp', 'p.id', '=', 'dp.prof_id')
+            ->where('p.emp_id', $id_empresa)
+            ->where('v.ven_codigo', $ven_codigo)
+            ->sum(DB::raw('dp.det_prof_cantidad * dp.det_prof_valor_u'));
+
+            // Obtener el porcentaje de descuento
+            $descuentoPorcentaje = DB::table('f_venta as v')
+                ->join('f_proforma as p', 'v.ven_idproforma', '=', 'p.prof_id')
+                ->where('v.ven_codigo', $ven_codigo)
+                ->where('p.emp_id', $id_empresa)
+                ->value('p.pro_des_por'); // Porcentaje de descuento
+
+            // Calcular el valor del descuento
+            $nuevo_prof_descuento = ($descuentoPorcentaje / 100) * $nuevoSubtotal;
+
+            // Calcular el nuevo valor total
+            $nuevo_prof_total = $nuevoSubtotal - $nuevo_prof_descuento;
+
+            // Actualizar f_venta con el nuevo subtotal, descuento y total
+            DB::table('f_venta as v')
+            ->join('f_proforma as p', 'v.ven_idproforma', '=', 'p.prof_id')
+            ->where('v.ven_codigo', $ven_codigo)
+            ->where('p.emp_id', $id_empresa)
+            ->update([
+                'p.prof_total'    => $nuevo_prof_total,
+                'p.prof_descuento' => $nuevo_prof_descuento,
+            ]);
+
+            // Confirmar transacción
+            DB::commit();
+        } catch (\Exception $e) {
+            // Revertir transacción en caso de error
+            DB::rollBack();
+
+            // Lanzar una excepción personalizada
+            throw new \Exception("No se pudo actualizar los valores del documento f_vent2a.");
+        }
+    }
+
 }

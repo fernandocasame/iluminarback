@@ -18,7 +18,7 @@ class SeriesController extends Controller
      */
     public function index()
     {
-        return Series::all();
+       return Series::all();
     }
 
 
@@ -29,7 +29,7 @@ class SeriesController extends Controller
         $series = DB::SELECT("SELECT * FROM series s WHERE s.id_serie != 6 ORDER BY s.nombre_serie DESC"); // omitir plan lector
         $datos = array();
         foreach($series as $key => $value){
-            $areas = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea, 
+            $areas = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,
             t.nombretipoarea, pf.*
             FROM area ar
             INNER JOIN asignatura a ON ar.idarea = a.area_idarea
@@ -38,9 +38,9 @@ class SeriesController extends Controller
             INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
             INNER JOIN pedidos_formato pf ON pf.id_area = ar.idarea
             WHERE ls.id_serie = ?
-            AND pf.id_periodo = ? 
+            AND pf.id_periodo = ?
             AND pf.id_serie = ?
-            AND ar.estado = '1' 
+            AND ar.estado = '1'
             AND a.estado = '1'
             AND pf.pvp <> 0
             AND l.Estado_idEstado = 1
@@ -141,7 +141,7 @@ class SeriesController extends Controller
     }
     //api:post/traspasarFormatoPedidos
     public function traspasarFormatoPedidos(Request $request){
-        //Transpaso de series basicas 
+        //Transpaso de series basicas
         $periodoAnterior    = $request->periodoAnterior;
         $periodoTranspaso   = $request->periodoTranspaso;
         $query = DB::SELECT("SELECT * FROM pedidos_series_basicas sb
@@ -218,7 +218,7 @@ class SeriesController extends Controller
         $series = DB::SELECT("SELECT sb.*, s.nombre_serie
             FROM pedidos_series_basicas sb
             LEFT JOIN series s ON sb.id_serie = s.id_serie
-            WHERE sb.periodo_id = '$periodo'        
+            WHERE sb.periodo_id = '$periodo'
         ");
         return $series;
     }
@@ -373,10 +373,10 @@ class SeriesController extends Controller
     public function areasxSerie_FullPedido(Request $request) {
         // Obtener todas las series disponibles
         $series = DB::table('libros_series')->distinct()->pluck('id_serie');
-        
+
         $datos = [];
         $contador = 0;
-    
+
         // Iterar sobre cada serie
         foreach($series as $serie_id) {
             // Obtener las áreas para la serie actual
@@ -389,7 +389,7 @@ class SeriesController extends Controller
                 AND l.Estado_idEstado = '1'
                 AND a.estado = '1'
             ");
-    
+
             foreach($query as $key => $item){
                 $libros = [];
                 $contador2 = 0;
@@ -405,7 +405,7 @@ class SeriesController extends Controller
                         AND a.estado = '1'
                         AND ls.year = '$i'
                     ");
-                    
+
                     if(empty($query2)){
                         $libros[$contador2] = [
                             "nivel"             => 0,
@@ -414,12 +414,12 @@ class SeriesController extends Controller
                     } else {
                         $idlibro = $query2[0]->idlibro;
                         $idasignatura = $query2[0]->asignatura_idasignatura;
-    
+
                         // Validar si el docente tiene el libro
                         $query3 = DB::SELECT("SELECT * FROM pedidos_formato_new pfn
                             WHERE pfn.idperiodoescolar = '$request->periodo_id'
                             AND pfn.idlibro = '$idlibro'");
-                        
+
                         $pfn_id = 0;
                         $selected = false;
                         $pfn_pvp = 0.00;
@@ -431,7 +431,7 @@ class SeriesController extends Controller
                             $pfn_estado = $query3[0]->pfn_estado;
                             $pfn_estado = $pfn_estado == 1;
                         }
-    
+
                         $libros[$contador2] = [
                             "nivel"             => $query2[0]->year,
                             "nombrelibro"       => $query2[0]->nombrelibro,
@@ -463,13 +463,13 @@ class SeriesController extends Controller
         // Obtener las series, excluyendo la serie con id 6
         $series = DB::SELECT("SELECT * FROM series s ORDER BY s.nombre_serie DESC");
         $datos = array();
-    
+
         foreach($series as $key => $value) {
             // Obtener las áreas y libros correspondientes
-            $areas = DB::SELECT("SELECT DISTINCT 
-                    ar.idarea, 
-                    ar.nombrearea, 
-                    t.nombretipoarea, 
+            $areas = DB::SELECT("SELECT DISTINCT
+                    ar.idarea,
+                    ar.nombrearea,
+                    t.nombretipoarea,
                     l.idlibro,
                     l.nombrelibro,
                     pf.pfn_pvp,
@@ -481,21 +481,21 @@ class SeriesController extends Controller
                 INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
                 INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
                 INNER JOIN pedidos_formato_new pf ON pf.idlibro = l.idlibro
-                WHERE ls.id_serie = ? 
-                AND pf.idperiodoescolar = ? 
-                AND ar.estado = '1' 
+                WHERE ls.id_serie = ?
+                AND pf.idperiodoescolar = ?
+                AND ar.estado = '1'
                 AND a.estado = '1'
                 AND pf.pfn_estado = 1
                 AND l.Estado_idEstado = 1
                 ORDER BY ar.idarea, pf.pfn_orden ASC", [$value->id_serie, $periodo]);
-    
+
             if ($areas) {
                 $datos[$key] = [
                     "id_serie" => $value->id_serie,
                     "nombre_serie" => $value->nombre_serie,
                     "areas" => $this->organizeAreas($areas)
                 ];
-    
+
                 // Obtener y asignar el valor de pvn_cantidad de la tabla pedidos_val_area_new
                 foreach ($datos[$key]['areas'] as &$area) {
                     foreach ($area['libros'] as &$libro) {
@@ -504,7 +504,7 @@ class SeriesController extends Controller
                             ->where('id_pedido', $id_pedido) // Asegúrate de tener el id del pedido correcto
                             ->where('pvn_tipo', $pvn_tipo) // Asegúrate de tener el id del tipo pedido correcto
                             ->first();
-                        
+
                         // Verificar si se encontró un registro en pedidos_val_area_new para este libro
                         if ($pedidoVal) {
                             $libro['pvn_cantidad'] = $pedidoVal->pvn_cantidad;
@@ -516,7 +516,7 @@ class SeriesController extends Controller
                 }
             }
         }
-    
+
         return $datos;
     }
 
@@ -531,7 +531,7 @@ class SeriesController extends Controller
                     "libros" => []
                 ];
             }
-    
+
             $organizedAreas[$area->idarea]['libros'][] = [
                 "idlibro" => $area->idlibro,
                 "nombrelibro" => $area->nombrelibro,
@@ -540,24 +540,24 @@ class SeriesController extends Controller
                 "year" => $area->year,
             ];
         }
-    
+
         // Ordenar los libros de cada área por 'year'
         foreach ($organizedAreas as &$area) {
             usort($area['libros'], function($a, $b) {
                 return $a['year'] <=> $b['year'];
             });
         }
-    
+
         return array_values($organizedAreas);
     }
 
     public function areasxSeriePlanLector_FullPedido(Request $request){
         // Obtener todas las series disponibles
         $series = DB::table('libros_series')->distinct()->pluck('id_serie');
-        
+
         $datos = [];
         $contadorGlobal = 0;
-    
+
         // Iterar sobre cada serie
         foreach($series as $serie_id) {
             // Obtener los libros para la serie actual
@@ -570,7 +570,7 @@ class SeriesController extends Controller
                 AND l.Estado_idEstado = '1'
                 AND a.estado = '1'
             ");
-    
+
             foreach($query as $key => $item){
                 // Validar si el docente tiene el libro
                 $idlibro = $item->idlibro;
@@ -578,12 +578,12 @@ class SeriesController extends Controller
                 $query2 = DB::SELECT("SELECT * FROM pedidos_formato_new pfn
                     WHERE pfn.idperiodoescolar = '$request->periodo_id'
                     AND pfn.idlibro = '$idlibro'");
-    
+
                 $pfn_id = 0;
                 $selected = false;
                 $pfn_pvp = 0.00;
                 $pfn_estado = null;
-    
+
                 if(count($query2) > 0){
                     $pfn_id = $query2[0]->pfn_id;
                     $selected = true;
@@ -591,7 +591,7 @@ class SeriesController extends Controller
                     $pfn_estado = $query2[0]->pfn_estado;
                     $pfn_estado = $pfn_estado == 1;
                 }
-    
+
                 $datos[$contadorGlobal] = [
                     "nombrelibro"   => $item->nombrelibro,
                     "idlibro"       => $item->idlibro,
@@ -605,7 +605,7 @@ class SeriesController extends Controller
                 $contadorGlobal++;
             }
         }
-    
+
         return $datos;
     }
 
@@ -669,7 +669,7 @@ class SeriesController extends Controller
 
 
     public function traspasarFormatoPedidos_New(Request $request){
-        //Transpaso de series basicas 
+        //Transpaso de series basicas
         // return $request;
         $periodo_formatoactual  = $request->periodoAnterior;
         $periodo_formatonuevo   = $request->periodoTranspaso;
@@ -818,6 +818,11 @@ class SeriesController extends Controller
         }
 
         return response()->json($productosFinales);
+    }
+
+    public function getSeries_new(){
+        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('ruta', 'ruta PLUS', 'conexiones')");
+        return $query;
     }
 
     //FIN METODOS JEYSON

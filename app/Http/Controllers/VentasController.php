@@ -356,25 +356,48 @@ class VentasController extends Controller
         GROUP BY fdv.ven_codigo, fdv.id_empresa, fdv.pro_codigo");
                 return $query;
     }
-    public function imprimirDVenta(Request $request){
-        try{
+    public function imprimirDVenta(Request $request)
+    {
+        try {
             DB::beginTransaction();
+
+            // Validar si existe la venta
             $venta = Ventas::where('ven_codigo', $request->ven_codigo)
-            ->where('id_empresa', $request->id_empresa)
-            ->firstOrFail();
-                if (!$venta){
-                    return "El ven_codigo no existe en la base de datos";
-                }
-                $venta->impresion= '1';
-                $venta->updated_at     = now();
-                $venta->save();
+                ->where('id_empresa', $request->id_empresa)
+                ->first();
+
+            if (!$venta) {
+                return response()->json([
+                    "status" => "0",
+                    "message" => "El ven_codigo no existe en la base de datos"
+                ], 200);
+            }
+
+            // Actualizar la tabla f_venta
+            DB::table('f_venta')
+                ->where('ven_codigo', $request->ven_codigo)
+                ->where('id_empresa', $request->id_empresa)
+                ->update([
+                    'impresion' => '1',
+                    'updated_at' => now()
+                ]);
+
             DB::commit();
-            return response()->json(['message' => 'impresion exitosa'], 200);
-        }catch(\Exception $e){
-            return response()->json(["error"=>"0", "message" => "No se pudo imprimir", 'error' => $e->getMessage()], 500);
-            DB::rollback();
+
+            return response()->json([
+                'message' => 'Impresión exitosa'
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollback(); // Asegurar que se haga el rollback
+
+            return response()->json([
+                "status" => "0",
+                "message" => "No se pudo imprimir",
+                'error' => $e->getMessage()
+            ], 200);
         }
     }
+
     public function getNumeroDocumento($empresa,$letra){
         if($empresa==1){
             $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_Prolipa as cod from  f_tipo_documento where tdo_letra='$letra'");
@@ -449,6 +472,7 @@ class VentasController extends Controller
         }
     }
     public function Postventa_Registra(Request $request){
+        return $request;
         $letraDocumento     = $request->letra;
         $id_empresa         = $request->id_empresa;
         $codigo_contrato    = $request->codigo_contrato;
@@ -682,11 +706,15 @@ class VentasController extends Controller
                     if (!$venta){
                         return "El ven_codigo no existe en la base de datos";
                     }
-                    $venta->est_ven_codigo  = $request->est_ven_codigo;
-                    $venta->user_anulado    = $id_usuario;
-                    $venta->observacionAnulacion = $request->observacionAnulacion;
-                    $venta->fecha_anulacion = now();
-                    $venta->save();
+                    DB::table('f_venta')
+                    ->where('ven_codigo', $request->ven_codigo)
+                    ->where('id_empresa', $request->empresa)
+                    ->update([
+                        'est_ven_codigo'       => $request->est_ven_codigo,
+                        'user_anulado'         => $id_usuario,
+                        'observacionAnulacion' => $request->observacionAnulacion,
+                        'fecha_anulacion'      => now(),
+                    ]);
                     foreach($miarray as $key => $item){
                         //con pro_stock y  pro_reservar
                         if($request->empresa==1){
@@ -724,12 +752,16 @@ class VentasController extends Controller
             }
 
         }else{
-            $venta= Ventas::findOrFail($request->ven_codigo);
+            $venta= Ventas::where('ven_codigo',$request->ven_codigo)->where('id_empresa', $request->id_empresa)->first();
             if (!$venta){
                 return "El ven_codigo no existe en la base de datos";
             }
-            $venta->est_ven_codigo = $request->est_ven_codigo;
-            $venta->save();
+            DB::table('f_venta')
+            ->where('ven_codigo', $request->ven_codigo)
+            ->where('id_empresa', $request->id_empresa)
+            ->update([
+                'est_ven_codigo'       => $request->est_ven_codigo,
+            ]);
             return $venta;
         }
     }
@@ -1241,7 +1273,7 @@ ORDER BY f.ven_fecha;");
               LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
               LEFT JOIN usuario as interc ON f.user_intercambio = interc.idusuario
               LEFT JOIN usuario au ON au.idusuario = f.user_anulado
-              WHERE (f.ven_codigo like'%$request->parte_documento%' or f.ruc_cliente like'%$request->parte_documento%')
+              WHERE (f.ven_codigo like'%$request->parte_documento%' or f.ruc_cliente like'%$request->parte_documento%' OR i.nombreInstitucion like'%$request->parte_documento%')
               and f.periodo_id=$request->periodo
               GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
              us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
@@ -1390,7 +1422,9 @@ ORDER BY f.ven_fecha;");
         $query = DB::SELECT(" SELECT dv.*, dv.det_ven_cantidad as despacho, pro.*
             FROM f_detalle_venta dv
             INNER JOIN 1_4_cal_producto pro ON pro.pro_codigo = dv.pro_codigo
-            WHERE dv.ven_codigo = '$request->id' order by dv.pro_codigo");
+            WHERE dv.ven_codigo = '$request->id'
+            and dv.id_empresa = $request->idemp
+            order by dv.pro_codigo");
         return $query;
     }
     //cambio ingereso de datos de libros a excluir o despachar
@@ -1432,6 +1466,7 @@ ORDER BY f.ven_fecha;");
                 if ($item->despacho != 0) {
                     $detalle = DB::table('f_detalle_venta')
                                  ->where('det_ven_codigo', $item->det_ven_codigo)
+                                 ->where('id_empresa', $request->id_empresa)
                                  ->first();
 
                     if (!$detalle) {
@@ -1441,6 +1476,7 @@ ORDER BY f.ven_fecha;");
                     // Actualiza la cantidad de despacho
                     DB::table('f_detalle_venta')
                       ->where('det_ven_codigo', $item->det_ven_codigo)
+                      ->where('id_empresa', $request->id_empresa)
                       ->update(['det_ven_cantidad_despacho' => $item->despacho]);
                 }
             }
@@ -1748,15 +1784,22 @@ ORDER BY f.ven_fecha;");
             DB::beginTransaction();
 
             // Actualizar f_venta
-            $venta = Ventas::where('ven_codigo', $request->documentoVenta)->firstOrFail();
-
+            $venta = Ventas::where('ven_codigo', $request->documentoVenta)->where('id_empresa', $request->id_empresa)->first();
+            if(!$venta){
+                DB::rollBack();
+                return "El ven_codigo no existe en la base de datos";
+            }
             if ($venta->institucion_id !== $request->id_institucion) {
-                $venta->institucion_id = $request->id_institucion;
-                $venta->save();
+                DB::table('f_venta')
+                ->where('ven_codigo', $request->documentoVenta)
+                ->where('id_empresa', $request->id_empresa)
+                ->update([
+                    'institucion_id'       => $request->id_institucion,
+                ]);
             }
 
             // Actualizar f_proforma
-            $proforma = Proforma::where('prof_id', $request->documentoProforma)->firstOrFail();
+            $proforma = Proforma::where('prof_id', $venta->ven_idproforma)->firstOrFail();
 
             if ($proforma->id_ins_depacho !== $request->id_institucion) {
                 $proforma->id_ins_depacho = $request->id_institucion;
@@ -1874,37 +1917,40 @@ ORDER BY f.ven_fecha;");
     {
         try {
             // Validación del request
-            $validatedData = $this->validate($request, [
-                'data_codigos'   => 'required|json',
-                'id_usuario'     => 'required|integer',
-                // 'comentario'     => 'nullable|string',
+            $validatedData              = $this->validate($request, [
+                'data_codigos'          => ['required', 'json'],
+                'id_usuario'            => ['required', 'integer'],
+                'ifPermitirReemplazar'  => ['required', 'boolean'],
             ]);
+
             DB::beginTransaction();
 
-            $data               = json_decode($validatedData['data_codigos']);
-            $id_usuario         = $validatedData['id_usuario'];
-            // $comentario         = $validatedData['comentario'];
-            $cambiados          = 0;
-            $codigosNoCambiados = [];
+            $data                   = json_decode($validatedData['data_codigos']);
+            $id_usuario             = $validatedData['id_usuario'];
+            $ifPermitirReemplazar   = (bool) $validatedData['ifPermitirReemplazar'];
+            $cambiados              = 0;
+            $codigosNoCambiados     = [];
 
             foreach ($data as $item) {
                 $codigo = CodigosLibros::where('codigo', $item->codigo)->first();
 
                 if (!$codigo) {
                     $codigosNoCambiados[] = [
-                        "codigo"  => $item->codigo,
+                        "codigo" => $item->codigo,
                         "mensaje" => "Código no existe",
                     ];
                     continue;
                 }
 
-                if (is_null($codigo->codigo_proforma) || $codigo->codigo_proforma == $item->documento) {
-                    $comentario ="Se agrego la documento $item->documento";
+                $validate = $ifPermitirReemplazar || is_null($codigo->codigo_proforma) || $codigo->codigo_proforma == $item->documento;
+
+                if ($validate) {
+                    $comentario = "Se agregó el documento {$item->documento}";
                     $this->actualizarCodigo($codigo, $item, $id_usuario, $comentario);
                     $cambiados++;
                 } else {
                     $codigosNoCambiados[] = [
-                        "codigo"  => $item->codigo,
+                        "codigo" => $item->codigo,
                         "mensaje" => "Ya existe una pre factura {$codigo->codigo_proforma} en la pre factura {$item->documento}",
                     ];
                 }
@@ -1912,13 +1958,17 @@ ORDER BY f.ven_fecha;");
 
             DB::commit();
 
-            return [
-                "cambiados"          => $cambiados,
+            return response()->json([
+                "error" => false,
+                "cambiados" => $cambiados,
                 "codigosNoCambiados" => $codigosNoCambiados,
-            ];
+            ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(["error" => true, "message" => $e->getMessage()], 500);
+            return response()->json([
+                "error" => true,
+                "message" => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -2419,6 +2469,131 @@ ORDER BY f.ven_fecha;");
         }
     }
 
+
+
+    public function cambioDesfasANotaCredito(Request $request)
+    {
+        // Recibimos los datos desde el frontend
+        $id_ins_depacho = $request->id_ins_depacho;
+        $empresa = $request->id_empresa;
+        $data_detalle = $request->data_detalle;
+        $tipoVenta = $request->tipoVenta; // Tipo de venta: 1 o 2
+        $nuevoVenCodigo = $request->ven_codigo; // Nuevo código de venta
+
+        // Si los detalles vienen como cadena JSON, decodificarlo
+        if (is_string($data_detalle)) {
+            $data_detalle = json_decode($data_detalle, true);
+        }
+
+        // Validación básica de los datos
+        if (!$id_ins_depacho || empty($data_detalle)) {
+            return response()->json(['message' => 'items inválidos.']);
+        }
+
+        // Iniciar la transacción
+        DB::beginTransaction();
+
+        try {
+            // Crear un nuevo documento de venta con los valores que envía el frontend
+            $nuevoDocumento = [
+                'ven_codigo' => $nuevoVenCodigo, // Nuevo código de venta
+                'id_empresa' => $empresa,
+                'ven_desc_por' => $request->ven_desc_por, // Descuento porcentaje recibido
+                'ven_iva_por' => $request->ven_iva_por, // IVA porcentaje recibido
+                'ven_descuento' => $request->ven_descuento, // Descuento recibido
+                'ven_iva' => $request->ven_iva, // IVA recibido
+                'ven_transporte' => $request->ven_transporte, // Transporte recibido
+                'ven_valor' => $request->ven_valor, // Valor total recibido
+                'ven_subtotal' => $request->ven_subtotal, // Subtotal recibido
+                'institucion_id' => $id_ins_depacho,
+                'periodo_id' => $request->periodo_id, // Periodo recibido
+                'ven_cliente' => $request->ven_cliente, // Cliente recibido
+                'clientesidPerseo' => $request->clientesidPerseo, // Cliente de Perseo recibido
+                'ven_fecha' => now(), // Fecha actual
+                'user_created' => $request->user_created, // Usuario que crea
+                'tip_ven_codigo' => $tipoVenta, // Tipo de venta (1 o 2)
+                'ven_tipo_inst' => $tipoVenta == 1 ? 'V' : 'L', // Tipo de venta según el valor recibido
+                'est_ven_codigo' => 1, // Tipo de venta según el valor recibido
+                'idtipodoc' => 16,
+                'ruc_cliente' => $request->ruc_cliente, // RUC del cliente
+            ];
+
+            // Insertar el nuevo documento en f_venta
+            DB::table('f_venta')->insert($nuevoDocumento);
+
+            // Iteramos sobre los detalles de la venta
+            foreach ($data_detalle as $item) {
+                $codigo = $item['pro_codigo'];
+                $cantidad = $item['cantidad_real_facturar'];
+                $precio = $item['precio'];
+
+                DB::table('f_detalle_venta')->insert([
+                    'ven_codigo' => $nuevoVenCodigo,
+                    'id_empresa' => $empresa,
+                    'pro_codigo' => $codigo,
+                    'det_ven_cantidad' => $cantidad,
+                    'det_ven_valor_u' => $precio,
+                ]);
+            }
+
+            // ACTUALIZAR SECUENCIAL
+            if ($empresa == 1) {
+                $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_Prolipa as cod from  f_tipo_documento where tdo_id=16");
+            } else if ($empresa == 3) {
+                $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_calmed as cod from  f_tipo_documento where tdo_id=16");
+            }
+
+            $id = $query1[0]->id;
+            $codi = $query1[0]->cod;
+            $co = (int)$codi + 1;
+            $tipo_doc = f_tipo_documento::findOrFail($id);
+            if ($empresa == 1) {
+                $tipo_doc->tdo_secuencial_Prolipa = $co;
+            } else if ($empresa == 3) {
+                $tipo_doc->tdo_secuencial_calmed = $co;
+            }
+            $tipo_doc->save();
+
+            // Si todo ha ido bien, hacemos commit
+            DB::commit();
+
+            return response()->json(['message' => 'Prefacturas convertidas a notas correctamente.', 'status' => '0']);
+
+        } catch (\Exception $e) {
+            // Si ocurre un error, hacemos rollback
+            DB::rollBack();
+            return response()->json(['message' => 'Hubo un error al procesar las prefacturas: ' . $e->getMessage(), 'status' => '1', 'line' => $e->getLine()]);
+        }
+    }
+
+    public function getCantidadNotaCredito(Request $request)
+    {
+        // Validar los parámetros de entrada
+        $request->validate([
+            'institucion' => 'required|integer',
+            'empresa' => 'required|integer',
+            'periodo' => 'required|integer',
+        ]);
+
+        // Ejecutar la consulta
+        $resultados = DB::table('f_venta as fva')
+            ->join('f_detalle_venta as fdva', function ($join) {
+                $join->on('fdva.ven_codigo', '=', 'fva.ven_codigo')
+                    ->on('fdva.id_empresa', '=', 'fva.id_empresa');
+            })
+            ->select('fdva.pro_codigo', DB::raw('SUM(fdva.det_ven_cantidad) as det_ven_cantidad'))
+            ->where('fva.institucion_id', $request->institucion)
+            ->where('fva.id_empresa', $request->empresa)
+            ->where('fva.periodo_id', $request->periodo)
+            ->where('fva.est_ven_codigo', '<>', 3)
+            ->where('fva.idtipodoc',16)
+            ->groupBy('fdva.pro_codigo')
+            ->get();
+
+        // Devolver los resultados
+        return response()->json($resultados);
+    }
+
     public function getNotasIntercambio(Request $request)
     {
         $institucion = $request->input('institucion');
@@ -2465,6 +2640,40 @@ ORDER BY f.ven_fecha;");
         ]);
     }
 
+    public function getNotasCredito(Request $request)
+    {
+        $institucion = $request->input('institucion');
+        $periodo = $request->input('periodo');
+
+        // Ejecutar la primera consulta y obtener las notas
+        $notas = DB::select("SELECT DISTINCT fv.*
+            FROM f_detalle_venta f
+            LEFT JOIN f_venta fv ON fv.ven_codigo = f.ven_codigo AND fv.id_empresa = f.id_empresa
+            WHERE fv.institucion_id = ?
+            AND fv.periodo_id = ?
+            AND fv.idtipodoc = 16", [$institucion, $periodo]);
+
+        // Devolver los datos con las notas y detalles integrados
+        return $notas;
+    }
+    public function getNotasCLiente(Request $request)
+    {
+        $institucion = $request->input('institucion');
+        $periodo = $request->input('periodo');
+
+        // Ejecutar la primera consulta y obtener las notas
+        $notas = DB::select("SELECT fv.*, i.nombreInstitucion
+            FROM f_venta fv
+            LEFT JOIN institucion i ON i.idInstitucion = fv.institucion_id
+            WHERE fv.institucion_id = $institucion
+            AND fv.periodo_id = $periodo
+            AND (fv.est_ven_codigo = 13
+            OR fv.idtipodoc = 16)");
+
+        // Devolver los datos con las notas y detalles integrados
+        return $notas;
+    }
+
     public function Get_PREFacturaCodigos(Request $request)
     {
         // Asegurarnos de que ven_codigo y idemp sean arreglos (en caso de que vengan como cadenas)
@@ -2480,5 +2689,64 @@ ORDER BY f.ven_fecha;");
 
         return $query;
     }
+
+    // METODOS JEYSON INICIO
+    public function GetFacturasxAgrupa_SoloEnviados(Request $request){
+        $identificacion = $request->input('identificacion');
+        $id_empresa = $request->input('id_empresa');
+
+            $query = DB::SELECT("SELECT
+            fv.id_factura,
+            fv.ven_cliente,
+            fv.ven_fecha,
+            fv.ven_valor,
+            fv.id_empresa,
+            fv.estadoPerseo,
+            fv.*,
+            ins.nombreInstitucion,
+            ins.direccionInstitucion,
+            ins.telefonoInstitucion,
+            usa.nombres,
+            usa.apellidos,
+            usa.cedula,
+            usa.email,
+            usa.telefono,
+            em.descripcion_corta as nombre,
+            CONCAT(us.nombres,' ',us.apellidos) AS responsable,
+            COUNT(DISTINCT dfv.pro_codigo) AS item,
+            SUM(dfv.det_ven_cantidad) AS libros
+        FROM
+            f_venta_agrupado fv
+            INNER JOIN institucion ins ON fv.institucion_id = ins.idInstitucion
+            INNER JOIN usuario usa ON fv.ven_cliente = usa.idusuario
+            INNER JOIN f_detalle_venta_agrupado dfv ON fv.id_factura = dfv.id_factura
+            INNER JOIN empresas em ON em.id = fv.id_empresa
+            INNER JOIN usuario us ON us.idusuario=fv.user_created
+        WHERE dfv.id_empresa = fv.id_empresa
+            AND fv.idtipodoc = 11
+            AND fv.estadoPerseo = 1
+            AND usa.cedula = $identificacion
+            AND fv.id_empresa = $id_empresa
+        GROUP BY
+            fv.id_factura,
+            fv.ven_cliente,
+            fv.ven_fecha,
+            fv.ven_valor,
+            fv.ven_valor,
+            fv.id_empresa,
+            fv.estadoPerseo,
+            ins.nombreInstitucion,
+            ins.direccionInstitucion,
+            ins.telefonoInstitucion,
+            usa.nombres,
+            usa.apellidos,
+            usa.cedula,
+            usa.email,
+            usa.telefono
+        ORDER BY
+            fv.ven_fecha DESC");
+    return $query;
+    }
+    // METODOS JEYSON FIN
 
 }

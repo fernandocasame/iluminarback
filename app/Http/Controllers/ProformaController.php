@@ -418,16 +418,17 @@ class ProformaController extends Controller
        {
 
         try{
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $miarray=json_decode($request->data_detalle);
-        DB::beginTransaction();
+            set_time_limit(6000000);
+            ini_set('max_execution_time', 6000000);
+            $miarray=json_decode($request->data_detalle);
+            DB::beginTransaction();
+            $letraDocumento = f_tipo_documento::getLetra(5)->tdo_letra;
             $proforma = new Proforma;
             if($request->id_group == 1 || $request->id_group == 22|| $request->id_group == 23){
                 $id_empresa         = $request->emp_id;
                 $cod_usuario        = $request->cod_usuario;
                 $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                $ven_codigo         = "PP-".$cod_usuario."-".$getNumeroDocumento;
+                $ven_codigo         = $letraDocumento."-".$cod_usuario."-".$getNumeroDocumento;
                 $proforma->prof_id = $ven_codigo;
             }
 
