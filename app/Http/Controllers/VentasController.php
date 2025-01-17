@@ -472,7 +472,6 @@ class VentasController extends Controller
         }
     }
     public function Postventa_Registra(Request $request){
-        return $request;
         $letraDocumento     = $request->letra;
         $id_empresa         = $request->id_empresa;
         $codigo_contrato    = $request->codigo_contrato;
