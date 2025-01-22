@@ -125,14 +125,13 @@ class AbonoController extends Controller
             COUNT(CASE WHEN ab.abono_facturas <> 0.00 THEN 1 ELSE NULL END) AS totalAbonoFacturas,
             SUM(CASE WHEN ab.abono_notas <> 0.00 AND ab.abono_estado = 0 THEN ab.abono_notas ELSE 0 END) AS abononotas,
             COUNT(CASE WHEN ab.abono_notas <> 0.00 THEN 1 ELSE NULL END) AS totalAbonoNotas,
-            SUM(CASE WHEN ab.abono_tipo = 3 AND ab.abono_valor_retencion <> 0.00 THEN ab.abono_valor_retencion ELSE 0 END) AS retencionValor,
-            COUNT(CASE WHEN ab.abono_tipo = 3 AND ab.abono_valor_retencion <> 0.00 THEN 1 ELSE NULL END) AS totalRetencionValor
+            SUM(CASE WHEN ab.abono_tipo = 3 AND ab.abono_valor_retencion <> 0.00 AND ab.abono_estado = 0 THEN ab.abono_valor_retencion ELSE 0 END) AS retencionValor,
+            COUNT(CASE WHEN ab.abono_tipo = 3 AND ab.abono_valor_retencion <> 0.00 AND ab.abono_estado = 0 THEN 1 ELSE NULL END) AS totalRetencionValor
             -- FROM abono ab WHERE ab.abono_institucion = '$request->institucion'
             FROM abono ab WHERE ab.abono_periodo = '$request->periodo'
             AND ab.abono_empresa = '$request->empresa'
             AND ab.abono_ruc_cliente ='$request->cliente'
-            GROUP BY ab.abono_ruc_cliente
-            HAVING SUM(ab.abono_facturas) <> 0 OR SUM(ab.abono_notas) <> 0;");
+            GROUP BY ab.abono_ruc_cliente;");
         return $query;
     }
 
@@ -2233,7 +2232,7 @@ class AbonoController extends Controller
                 usa.nombres, usa.apellidos, egf.egf_url,
                 CONCAT(us.nombres, ' ', us.apellidos) AS nombrecreador, 
                 COUNT(DISTINCT dfv.pro_codigo) AS item, 
-                SUM(dfv.det_ven_cantidad) AS libros, a.abono_estado
+                SUM(dfv.det_ven_cantidad) AS libros, a.abono_estado, egft.egft_nombre
             FROM abono a 
             INNER JOIN f_venta_agrupado fva ON a.referencia_retencion_factura = fva.id_factura
             INNER JOIN usuario us ON a.user_created = us.idusuario
@@ -2242,6 +2241,7 @@ class AbonoController extends Controller
             INNER JOIN f_detalle_venta_agrupado dfv ON fva.id_factura = dfv.id_factura
             INNER JOIN empresas em ON em.id = fva.id_empresa
             INNER JOIN evidencia_global_files egf ON a.egf_id = egf.egf_id
+            INNER JOIN evidencia_global_files_tipo egft ON egf.egft_id = egft.egft_id
             WHERE a.abono_tipo = 3
             AND a.abono_ruc_cliente = ?
             AND fva.id_empresa = ?
@@ -2250,7 +2250,7 @@ class AbonoController extends Controller
                     a.idClientePerseo, a.clienteCodigoPerseo, a.abono_concepto, a.abono_ruc_cliente,
                     fva.ven_valor, fva.id_empresa, em.descripcion_corta, ins.nombreInstitucion, ins.direccionInstitucion, 
                     usa.nombres, usa.apellidos, us.nombres, us.apellidos
-                    ORDER BY a.updated_at DESC
+                    ORDER BY a.created_at DESC
         ", [$identificacion, $id_empresa]);
 
         return $query;
@@ -2281,6 +2281,49 @@ class AbonoController extends Controller
             WHERE egf.egf_id = ?", [$egf_id]);
 
         return $query;
+    }
+
+    public function anularretencion_quitarevidencia(Request $request)
+    {
+        // return $request;
+        DB::beginTransaction();
+        try {
+            $validator = Validator::make($request->all(), [
+                'abono_id' => 'required|numeric',
+            ]);
+            if ($validator->fails()) {
+                return response()->json(['status' => 0, 'message' => 'Validación fallida','errors' => $validator->errors(),], 422);
+            }
+
+            // Buscar o crear un registro en la tabla Abono
+            $retencionupdate = Abono::firstOrNew(['abono_id' => $request->abono_id]);
+
+            if (!$retencionupdate->exists) {
+                return response()->json(['status' => 0,'message' => 'No se encontró el registro de abono.',], 404);
+            }
+
+            // Buscar el registro de EvidenciaGlobalFiles asociado a egf_id
+            $evidenciaGlobalFile = EvidenciaGlobalFiles::find($retencionupdate->egf_id);
+
+            if ($evidenciaGlobalFile) {
+                // Establecer todos los campos en null
+                $evidenciaGlobalFile->egf_archivo = null;
+                $evidenciaGlobalFile->egf_url = null;
+                $evidenciaGlobalFile->egf_tamano = null;
+                $evidenciaGlobalFile->updated_at = now();
+                $evidenciaGlobalFile->save();
+            } else {
+                return response()->json(['status' => 0,'message' => 'No se encontró el registro asociado en EvidenciaGlobalFiles.',], 404);
+            }
+            DB::commit();
+            return response()->json(['message' => 'Registro procesado correctamente','status' => 1,]);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                "status" => "0", 
+                'message' => 'Error al actualizar los datos: ' . $e->getMessage()
+            ], 500);
+        }
     }
     //JEYSON METODOS FIN
 

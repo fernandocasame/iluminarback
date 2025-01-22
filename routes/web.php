@@ -1077,6 +1077,8 @@ Route::post('cambioEstadoCuentas', 'BancoController@cambioEstadoCuentas');
 Route::get('clientesVentas', 'BancoController@clientesVentas');
 Route::get('clientesVentasALL', 'BancoController@clientesVentasALL');
 Route::get('obtenerCuentasXCobrar', 'BancoController@obtenerCuentasXCobrar');
+Route::get('obtenerNotasCredito', 'BancoController@obtenerNotasCredito');
+Route::post('actualizardatosNotasCredito', 'BancoController@actualizardatosNotasCredito');
 //FIN SEGUIMIENTO
 //PREFACTURAS A NOTAS
 Route::post('cambioCodigosPrefacturasANota', 'VentasController@cambioCodigosPrefacturasANota');
@@ -1146,6 +1148,8 @@ Route::get('get_pedidos_periodo_facturador/{periodo}/{id_facturador}', 'PedidosC
 Route::get('get_pedidos_periodoxContrato/{contrato}', 'PedidosController@get_pedidos_periodo_contrato');
 Route::get('get_pedidos_periodo_Only_contrato/{contrato}/{beneficiario}', 'PedidosController@get_pedidos_periodo_Only_contrato');
 Route::get('getConvenio','PedidosController@getConvenio');
+Route::get('getConvenioGlobalActivo','PedidosController@getConvenioGlobalActivo');
+Route::get('getAnticipoPedido','PedidosController@getAnticipoPedido');
 Route::get('get_pedidos_periodo_Only_pedido/{contrato}/{beneficiario}', 'PedidosController@get_pedidos_periodo_Only_pedido');
 Route::get('get_pedidos_asesor/{periodo}/{asesor}', 'PedidosController@get_pedidos_asesor');
 Route::post('guardarPedidoGuias', 'PedidosController@guardarPedidoGuias');
@@ -1197,13 +1201,14 @@ Route::get('GetFacturasxAgrupa_SoloEnviados','VentasController@GetFacturasxAgrup
 Route::get('GetListadoRetenciones','AbonoController@GetListadoRetenciones');
 Route::get('GetVerificacionAbonoDocumento','AbonoController@GetVerificacionAbonoDocumento');
 Route::get('GetEvidenciasGlobalxID','AbonoController@GetEvidenciasGlobalxID');
-Route::get('GetPorcentajeRetencion','AbonoRetencionPorcentajeController@GetPorcentajeRetencion');
-Route::get('GetPorcentajeRetencion','AbonoRetencionPorcentajeController@GetPorcentajeRetencion');
+Route::get('VerifcarMetodosGet_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosGet_AbonoRetencionPorcentaje');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
 Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
 Route::post('retencion_registro_update_new', 'AbonoController@retencion_registro_update_new');
 Route::post('Post_ActualizarPorcentaje_Venta','AdminController@Post_ActualizarPorcentaje_Venta');
+Route::post('anularretencion_quitarevidencia','AbonoController@anularretencion_quitarevidencia');
+Route::post('VerifcarMetodosPost_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosPost_AbonoRetencionPorcentaje');
 //FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -2007,3 +2012,5 @@ Route::group([], function () {
     // Definición manual de rutas para el controlador EvaluacionEstudianteController
     Route::resource('/notificaciones', 'NotificacionController');
 });
+//quitar codigo del reporte de facturacion
+Route::post('restaurarALiquidado_devueltos','CodigoLibrosController@restaurarALiquidado_devueltos');

@@ -667,6 +667,7 @@ class InstitucionController extends Controller
            AND c.estado <> '2'
            ORDER BY c.id DESC
             ");
+            return $todoAgenda;
             if(count($todoAgenda) == 0){
                return [];
             }else{
@@ -675,12 +676,21 @@ class InstitucionController extends Controller
                     if($item->estado_institucion_temporal == '1'){
                         $item->userAsesor = $item->asesor;
                     }else{
-                        $getInstitucion = Institucion::Where('idInstitucion',$item->institucion_id)->with('asesor')->get();
+                        $getInstitucion = DB::SELECT("SELECT u.nombres,u.apellidos  FROM institucion i
+                        LEFT JOIN usuario u ON i.asesor_id = u.idusuario
+                        WHERE i.idInstitucion = '$item->institucion_id'
+                        ");
                         if(count($getInstitucion) > 0){
-                            $item->userAsesor = $getInstitucion[0]->asesor->nombres." ".$getInstitucion[0]->asesor->apellidos;
+                            $item->userAsesor = $getInstitucion[0]->nombres." ".$getInstitucion[0]->apellidos;
                         }else{
-                            $item->userAsesor = "";
+                            $item->userAsesor = "No se encontro asesor";
                         }
+                        // $getInstitucion = Institucion::Where('idInstitucion',$item->institucion_id)->with('asesor')->get();
+                        // if(count($getInstitucion) > 0){
+                        //     $item->userAsesor = $getInstitucion[0]->asesor->nombres." ".$getInstitucion[0]->asesor->apellidos;
+                        // }else{
+                        //     $item->userAsesor = "";
+                        // }
                     }
                 })->chunk(10)->flatten();
                 return $data;

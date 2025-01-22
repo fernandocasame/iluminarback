@@ -2478,20 +2478,20 @@ ORDER BY f.ven_fecha;");
         $data_detalle = $request->data_detalle;
         $tipoVenta = $request->tipoVenta; // Tipo de venta: 1 o 2
         $nuevoVenCodigo = $request->ven_codigo; // Nuevo código de venta
-
+    
         // Si los detalles vienen como cadena JSON, decodificarlo
         if (is_string($data_detalle)) {
             $data_detalle = json_decode($data_detalle, true);
         }
-
+    
         // Validación básica de los datos
         if (!$id_ins_depacho || empty($data_detalle)) {
             return response()->json(['message' => 'items inválidos.']);
         }
-
+    
         // Iniciar la transacción
         DB::beginTransaction();
-
+    
         try {
             // Crear un nuevo documento de venta con los valores que envía el frontend
             $nuevoDocumento = [
@@ -2512,20 +2512,21 @@ ORDER BY f.ven_fecha;");
                 'user_created' => $request->user_created, // Usuario que crea
                 'tip_ven_codigo' => $tipoVenta, // Tipo de venta (1 o 2)
                 'ven_tipo_inst' => $tipoVenta == 1 ? 'V' : 'L', // Tipo de venta según el valor recibido
-                'est_ven_codigo' => 1, // Tipo de venta según el valor recibido
+                'est_ven_codigo' => 14, // Tipo de venta según el valor recibido
                 'idtipodoc' => 16,
                 'ruc_cliente' => $request->ruc_cliente, // RUC del cliente
+                'fecha_notaCredito' => $request->ven_fecha,
             ];
-
+    
             // Insertar el nuevo documento en f_venta
             DB::table('f_venta')->insert($nuevoDocumento);
-
+    
             // Iteramos sobre los detalles de la venta
             foreach ($data_detalle as $item) {
                 $codigo = $item['pro_codigo'];
                 $cantidad = $item['cantidad_real_facturar'];
                 $precio = $item['precio'];
-
+    
                 DB::table('f_detalle_venta')->insert([
                     'ven_codigo' => $nuevoVenCodigo,
                     'id_empresa' => $empresa,
@@ -2534,14 +2535,14 @@ ORDER BY f.ven_fecha;");
                     'det_ven_valor_u' => $precio,
                 ]);
             }
-
+    
             // ACTUALIZAR SECUENCIAL
             if ($empresa == 1) {
                 $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_Prolipa as cod from  f_tipo_documento where tdo_id=16");
             } else if ($empresa == 3) {
                 $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_calmed as cod from  f_tipo_documento where tdo_id=16");
             }
-
+    
             $id = $query1[0]->id;
             $codi = $query1[0]->cod;
             $co = (int)$codi + 1;
@@ -2552,12 +2553,12 @@ ORDER BY f.ven_fecha;");
                 $tipo_doc->tdo_secuencial_calmed = $co;
             }
             $tipo_doc->save();
-
+    
             // Si todo ha ido bien, hacemos commit
             DB::commit();
-
+    
             return response()->json(['message' => 'Prefacturas convertidas a notas correctamente.', 'status' => '0']);
-
+    
         } catch (\Exception $e) {
             // Si ocurre un error, hacemos rollback
             DB::rollBack();

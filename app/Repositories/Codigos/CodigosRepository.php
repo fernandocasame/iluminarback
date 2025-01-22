@@ -765,6 +765,7 @@ class  CodigosRepository extends BaseRepository
                     'c.bc_institucion',
                     'c.contrato',
                     'c.venta_lista_institucion',
+                    'c.quitar_de_reporte',
                     'ls.year',
                     'ls.id_libro_plus',
                     DB::raw("CASE WHEN c.plus = 1 THEN ls.id_libro_plus ELSE c.libro_idlibro END AS libro_idReal"), // Lógica para la nueva columna

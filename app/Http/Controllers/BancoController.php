@@ -672,18 +672,46 @@ class BancoController extends Controller
 
         // Retornar los resultados como una respuesta JSON
         return response()->json($resultados);
-    }
+    }    
     
-
     public function obtenerCuentasXCobrar(Request $request)
     {
-        // Recibir el año y periodo desde el request
+        // Recibir los parámetros
         $year = $request->input('year');
-
-        // Construir el rango de fechas
+        $tipo = $request->input('tipoFecha');  // Ajustado para coincidir con el frontend
+        
+        // Validar que se haya seleccionado al menos un año y un tipo de fecha
+        if (!$year) {
+            return response()->json([
+                'error' => 'Debe seleccionar un año.'
+            ], 400);  // Retornar un error si no se pasa alguno de los parámetros requeridos
+        }
+    
+        // Si no se pasa tipo de fecha, se establece uno por defecto
+        if (!$tipo) {
+            $tipo = 1;  // Asignamos el valor por defecto que corresponde a 'fv.fecha_notaCredito'
+        }
+    
+        // Determinar qué campo de fecha usar basado en el tipo
+        $campoFecha = '';
+        $validacionAdicional='';
+        if ($tipo == 1) {
+            $campoFecha = 'fv.fecha_notaCredito';
+        } elseif ($tipo == 2) {
+            $campoFecha = 'fv.fecha_sri';
+            $validacionAdicional='AND fv.est_ven_codigo = 15';
+        } elseif ($tipo == 3) {
+            $campoFecha = 'f.ven_fecha';
+        } else {
+            return response()->json([
+                'error' => 'Tipo de fecha inválido.'
+            ], 400);  // Validar que el tipo sea correcto
+        }
+    
+        // Si no se pasa un rango de fechas, usamos el 1 de enero y el 31 de diciembre del año seleccionado
         $fechaInicio = $year . '-01-01';
         $fechaFin = $year . '-12-31';
-
+    
         // Consulta SQL para la empresa 1 (Prolipa)
         $queryProlipa = "
             SELECT 
@@ -701,29 +729,45 @@ class BancoController extends Controller
                     AND a.abono_estado = 0
                     AND DATE(a.abono_fecha) BETWEEN ? AND ?
                 ) AS totalCobrado,
+                COALESCE(nc.totalNotasCredito, 0) AS totalNotasCredito,
                 f.id_empresa
             FROM f_venta_agrupado AS f
             INNER JOIN institucion AS i ON i.idInstitucion = f.institucion_id
             INNER JOIN usuario AS u ON u.idusuario = f.ven_cliente
+            LEFT JOIN (
+                SELECT 
+                    fv.institucion_id, 
+                    fv.ven_cliente,
+                    SUM(fv.ven_valor) AS totalNotasCredito
+                FROM f_venta AS fv
+                WHERE fv.idtipodoc = 16
+                AND fv.id_empresa = 1
+                AND fv.id_empresa = 1
+                $validacionAdicional
+                AND DATE($campoFecha) BETWEEN ? AND ?
+                GROUP BY fv.institucion_id, fv.ven_cliente
+            ) AS nc ON nc.institucion_id = f.institucion_id AND nc.ven_cliente = f.ven_cliente
             WHERE DATE(f.ven_fecha) BETWEEN ? AND ?
             AND f.estadoPerseo = 1
             AND f.id_empresa = 1
+            AND f.est_ven_codigo = 0
             GROUP BY f.ven_cliente, f.institucion_id, f.id_empresa
         ";
-
+    
         // Ejecutar la consulta para la empresa Prolipa
         $resultadosProlipa = DB::select($queryProlipa, [
-            $fechaInicio, $fechaFin, $fechaInicio, $fechaFin
+            $fechaInicio, $fechaFin, $fechaInicio, $fechaFin, $fechaInicio, $fechaFin
         ]);
-
+    
         // Transformar los resultados para Prolipa
         $resultadosProlipa = array_map(function ($item) {
-            // Añadir el tipo de empresa
-            $item->totalCobrado = (float) $item->totalCobrado;  // Asegurar que el totalCobrado sea un float
-            $item->empresa = 'Prolipa';  // Añadir el nombre de la empresa
+            // Asegurar que el totalCobrado sea un float
+            $item->totalCobrado = (float) $item->totalCobrado;
+            // Añadir el nombre de la empresa
+            $item->empresa = 'Prolipa';
             return $item;
         }, $resultadosProlipa);
-
+    
         // Consulta SQL para la empresa 3 (Calmed)
         $queryCalmed = "
             SELECT 
@@ -741,37 +785,107 @@ class BancoController extends Controller
                     AND a.abono_estado = 0
                     AND DATE(a.abono_fecha) BETWEEN ? AND ?
                 ) AS totalCobrado,
+                COALESCE(nc.totalNotasCredito, 0) AS totalNotasCredito,
                 f.id_empresa
             FROM f_venta_agrupado AS f
             INNER JOIN institucion AS i ON i.idInstitucion = f.institucion_id
             INNER JOIN usuario AS u ON u.idusuario = f.ven_cliente
+            LEFT JOIN (
+                SELECT 
+                    fv.institucion_id, 
+                    fv.ven_cliente,
+                    SUM(fv.ven_valor) AS totalNotasCredito
+                FROM f_venta AS fv
+                WHERE fv.idtipodoc = 16
+                AND fv.id_empresa = 3
+                $validacionAdicional
+                AND DATE($campoFecha) BETWEEN ? AND ?
+                GROUP BY fv.institucion_id, fv.ven_cliente
+            ) AS nc ON nc.institucion_id = f.institucion_id AND nc.ven_cliente = f.ven_cliente
             WHERE DATE(f.ven_fecha) BETWEEN ? AND ?
             AND f.estadoPerseo = 1
             AND f.id_empresa = 3
+            AND f.est_ven_codigo = 0
             GROUP BY f.ven_cliente, f.institucion_id, f.id_empresa
         ";
-
+    
         // Ejecutar la consulta para la empresa Calmed
         $resultadosCalmed = DB::select($queryCalmed, [
-            $fechaInicio, $fechaFin, $fechaInicio, $fechaFin
+            $fechaInicio, $fechaFin, $fechaInicio, $fechaFin, $fechaInicio, $fechaFin
         ]);
-
+    
         // Transformar los resultados para Calmed
         $resultadosCalmed = array_map(function ($item) {
-            // Añadir el tipo de empresa
-            $item->totalCobrado = (float) $item->totalCobrado;  // Asegurar que el totalCobrado sea un float
-            $item->empresa = 'Calmed';  // Añadir el nombre de la empresa
+            // Asegurar que el totalCobrado sea un float
+            $item->totalCobrado = (float) $item->totalCobrado;
+            // Añadir el nombre de la empresa
+            $item->empresa = 'Calmed';
             return $item;
         }, $resultadosCalmed);
-
+    
         // Organizar los resultados en el formato requerido
         $resultados = [
             'prolipa' => $resultadosProlipa,
             'calmed' => $resultadosCalmed
         ];
-
+    
         // Devolver los resultados en una respuesta JSON
         return response()->json($resultados);
+    }
+    
+    
+    public function obtenerNotasCredito(Request $request)
+    {
+        $empresa = $request->empresa;
+        $year = $request->year;
+    
+        // Realizamos la consulta con DB::table y uniones
+        $resultados = DB::table('f_venta as f')
+            ->select('f.*', 
+                    DB::raw("CONCAT(u.nombres, ' ', u.apellidos) AS cliente"), 
+                    'i.nombreInstitucion')
+            ->join('institucion as i', 'i.idInstitucion', '=', 'f.institucion_id')
+            ->join('usuario as u', 'u.idusuario', '=', 'f.ven_cliente')
+            ->where('f.idtipodoc', 16)
+            ->where('f.id_empresa', $empresa)
+            ->whereBetween('f.fecha_notaCredito', ["$year-01-01", "$year-12-31"])
+            ->get();
+    
+        // Devolver los resultados como un JSON
+        return response()->json($resultados);
+    }
+
+    public function actualizardatosNotasCredito(Request $request)
+    {
+        // Validar los datos recibidos
+        $request->validate([
+            'documento_sri' => 'required',
+            'empresa' => 'required',
+            'fecha_sri' => 'required',
+            'ven_codigo' => 'required',
+            'usuario' => 'required',
+        ]);
+    
+        // Realizar la actualización
+        $updated = DB::table('f_venta')
+                    ->where('ven_codigo', $request->ven_codigo)
+                    ->where('id_empresa', $request->empresa)
+                    ->update([
+                        'fecha_sri' => $request->fecha_sri,
+                        'documento_sri' => $request->documento_sri,
+                        'est_ven_codigo' => 15,
+                        'fecha_update_sri' => now(),
+                        'usuario_update_sri' => $request->usuario,
+                    ]);
+    
+        // Verificar si se actualizó al menos una fila
+        if ($updated > 0) {
+            // Si el número de filas afectadas es mayor que 0, significa que la actualización fue exitosa
+            return response()->json(['message' => 'Datos actualizados correctamente'], 200);
+        } else {
+            // Si no se actualizó ninguna fila, podría ser que no se encontró el registro
+            return response()->json(['message' => 'No se encontraron registros para actualizar'], 404);
+        }
     }
 
 }

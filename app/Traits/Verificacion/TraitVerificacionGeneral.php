@@ -96,7 +96,7 @@ trait TraitVerificacionGeneral
                     end) as verificacion
                 FROM codigoslibros ci
                 WHERE ci.codigo = c.codigo
-            ) AS verificacionAsignada
+            ) AS verificacionAsignada, c.quitar_de_reporte
             FROM codigoslibros c
             LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
             LEFT JOIN libro l ON ls.idLibro = l.idlibro

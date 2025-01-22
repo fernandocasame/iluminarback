@@ -29,8 +29,11 @@ class  VerificacionRepository extends BaseRepository
                 when (c.venta_estado = '2') then 'Venta por lista'
              end) as ventaEstado,
              (case when (c.plus = '1') then 'si'
-                 when (c.plus = '0') then 'no'
-             end) as plus
+                 when (c.plus = '0') then ''
+             end) as plus,
+            (case when (c.quitar_de_reporte = '1') then 'si'
+                 when (c.plus = '0') then ''
+             end) as quitar_de_reporte
             FROM codigoslibros c
             LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
             LEFT JOIN libro l ON ls.idLibro = l.idlibro

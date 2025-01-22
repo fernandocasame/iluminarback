@@ -430,7 +430,7 @@ class VerificacionControllerAnterior extends Controller
                 $verificacion_id =  $request->verificacion_id;
             }
             $columnaVerificacion = "verif".$request->num_verificacion;
-             $codigos = DB::table('codigoslibros as c')
+            $codigos = DB::table('codigoslibros as c')
             //  ->select('codigo','estado_liquidacion','venta_estado','factura')
             ->select(DB::RAW('
                 c.codigo,c.estado_liquidacion,c.venta_estado,c.factura,c.contrato,
@@ -451,7 +451,8 @@ class VerificacionControllerAnterior extends Controller
                     FROM codigoslibros ci
                     WHERE ci.codigo = c.codigo
                 ) AS verificacion,
-                c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10
+                c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
+                c.quitar_de_reporte
             '))
              ->where($columnaVerificacion, $verificacion_id)
              ->where('contrato', $request->contrato)
@@ -561,7 +562,8 @@ class VerificacionControllerAnterior extends Controller
                 "bc_institucion"            => $item->bc_institucion,
                 "contrato"                  => $item->contrato,
                 "venta_lista_institucion"   => $item->venta_lista_institucion,
-                "plus"                      => $item->plus
+                "plus"                      => $item->plus,
+                'quitar_de_reporte'         => $item->quitar_de_reporte,
             ];
             $contador++;
         }
@@ -1626,7 +1628,8 @@ class VerificacionControllerAnterior extends Controller
                     "bc_institucion"            => $item->bc_institucion,
                     "contrato"                  => $item->contrato,
                     "venta_lista_institucion"   => $item->venta_lista_institucion,
-                    "plus"                      => $item->plus
+                    "plus"                      => $item->plus,
+                    "quitar_de_reporte"         => $item->quitar_de_reporte,
                 ];
                 $contador++;
             }

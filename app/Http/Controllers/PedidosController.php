@@ -1586,6 +1586,24 @@ class PedidosController extends Controller
         ");
         return $getPagoConvenio;
     }
+    //api:get/getConvenioGlobalActivo?institucion=840
+    public function getConvenioGlobalActivo(Request $request){
+        $institucion = $request->institucion;
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios c
+        WHERE c.institucion_id = ?
+        AND c.estado = '1'
+        ",[$institucion]);
+        return $query;
+    }
+    //api:get/getAnticipoPedido?pedido=1540
+    public function getAnticipoPedido(Request $request){
+        $pedido = $request->pedido;
+        $query = DB::SELECT("SELECT * FROM 1_4_documento_liq l
+        WHERE l.id_pedido = ?
+        AND l.ifAntAprobado = '1'
+        ",[$pedido]);
+        return $query;
+    }
     public function get_pedidos_periodo_Only_pedido($pedido,$beneficiario){
         $pedidos =$this->getPedido(0,$pedido);
         $datos = [];
@@ -5648,10 +5666,10 @@ class PedidosController extends Controller
     // Determinar qué tipo de documento y letra secuencial utilizar
     if ($descuento == 100) {
         $tipoDocumento = f_tipo_documento::where('tdo_nombre', 'ACTA (A)')->first();
-        $letraSecuencial = $tipoDocumento->tdo_letra;
+        $letraSecuencial = "A";
     } else {
         $tipoDocumento = f_tipo_documento::where('tdo_nombre', 'NOTA DE VENTA (AI)')->first();
-        $letraSecuencial = $tipoDocumento->tdo_letra;
+        $letraSecuencial = "AI";
     }
 
     // Determinar qué secuencial utilizar según la empresa

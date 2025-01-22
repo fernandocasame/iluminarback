@@ -2207,7 +2207,7 @@ class CodigoLibrosController extends Controller
                                 //ingresar en el historico
                                 $this->GuardarEnHistorico(0,$id_cliente,$periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,$newValuesCodigoActivacion,$setContrato,$verificacion_liquidada);
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO LIBRO
-                                $this->tr_GuardarDevolucionHijos($id_devolucion,$item->codigo,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,0,null,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio,$tipo_importacion,$estado_codigo);
+                                $this->tr_GuardarDevolucionHijos($id_devolucion,$item->codigo,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,0,null,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio,$tipo_importacion,$estado_codigo,$ifCodigoCombo);
                                 $codigosSinCodigoUnion[] = $validar[0];
                             }
                             else{
@@ -2773,8 +2773,8 @@ class CodigoLibrosController extends Controller
         DB::table('codigoslibros')
         ->where('codigo', '=', $codigo)
         ->update([
-            'estado_liquidacion'    => '3',
-            'bc_estado'             => '1',
+            // 'estado_liquidacion'    => '3',
+            // 'bc_estado'             => '1',//sin leer
             'quitar_de_reporte'        => '1', // no se visualizará en el reporte de facturacion, pero el estudiante si puede seguir usando en su módulo
         ]);
     }
@@ -3482,8 +3482,10 @@ class CodigoLibrosController extends Controller
         try {
             // Pasar el array directamente al repositorio
             $results = $this->codigosRepository->getCodigosIndividuales($request);
+            //excluir quitar_de_reporte diferente de 1
+            $resultsExcluir = $results->where('quitar_de_reporte', '<>', '1')->values();
             // Agrupamos por nombrelibro y contamos los estados de liquidación
-            $conteo = $results->groupBy('nombrelibro')->map(function ($grupo) {
+            $conteo = $resultsExcluir->groupBy('nombrelibro')->map(function ($grupo) {
                 return [
                     'libro' => $grupo->first()->nombrelibro, // Nombre del libro
                     'codigo_liquidacion' => $grupo->first()->codigo, // Código de liquidación
@@ -4631,4 +4633,111 @@ class CodigoLibrosController extends Controller
         return $val_pedido2;
     }
     //FIN METODOS JEYSON
+    //api:post/restaurarALiquidado_devueltos
+    public function restaurarALiquidado_devueltos(Request $request)
+    {
+        // Limpiar caché
+        Cache::flush();
+
+        $codigo = $request->codigo;
+        $contrato = $request->contrato;
+        $usuario_editor = $request->id_usuario;
+        $comentario = "Restaurar código $codigo del contrato $contrato";
+
+        try {
+            DB::beginTransaction(); // Inicia la transacción
+
+            $getCodigo = CodigosLibros::where('codigo', $codigo)->first();
+
+            // Verificar si el código existe
+            if (!$getCodigo) {
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'El código no existe.',
+                ], 200);
+            }
+
+            // Clonar los valores originales antes de modificarlos
+            $old_ValuesA = $getCodigo->toArray();
+            $old_ValuesD = null;
+
+            $getquitar_de_reporte = $getCodigo->quitar_de_reporte;
+            $bc_institucion       = $getCodigo->bc_institucion;
+            $bc_periodo           = $getCodigo->bc_periodo;
+            $estado_liquidacion   = $getCodigo->estado_liquidacion;
+            $contratoCodigo       = $getCodigo->contrato;
+            //el contratoCodigo debe ser igual al contrato que se está restaurando
+            if($contratoCodigo != $contrato){
+                return response()->json([
+                    'status' => 0,
+                    'message' => 'El contrato del código no coincide con el contrato que se está restaurando.',
+                ], 200);
+            }
+            if ($getquitar_de_reporte == '1' && $estado_liquidacion == '0') {
+                // Activación
+                $getCodigo->quitar_de_reporte = '0';
+                $getCodigo->save();
+
+                // Actualizar diagnóstico
+                $getCodigoUnion = CodigosLibros::where('codigo_union', $codigo)->first();
+                if ($getCodigoUnion) {
+                    $old_ValuesD = $getCodigoUnion->toArray(); // Clonar valores originales
+                    $getCodigoUnion->quitar_de_reporte = '0';
+                    $getCodigoUnion->save();
+                }
+            } else {
+                // Restaurar estado de liquidación
+                $getCodigoUnion = CodigosLibros::where('codigo_union', $codigo)->first();
+                if ($getCodigoUnion) {
+                    $old_ValuesD = $getCodigoUnion->toArray(); // Clonar valores originales
+                    $getCodigoUnion->quitar_de_reporte = '0';
+                    $getCodigoUnion->estado_liquidacion = '0';
+                    $getCodigoUnion->bc_estado = '2';
+                    $getCodigoUnion->save();
+                }
+
+                DB::table('codigoslibros')
+                    ->where('codigo', '=', $codigo)
+                    ->update([
+                        'estado_liquidacion' => '0',
+                        'bc_estado'          => '2',
+                        'quitar_de_reporte'  => '0',
+                    ]);
+            }
+
+            // Quitar del histórico
+            HistoricoCodigos::where('codigo_libro', $codigo)
+                ->where('devueltos_liquidados', $contrato)
+                ->update([
+                    'devueltos_liquidados' => null,
+                ]);
+
+            if ($getCodigo->codigo_union) {
+                HistoricoCodigos::where('codigo_libro', $getCodigo->codigo_union)
+                    ->where('devueltos_liquidados', $contrato)
+                    ->update([
+                        'devueltos_liquidados' => null,
+                    ]);
+                $this->GuardarEnHistorico(0, $bc_institucion, $bc_periodo, $getCodigo->codigo_union, $usuario_editor, $comentario, json_encode($old_ValuesD), json_encode($getCodigoUnion->getAttributes()), null);
+            }
+
+            // Guardar en la tabla histórico
+            $this->GuardarEnHistorico(0, $bc_institucion, $bc_periodo, $codigo, $usuario_editor, $comentario, json_encode($old_ValuesA), json_encode($getCodigoUnion->getAttributes()), null);
+
+            DB::commit(); // Confirma la transacción
+
+            return response()->json([
+                'status' => 1,
+                'message' => 'Se restauró el código con éxito.',
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack(); // Revierte la transacción en caso de error
+
+            return response()->json([
+                'status' => 0,
+                'message' => 'Error al restaurar el código.',
+                'error' => $e->getMessage(),
+            ], 200);
+        }
+    }
 }

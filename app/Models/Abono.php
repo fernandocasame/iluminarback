@@ -13,6 +13,7 @@ class Abono extends Model
     
     protected $fillable = [
         'abono_id',
+        'egf_id',
         'abono_facturas',
         'abono_notas',
         'bono_totalFacturas',
@@ -25,6 +26,7 @@ class Abono extends Model
         'abono_valor_retencion',
         'abono_cuenta',
         'abono_documento',
+        'referencia_retencion_factura',
         'abono_institucion',
         'abono_periodo',
         'abono_concepto',

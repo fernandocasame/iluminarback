@@ -421,13 +421,27 @@ trait TraitPedidosGeneral
        return $query;
     }
     public function tr_getPuntosVentasDespachos($periodo){
-        $query = DB::SELECT("SELECT DISTINCT c.venta_lista_institucion, i.nombreInstitucion
+        $query = DB::SELECT("SELECT DISTINCT c.venta_lista_institucion, i.nombreInstitucion, venta_lista_institucion as institucion_id
         FROM codigoslibros c
         LEFT JOIN institucion i ON i.idInstitucion = c.venta_lista_institucion
         WHERE c.bc_periodo = ?
         AND c.venta_lista_institucion  > 0
         AND c.estado_liquidacion <> '3'
         AND c.estado_liquidacion <> '4'
+        ORDER BY i.nombreInstitucion
+        "
+        ,[ $periodo ]);
+        return $query;
+    }
+    public function tr_getPuntosVentasDirectasDespachos($periodo){
+        $query = DB::SELECT("SELECT DISTINCT i.nombreInstitucion, bc_institucion as institucion_id
+        FROM codigoslibros c
+        LEFT JOIN institucion i ON i.idInstitucion = c.bc_institucion
+        WHERE c.bc_periodo = ?
+        AND c.bc_institucion  > 0
+        AND c.estado_liquidacion <> '3'
+        AND c.estado_liquidacion <> '4'
+        AND ( c.venta_estado = '0' OR c.venta_estado = '1')
         ORDER BY i.nombreInstitucion
         "
         ,[ $periodo ]);
@@ -903,7 +917,9 @@ trait TraitPedidosGeneral
                     "idasignatura"      => $valores[0]->asignatura_idasignatura,
                     "subtotal"          => $item->valor * $valores[0]->precio,
                     "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
-                    "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion
+                    "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion,
+                    "cantidad_pendiente" => $item->cantidad_pendiente,
+                    "cantidad_pendiente_especifico" => $item->cantidad_pendiente_especifico,
                 ];
             }
             return $datos;
@@ -934,7 +950,9 @@ trait TraitPedidosGeneral
                                 ls.version,
                                 asi.idasignatura,
                                 ls.codigo_liquidacion,
-                                p.fecha_aprobado_facturacion
+                                p.fecha_aprobado_facturacion,
+                                pv.cantidad_pendiente,
+                                pv.cantidad_pendiente_especifico
                 FROM pedidos_val_area_new pv
                 LEFT JOIN libro l ON  pv.idlibro = l.idlibro
                 LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
@@ -994,6 +1012,8 @@ trait TraitPedidosGeneral
                     "subtotal"          => $item->valor * $pfn_pvp_result,  // Añade el pfn_pvp correcto
                     "codigo_liquidacion"=> $item->codigo_liquidacion,
                     "fecha_aprobado_facturacion" => $item->fecha_aprobado_facturacion,
+                    "cantidad_pendiente" => $item->cantidad_pendiente,
+                    "cantidad_pendiente_especifico" => $item->cantidad_pendiente_especifico,
                 ];
             }
             return $final_result;
