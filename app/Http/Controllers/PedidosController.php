@@ -1799,7 +1799,9 @@ class PedidosController extends Controller
          i.idInstitucion AS id_institucion
          FROM institucion i
          LEFT JOIN ciudad c ON c.idciudad = i.ciudad_id
-         WHERE i.vendedorInstitucion = '$cedula'");
+         WHERE i.vendedorInstitucion = '$cedula'
+         ANd i.estado_idEstado = 1
+        ");
         return $instituciones;
     }
     public function get_instituciones_asesorXId($institucion)
@@ -7093,6 +7095,274 @@ class PedidosController extends Controller
             ) IS NOT NULL
             AND a.estado = '1';");
         return $datos;
+    }
+
+    public function get_VerificacionAntesEliminarPedido(Request $request) {
+        // Obtener el id_pedido desde la solicitud
+        $id_pedido = $request->input('id_pedido');
+        $id_periodo = $request->input('id_periodo');
+        $validacionperiodo = $request->input('validacionperiodo');
+
+        // Validar si se envió el ID del pedido
+        if (!$id_pedido) {
+            return response()->json(['error' => 'ID de pedido no proporcionado'], 400);
+        }
+
+        $librosdelpedido = [];
+        $convenios = [];
+        $pagos = [];
+        $beneficiarios = [];
+        $libroshijosdocentes = [];
+        $actashijosdocentes = [];
+        $actashijosdocentes = [];
+
+        // Consultar librosdelpedido x periodo
+        if ($validacionperiodo == 'formato_anterior') {
+            $librosdelpedido = DB::SELECT("SELECT * FROM pedidos_val_area pva WHERE pva.id_pedido = ? LIMIT 1", [$id_pedido]);
+            if (!empty($librosdelpedido)) {
+                $mensajeLibrosDelPedido = "Sí contiene";
+            }else{
+                $mensajeLibrosDelPedido = "No contiene";
+            }
+        }else if($validacionperiodo == 'formato_new') {
+            $librosdelpedido = DB::SELECT("SELECT * FROM pedidos_val_area_new pvan WHERE pvan.id_pedido = ? LIMIT 1", [$id_pedido]);
+            if (!empty($librosdelpedido)) {
+                $mensajeLibrosDelPedido = "Sí contiene";
+            }else{
+                $mensajeLibrosDelPedido = "No contiene";
+            }
+        }else{
+            $mensajeLibrosDelPedido = "No se a definido un periodo para consultar los libros.";
+        }
+
+        // Consultar convenios
+        $convenios = DB::SELECT("SELECT * FROM pedidos_convenios WHERE id_pedido = ?", [$id_pedido]);
+        if (!empty($convenios)) {
+            $mensajeConvenios = "Sí contiene";
+        }else{
+            $mensajeConvenios = "No contiene";
+        }
+
+        // Consultar pagos
+        $pagos = DB::SELECT("SELECT * FROM 1_4_documento_liq dl WHERE dl.id_pedido = ?", [$id_pedido]);
+        if (!empty($pagos)) {
+            $mensajePagos = "Sí contiene";
+        }else{
+            $mensajePagos = "No contiene";
+        }
+
+        // Consultar pedidos_beneficiarios
+        $beneficiarios = DB::SELECT("SELECT * FROM pedidos_beneficiarios pb WHERE pb.id_pedido = ?", [$id_pedido]);
+        if (!empty($beneficiarios)) {
+            $mensajebeneficiarios = "Sí contiene";
+        }else{
+            $mensajebeneficiarios = "No contiene";
+        }
+
+        // Consultar libroshijosdocentes
+        // 1. Obtener todos los ID de p_libros_obsequios relacionados con id_pedido
+        $libroshijosdocentes = DB::table('p_libros_obsequios')
+        ->where('id_pedido', $id_pedido)
+        ->pluck('id') // Obtener solo los IDs
+        ->toArray();
+
+        // Inicializar los mensajes
+        $mensajeLibrosHijosDocentes = "No contiene";
+        $mensajeActasHijosDocentes = "No contiene";
+
+        // 2. Verificar si hay registros en p_libros_obsequios
+        if (!empty($libroshijosdocentes)) {
+            // Asignamos el mensaje si encontramos registros en p_libros_obsequios
+            $mensajeLibrosHijosDocentes = "Sí contiene";
+
+            // 3. Consultar en f_venta si alguno de esos ID está presente en ven_p_libros_obsequios
+            $actashijosdocentes = DB::table('f_venta')
+                ->whereIn('ven_p_libros_obsequios', $libroshijosdocentes)
+                ->get();
+
+            // 4. Comprobar si se encontraron registros en f_venta
+            if ($actashijosdocentes->isNotEmpty()) {
+                $mensajeActasHijosDocentes = "Sí contiene";
+            }
+        }
+
+        // Retornar la respuesta final con todos los resultados
+        return response()->json([
+            'mensajeConvenios'             => $mensajeConvenios,
+            'mensajePagos'                 => $mensajePagos,
+            'mensajeLibrosHijosDocentes'   => $mensajeLibrosHijosDocentes,
+            'mensajeLibrosDelPedido'       => $mensajeLibrosDelPedido,
+            'mensajeActasHijosDocentes'    => $mensajeActasHijosDocentes,
+            'mensajebeneficiarios'         => $mensajebeneficiarios,
+            'datos' => [
+                'convenios'                => $convenios,
+                'pagos'                    => $pagos,
+                'libroshijosdocentes'      => $libroshijosdocentes,
+                'librosdelpedido'          => $librosdelpedido,
+                'actashijosdocentes'       => $actashijosdocentes,
+                'beneficiarios'            => $beneficiarios,
+            ]
+        ]);
+    }
+
+    public function EliminarPedidoCompleto_SinContrato(Request $request)
+    {
+        DB::beginTransaction();
+        $resultados = []; // Para almacenar los resultados de las eliminaciones
+        try {
+            //Validacion eliminación de los libros del pedido formato nuevo o anterior
+            if ($request->validacionperiodo == 'formato_anterior') {
+                // Eliminar registros de pedidos_val_area
+                    $deleted_pedidos_val_area = DB::table('pedidos_val_area')
+                    ->where('id_pedido', $request->id_pedido)
+                    ->delete();
+                if ($deleted_pedidos_val_area === 0) {
+                    $resultados[] = 'No se encontraron registros en pedidos_val_area con el id_pedido ' . $request->id_pedido;
+                } else {
+                    $resultados[] = 'Registros eliminados en pedidos_val_area: ' . $deleted_pedidos_val_area;
+                }
+            }else if ($request->validacionperiodo == 'formato_new') {
+                // Eliminar registros de pedidos_val_area_new
+                $deleted_pedidos_val_area_new = DB::table('pedidos_val_area_new')
+                ->where('id_pedido', $request->id_pedido)
+                ->delete();
+                if ($deleted_pedidos_val_area_new === 0) {
+                    $resultados[] = 'No se encontraron registros en pedidos_val_area_new con el id_pedido ' . $request->id_pedido;
+                } else {
+                    $resultados[] = 'Registros eliminados en pedidos_val_area_new: ' . $deleted_pedidos_val_area_new;
+                }
+            }else{
+                $resultados[] = 'No se proporciono un valor para validacionperiodo, para eliminar los registros de pedidos_val_area_new: ';
+            }
+            // Eliminar registros de pedidos_convenios
+            $deleted_pedidos_convenios = DB::table('pedidos_convenios')
+                ->where('id_pedido', $request->id_pedido)
+                ->delete();
+
+            if ($deleted_pedidos_convenios === 0) {
+                $resultados[] = 'No se encontraron registros en pedidos_convenios con el id_pedido ' . $request->id_pedido;
+            } else {
+                $resultados[] = 'Registros eliminados en pedidos_convenios: ' . $deleted_pedidos_convenios;
+            }
+            // Eliminar registros de 1_4_documento_liq
+            $deleted_1_4_documento_liq = DB::table('1_4_documento_liq')
+                ->where('id_pedido', $request->id_pedido)
+                ->delete();
+
+            if ($deleted_1_4_documento_liq === 0) {
+                $resultados[] = 'No se encontraron registros en 1_4_documento_liq con el id_pedido ' . $request->id_pedido;
+            } else {
+                $resultados[] = 'Registros eliminados en 1_4_documento_liq: ' . $deleted_1_4_documento_liq;
+            }
+            // Eliminar registros de pedidos_beneficiarios
+            $deleted_pedidos_beneficiarios = DB::table('pedidos_beneficiarios')
+                ->where('id_pedido', $request->id_pedido)
+                ->delete();
+
+            if ($deleted_pedidos_beneficiarios === 0) {
+                $resultados[] = 'No se encontraron registros en pedidos_beneficiarios con el id_pedido ' . $request->id_pedido;
+            } else {
+                $resultados[] = 'Registros eliminados en pedidos_beneficiarios: ' . $deleted_pedidos_beneficiarios;
+            }
+            // 1. Obtener los IDs de p_libros_obsequios relacionados con id_pedido
+            $ids_p_libros_obsequios = DB::table('p_libros_obsequios')
+            ->where('id_pedido', $request->id_pedido)
+            ->pluck('id') // Obtener solo los IDs
+            ->toArray();
+
+            if (empty($ids_p_libros_obsequios)) {
+                $resultados[] = 'No se encontraron registros en p_libros_obsequios con id_pedido ' . $request->id_pedido;
+            } else {
+                // 2. Obtener las combinaciones de ven_codigo e id_empresa de f_venta asociadas
+                $ventas = DB::table('f_venta')
+                    ->whereIn('ven_p_libros_obsequios', $ids_p_libros_obsequios)
+                    ->select('ven_codigo', 'id_empresa')
+                    ->get();
+
+                if ($ventas->isNotEmpty()) {
+                    foreach ($ventas as $venta) {
+                        // Para cada combinación de ven_codigo e id_empresa, eliminar los registros correspondientes de f_detalle_venta
+                        $deleted_f_detalle_venta = DB::table('f_detalle_venta')
+                            ->where('ven_codigo', $venta->ven_codigo)
+                            ->where('id_empresa', $venta->id_empresa)
+                            ->delete();
+
+                        if ($deleted_f_detalle_venta > 0) {
+                            $resultados[] = 'Registros eliminados en f_detalle_venta para ven_codigo ' . $venta->ven_codigo . ' e id_empresa ' . $venta->id_empresa;
+                        } else {
+                            $resultados[] = 'No se encontraron registros en f_detalle_venta para ven_codigo ' . $venta->ven_codigo . ' e id_empresa ' . $venta->id_empresa;
+                        }
+                    }
+
+                    // 3. Eliminar en f_venta los registros donde ven_p_libros_obsequios coincide con los IDs obtenidos
+                    $deleted_f_venta = DB::table('f_venta')
+                        ->whereIn('ven_p_libros_obsequios', $ids_p_libros_obsequios)
+                        ->delete();
+
+                    if ($deleted_f_venta > 0) {
+                        $resultados[] = 'Registros eliminados en f_venta: ' . $deleted_f_venta;
+                    } else {
+                        $resultados[] = 'No se encontraron registros en f_venta relacionados con p_libros_obsequios.';
+                    }
+                }
+
+                // 4. Eliminar en p_detalle_libros_obsequios los registros donde p_libros_obsequios_id coincide con los IDs obtenidos
+                $deleted_p_detalle_libros_obsequios = DB::table('p_detalle_libros_obsequios')
+                    ->whereIn('p_libros_obsequios_id', $ids_p_libros_obsequios)
+                    ->delete();
+
+                if ($deleted_p_detalle_libros_obsequios > 0) {
+                    $resultados[] = 'Registros eliminados en p_detalle_libros_obsequios: ' . $deleted_p_detalle_libros_obsequios;
+                } else {
+                    $resultados[] = 'No se encontraron registros en p_detalle_libros_obsequios relacionados con p_libros_obsequios.';
+                }
+
+                // 5. Eliminar los registros de p_libros_obsequios
+                $deleted_p_libros_obsequios = DB::table('p_libros_obsequios')
+                    ->whereIn('id', $ids_p_libros_obsequios)
+                    ->delete();
+
+                if ($deleted_p_libros_obsequios > 0) {
+                    $resultados[] = 'Registros eliminados en p_libros_obsequios: ' . $deleted_p_libros_obsequios;
+                } else {
+                    $resultados[] = 'No se encontraron registros en p_libros_obsequios para eliminar.';
+                }
+            }
+
+            DB::table('pedidos_historico')->insert([
+                'id_pedido' => $request->id_pedido,          // Id del pedido
+                'periodo_id' => $request->id_periodo,        // Id del periodo
+                'estado' => 12,                                // Estado 8
+                'fecha_eliminacion_pedido' => now(),          // Fecha actual de eliminación
+                'user_eliminacion' => $request->id_usuario   // Id del usuario que elimina
+            ]);
+
+            // Eliminar registros de pedidos
+            $deleted_pedidos = DB::table('pedidos')
+                ->where('id_pedido', $request->id_pedido)
+                ->delete();
+
+            if ($deleted_pedidos === 0) {
+                $resultados[] = 'No se encontraron registros en pedidos con el id_pedido ' . $request->id_pedido;
+            } else {
+                $resultados[] = 'Registros eliminados en pedidos: ' . $deleted_pedidos;
+            }
+
+            // Validar si alguna eliminación no fue exitosa
+            if (empty($resultados)) {
+                return response()->json(['status' => 0, 'message' => 'No se encontraron registros para eliminar.'], 404);
+            }
+
+            DB::commit();
+            return response()->json(['status' => 1, 'message' => 'Eliminaciones realizadas con éxito', 'resultados' => $resultados]);
+
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json([
+                "status" => 0,
+                'message' => 'Error al realizar las eliminaciones: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     //FIN METODOS JEYSON

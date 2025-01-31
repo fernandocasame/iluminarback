@@ -669,7 +669,7 @@ class DevolucionController extends Controller
             COUNT(DISTINCT dfv.pro_codigo) AS item, CONCAT(us.nombres, ' ', us.apellidos) AS responsable,
             (SELECT SUM(det_ven_cantidad) FROM f_detalle_venta WHERE ven_codigo = fv.ven_codigo AND id_empresa = fv.id_empresa) AS libros,
             fv.ruc_cliente AS cedula, usa.email, usa.telefono,fv.idtipodoc, em.id AS empresa_id, fv.ven_tipo_inst, fv.ven_idproforma, fv.ven_observacion,
-            fv.ven_subtotal, fv.ven_desc_por, fv.ven_descuento, fv.ven_iva, fv.ven_transporte, fv.ven_p_libros_obsequios
+            fv.ven_subtotal, fv.ven_desc_por, fv.ven_descuento, fv.ven_iva, fv.ven_transporte, fv.ven_p_libros_obsequios,fv.institucion_id
             FROM f_venta fv
             LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
             LEFT JOIN p_libros_obsequios plo ON plo.id = fv.ven_p_libros_obsequios
@@ -680,7 +680,7 @@ class DevolucionController extends Controller
             INNER JOIN usuario us ON fv.user_created = us.idusuario
             LEFT JOIN usuario u ON ins.asesor_id = u.idusuario
             LEFT JOIN f_detalle_venta dfv ON fv.ven_codigo = dfv.ven_codigo AND fv.id_empresa = dfv.id_empresa
-            WHERE fv.ven_codigo = '$request->documentos' AND fv.est_ven_codigo <> 3
+            WHERE fv.ven_codigo = '$request->documentos' and fv.id_empresa = '$request->empresa'
             GROUP BY fv.ven_codigo, fv.ven_fecha,
                 ins.ruc, em.nombre, usa.nombres, usa.apellidos, fpr.prof_observacion,
                 fpr.idPuntoventa, u.nombres, u.apellidos, fv.user_created, fv.ven_valor, ins.nombreInstitucion,
@@ -692,7 +692,7 @@ class DevolucionController extends Controller
       return $query;
     }
     public function CargarDocumentosDetalles(Request $request){
-        $query = DB::SELECT("SELECT dv.det_ven_codigo, dv.pro_codigo, dv.det_ven_dev, dv.det_ven_cantidad, dv.det_ven_valor_u,
+        $query = DB::SELECT("SELECT dv.det_ven_codigo, dv.pro_codigo, dv.det_ven_dev, dv.det_ven_cantidad, dv.det_ven_valor_u,dv.detalle_notaCreditInterna,
             l.descripcionlibro, ls.nombre, s.nombre_serie, ls.id_serie
             FROM f_detalle_venta AS dv
             LEFT JOIN f_venta AS fv ON dv.ven_codigo=fv.ven_codigo

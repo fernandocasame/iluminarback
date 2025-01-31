@@ -410,6 +410,12 @@ class CodigoLibrosController extends Controller
         $usuario_editor             = $request->id_usuario;
         $institucion                = $request->institucion_id;
         $comentario                 = $request->comentario;
+        $comboSelected              = $request->comboSelected;
+        if($request->ifSetCombo == 1){
+            $comentario = $comboSelected."_".$request->comentario;
+        }else{
+            $comentario = $request->comentario;
+        }
         $periodo_id                 = $request->periodo_id;
         //0=> USAN Y LIQUIDAN ; 1=> regalado; 2 regalado y bloqueado; 3 = bloqueado
         $tipoProceso                = $request->regalado;
@@ -634,7 +640,12 @@ class CodigoLibrosController extends Controller
         //variables
         $usuario_editor             = $request->id_usuario;
         $institucion_id             = $request->institucion_id;
-        $comentario                 = $request->comentario;
+        $comboSelected              = $request->comboSelected;
+        if($request->ifSetCombo == '1'){
+            $comentario                 = $comboSelected.'_'.$request->comentario;
+        }else{
+            $comentario                 = $request->comentario;
+        }
         $periodo_id                 = $request->periodo_id;
         $contadorA                  = 0;
         $contadorD                  = 0;
@@ -2430,12 +2441,12 @@ class CodigoLibrosController extends Controller
                 $codigo_union           = $validar[0]->codigo_union;
                 $ifliquidado_regalado   = $validar[0]->liquidado_regalado;
                 //para ver el estado devuelto proforma
-                $ifdevuelto_proforma        = $validar[0]->devuelto_proforma;
+                // $ifdevuelto_proforma        = $validar[0]->devuelto_proforma;
                 //VALIDACION QUE NO SEA LIQUIDADO
                 if($ifDevuelto != '0' && $ifliquidado_regalado == '0' && $ifDevuelto != '4'){ $EstatusProceso = true; }
                 //====PROFORMA============================================
                 //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
-                if($ifdevuelto_proforma == 2 ){ $EstatusProceso = false; $messageProforma = "No se puede activar el código, ya que tiene proforma que no se pudo devolver por que ya fue enviado a perseo el pedido"; }
+                // if($ifdevuelto_proforma == 2 ){ $EstatusProceso = false; $messageProforma = "No se puede activar el código, ya que tiene proforma que no se pudo devolver por que ya fue enviado a perseo el pedido"; }
                 //PROFORMA si tiene proforma que no se pudo devolver despues de enviar el pedido
                 if($EstatusProceso){
                     //VALIDAR CODIGOS QUE NO TENGA CODIGO UNION
@@ -2479,7 +2490,7 @@ class CodigoLibrosController extends Controller
                     }
                 }else{
                     //si el codigo tiene proforma que no se pudo devolver despues de enviar el pedido
-                    if($ifdevuelto_proforma == 2)     { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
+                    // if($ifdevuelto_proforma == 2)     { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
                     $codigoSinDevolucion[] = $validar[0];
                     $contador++;
                 }

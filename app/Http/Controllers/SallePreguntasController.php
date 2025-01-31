@@ -458,6 +458,7 @@ class SallePreguntasController extends Controller
     }
 
     public function obtenerCalificacion_salle($id_evaluacion){
+        // return $this->salleRepository->updateCalificacionFinal($id_evaluacion);
         // Actualiza la calificación final
         $calificacionFinal              = 0;
         $totalPuntaje                   = 0;
@@ -743,6 +744,7 @@ class SallePreguntasController extends Controller
                                 'nombre_tipo' => $pregunta->tipo->nombre_tipo,
                                 'total_pregunta' => $total_pregunta,
                                 'opciones' => $pregunta->opciones,
+                                'n_pregunta' => $pregunta->calificacion_final,
                                 'respuestas' => $pregunta->respuestas->map(function ($respuesta) {
                                     return [
                                         'id_pregunta' => $respuesta->id_pregunta,
@@ -825,7 +827,10 @@ class SallePreguntasController extends Controller
 
             // Redondear el puntaje total a 2 decimales
             $totalPuntajeRedondeado = round($totalPuntaje, 2);
-
+            //si es menor a cero color cero
+            if($totalPuntajeRedondeado < 0){
+                $totalPuntajeRedondeado = 0;
+            }
             // Actualizar la calificación final en la tabla salle_respuestas_preguntas
             DB::table('salle_preguntas_evaluacion')
                 ->where('id_evaluacion', $request->id_evaluacion)
@@ -895,6 +900,10 @@ class SallePreguntasController extends Controller
             // Redondear el puntaje total a 2 decimales
             $totalPuntajeRedondeado = round($puntajeRespuesta, 2);
 
+            //si es menor a cero color cero
+            if($totalPuntajeRedondeado < 0){
+                $totalPuntajeRedondeado = 0;
+            }
             // Actualizar la calificación final en la tabla salle_preguntas_evaluacion
             DB::table('salle_preguntas_evaluacion')
                 ->where('id_evaluacion', $request->id_evaluacion)
@@ -1286,29 +1295,23 @@ class SallePreguntasController extends Controller
     }
     //api:post/obtenerCalificacionSalle
     public function obtenerCalificacionSalle(Request $request){
-        $totalPuntaje     = 0;
-        $query = DB::SELECT("SELECT DISTINCT  r.id_pregunta , r.respuesta, r.puntaje
-        FROM
-        salle_respuestas_preguntas r
-        LEFT JOIN salle_preguntas p ON r.id_pregunta = p.id_pregunta
-        LEFT JOIN salle_asignaturas a ON p.id_asignatura = a.id_asignatura
-        WHERE r.id_evaluacion = ?
-        AND a.id_area = ?
-        ",[$request->id_evaluacion,$request->id_area]);
-        //total puntaje preguntas
-        $query2 = DB::SELECT("SELECT SUM(pp.puntaje_pregunta) AS puntaje
-        FROM salle_preguntas_evaluacion p
-        LEFT JOIN salle_preguntas pp ON pp.id_pregunta = p.id_pregunta
-        LEFT JOIN salle_asignaturas a ON pp.id_asignatura = a.id_asignatura
-        WHERE p.id_evaluacion = ?
-        AND a.id_area = ?
-        ",[$request->id_evaluacion,$request->id_area]);
-        foreach ($query2 as $key => $value) {
-            $totalPuntaje += $value->puntaje;
+        try{
+            $totalPuntaje     = 0;
+            $id_evaluacion    = $request->id_evaluacion;
+            $id_area          = $request->id_area;
+            // Obtener el tipo de calificación
+            $query = $this->salleRepository->getCalificacionPreguntasXArea($id_evaluacion,$id_area);
+            //total puntaje por area
+            $query2 = $this->salleRepository->puntajePorArea($id_evaluacion,$id_area);
+            foreach ($query2 as $key => $value) {
+                $totalPuntaje += $value->puntaje;
+            }
+            return [
+                'arrayCalificacionFinal' => $query,
+                'totalPuntaje'           => $totalPuntaje
+            ];
+        }catch(\Exception $e){
+            return ["status" => "0", "message" => "Error al obtener la calificación", "error" => $e->getMessage()];
         }
-        return [
-            'arrayCalificacionFinal' => $query,
-            'totalPuntaje'           => $totalPuntaje
-        ];
     }
 }

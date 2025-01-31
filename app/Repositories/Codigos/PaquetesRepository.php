@@ -12,10 +12,10 @@ class  PaquetesRepository extends BaseRepository
         parent::__construct($PaqueteRepository);
         $this->codigosRepository = $codigosRepository;
     }
-    public function validateGestion($tipoProceso,$estadoPaquete,$validarA,$validarD,$item,$codigoActivacion,$codigoDiagnostico,$request){
+    public function validateGestion($tipoProceso,$validarA,$validarD,$item,$codigoActivacion,$codigoDiagnostico,$request){
         $periodo_id                  = $request->periodo_id;
-        $errorA                      = 1;
-        $errorD                      = 1;
+        $errorA                      = 0;
+        $errorD                      = 0;
         $proforma_empresa            = $request->proforma_empresa;
         $codigo_proforma             = $request->codigo_proforma;
         $ifSetProforma               = $request->ifSetProforma;
@@ -43,9 +43,9 @@ class  PaquetesRepository extends BaseRepository
         //validar si el codigo no este leido
         $ifBcEstadoA                 = $validarA[0]->bc_estado;
         //validar si el codigo tiene proforma empresa proforma_empresa
-        $ifproforma_empresaA             = $validarA[0]->proforma_empresa;
+        $ifproforma_empresaA         = $validarA[0]->proforma_empresa;
         //validar si el codigo tiene proforma codigo_proforma
-        $ifcodigo_proformaA             = $validarA[0]->codigo_proforma;
+        $ifcodigo_proformaA          = $validarA[0]->codigo_proforma;
         //venta estado
         $ifventa_estadoA             = $validarA[0]->venta_estado;
         ///*//////===================Diagnostico=======*/////
@@ -66,24 +66,15 @@ class  PaquetesRepository extends BaseRepository
         //obtener la factura si no envian nada le dejo lo mismo
         $facturaA                     = $validarA[0]->factura;
         //validar si el codigo tiene proforma empresa proforma_empresa
-        $ifproforma_empresaD            = $validarD[0]->proforma_empresa;
+        $ifproforma_empresaD          = $validarD[0]->proforma_empresa;
         //validar si el codigo tiene proforma codigo_proforma
-        $ifcodigo_proformaD             = $validarD[0]->codigo_proforma;
+        $ifcodigo_proformaD           = $validarD[0]->codigo_proforma;
         //venta estado
-        $ifventa_estadoD                = $validarD[0]->venta_estado;
+        $ifventa_estadoD              = $validarD[0]->venta_estado;
         if($request->factura == null || $request->factura == "")   $factura = $facturaA;
         else  $factura = $request->factura;
         //===PRIMERA VALIDACION====
         //error 0 => no hay error; 1 hay error
-        //==SI EL PAQUETE ESTA CERRADO VALIDAR QUE SEA EL MISMO PAQUETE
-        //estadoPaquete => 0 = utilizado; 1 abierto;
-        if($estadoPaquete == 0){
-            if( ($ifcodigo_paqueteA == $item->codigoPaquete) ||  ($ifcodigo_paqueteA == "" || $ifcodigo_paqueteA == null ) )  $errorA = 0;
-            if( ($ifcodigo_paqueteD == $item->codigoPaquete) ||  ($ifcodigo_paqueteD == "" || $ifcodigo_paqueteD == null ) )  $errorD = 0;
-        }else{
-            if( $ifcodigo_paqueteA == null )                  $errorA = 0;
-            if( $ifcodigo_paqueteD == null )                  $errorD = 0;
-        }
          //=============PROFORMA ==========
         //cambiar codigo de proforma
         if($ifSetProforma == 1){
@@ -120,7 +111,7 @@ class  PaquetesRepository extends BaseRepository
                 }
             }
         }
-    ///============PROFORMA =======
+        ///============PROFORMA =======
         //si pasa la validacion voy la validacion por cada botton
         if($errorA == 0 && $errorD == 0){
             $errorA = 1;
@@ -178,11 +169,11 @@ class  PaquetesRepository extends BaseRepository
             return ["errorA" => $errorA, "errorD" => $errorD, "factura" => $factura,"ifChangeProforma" => $ifChangeProformaA];
         }
     }
-    public function procesoGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$factura,$codigoPaquete,$ifChangeProforma=false,$datosProforma=[]){
+    public function procesoGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$factura,$codigoPaquete,$ifChangeProforma=false,$datosProforma=[],$comboIndividual=null){
         //numero proceso => 0 = usan y liquidan; 1 = venta lista; 2 = regalado; 3 regalado y bloqueado; 4 = guia; 5 = regalado sin institucion; 6 = bloqueado y regalado sin institucion; 7 = bloqueado sin institucion; 8 = guia sin institucion;
         $estadoIngreso       = 0;
-        $codigoU             = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo_union,$codigo,$request,$factura,$codigoPaquete,$ifChangeProforma,$datosProforma);
-        if($codigoU) $codigo = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$factura,$codigoPaquete,$ifChangeProforma,$datosProforma);
+        $codigoU             = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo_union,$codigo,$request,$factura,$codigoPaquete,$ifChangeProforma,$datosProforma,$comboIndividual);
+        if($codigoU) $codigo = $this->codigosRepository->procesoUpdateGestionBodega($numeroProceso,$codigo,$codigo_union,$request,$factura,$codigoPaquete,$ifChangeProforma,$datosProforma,$comboIndividual);
         if($codigo && $codigoU)  $estadoIngreso = 1;
         else                     $estadoIngreso = 2;
         return $estadoIngreso;

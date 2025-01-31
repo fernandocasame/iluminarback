@@ -1654,10 +1654,43 @@ class VerificacionControllerAnterior extends Controller
         $id_asesor      = $request->id_asesor;
         $pendientesNot  = $request->pendientesNot;
         $soloLongitud   = $request->soloLongitud;
+        $id_periodo     = $request->id_periodo;
+        $sinSolicitud   = $request->sinSolicitud;
+        $conValores     = $request->conValores;
+
         $verificaciones = DB::table('verificaciones as v')
-        ->select('v.num_verificacion','v.id', 'v.contrato', 'v.fecha_subir_evidencia','v.file_evidencia', 'i.nombreInstitucion',
-        'v.fecha_subir_factura','v.file_factura','v.ifnotificado',
-         DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor')
+        ->select(
+            'v.num_verificacion',
+            'v.id',
+            'v.contrato',
+            'v.fecha_subir_evidencia',
+            'v.file_evidencia',
+            'i.nombreInstitucion',
+            'v.fecha_subir_factura',
+            'v.file_factura',
+            'v.ifnotificado',
+            'p.id_periodo',
+            'v.ifaprobadoGerencia',
+            'v.fecha_aprobacionGerencia',
+            'p.id_pedido',
+            DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
+            DB::raw('
+                CASE
+                    WHEN v.num_verificacion = 1 THEN
+                        ROUND(v.valor_liquidacion, 2)
+                    ELSE
+                        (SELECT ROUND(SUM(vi.valor_liquidacion), 2)
+                        FROM verificaciones vi
+                        WHERE vi.contrato = v.contrato
+                        AND vi.estado = 0)
+                END AS valorLiquidaciones
+            '),
+            DB::raw('(SELECT COALESCE(ROUND(SUM(l.doc_valor), 2), 0) AS totalPagos
+            FROM 1_4_documento_liq l
+            WHERE l.id_pedido = p.id_pedido
+            AND l.estado = 1
+            AND l.tipo_pago_id <> 3
+            ) AS totalPagos')
         )
         ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
         ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
@@ -1670,28 +1703,41 @@ class VerificacionControllerAnterior extends Controller
         ->when($pendientesNot, function ($query) {
             $query->where('v.ifnotificado', '0');
         })
+        ->when($id_periodo, function ($query) use ($id_periodo) {
+            $query->where('p.id_periodo', $id_periodo);
+        })
         ->orderByDesc('v.id')
+        ->orderBy('v.contrato')
         ->get();
+
+
+
+        //si solo se quiere obtener la longitud de la tabla
         if($soloLongitud){
-            //count($verificaciones);
             return count($verificaciones);
         }
-        //obtener solicitudes de verificación
-        foreach ($verificaciones as $key => $value) {
-            $arraySolicitudes = [];
-            $posicionArray = 0;
-            $getNumeroVerificacion = $value->num_verificacion;
-            $posicionArray = $getNumeroVerificacion - 1;
-
-            $solicitudes = DB::SELECT("SELECT * FROM temporadas_verificacion_historico h WHERE h.contrato = '$value->contrato'");
-
-            if (isset($solicitudes[$posicionArray])) {
-                $arraySolicitudes[0] = $solicitudes[$posicionArray];
-            } else {
+        //si no se quiere obtener las solicitudes de verificación
+        if(!$sinSolicitud){
+            //obtener solicitudes de verificación
+            foreach ($verificaciones as $key => $value) {
                 $arraySolicitudes = [];
-            }
+                $posicionArray = 0;
+                $getNumeroVerificacion = $value->num_verificacion;
+                $posicionArray = $getNumeroVerificacion - 1;
 
-            $value->solicitudes = $arraySolicitudes;
+                $solicitudes = DB::SELECT("SELECT * FROM temporadas_verificacion_historico h WHERE h.contrato = '$value->contrato'");
+
+                if (isset($solicitudes[$posicionArray])) {
+                    $arraySolicitudes[0] = $solicitudes[$posicionArray];
+                } else {
+                    $arraySolicitudes = [];
+                }
+
+                $value->solicitudes = $arraySolicitudes;
+            }
+        }
+        if($conValores){
+            //obtener valores de verificación
         }
         return $verificaciones;
     }
@@ -1767,27 +1813,56 @@ class VerificacionControllerAnterior extends Controller
         if($request->guardarNotificacionVerificacion){ return $this->guardarNotificacionVerificacion($request); }
     }
     //api:post/metodosPostVerificaciones?guardarNotificacionVerificacion=1
-    public function guardarNotificacionVerificacion($request){
-        try{
-            //transaccion
+    public function guardarNotificacionVerificacion($request)
+    {
+        try {
+            // Iniciamos la transacción
             DB::beginTransaction();
+
+            // Decodificamos el array de notificaciones del request
             $arrayNotificaciones = json_decode($request->data_verificacion);
-            $contador            = 0;
-            foreach($arrayNotificaciones as $key => $item){
+            $ifnotificado = $request->ifnotificado;
+            $ifaprobadoGerencia = $request->ifaprobadoGerencia;
+            $contador = 0;
+
+            // Iteramos sobre las notificaciones
+            foreach ($arrayNotificaciones as $key => $item) {
                 $getid = $item->id;
-                Verificacion::where('id', $getid)->update([
-                    'ifnotificado' => 1
-                ]);
-                $contador++;
+
+                // Preparando los datos para actualizar
+                $updateData = [];
+
+                // Si se envía un valor para ifnotificado, lo actualizamos
+                if ($ifnotificado !== null) {
+                    $updateData['ifnotificado'] = $ifnotificado;
+                }
+
+                // Si se envía un valor para ifaprobadoGerencia, lo actualizamos
+                if ($ifaprobadoGerencia !== null) {
+                    $updateData['ifaprobadoGerencia'] = $ifaprobadoGerencia;
+                    $updateData['fecha_aprobacionGerencia'] = now(); // Asignamos la fecha de aprobación
+                }
+
+                // Si hay datos para actualizar, hacemos la actualización
+                if (!empty($updateData)) {
+                    Verificacion::where('id', $getid)->update($updateData);
+                    $contador++;
+                }
             }
+
+            // Si todo fue bien, confirmamos la transacción
             DB::commit();
-            return[
+
+            // Devolvemos la cantidad de registros guardados
+            return [
                 "guardados" => $contador,
             ];
 
-        }catch(\Exception $e){
+        } catch (\Exception $e) {
+            // Si ocurre un error, hacemos rollback de la transacción
             DB::rollback();
-            return response()->json(["error"=>"0", "message" => $e->getMessage()], 500);
+            return response()->json(["error" => "0", "message" => $e->getMessage()], 500);
         }
     }
+
 }

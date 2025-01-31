@@ -324,6 +324,16 @@ class ComboController extends Controller
                 //VALIDAR QUE EL CODIGO DE COMBO EXISTE
                 $ExistsCombo = $this->getExistsCombo($codigoCombo);
                 if (!empty($ExistsCombo)) {
+                    $getEstadoCombo = $ExistsCombo[0]->estado;
+                    //si es estado 2 esta bloqueado
+                    if($getEstadoCombo == 2){
+                        $arregloProblemaCombos[$contadorErrCombos] = [
+                            "combo"     => $codigoCombo,
+                            "problema"  => 'Combo bloqueado'
+                        ];
+                        $contadorErrCombos++;
+                        continue;
+                    }
                     foreach ($item->codigosHijos as $key2 => $tr) {
                         $codigoA                = '';
                         $codigoB                = '';
@@ -346,22 +356,30 @@ class ComboController extends Controller
                             if($variosCodigos == 0){ $codigoB = strtoupper($validarA[0]->codigo_union); }
                             $validarB           = CodigosLibros::where('codigo', $codigoB)->get();
                             if (count($validarB) > 0) {
+                                $comboIgualAnteriorA = false;
+                                $comboIgualAnteriorB = false;
                                 //VARIABLES PARA EL PROCESO
                                 //CODIGO A
-                                $ifcodigo_comboA        = strtoupper($validarA[0]->codigo_combo);
-                                $codigo_unionA          = strtoupper($validarA[0]->codigo_union);
-                                $if_estado_liquidacionA = $validarA[0]->estado_liquidacion;
+                                $ifcodigo_comboA            = strtoupper($validarA[0]->codigo_combo);
+                                $codigo_unionA              = strtoupper($validarA[0]->codigo_union);
+                                $if_estado_liquidacionA     = $validarA[0]->estado_liquidacion;
+                                $if_bc_institucionA         = $validarA[0]->bc_institucion;
+                                $venta_lista_institucionA   = $validarA[0]->venta_lista_institucion;
+
                                 //CODIGO B
-                                $ifcodigo_comboB        = strtoupper($validarB[0]->codigo_combo);
-                                $codigo_unionB          = strtoupper($validarB[0]->codigo_union);
-                                $if_estado_liquidacionB = $validarB[0]->estado_liquidacion;
+                                $ifcodigo_comboB            = strtoupper($validarB[0]->codigo_combo);
+                                $codigo_unionB              = strtoupper($validarB[0]->codigo_union);
+                                $if_estado_liquidacionB     = $validarB[0]->estado_liquidacion;
+                                $if_bc_institucionB         = $validarB[0]->bc_institucion;
+                                $venta_lista_institucionB   = $validarB[0]->venta_lista_institucion;
 
                                 //===VALIDACION COMBO NORMAL====
                                 if (($ifcodigo_comboA == null || $ifcodigo_comboA == $codigoCombo) && (($codigo_unionA == $codigoB) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) { $mensajeError = CodigosLibros::CODIGO_ACTIVACION;  $errorA = 0; }
                                 if (($ifcodigo_comboB == null || $ifcodigo_comboB == $codigoCombo) && (($codigo_unionB == $codigoA) || ($codigo_unionB == null || $codigo_unionB == "" || $codigo_unionB == "0"))) { $mensajeError = CodigosLibros::CODIGO_DIAGNOSTICA; $errorB = 0; }
-
+                                $comboIgualAnteriorA = ($ifcodigo_comboA == $codigoCombo);
+                                $comboIgualAnteriorB = ($ifcodigo_comboB == $codigoCombo);
                                 //===VALIDACION SI ES libroSeleccionado 1 porque se va a colocar como regalado===
-                                if($libroSeleccionado == '1'){
+                                // if($libroSeleccionado == '1'){
                                     //codigo A
                                     if($if_estado_liquidacionA == 0){ $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorA = 1; }
                                     if($if_estado_liquidacionA == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorA = 1; }
@@ -370,7 +388,10 @@ class ComboController extends Controller
                                     if($if_estado_liquidacionB == 0){ $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorB = 1; }
                                     if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
                                     if($if_estado_liquidacionB == 4){ $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
-                                }
+                                    //institucion si bc_institucion o venta_lista_institucion es mayor a 0  seria mensajeError
+                                    if($if_bc_institucionA > 0 || $venta_lista_institucionA > 0){ $mensajeError = CodigosLibros::CODIGO_CON_INSTITUCION;  $errorA = 1; }
+                                    if($if_bc_institucionB > 0 || $venta_lista_institucionB > 0){ $mensajeError = CodigosLibros::CODIGO_CON_INSTITUCION;  $errorB = 1; }
+                                //}
                                 //===MENSAJE VALIDACION====
                                 if ($errorA == 1 && $errorB == 0) {
                                     $codigoConProblemas->push($validarA);
@@ -386,13 +407,15 @@ class ComboController extends Controller
                                 //SI AMBOS CODIGOS PASAN LA VALIDACION GUARDO
                                 if ($errorA == 0 && $errorB == 0) {
                                     $old_valuesA    = $validarA;
-                                    $ingresoA       = $this->updatecodigosCombo($codigoCombo, $codigoA, $codigoB, $libroSeleccionado, $tipoRegalado);
+                                    $ingresoA       = $this->updatecodigosCombo($codigoCombo, $codigoA, $codigoB, $libroSeleccionado, $tipoRegalado, $comboIgualAnteriorA);
                                     $old_valuesB    = $validarB;
-                                    $ingresoB       = $this->updatecodigosCombo($codigoCombo, $codigoB, $codigoA, $libroSeleccionado, $tipoRegalado);
+                                    $ingresoB       = $this->updatecodigosCombo($codigoCombo, $codigoB, $codigoA, $libroSeleccionado, $tipoRegalado,$comboIgualAnteriorB);
 
                                     if($ingresoA && $ingresoB){
-                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null);
-                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null);
+                                        if($comboIgualAnteriorA){}
+                                        else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null); }
+                                        if($comboIgualAnteriorB){}
+                                        else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null); }
                                         $contadorA++;
                                         $contadorB++;
                                     }
@@ -454,10 +477,10 @@ class ComboController extends Controller
                     $contadorErrCombos++;
                 }
                 //si contadorA es mayor a cero marco el combo como usado
-                // if($contadorA > 0){
-                //     //colocar el combo como utilizado
-                //     $this->changeUseCombo($codigoCombo);
-                // }
+                if($contadorA > 0){
+                    //colocar el combo como utilizado
+                    $this->changeUseCombo($codigoCombo);
+                }
             }
 
             DB::commit(); // Commit the transaction
@@ -499,12 +522,15 @@ class ComboController extends Controller
         $combo->estado = "0";
         $combo->save();
     }
-    public function updatecodigosCombo($codigoCombo,$codigo,$codigo_union, $libroSeleccionado, $tipoRegalado){
+    public function updatecodigosCombo($codigoCombo,$codigo,$codigo_union, $libroSeleccionado, $tipoRegalado,$comboIgualAnterior){
+        if($comboIgualAnterior){
+            return 1;
+        }
         $codigoLibro = CodigosLibros::where('codigo', '=', $codigo)->first();
-
+        $fecha = date('Y-m-d H:i:s');
         if ($codigoLibro) {
             $codigoLibro->codigo_combo              = $codigoCombo;
-            // $codigoLibro->fecha_registro_paquete    = $fecha;
+            $codigoLibro->fecha_registro_combo      = $fecha;
             $codigoLibro->codigo_union              = $codigo_union;
             if($libroSeleccionado == '1'){
                 $codigoLibro->estado_liquidacion    = '2';

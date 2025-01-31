@@ -49,6 +49,9 @@ class Pedidos2Controller extends Controller
         if($request->getLibrosXDespacho_new)        { return $this->getLibrosXDespacho_new($request); }
         if($request->getLibrosXInstituciones)       { return $this->getLibrosXInstituciones($request->id_periodo,$request->tipo_venta); }
         if($request->getLibrosXInstitucionesAsesor) { return $this->getLibrosXInstitucionesAsesor($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
+        if($request->getLibrosXPerido) { return $this->getLibrosXPerido($request->id_periodo); }
+
+
         if($request->getproStockReserva)            { return $this->getproStockReserva($request); }
         if($request->getPuntosVentaDespachadosComparativo) { return $this->getPuntosVentaDespachadosComparativo($request); }
         if($request->getPuntosVentaDespachados)     { return $this->getPuntosVentaDespachados($request); }
@@ -178,6 +181,17 @@ class Pedidos2Controller extends Controller
         $id_pedidos = implode(",",$id_pedidos->toArray());
         $query = $this->geAllLibrosxAsesor(0,$id_periodo,1,$id_pedidos);
         return $query;
+    }
+    //API:GET/pedidos2/pedidos?getLibrosXPerido=yes&id_periodo=22
+    public function getLibrosXPerido($id_periodo){
+        $query = $this->tr_getInstitucionesPeriodo($id_periodo);
+        $id_pedidos = "";
+        //crear un coleccion y pluck de id_pedido
+        $id_pedidos = collect($query)->pluck('id_pedido');
+        //convertir en string
+        $id_pedidos = implode(",",$id_pedidos->toArray());
+        $query2 = $this->geAllLibrosxAsesor(0,$id_periodo,1,$id_pedidos);
+        return $query2;
     }
     //API:GET/pedidos2/pedidos?getproStockReserva=yes
     public function getproStockReserva($pro_codigo){
@@ -804,12 +818,16 @@ class Pedidos2Controller extends Controller
         // }
         // return $query;
     }
+    public function getlibrosxPeriodo($asesor_id,$periodo_id,$tipo = null,$parametro1=null)
+    {
+
+    }
     //API:GET/pedidos2/pedidos?geAllLibrosxAsesor=yes&asesor_id=4179&periodo_id=22
     public function geAllLibrosxAsesor($asesor_id,$periodo_id,$tipo = null,$parametro1=null){
         $val_pedido = [];
         //por asesor
         if($tipo == null){
-            $val_pedido = DB::SELECT("SELECT DISTINCT pv.valor,
+            $val_pedido = DB::SELECT("SELECT pv.valor,
             pv.id_area, pv.tipo_val, pv.id_serie, pv.year,pv.plan_lector,pv.alcance,
             p.id_periodo,
             CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
@@ -832,7 +850,7 @@ class Pedidos2Controller extends Controller
             //quitar las comas y convertir en array
             $ids = explode(",",$parametro1);
             $val_pedido = DB::table('pedidos_val_area as pv')
-            ->selectRaw('DISTINCT pv.valor, pv.id_area, pv.tipo_val, pv.id_serie, pv.year, pv.plan_lector, pv.alcance,
+            ->selectRaw('pv.valor, pv.id_area, pv.tipo_val, pv.id_serie, pv.year, pv.plan_lector, pv.alcance,
                         p.id_periodo,
                         CONCAT(se.nombre_serie, " ", ar.nombrearea) as serieArea,
                         se.nombre_serie')
@@ -947,7 +965,7 @@ class Pedidos2Controller extends Controller
                 "valor"             => $item->valor,
                 // "tipo_val"          => $item->tipo_val,
                 "id_serie"          => $item->id_serie,
-                // "year"              => $item->year,
+                "year"              => $item->year,
                 // "anio"              => $valores[0]->year,
                 // "version"           => $valores[0]->version,
                 // "plan_lector"       => $item->plan_lector,
@@ -991,7 +1009,7 @@ class Pedidos2Controller extends Controller
     }
     //API:GET/pedidos2/pedidos?getLibrosXAreaXSerieUsados=yes&periodo_id=24&area=19&serie=169
     public function getLibrosXAreaXSerieUsados($periodo,$area,$serie){
-        $query = DB::SELECT("SELECT DISTINCT pv.valor,
+        $query = DB::SELECT("SELECT pv.valor,
         pv.id_area, pv.tipo_val, pv.id_serie, pv.year,pv.plan_lector,pv.alcance,
         p.id_periodo,
         CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
@@ -1358,7 +1376,7 @@ class Pedidos2Controller extends Controller
         $val_pedido = [];
         //por asesor
         if($tipo == null){
-            $val_pedido = DB::SELECT("SELECT DISTINCT pv.valor,
+            $val_pedido = DB::SELECT("SELECT pv.valor,
             pv.id_area, pv.tipo_val, pv.id_serie, pv.year,pv.plan_lector,pv.alcance,
             p.id_periodo,
             CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
@@ -1381,7 +1399,7 @@ class Pedidos2Controller extends Controller
             //quitar las comas y convertir en array
             $ids = explode(",",$parametro1);
             $val_pedido = DB::table('pedidos_val_area_new as pv')
-            ->selectRaw('DISTINCT pv.pvn_cantidad as valor,
+            ->selectRaw('pv.pvn_cantidad as valor,
                         CASE
                             WHEN se.id_serie = 6 THEN l.idlibro
                             ELSE ar.idarea

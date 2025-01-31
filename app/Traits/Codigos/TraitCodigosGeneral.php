@@ -142,6 +142,10 @@ trait TraitCodigosGeneral{
         if($busqueda == 3) {  $resultado->where('c.codigo_paquete', '=', $codigo)->where('prueba_diagnostica','0'); }
         //todos los codigos de un paquete
         if($busqueda == 4) {  $resultado->where('c.codigo_paquete', '=', $codigo); }
+        //por combo solo codigos de activacion
+        if($busqueda == 5) {  $resultado->where('c.codigo_combo', '=', $codigo)->where('prueba_diagnostica','0'); }
+        //todos los codigos de un combo
+        if($busqueda == 6) {  $resultado->where('c.codigo_combo', '=', $codigo); }
         $consulta = $resultado->get();
         if(empty($consulta)){
             return $consulta;

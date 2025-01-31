@@ -420,6 +420,20 @@ trait TraitPedidosGeneral
         ");
        return $query;
     }
+    public function tr_getInstitucionesPeriodo($id_periodo){
+        $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
+        CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        WHERE p.estado = '1'
+        AND p.tipo = '0'
+        AND p.id_periodo = '$id_periodo'
+        ORDER BY p.id_pedido DESC
+        ");
+       return $query;
+    }
     public function tr_getPuntosVentasDespachos($periodo){
         $query = DB::SELECT("SELECT DISTINCT c.venta_lista_institucion, i.nombreInstitucion, venta_lista_institucion as institucion_id
         FROM codigoslibros c

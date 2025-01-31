@@ -1080,6 +1080,14 @@ Route::get('obtenerCuentasXCobrar', 'BancoController@obtenerCuentasXCobrar');
 Route::get('obtenerNotasCredito', 'BancoController@obtenerNotasCredito');
 Route::post('actualizardatosNotasCredito', 'BancoController@actualizardatosNotasCredito');
 //FIN SEGUIMIENTO
+//NOTAS DE CREDITO INTERNAS
+Route::get('buscarLibreriaOestablecimiento', 'AbonoController@buscarLibreriaOestablecimiento');
+Route::get('getCodigoSecuencial', 'AbonoController@getCodigoSecuencial');
+Route::post('cruce_registro', 'AbonoController@cruce_registro');
+Route::get('buscarCrucesCuentas', 'AbonoController@buscarCrucesCuentas');
+Route::get('getReferenciaNotaCredito', 'AbonoController@getReferenciaNotaCredito');
+Route::post('editarVenta', 'AbonoController@editarVenta');
+//FIN NOTAS DE CREDITO INTERNAS
 //PREFACTURAS A NOTAS
 Route::post('cambioCodigosPrefacturasANota', 'VentasController@cambioCodigosPrefacturasANota');
 Route::post('cambioPrefacturasANota', 'VentasController@cambioPrefacturasANota');
@@ -1202,6 +1210,7 @@ Route::get('GetListadoRetenciones','AbonoController@GetListadoRetenciones');
 Route::get('GetVerificacionAbonoDocumento','AbonoController@GetVerificacionAbonoDocumento');
 Route::get('GetEvidenciasGlobalxID','AbonoController@GetEvidenciasGlobalxID');
 Route::get('VerifcarMetodosGet_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosGet_AbonoRetencionPorcentaje');
+Route::get('get_VerificacionAntesEliminarPedido','PedidosController@get_VerificacionAntesEliminarPedido');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
 Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
@@ -1209,6 +1218,7 @@ Route::post('retencion_registro_update_new', 'AbonoController@retencion_registro
 Route::post('Post_ActualizarPorcentaje_Venta','AdminController@Post_ActualizarPorcentaje_Venta');
 Route::post('anularretencion_quitarevidencia','AbonoController@anularretencion_quitarevidencia');
 Route::post('VerifcarMetodosPost_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosPost_AbonoRetencionPorcentaje');
+Route::post('EliminarPedidoCompleto_SinContrato','PedidosController@EliminarPedidoCompleto_SinContrato');
 //FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -1543,6 +1553,10 @@ Route::group(['prefix' => 'paquetes'],function(){
 Route::group(['prefix' => 'combos'],function(){
     Route::resource('combos', 'CombosCodigosController');
     Route::post('generarCodigosCombo', 'CombosCodigosController@generarCodigosCombo');
+    Route::post('ComboModificar','CombosCodigosController@ComboModificar');
+    Route::post('eliminar','CombosCodigosController@ImporteliminarCombo');
+    Route::post('limpiar','CombosCodigosController@ImportLimpiarCombo');
+    Route::post('bloquear','CombosCodigosController@ImportBloquearCombo');
 });
 //=======FIN CODIGOS COMBOS=======================================
 
@@ -2004,9 +2018,12 @@ Route::post('metodosPostCodigos','CodigoLibrosController@metodosPostCodigos');
 Route::group([], function () {
     // Definición manual de rutas para el controlador EvaluacionEstudianteController
     Route::resource('/combos', 'ComboController');
-    Route::post('guardarAsignacionVariosCodigos','ComboController@guardarAsignacionVariosCodigos');
     Route::post('guardarAsignacionCodigo','ComboController@guardarAsignacionCodigo');
 });
+
+Route::get('empresa2', '_14EmpresaController@empresa2');
+Route::get('periodo2','PeriodoController@periodo2');
+Route::post('getSecuencialMovimiento_N_O','f_tipo_documentoController@getSecuencialMovimiento_N_O');
 //NOTIFICACIONES
 Route::group([], function () {
     // Definición manual de rutas para el controlador EvaluacionEstudianteController
@@ -2014,3 +2031,5 @@ Route::group([], function () {
 });
 //quitar codigo del reporte de facturacion
 Route::post('restaurarALiquidado_devueltos','CodigoLibrosController@restaurarALiquidado_devueltos');
+
+Route::post('docentes_x_institucion', 'UsuarioController@docentes_x_institucion');

@@ -302,6 +302,9 @@ class BancoController extends Controller
                 throw new \Exception('No se encontró la cuenta');
             }
 
+            $ultimoId  = CuentaBancaria::max('cue_pag_codigo') + 1;
+            DB::statement('ALTER TABLE 1_1_cuenta_pago AUTO_INCREMENT = ' . $ultimoId);
+
             \DB::commit();
 
             return response()->json(['message' => 'Cuenta eliminada correctamente'], 200);

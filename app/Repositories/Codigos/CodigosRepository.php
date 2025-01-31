@@ -23,9 +23,11 @@ class  CodigosRepository extends BaseRepository
         $this->pedidosRepository  = $pedidosRepository;
     }
 
-    public function procesoUpdateGestionBodega($numeroProceso,$codigo,$union,$request,$factura,$paquete=null,$ifChangeProforma=false,$datosProforma=[]){
-        $venta_estado = $request->venta_estado;
-        $arrayInstitucionGestion = [];
+    public function procesoUpdateGestionBodega($numeroProceso,$codigo,$union,$request,$factura,$paquete=null,$ifChangeProforma=false,$datosProforma=[],$comboIndividual=null){
+        $venta_estado               = $request->venta_estado;
+        //tipoComboImportacion => 0 combo general; 1 = combo individual del excel
+        $tipoComboImportacion       = $request->tipoComboImportacion;
+        $arrayInstitucionGestion    = [];
         if($venta_estado == 1){
             $arrayInstitucionGestion = ["bc_institucion" => $request->institucion_id ,"venta_lista_institucion" => 0];
         }
@@ -38,8 +40,6 @@ class  CodigosRepository extends BaseRepository
         $arraySave               = [];
         $arrayUnion              = [];
         $arrayPaquete            = [];
-        $arrayPaqueteInstitucion = [];
-        $arrayPaqueteVentaEstado = [];
         $arrayProforma           = [];
         $arrayCombo              = [];
         //combo
@@ -47,16 +47,13 @@ class  CodigosRepository extends BaseRepository
         $combo                   = $request->comboSelected;
         //si ifSetCombo es 1 coloco el combo
         if($ifSetCombo == 1)            { $arrayCombo  = [ 'combo' => $combo]; }
+        if($tipoComboImportacion == 1)  { $arrayCombo  = [ 'combo' => $comboIndividual, ]; }
         //paquete
         if($paquete == null)            { $arrayPaquete = []; }else{ $arrayPaquete  = [ 'codigo_paquete' => $paquete, 'fecha_registro_paquete'    => $fecha]; }
         //codigo de union
         if($union == null)              { $arrayUnion  = [];  } else{ $arrayUnion  = [ 'codigo_union' => $union ]; }
         //si proforma es true
         if($ifChangeProforma == false)  { $arrayProforma = []; } else{ $arrayProforma = [ 'codigo_proforma' => $datosProforma['codigo_proforma'], 'proforma_empresa' => $datosProforma['proforma_empresa'] ]; }
-        //para import de gestion de paquetes si envia la institucion
-        if($request->institucion_id)    { $arrayPaqueteInstitucion = [ 'bc_institucion' => $request->institucion_id, 'bc_periodo' => $request->periodo_id, 'venta_lista_institucion' => 0 ];   }
-        //para import de gestion de paquetes si el estado de venta directa
-        if($venta_estado == 1)          { $arrayPaqueteVentaEstado = [ 'venta_estado' => $request->venta_estado ]; }
         //Usan y liquidan
         if($numeroProceso == '0'){
             $arraySave = [
@@ -167,13 +164,16 @@ class  CodigosRepository extends BaseRepository
             'combo'                     => null,
             'documento_devolucion'      => null,
             'permitir_devolver_nota'    => '0',
-            'codigo_combo'              => null,
             'quitar_de_reporte'         => null,
             'plus'                      => 0,
         ];
         $arrayPaquete = [
             'codigo_paquete'            => null,
             'fecha_registro_paquete'    => null,
+        ];
+        $arrayCombo = [
+            'codigo_combo'              => null,
+            'fecha_registro_combo'      => null,
         ];
         if($todo == 1) { $arrayCombinar = array_merge($arrayLimpiar, $arrayPaquete); }
         else           { $arrayCombinar = $arrayLimpiar;}
