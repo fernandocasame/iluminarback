@@ -1738,6 +1738,38 @@ class VerificacionControllerAnterior extends Controller
         }
         if($conValores){
             //obtener valores de verificación
+            // Agrupar por contrato
+            $verificacionesAgrupadas = $verificaciones->groupBy('contrato')->map(function ($items, $contrato) {
+                // Verificar si alguna verificación tiene ifaprobadoGerencia en 0
+                $ifaprobadoGerenciaPadre = $items->contains('ifaprobadoGerencia', 0) ? 0 : 1;
+
+                return [
+                    'contrato' => $contrato,
+                    'nombreInstitucion' => $items->first()->nombreInstitucion,
+                    'asesor' => $items->first()->asesor,
+                    'id_pedido' => $items->first()->id_pedido,
+                    'totalPagos' => $items->first()->totalPagos,
+                    'ifaprobadoGerenciaPadre' => $ifaprobadoGerenciaPadre, // Nuevo campo agregado
+                    'verificaciones' => $items->map(function ($item) {
+                        return [
+                            'num_verificacion' => $item->num_verificacion,
+                            'id' => $item->id,
+                            'fecha_subir_evidencia' => $item->fecha_subir_evidencia,
+                            'file_evidencia' => $item->file_evidencia,
+                            'fecha_subir_factura' => $item->fecha_subir_factura,
+                            'file_factura' => $item->file_factura,
+                            'ifnotificado' => $item->ifnotificado,
+                            'ifaprobadoGerencia' => $item->ifaprobadoGerencia,
+                            'fecha_aprobacionGerencia' => $item->fecha_aprobacionGerencia,
+                            'valorLiquidaciones' => $item->valorLiquidaciones,
+                        ];
+                    })->values(),
+                ];
+            })->values();
+
+            // Retornar respuesta con la estructura deseada
+            return response()->json($verificacionesAgrupadas);
+
         }
         return $verificaciones;
     }

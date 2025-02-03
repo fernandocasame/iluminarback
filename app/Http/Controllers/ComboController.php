@@ -362,14 +362,18 @@ class ComboController extends Controller
                                 //CODIGO A
                                 $ifcodigo_comboA            = strtoupper($validarA[0]->codigo_combo);
                                 $codigo_unionA              = strtoupper($validarA[0]->codigo_union);
+                                $ifestado                   = $validarA[0]->estado;
                                 $if_estado_liquidacionA     = $validarA[0]->estado_liquidacion;
+                                $if_liquidado_regaladoA     = $validarA[0]->liquidado_regalado;
                                 $if_bc_institucionA         = $validarA[0]->bc_institucion;
                                 $venta_lista_institucionA   = $validarA[0]->venta_lista_institucion;
 
                                 //CODIGO B
                                 $ifcodigo_comboB            = strtoupper($validarB[0]->codigo_combo);
                                 $codigo_unionB              = strtoupper($validarB[0]->codigo_union);
+                                $ifestado                   = $validarB[0]->estado;
                                 $if_estado_liquidacionB     = $validarB[0]->estado_liquidacion;
+                                $if_liquidado_regaladoB     = $validarB[0]->liquidado_regalado;
                                 $if_bc_institucionB         = $validarB[0]->bc_institucion;
                                 $venta_lista_institucionB   = $validarB[0]->venta_lista_institucion;
 
@@ -381,16 +385,24 @@ class ComboController extends Controller
                                 //===VALIDACION SI ES libroSeleccionado 1 porque se va a colocar como regalado===
                                 // if($libroSeleccionado == '1'){
                                     //codigo A
-                                    if($if_estado_liquidacionA == 0){ $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorA = 1; }
-                                    if($if_estado_liquidacionA == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorA = 1; }
-                                    if($if_estado_liquidacionA == 4){ $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorA = 1; }
+                                    if($if_estado_liquidacionA == 0)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorA = 1; }
+                                    //CODIGO_LIQUIDADO_REGALADO
+                                    if($if_liquidado_regaladoA == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorA = 1; }
+                                    //bloqueado
+                                    if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorA = 1; }
+                                    //if($if_estado_liquidacionA == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorA = 1; }
+                                    if($if_estado_liquidacionA == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorA = 1; }
                                     //codigo B
-                                    if($if_estado_liquidacionB == 0){ $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorB = 1; }
-                                    if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
-                                    if($if_estado_liquidacionB == 4){ $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
+                                    if($if_estado_liquidacionB == 0)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO;  $errorB = 1; }
+                                    //CODIGO_LIQUIDADO_REGALADO
+                                    if($if_liquidado_regaladoB == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorB = 1; }
+                                    //bloqueado
+                                    if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
+                                    // if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
+                                    if($if_estado_liquidacionB == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
                                     //institucion si bc_institucion o venta_lista_institucion es mayor a 0  seria mensajeError
-                                    if($if_bc_institucionA > 0 || $venta_lista_institucionA > 0){ $mensajeError = CodigosLibros::CODIGO_CON_INSTITUCION;  $errorA = 1; }
-                                    if($if_bc_institucionB > 0 || $venta_lista_institucionB > 0){ $mensajeError = CodigosLibros::CODIGO_CON_INSTITUCION;  $errorB = 1; }
+                                    // if($if_bc_institucionA > 0 || $venta_lista_institucionA > 0){ $mensajeError = CodigosLibros::CODIGO_CON_INSTITUCION;  $errorA = 1; }
+                                    // if($if_bc_institucionB > 0 || $venta_lista_institucionB > 0){ $mensajeError = CodigosLibros::CODIGO_CON_INSTITUCION;  $errorB = 1; }
                                 //}
                                 //===MENSAJE VALIDACION====
                                 if ($errorA == 1 && $errorB == 0) {
