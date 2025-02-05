@@ -20,7 +20,7 @@ trait TraitPedidosGeneral
     public $api_KeyCOBACANGO            = "RfVaC9hIMhn49J4jSq2_I6jl_oMHwM8TrJbBo8ztdHA-";
     //=====END SOLINFA======
     public $ipProlipa                   = "http://186.4.218.168:9095/api/";
-    public $ipPerseo                    = "http://190.12.43.171:8181/api/";
+    public $ipPerseo                    = "http://45.184.225.106:8181/api/";
     public $gl_perseoProduccion         = 1;
     // public $ipLocal        = "http://localhost:5000/api/";
     public function FacturacionGet($endpoint)
