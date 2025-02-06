@@ -1785,7 +1785,6 @@ class DevolucionController extends Controller
     //METODO ACTUALIZAR DATOS DE DEVOLUCION
     public function actualizarDatosDevolucion(Request $request)
     {
-        // return $request;
         // Datos recibidos desde el front
         $datosFiltrados = $request->input('datosFiltrados');  // Este es el arreglo de datos que se recibe del front
         $empresaId = $request->input('empresaId');
@@ -1805,7 +1804,6 @@ class DevolucionController extends Controller
         try {
             // Comienza la transacción
             DB::beginTransaction();
-
             // Iterar sobre cada libro en los datos filtrados
             foreach ($datosFiltrados as $libro) {
                 // Actualizar tabla codigoslibros
@@ -1813,7 +1811,7 @@ class DevolucionController extends Controller
 
                 // Actualizar tabla f_detalle_venta
                 $modificados['f_detalle_venta'] = array_merge($modificados['f_detalle_venta'], $this->actualizarDetalleVenta($libro, $empresaId));
-
+                
                 // Actualizar tabla codigoslibros_devolucion_son
                 $modificados['codigoslibros_devolucion_son'] = array_merge($modificados['codigoslibros_devolucion_son'], $this->actualizarCodigosLibrosDevolucionSon($libro, $empresaId, $iDdocumentoDev, $documentoDev));
 
@@ -2002,20 +2000,62 @@ class DevolucionController extends Controller
         return $modificados;
     }
 
+    // private function actualizarCodigosLibrosDevolucionSon($libro, $empresaId, $iDdocumentoDev, $documentoDev)
+    // {
+    //     $modificados = []; // Para guardar los registros modificados
+
+    //     // Iteramos sobre los detallesDevolucion del libro
+    //     $codigosFiltrados = []; // Inicializamos el arreglo de códigos filtrados
+
+    //     // foreach ($libro['codigos'] as $codigo) {
+    //     //     return $codigo['codigo'];
+    //     //     //CLI-5APRFMZ
+    //     //     //ICLI
+    //     //     // Verificamos si el código pertenece al 'codigoAfectado'
+    //     //     if (strpos($codigo['codigo'], $libro['codigo']) !== false) {
+    //     //         $codigosFiltrados[] = $codigo;
+    //     //     }
+    //     // }
+    //     $indiceCodigo = 0; // Inicializamos el índice del código
+
+    //     foreach ($libro['detallesDevolucion'] as $devolucion) {
+    //         $venCodigo = $devolucion['ven_codigo']; // El ven_codigo que está asociado con la devolución
+    //         $cantidadDevolucion = $devolucion['cantidadDevolucion']; // Cantidad de devoluciones
+
+    //         for ($i = 0; $i < $cantidadDevolucion; $i++) {
+    //             if ($indiceCodigo >= count($codigosFiltrados)) {
+    //                 break; // Si se ha agotado la lista de códigos, salimos del ciclo
+    //             }
+
+    //             $codigo = $codigosFiltrados[$indiceCodigo];
+
+    //             // Realizamos la actualización en la base de datos para cada código
+    //             DB::table('codigoslibros_devolucion_son')
+    //                 ->where('codigoslibros_devolucion_id', $iDdocumentoDev)
+    //                 ->where('codigo', $codigo['codigo'])
+    //                 ->where('codigo_union', $codigo['codigo_union'])
+    //                 ->whereNull('id_empresa') // Solo actualizamos si 'id_empresa' es null
+    //                 ->update([
+    //                     'id_empresa' => $empresaId,
+    //                     'documento' => $venCodigo, // Asignamos el ven_codigo correcto
+    //                 ]);
+
+    //             // Guardamos los registros modificados para retornarlos después
+    //             $modificados[] = [
+    //                 'codigo' => $codigo['codigo'],
+    //                 'codigo_union' => $codigo['codigo_union'],
+    //                 'documento' => $venCodigo,
+    //             ];
+
+    //             $indiceCodigo++; // Incrementamos el índice del código
+    //         }
+    //     }
+
+    //     return $modificados; // Devolvemos los registros modificados
+    // }
     private function actualizarCodigosLibrosDevolucionSon($libro, $empresaId, $iDdocumentoDev, $documentoDev)
     {
         $modificados = []; // Para guardar los registros modificados
-
-        // Iteramos sobre los detallesDevolucion del libro
-        $codigosFiltrados = []; // Inicializamos el arreglo de códigos filtrados
-
-        foreach ($libro['codigos'] as $codigo) {
-            // Verificamos si el código pertenece al 'codigoAfectado'
-            if (strpos($codigo['codigo'], $libro['codigo']) !== false) {
-                $codigosFiltrados[] = $codigo;
-            }
-        }
-
         $indiceCodigo = 0; // Inicializamos el índice del código
 
         foreach ($libro['detallesDevolucion'] as $devolucion) {
@@ -2023,11 +2063,12 @@ class DevolucionController extends Controller
             $cantidadDevolucion = $devolucion['cantidadDevolucion']; // Cantidad de devoluciones
 
             for ($i = 0; $i < $cantidadDevolucion; $i++) {
-                if ($indiceCodigo >= count($codigosFiltrados)) {
-                    break; // Si se ha agotado la lista de códigos, salimos del ciclo
+                // Aquí es donde usábamos los $codigosFiltrados, pero lo hemos eliminado
+                if ($indiceCodigo >= count($libro['codigos'])) {
+                    break; // Si no hay más códigos, salimos del ciclo
                 }
 
-                $codigo = $codigosFiltrados[$indiceCodigo];
+                $codigo = $libro['codigos'][$indiceCodigo]; // Usamos directamente los codigos del libro
 
                 // Realizamos la actualización en la base de datos para cada código
                 DB::table('codigoslibros_devolucion_son')
