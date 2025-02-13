@@ -7102,7 +7102,7 @@ class PedidosController extends Controller
         $id_pedido = $request->input('id_pedido');
         $id_periodo = $request->input('id_periodo');
         $validacionperiodo = $request->input('validacionperiodo');
-
+    
         // Validar si se envió el ID del pedido
         if (!$id_pedido) {
             return response()->json(['error' => 'ID de pedido no proporcionado'], 400);
@@ -7134,7 +7134,7 @@ class PedidosController extends Controller
         }else{
             $mensajeLibrosDelPedido = "No se a definido un periodo para consultar los libros.";
         }
-
+    
         // Consultar convenios
         $convenios = DB::SELECT("SELECT * FROM pedidos_convenios WHERE id_pedido = ?", [$id_pedido]);
         if (!empty($convenios)) {
@@ -7142,7 +7142,7 @@ class PedidosController extends Controller
         }else{
             $mensajeConvenios = "No contiene";
         }
-
+    
         // Consultar pagos
         $pagos = DB::SELECT("SELECT * FROM 1_4_documento_liq dl WHERE dl.id_pedido = ?", [$id_pedido]);
         if (!empty($pagos)) {
@@ -7158,7 +7158,7 @@ class PedidosController extends Controller
         }else{
             $mensajebeneficiarios = "No contiene";
         }
-
+    
         // Consultar libroshijosdocentes
         // 1. Obtener todos los ID de p_libros_obsequios relacionados con id_pedido
         $libroshijosdocentes = DB::table('p_libros_obsequios')
@@ -7185,7 +7185,7 @@ class PedidosController extends Controller
                 $mensajeActasHijosDocentes = "Sí contiene";
             }
         }
-
+    
         // Retornar la respuesta final con todos los resultados
         return response()->json([
             'mensajeConvenios'             => $mensajeConvenios,
@@ -7220,7 +7220,7 @@ class PedidosController extends Controller
                     $resultados[] = 'No se encontraron registros en pedidos_val_area con el id_pedido ' . $request->id_pedido;
                 } else {
                     $resultados[] = 'Registros eliminados en pedidos_val_area: ' . $deleted_pedidos_val_area;
-                }
+                }   
             }else if ($request->validacionperiodo == 'formato_new') {
                 // Eliminar registros de pedidos_val_area_new
                 $deleted_pedidos_val_area_new = DB::table('pedidos_val_area_new')
@@ -7230,7 +7230,7 @@ class PedidosController extends Controller
                     $resultados[] = 'No se encontraron registros en pedidos_val_area_new con el id_pedido ' . $request->id_pedido;
                 } else {
                     $resultados[] = 'Registros eliminados en pedidos_val_area_new: ' . $deleted_pedidos_val_area_new;
-                }
+                }   
             }else{
                 $resultados[] = 'No se proporciono un valor para validacionperiodo, para eliminar los registros de pedidos_val_area_new: ';
             }
