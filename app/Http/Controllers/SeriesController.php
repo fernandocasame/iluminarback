@@ -129,9 +129,10 @@ class SeriesController extends Controller
             $serie = new Series();
         }
         $serie->nombre_serie        = $request->nombre_serie;
-        $serie->longitud_numeros    = $request->longitud_numeros;
-        $serie->longitud_letras     = $request->longitud_letras;
-        $serie->longitud_codigo     = $request->longitud_codigo;
+        // $serie->longitud_numeros    = $request->longitud_numeros;
+        // $serie->longitud_letras     = $request->longitud_letras;
+        $serie->longitud_codigo             = $request->longitud_codigo;
+        $serie->longitud_codigo_grafitext   = $request->longitud_codigo_grafitext;
         $serie->save();
         if($serie){
             return ["status" => "1", "message" => "Se guardo correctamente"];
@@ -741,21 +742,21 @@ class SeriesController extends Controller
             $query = DB::SELECT("SELECT pro.pro_codigo
             FROM libro li
             LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
-            LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            INNER JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
             LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
             LEFT JOIN area ar ON asi.area_idarea = ar.idarea
             LEFT JOIN series se ON ls.id_serie = se.id_serie
-            WHERE (pro.pro_codigo IS NOT NULL AND pro.pro_codigo NOT LIKE 'G%') AND se.id_serie = $id_serie AND ar.idarea = $idarea
+            WHERE pro.pro_codigo IS NOT NULL AND pro.gru_pro_codigo = 1 AND se.id_serie = $id_serie AND ar.idarea = $idarea
             ORDER BY pro.pro_nombre");
         }else if($id_serie && !$idarea){
             $query = DB::SELECT("SELECT pro.pro_codigo
             FROM libro li
             LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
-            LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            INNER JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
             LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
             LEFT JOIN area ar ON asi.area_idarea = ar.idarea
             LEFT JOIN series se ON ls.id_serie = se.id_serie
-            WHERE (pro.pro_codigo IS NOT NULL AND pro.pro_codigo NOT LIKE 'G%') AND se.id_serie = $id_serie
+            WHERE pro.pro_codigo IS NOT NULL AND pro.gru_pro_codigo = 1 AND se.id_serie = $id_serie
             ORDER BY pro.pro_nombre");
         }
         if (!$query) {
@@ -773,23 +774,27 @@ class SeriesController extends Controller
         foreach ($codigos as $codigo) {
             if ($tipo_producto == 2) {
                 // Buscar código original
-                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
+                    pro.gru_pro_codigo
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigo]);
             } else if ($tipo_producto == 3) {
                 // Buscar código con 'G' al inicio
                 $codigoConG = "G" . $codigo;
-                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
+                    pro.gru_pro_codigo
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigoConG]);
             } else if ($tipo_producto == 1) {
                 // Buscar código original y con 'G' al inicio
                 $codigoConG = "G" . $codigo;
-                $productoDetallesOriginal = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                $productoDetallesOriginal = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
+                    pro.gru_pro_codigo
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigo]);
 
-                $productoDetallesConG = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
+                $productoDetallesConG = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
+                    pro.gru_pro_codigo
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigoConG]);
 
@@ -822,6 +827,11 @@ class SeriesController extends Controller
 
     public function getSeries_new(){
         $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('ruta', 'ruta PLUS', 'conexiones')");
+        return $query;
+    }
+
+    public function getSeries_EdicionStock(){
+        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('Combos')");
         return $query;
     }
 

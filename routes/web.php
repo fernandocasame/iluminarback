@@ -1211,6 +1211,7 @@ Route::get('GetVerificacionAbonoDocumento','AbonoController@GetVerificacionAbono
 Route::get('GetEvidenciasGlobalxID','AbonoController@GetEvidenciasGlobalxID');
 Route::get('VerifcarMetodosGet_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosGet_AbonoRetencionPorcentaje');
 Route::get('get_VerificacionAntesEliminarPedido','PedidosController@get_VerificacionAntesEliminarPedido');
+Route::get('getSeries_EdicionStock','SeriesController@getSeries_EdicionStock');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
 Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
@@ -1791,6 +1792,7 @@ Route::post('Eliminar_Bodega','BodegasController@Eliminar_Bodega');
 //FIN BODEGAS
 //INICIO 1_4_document_liq
 Route::get('GetDocumentoliq', 'DocumentoliqController@GetDocumentoliq');
+Route::get('GetDocumentoliqXPedido', 'DocumentoliqController@GetDocumentoliqXPedido');
 Route::get('GetPago', 'DocumentoliqController@GetPago');
 Route::get('GetDocumentoliq_xfiltro', 'DocumentoliqController@GetDocumentoliq_xfiltro');
 Route::post('PostDocumentoliq_Registrar_modificar','DocumentoliqController@PostDocumentoliq_Registrar_modificar');

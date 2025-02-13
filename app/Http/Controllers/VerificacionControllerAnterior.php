@@ -1673,24 +1673,36 @@ class VerificacionControllerAnterior extends Controller
             'v.ifaprobadoGerencia',
             'v.fecha_aprobacionGerencia',
             'p.id_pedido',
+            'p.valor_aprobo_gerencia_verificacion',
+            'v.valor_liquidacion',
             DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
             DB::raw('
-                CASE
-                    WHEN v.num_verificacion = 1 THEN
-                        ROUND(v.valor_liquidacion, 2)
-                    ELSE
-                        (SELECT ROUND(SUM(vi.valor_liquidacion), 2)
-                        FROM verificaciones vi
-                        WHERE vi.contrato = v.contrato
-                        AND vi.estado = 0)
-                END AS valorLiquidaciones
+                (SELECT ROUND(SUM(vi.valor_liquidacion), 2)
+                FROM verificaciones vi
+                WHERE vi.contrato = v.contrato
+                AND vi.estado = 0)
+                 AS valorLiquidaciones
             '),
             DB::raw('(SELECT COALESCE(ROUND(SUM(l.doc_valor), 2), 0) AS totalPagos
             FROM 1_4_documento_liq l
             WHERE l.id_pedido = p.id_pedido
             AND l.estado = 1
             AND l.tipo_pago_id <> 3
-            ) AS totalPagos')
+            ) AS totalPagos'),
+            DB::raw('
+                (SELECT COALESCE(ROUND(SUM(vi.valor_comision), 2), 0)
+                FROM verificaciones vi
+                WHERE vi.contrato = v.contrato
+                AND vi.estado = 0)
+                AS valorTotalComision
+            '),
+            DB::raw('(
+                SELECT count(l.doc_valor) AS pagosPorCerrarse
+                FROM `1_4_documento_liq` l
+                WHERE l.id_pedido = p.id_pedido
+                AND l.estado = 0
+                AND l.tipo_pago_id <> 3
+            ) AS pagosPorCerrarse')
         )
         ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
         ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
@@ -1742,7 +1754,12 @@ class VerificacionControllerAnterior extends Controller
             $verificacionesAgrupadas = $verificaciones->groupBy('contrato')->map(function ($items, $contrato) {
                 // Verificar si alguna verificación tiene ifaprobadoGerencia en 0
                 $ifaprobadoGerenciaPadre = $items->contains('ifaprobadoGerencia', 0) ? 0 : 1;
-
+            
+                // Obtener la fecha más reciente de los hijos, ignorando los null
+                $fechaAprobadoGeneral = $items->filter(function ($item) {
+                    return !is_null($item->fecha_aprobacionGerencia); // Filtra los que no son null
+                })->max('fecha_aprobacionGerencia'); // Obtiene la fecha máxima
+            
                 return [
                     'contrato' => $contrato,
                     'nombreInstitucion' => $items->first()->nombreInstitucion,
@@ -1750,7 +1767,13 @@ class VerificacionControllerAnterior extends Controller
                     'id_pedido' => $items->first()->id_pedido,
                     'totalPagos' => $items->first()->totalPagos,
                     'ifaprobadoGerenciaPadre' => $ifaprobadoGerenciaPadre, // Nuevo campo agregado
-                    'verificaciones' => $items->map(function ($item) {
+                    'valorLiquidaciones' => $items->first()->valorLiquidaciones,
+                    'valorTotalComision' => $items->first()->valorTotalComision,
+                    'valor_ResultadoPagos' => round(floatval($items->first()->valorTotalComision - $items->first()->totalPagos), 2),
+                    'valor_aprobo_gerencia_verificacion' => $items->first()->valor_aprobo_gerencia_verificacion,
+                    'fecha_aprobado_general' => $fechaAprobadoGeneral, // Nueva fecha más reciente de los hijos
+                    
+                    'verificaciones' => $items->sortBy('num_verificacion')->map(function ($item) {
                         return [
                             'num_verificacion' => $item->num_verificacion,
                             'id' => $item->id,
@@ -1760,13 +1783,19 @@ class VerificacionControllerAnterior extends Controller
                             'file_factura' => $item->file_factura,
                             'ifnotificado' => $item->ifnotificado,
                             'ifaprobadoGerencia' => $item->ifaprobadoGerencia,
+                            'temporalIfaprobadoGerencia' => $item->ifaprobadoGerencia,
                             'fecha_aprobacionGerencia' => $item->fecha_aprobacionGerencia,
-                            'valorLiquidaciones' => $item->valorLiquidaciones,
+                            'valor_liquidacion' => floatval($item->valor_liquidacion),
+                            'id_pedido' => $item->id_pedido,
+                            'valorLiquidaciones' => floatval($item->valorLiquidaciones),
+                            'pagosPorCerrarse' => $item->pagosPorCerrarse,
+
                         ];
-                    })->values(),
+                    })->values(), // Asegura que las claves sean reindexadas
                 ];
             })->values();
-
+             
+            
             // Retornar respuesta con la estructura deseada
             return response()->json($verificacionesAgrupadas);
 
@@ -1852,9 +1881,10 @@ class VerificacionControllerAnterior extends Controller
             DB::beginTransaction();
 
             // Decodificamos el array de notificaciones del request
-            $arrayNotificaciones = json_decode($request->data_verificacion);
-            $ifnotificado = $request->ifnotificado;
-            $ifaprobadoGerencia = $request->ifaprobadoGerencia;
+            $arrayNotificaciones    = json_decode($request->data_verificacion);
+            $ifnotificado           = $request->ifnotificado;
+            $ifaprobadoGerencia     = $request->ifaprobadoGerencia;
+            $user_created           = $request->user_created;
             $contador = 0;
 
             // Iteramos sobre las notificaciones
@@ -1873,6 +1903,9 @@ class VerificacionControllerAnterior extends Controller
                 if ($ifaprobadoGerencia !== null) {
                     $updateData['ifaprobadoGerencia'] = $ifaprobadoGerencia;
                     $updateData['fecha_aprobacionGerencia'] = now(); // Asignamos la fecha de aprobación
+                    $updateData['user_aprobado_gerencia'] = $user_created; // Asignamos el usuario que hizo la aprobación
+                    //actualizar el pedido
+                    Pedidos::where('id_pedido', $item->id_pedido)->update(['valor_aprobo_gerencia_verificacion' => $item->valorLiquidaciones]);
                 }
 
                 // Si hay datos para actualizar, hacemos la actualización
@@ -1893,7 +1926,7 @@ class VerificacionControllerAnterior extends Controller
         } catch (\Exception $e) {
             // Si ocurre un error, hacemos rollback de la transacción
             DB::rollback();
-            return response()->json(["error" => "0", "message" => $e->getMessage()], 500);
+            return response()->json(["error" => "0", "message" => $e->getMessage()], 200);
         }
     }
 

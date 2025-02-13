@@ -20,6 +20,7 @@ use App\Models\Institucion;
 use App\Models\LibroSerie;
 use App\Models\Ventas;
 use App\Repositories\Codigos\CodigosRepository;
+use App\Repositories\Facturacion\DevolucionRepository;
 use App\Repositories\Facturacion\ProformaRepository;
 use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
@@ -37,10 +38,12 @@ class CodigoLibrosController extends Controller
     private $codigosRepository;
     protected $proformaRepository;
     protected $pedidosRepository;
-    public function __construct(CodigosRepository $codigosRepository,ProformaRepository $proformaRepository, PedidosRepository $pedidosRepository) {
+    protected $devolucionRepository;
+    public function __construct(CodigosRepository $codigosRepository,ProformaRepository $proformaRepository, PedidosRepository $pedidosRepository, DevolucionRepository $devolucionRepository) {
         $this->codigosRepository    = $codigosRepository;
         $this->proformaRepository   = $proformaRepository;
         $this->pedidosRepository    = $pedidosRepository;
+        $this->devolucionRepository = $devolucionRepository;
     }
     //api:post//codigos/importar
     public function importar(Request $request){
@@ -1819,14 +1822,12 @@ class CodigoLibrosController extends Controller
                     $validar                        = $this->getCodigos($item->codigo,0);
                     $ingreso                        = 0;
                     $ifsetProforma                  = 0;
-                    $ifErrorProforma                = 0;
-                    $messageProforma                = "";
-                    $datosProforma                  = [];
                     $ingreso                        = 0;
                     $messageIngreso                 = "";
                     $id_cliente                     = $item->id_cliente;
                     $bc_periodo                     = $item->id_periodo;
                     $tipo_importacion               = $item->tipo_importacion;
+                    $cantidadLibroDescontar         = 1;
                     //valida que el codigo existe
                     if(count($validar)>0){
 
@@ -1866,25 +1867,35 @@ class CodigoLibrosController extends Controller
                             //VALIDACION QUE NO SEA LIQUIDADO
                             $EstatusProceso = true;
                         }
-                        // if($request->dLiquidado ==  '1'){
-                        //     $setContrato            = $ifContrato;
-                        //     $verificacion_liquidada = $ifVerificacion;
-                        //     //VALIDACION AUNQUE ESTE LIQUIDADO
-                        //     if($ifLiquidado == '0' || $ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') $EstatusProceso = true;
-                        // }else{
-                        //     //VALIDACION QUE NO SEA LIQUIDADO
-                        //     if(($ifLiquidado == '1' || $ifLiquidado == '2' || $ifLiquidado == '4') && $ifliquidado_regalado == '0' ) $EstatusProceso = true;
-                        // }
+                     
                         //====PROFORMA============================================
                         //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
                         if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1 && ($ifCombo == null || $ifCombo == "")){
-                            $datosProforma     = $this->codigosRepository->validateProforma($ifcodigo_proforma,$ifproforma_empresa,$ifcodigo_liquidacion);
-                            $ifErrorProforma   = $datosProforma["ifErrorProforma"];
-                            $messageIngreso    = $datosProforma["messageProforma"];
-                            $ifsetProforma     = $datosProforma["ifsetProforma"];
-                            $mensaje           = $request->observacion." - Se devolvio a $ifcodigo_proforma";
-                            if($ifsetProforma  == 1 && $ifErrorProforma == 0)   { $EstatusProceso = true; }
-                            else                                                { $EstatusProceso = false; }
+                            //validacion de documento 
+                            $datos = (object) [
+                                "pro_codigo"        => $ifcodigo_liquidacion,
+                                "id_institucion"    => $id_cliente,
+                                "id_periodo"        => $bc_periodo,
+                                "id_empresa"        => $ifproforma_empresa
+                            ];  
+                            //VALIDAR QUE EL DOCUMENTO ACTUAL ESTE DISPONIBLE 
+                            $getDisponibilidadDocumento = $this->devolucionRepository->getFacturaAvailable($datos, $cantidadLibroDescontar, [],$ifcodigo_proforma,$item->codigo);
+                            if($getDisponibilidadDocumento){
+                                $mensaje           = $request->observacion." - Se devolvio a $ifcodigo_proforma";
+                                $ifsetProforma     = 1;
+                                $EstatusProceso    = true; 
+                            }else{
+                                $messageIngreso    = "No se pudo devolver al documento $ifcodigo_proforma porque no se encuentra disponible.";
+                                $ifsetProforma     = 0;
+                                $EstatusProceso    = false;
+                            }
+                            // $datosProforma     = $this->codigosRepository->validateProforma($ifcodigo_proforma,$ifproforma_empresa,$ifcodigo_liquidacion);
+                            // $ifErrorProforma   = $datosProforma["ifErrorProforma"];
+                            // $messageIngreso    = $datosProforma["messageProforma"];
+                            // $ifsetProforma     = $datosProforma["ifsetProforma"];
+                            // $mensaje           = $request->observacion." - Se devolvio a $ifcodigo_proforma";
+                            // if($ifsetProforma  == 1 && $ifErrorProforma == 0)   { $EstatusProceso = true; }
+                            // else                                                { $EstatusProceso = false; }
                         }
                         //jorge dice que se quita esta validacion
                         // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
@@ -2038,7 +2049,6 @@ class CodigoLibrosController extends Controller
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
         $codigos                = json_decode($request->data_codigos);
-        $arrayDocumentosD       = json_decode($request->arrayCodigosDocumentosD);
         $codigosNoCambiados     = [];
         $codigosConLiquidacion  = [];
         $codigoNoExiste         = [];
@@ -2053,13 +2063,14 @@ class CodigoLibrosController extends Controller
         $mensaje                = $request->observacion;
         $setContrato            = null;
         $verificacion_liquidada = null;
-        $institucion_id_select  = $request->institucion_id_select;
         $tipo_importacion       = $request->tipo_importacion;
+        $id_usuario             = $request->id_usuario;
         //la empresa es 1 porque ya no se hace por empresa
         $iniciales              = $request->iniciales;
         $ifNuevoDocumento       = $request->ifNuevoDocumento;
         $documento_cliente      = $request->documento_cliente;
         $documento_clienteId    = $request->documento_clienteId;
+        $institucion_id_select  = $request->institucion_id_select;
         try{
             //iniciales
             if($iniciales == null || $iniciales == "" || $iniciales == "null"){ return ["status" => "0", "message" => "No se pudo obtener la iniciales del usuario"]; }
@@ -2084,9 +2095,9 @@ class CodigoLibrosController extends Controller
                     $devolucion                         = new CodigosLibrosDevolucionHeader();
                     $devolucion->codigo_devolucion      = $codigo_ven;
                     //0 porque el cliente ahora se guarda en cada codigo individual
-                    $devolucion->id_cliente             = $request->institucion_id_select;
+                    $devolucion->id_cliente             = $institucion_id_select;
                     $devolucion->observacion            = $mensaje;
-                    $devolucion->user_created           = $request->id_usuario;
+                    $devolucion->user_created           = $id_usuario;
                     $devolucion->periodo_id             = $periodo_id;
                     $devolucion->cantidadCajas          = $cantidadCajas;
                     $devolucion->cantidadPaquetes       = $cantidadPaquetes;
@@ -2118,6 +2129,56 @@ class CodigoLibrosController extends Controller
             //codigos de documentos devolucion por cliente
             ///===PROCESO===
             foreach($codigos as $key => $item){
+                $codigo                 = $item->codigo;
+                $combo                  = $item->combo;
+                $codigo_liquidacion     = $item->codigo_liquidacion;
+                $proforma_empresa       = $item->proforma_empresa;
+                $codigo_proforma        = $item->codigo_proforma;
+                $cantidadLibroDescontar = 1;
+                $ifBusquedaDocumento    = 0;
+                $getidtipodoc           = 1;
+                //si no hay combo asignar un documento 
+                if(($combo == null || $combo == "") && $proforma_empresa > 0){
+                    //validacion de documento 
+                    $datos = (object) [
+                        "pro_codigo"        => $codigo_liquidacion,
+                        "id_institucion"    => $institucion_id_select,
+                        "id_periodo"        => $periodo_id,
+                        "id_empresa"        => $proforma_empresa
+                    ];  
+                    
+                    //VALIDAR QUE EL DOCUMENTO ACTUAL ESTE DISPONIBLE 
+                    $getDisponibilidadDocumento = $this->devolucionRepository->getFacturaAvailable($datos, $cantidadLibroDescontar, [],$codigo_proforma);
+                    if($getDisponibilidadDocumento){
+                        $getidtipodoc = $getDisponibilidadDocumento->idtipodoc;
+                        //si es 1 no hacer nada porque es pre factura
+                        if($getidtipodoc != 1)   { $ifBusquedaDocumento  = 1; }
+                        else                     { $ifBusquedaDocumento  = 0; }
+                    }
+                    
+                    //si no hay disponibilidad asignar un documento o si es una nota buscar una pre factura
+                    if(!$getDisponibilidadDocumento || $ifBusquedaDocumento == 1){
+                        // Intentar obtener la prefactura
+                        $getPrefactura = $this->devolucionRepository->getFacturaAvailable($datos, $cantidadLibroDescontar, [1]);
+                        if (!$getPrefactura) {
+                            // Si no hay prefactura disponible, intentar obtener una nota
+                            $getPrefactura = $this->devolucionRepository->getFacturaAvailable($datos, $cantidadLibroDescontar, [3, 4]);
+                            if (!$getPrefactura) {
+                                // No hay notas ni prefacturas disponibles
+                                $item->mensaje = 'No hay suficientes en notas ni pre facturas disponibles';
+                                $codigosNoCambiados[] = $item;
+                                $contadorNoCambiado++;
+                                continue;
+                            }else{
+                                // Llamada a la función de actualización de código, pasando los parámetros correctos
+                                $this->devolucionRepository->actualizarCodigo($codigo, $codigo_proforma, $getPrefactura->ven_codigo,  $institucion_id_select, $periodo_id, $id_usuario);
+                            }
+                        }else{
+                            // Llamada a la función de actualización de código, pasando los parámetros correctos
+                            $this->devolucionRepository->actualizarCodigo($codigo, $codigo_proforma, $getPrefactura->ven_codigo,  $institucion_id_select, $periodo_id, $id_usuario);
+                        }
+                    }
+                }
                 //validar si el codigo existe
                 $validar                        = $this->getCodigos($item->codigo,0);
                 $ingreso                        = 0;
@@ -2154,12 +2215,8 @@ class CodigoLibrosController extends Controller
                     $ifliquidado_regalado       = $validar[0]->liquidado_regalado;
                     //para ver la empresa de la proforma
                     $ifproforma_empresa         = $validar[0]->proforma_empresa;
-                    //para ver el estado devuelto proforma
-                    $ifdevuelto_proforma        = $validar[0]->devuelto_proforma;
                     ///para ver el codigo de proforma
                     $ifcodigo_proforma          = $validar[0]->codigo_proforma;
-                    //codigo de liquidacion
-                    $ifcodigo_liquidacion       = $validar[0]->codigo_liquidacion;
                     //ADMINISTRADOR (SI PUEDE DEVOLVER AUNQUE LA INSTITUCION SEA DIFERENTE)
                     $EstatusProceso             = false;
                     if($request->dLiquidado ==  '1'){
@@ -2197,10 +2254,9 @@ class CodigoLibrosController extends Controller
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO LIBRO
                                 $this->tr_GuardarDevolucionHijos($id_devolucion,$item->codigo,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,0,$codigo_union,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio,$tipo_importacion,$estado_codigo,$ifCodigoCombo);
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO UNION
-                                // $this->tr_GuardarDevolucionHijos($id_devolucion,$codigo_union,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,1,$item->codigo,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio);
                             }
                             else{
-                                $codigosNoCambiados[$contadorNoCambiado] = [
+                                $codigosNoCambiados[] = [
                                     "codigo"        => $item->codigo,
                                     "mensaje"       => $messageIngreso
                                 ];
@@ -2222,7 +2278,7 @@ class CodigoLibrosController extends Controller
                                 $codigosSinCodigoUnion[] = $validar[0];
                             }
                             else{
-                                $codigosNoCambiados[$contadorNoCambiado] = [
+                                $codigosNoCambiados[] = [
                                     "codigo"        => $item->codigo,
                                     "mensaje"       => $messageIngreso
                                 ];
@@ -2232,35 +2288,24 @@ class CodigoLibrosController extends Controller
                     }
                     //SI NO CUMPLE LA VALIDACION
                     else{
-                        //admin
-                        if($request->admin == "yes"){
-                            if($ifErrorProforma == 1)               { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
-                            $codigosConLiquidacion[]                = $validar[0];
-                            $contador++;
-                        }
-                        //bodega
-                        else{
-                            $mensaje_personalizado                  = "";
-                            //mensaje personalizado front
-                            if($ifLiquidado == 0)                   { $mensaje_personalizado  = "Código liquidado"; }
-                            if($ifLiquidado == 3)                   { $mensaje_personalizado  = "Código  ya devuelto"; }
-                            if($ifliquidado_regalado == '1')        { $mensaje_personalizado  = "Código Regalado liquidado"; }
-                            //error proforma
-                            if($ifErrorProforma == 1)               { $mensaje_personalizado  = $messageProforma; }
-                            //add array to front
-                            $validar[0]->mensaje                    = $mensaje_personalizado;
-                            $codigosConLiquidacion[]                = $validar[0];
-                            $contador++;
-                        }
+                        if($ifErrorProforma == 1)               { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
+                        $codigosConLiquidacion[]                = $validar[0];
+                        $contador++;
                     }
                 }else{
                     $codigoNoExiste[$contadorNoexiste] = [ "codigo" => $item->codigo ];
                     $contadorNoexiste++;
                 }
             }
-            DB::commit();
+            if($contadorNoCambiado > 0 || $contadorNoexiste > 0){
+                $porcentaje = 0;
+                DB::rollBack();
+            }else{
+                DB::commit();
+            }
             return [
                 "cambiados"             => $porcentaje,
+                "contadorNoCambiado"    => $contadorNoCambiado,
                 "codigosNoCambiados"    => $codigosNoCambiados,
                 "codigosConLiquidacion" => $codigosConLiquidacion,
                 "codigoNoExiste"        => $codigoNoExiste,

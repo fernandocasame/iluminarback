@@ -226,82 +226,84 @@ class UsuarioController extends Controller
     //visitas docente
    //visitas docente
    public function docentesVisitas(Request $request)
-   {
-       set_time_limit(6000000);
-       ini_set('max_execution_time', 6000000);
+    {
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
 
-       // $idInstitucion = $request->idInstitucion;
-       // $fromDate = $request->fromDate;
-       // $toDate = $request->toDate;
-       // $usuarios = DB::table('usuario')
-       //     ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
-       //     ->leftJoin('historico_visitas', function ($join) use ($fromDate, $toDate) {
-       //         $join->on('usuario.idusuario', '=', 'historico_visitas.idusuario')
-       //             ->where('historico_visitas.recurso', '=', 15)
-       //             ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate]);
-       //     })
-       //     ->select('usuario.*', 'institucion_cargos.cargo', 'institucion_cargos.id as cargo_id', DB::raw('COUNT(historico_visitas.id) as visitas'))
-       //     ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
-       //     ->where('usuario.id_group', '=', 6)
-       //     ->where('usuario.estado_idEstado', '=', '1')
-       //     ->groupBy('usuario.idusuario')
-       //     ->get();
-       // return $usuarios;
+        // $idInstitucion = $request->idInstitucion;
+        // $fromDate = $request->fromDate;
+        // $toDate = $request->toDate;
+        // $usuarios = DB::table('usuario')
+        //     ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
+        //     ->leftJoin('historico_visitas', function ($join) use ($fromDate, $toDate) {
+        //         $join->on('usuario.idusuario', '=', 'historico_visitas.idusuario')
+        //             ->where('historico_visitas.recurso', '=', 15)
+        //             ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate]);
+        //     })
+        //     ->select('usuario.*', 'institucion_cargos.cargo', 'institucion_cargos.id as cargo_id', DB::raw('COUNT(historico_visitas.id) as visitas'))
+        //     ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
+        //     ->where('usuario.id_group', '=', 6)
+        //     ->where('usuario.estado_idEstado', '=', '1')
+        //     ->groupBy('usuario.idusuario')
+        //     ->get();
+        // return $usuarios;
 
-       $idInstitucion = $request->idInstitucion;
-       $fromDate = $request->fromDate;
-       $toDate = $request->toDate;
-       $periodoId = $request->periodo_id;
+        $idInstitucion = $request->idInstitucion;
+        $fromDate = $request->fromDate;
+        $toDate = $request->toDate;
+        $periodoId = $request->periodo_id;
 
-       $result = AsignaturaDocente::select(
-           'asignaturausuario.usuario_idusuario',
-           'asignaturausuario.periodo_id',
-           'usuario.nombres',
-           'usuario.name_usuario',
-           'usuario.apellidos',
-           'usuario.cedula',
-           'usuario.email',
-           'usuario.idusuario',
-           'usuario.created_at',
-           'institucion_cargos.cargo',
-           'institucion_cargos.id as cargo_id'
-       )
-       ->distinct()
-       ->leftJoin('usuario', 'asignaturausuario.usuario_idusuario', '=', 'usuario.idusuario')
-       ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
-       ->where('usuario.id_group', '=', '6')
-       ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
-       ->where('asignaturausuario.periodo_id', '=', $periodoId)
-       ->where('usuario.estado_idEstado', '=', '1')
-       ->get() // Ejecutar la consulta y obtener los resultados
-       ->map(function ($documento) {
-           return(Object) [
-               "usuario_idusuario" => $documento->usuario_idusuario,
-               "periodo_id"        => $documento->periodo_id,
-               "nombres"           => $documento->nombres,
-               "name_usuario"      => $documento->name_usuario,
-               "apellidos"         => $documento->apellidos,
-               "cedula"            => $documento->cedula,
-               "email"             => $documento->email,
-               "idusuario"         => $documento->idusuario,
-               'created_at'        => $documento->created_at->format('Y-m-d H:i:s'), // Formatea la fecha
-               "cargo"             => $documento->cargo,
-               "cargo_id"          => $documento->cargo_id,
-           ];
-       });
+        $result = AsignaturaDocente::select(
+            'asignaturausuario.usuario_idusuario',
+            'asignaturausuario.periodo_id',
+            'usuario.nombres',
+            'usuario.name_usuario',
+            'usuario.apellidos',
+            'usuario.cedula',
+            'usuario.email',
+            'usuario.idusuario',
+            'usuario.created_at',
+            'usuario.updated_at',
+            'institucion_cargos.cargo',
+            'institucion_cargos.id as cargo_id'
+        )
+        ->distinct()
+        ->leftJoin('usuario', 'asignaturausuario.usuario_idusuario', '=', 'usuario.idusuario')
+        ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
+        ->where('usuario.id_group', '=', '6')
+        ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
+        ->where('asignaturausuario.periodo_id', '=', $periodoId)
+        ->where('usuario.estado_idEstado', '=', '1')
+        ->get() // Ejecutar la consulta y obtener los resultados
+        ->map(function ($documento) {
+            return(Object) [
+                "usuario_idusuario" => $documento->usuario_idusuario,
+                "periodo_id"        => $documento->periodo_id,
+                "nombres"           => $documento->nombres,
+                "name_usuario"      => $documento->name_usuario,
+                "apellidos"         => $documento->apellidos,
+                "cedula"            => $documento->cedula,
+                "email"             => $documento->email,
+                "idusuario"         => $documento->idusuario,
+                'created_at'        => $documento->created_at->format('Y-m-d H:i:s'), // Formatea la fecha
+                'updated_at'        => $documento->updated_at->format('Y-m-d H:i:s'), // Formatea la fecha
+                "cargo"             => $documento->cargo,
+                "cargo_id"          => $documento->cargo_id,
+            ];
+        });
 
-       $result->map(function($item) use ($fromDate, $toDate) {
-           $item->visitas = HistoricoVisitas::where('idusuario', $item->usuario_idusuario)
-               ->where('recurso', 15)
-               ->where('periodo_id', $item->periodo_id)
-               ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate])
-               ->count();
-           return $item;
-       });
+        $result->map(function($item) use ($fromDate, $toDate) {
+            $item->visitas = HistoricoVisitas::where('idusuario', $item->usuario_idusuario)
+                ->where('recurso', 15)
+                ->where('periodo_id', $item->periodo_id)
+                ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate])
+                ->count();
+            return $item;
+        });
 
-       // Devuelve el resultado modificado
-       return $result;
-   }
+        // Devuelve el resultado modificado
+        return $result;
+    }
 
     public function usuarioVisitas(Request $request){
         $datos = DB::SELECT("SELECT h.*, i.nombreInstitucion, p.periodoescolar AS periodo,

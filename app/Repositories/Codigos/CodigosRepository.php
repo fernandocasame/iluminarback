@@ -683,8 +683,8 @@ class  CodigosRepository extends BaseRepository
         $devolucion->usuario_editor     = $id_usuario;
         $devolucion->save();
     }
-    //validacion Proforma
-    public function validateProforma($ifcodigo_proforma,$ifproforma_empresa,$codigo_liquidacion){
+     //validacion Proforma
+     public function validateProforma($ifcodigo_proforma,$ifproforma_empresa,$codigo_liquidacion){
         $ifErrorProforma    = 0;
         $messageProforma    = "";
         $ifsetProforma      = 0;

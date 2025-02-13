@@ -289,14 +289,16 @@ class AbonoController extends Controller
 
             // Cambiar el estado del abono a anulado (asumiendo que 1 es el estado "anulado")
             $abono->abono_estado = 1;
+            $abonoNuevo = json_decode(json_encode($abono));
 
             // Verificar si el parámetro 'anularretencion' existe en el request
             if ($request->has('anularretencion') && $request->anularretencion == 'yes') {
+
                 // Si 'anularretencion' es 'yes', se usa el tipo 7
-                $this->guardarAbonoHistorico($abono, 7, $validatedData['usuario']);
+                $this->guardarAbonoHistorico($abonoNuevo, 7, $validatedData['usuario']);
             } else  if ($request->has('AnularCruce') && $request->AnularCruce == 'yes') {
 
-                $this->guardarAbonoHistorico($abono, 10, $validatedData['usuario']);
+                $this->guardarAbonoHistorico($abonoNuevo, 10, $validatedData['usuario']);
 
                 $venta = Ventas::where('ven_codigo', $request->abono_documento)
                 ->where('id_empresa', $request->abono_empresa)
@@ -313,7 +315,7 @@ class AbonoController extends Controller
 
             } else {
                 // Guardar en histórico (aquí asumimos que este método existe y funciona correctamente)
-                $this->guardarAbonoHistorico($abono, 5, $validatedData['usuario']);
+                $this->guardarAbonoHistorico($abonoNuevo, 5, $validatedData['usuario']);
             }
 
             // Guardar los cambios en la base de datos
@@ -794,7 +796,8 @@ class AbonoController extends Controller
 
             // Guardar los cambios
             $abono->save();
-            $this->guardarAbonoHistorico($abono, 4, $request->user_created);
+            $abonoNuevo = json_decode(json_encode($abono));
+            $this->guardarAbonoHistorico($abonoNuevo, 4, $request->user_created);
             // Confirmar la transacción
             DB::commit();
 
@@ -1291,6 +1294,64 @@ class AbonoController extends Controller
             }
         }
 
+        // Paso 6: Obtener los clientes únicos sin empresa
+        $rucsUnicos = $reporte->pluck('ruc_cliente')->unique();
+
+        // Paso 7: Obtener la información de devoluciones para los clientes sin empresa
+        foreach ($rucsUnicos as $ruc) {
+            // Buscar el cliente en el reporte para obtener sus datos
+            $clienteReporte = $reporte->firstWhere('ruc_cliente', $ruc);
+
+            // Buscar los registros de la tabla abono
+            $abonoSinF_venta = DB::table('abono as ab')
+                ->leftJoin('f_venta as fv', function ($join) {
+                    $join->on('ab.abono_ruc_cliente', '=', 'fv.ruc_cliente')
+                        ->on('ab.abono_empresa', '=', 'fv.id_empresa');
+                })
+                ->whereNull('fv.ven_codigo') // Solo si no tiene documentos en f_venta
+                ->whereRaw('(ab.abono_facturas > 0 OR ab.abono_notas > 0)') // Corrección de whereRaw
+                ->where('ab.abono_ruc_cliente', '=', $ruc) // Corrección de espacio extra
+                ->where('ab.abono_estado', '=', 0) // Corrección de espacio extra
+                ->where('ab.abono_tipo', '<>', 4) // Corrección de espacio extra
+                ->select(
+                    'ab.abono_ruc_cliente',
+                    'ab.abono_empresa',
+                    DB::raw('SUM(ab.abono_facturas) + SUM(ab.abono_notas) AS suma_abonos')
+                )
+                ->groupBy('ab.abono_ruc_cliente', 'ab.abono_empresa')
+                ->limit(2) // Limita a máximo 2 registros
+                ->get();
+
+            // Validar que al menos existe un abono antes de procesar
+            if ($abonoSinF_venta->isNotEmpty()) {
+                foreach ($abonoSinF_venta as $abono) {
+                    // Crear el objeto para agregarlo al reporte
+                    $reporte[] = (object) [
+                        'idtipodoc' => 10, // Código de tipo "DEVOLUCION SIN EMPRESA"
+                        'tdo_id' => 10,
+                        'tdo_nombre' => 'ABONO SIN VENTAS',
+                        'empresa' => $abono->abono_empresa == 1 ? 'PROLIPA' : 'GRUPOCALMED CIA.LTDA.',
+                        'id_empresa' => $abono->abono_empresa,
+                        'nombreInstitucion' => $clienteReporte->nombreInstitucion, // Tomar del reporte original
+                        'asesor' => $clienteReporte->asesor, // Tomar del reporte original
+                        'idInstitucion' => $clienteReporte->idInstitucion,
+                        'punto_venta' => $clienteReporte->punto_venta, // Tomar del reporte original
+                        'institucion_id' => $clienteReporte->idInstitucion,
+                        'ruc_cliente' => $clienteReporte->ruc_cliente, // Tomar del reporte original
+                        'subtotal_total' => 0,
+                        'descuento_total' => 0,
+                        'valor_total' => 0,
+                        'todos_los_documentos' => '',
+                        'abono_total' => $abono->suma_abonos,
+                        'retencion_total' => 0,
+                        'devolucion' => 0,
+                        'devolucion_todas' => [], // Puedes dejarlo vacío o añadir detalles si es necesario
+                    ];
+                }
+            }
+        }
+
+
         return $reporte;
 
     }
@@ -1449,6 +1510,8 @@ class AbonoController extends Controller
                     empresas e ON ab.abono_empresa = e.id
                 WHERE
                     ab.abono_estado = 0
+                AND
+                    ab.abono_tipo <> 4
                 AND
                     ab.abono_periodo = ?
                 GROUP BY
@@ -1715,6 +1778,7 @@ class AbonoController extends Controller
             ->where('cls.documento', '=', $documento)
             ->where('cls.id_empresa', '=', $empresa)
             ->where('cls.tipo_codigo', '=', 1)  // Solo tipo_codigo = 1
+            ->whereNotNull('cls.combo')
             ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
             ->select(
                 'cdh.id',
@@ -1988,6 +2052,7 @@ class AbonoController extends Controller
                 'f.ven_codigo',
                 'f.id_empresa',
                 'i.nombreInstitucion',
+                'i.punto_venta',
                 DB::raw('CONCAT(u.nombres, " ", u.apellidos) AS cliente')
             )
             ->where('f.est_ven_codigo', '<>', 3)
@@ -2142,6 +2207,7 @@ class AbonoController extends Controller
             $clienteId = $cliente->ven_cliente;
             $institucionId = $cliente->institucion_id;
             $rucCliente = $cliente->ruc_cliente;
+            $puntoVenta = $cliente->punto_venta;
             
             // Verificar si el cliente ya fue procesado
             $clienteKey = $clienteId . '-' . $institucionId;
@@ -2212,6 +2278,7 @@ class AbonoController extends Controller
                 'institucion_id' => $institucionId,
                 'ruc_cliente' => $rucCliente,
                 'cliente' => $cliente->cliente,
+                'punto_venta' => $puntoVenta,
                 'institucion' => $cliente->nombreInstitucion,
                 'total_prefacturas' => round($totalPrefacturas, 2),
                 'total_notas' => round($totalNotas, 2),

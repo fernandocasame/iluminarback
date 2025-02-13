@@ -397,7 +397,7 @@ class ComboController extends Controller
                                     //CODIGO_LIQUIDADO_REGALADO
                                     if($if_liquidado_regaladoB == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorB = 1; }
                                     //bloqueado
-                                    if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
+                                    if($ifestado == 2 && $if_estado_liquidacionA !=3)  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
                                     // if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
                                     if($if_estado_liquidacionB == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
                                     //institucion si bc_institucion o venta_lista_institucion es mayor a 0  seria mensajeError

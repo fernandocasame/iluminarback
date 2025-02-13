@@ -18,7 +18,7 @@ class _14ProductoController extends Controller {
     }
 
     public function GetProductoxcodynombre(Request $request) {
-        $query = DB:: SELECT("SELECT * FROM 1_4_cal_producto
+        $query = DB:: SELECT("SELECT pro_codigo, pro_nombre,pro_stock,pro_deposito,pro_stockCalmed,pro_depositoCalmed,id_perseo_prolipa,id_perseo_calmed,id_perseo_prolipa_produccion,id_perseo_calmed_produccion,temporal FROM 1_4_cal_producto
         WHERE pro_codigo LIKE '%$request->busquedacodnombre%' || pro_nombre LIKE '%$request->busquedacodnombre%'
         ORDER BY pro_nombre ASC");
         return $query;
@@ -874,11 +874,39 @@ class _14ProductoController extends Controller {
     }
 
     public function GetProductosSoloStocks() {
-        $query = DB:: SELECT("SELECT pro.pro_codigo, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed, pro.pro_deposito,
-        pro.pro_depositoCalmed
-        FROM 1_4_cal_producto pro
-        ORDER BY pro.pro_codigo ASC");
-        return $query;
+        // Consulta original
+        $productos = DB::select("
+            SELECT pro.pro_codigo, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, 
+                   pro.pro_stockCalmed, pro.pro_deposito, pro.pro_depositoCalmed, pro.gru_pro_codigo
+            FROM libros_series ls
+            INNER JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            WHERE pro.ifcombo != 1 
+            AND (pro.gru_pro_codigo = 1 OR pro.gru_pro_codigo = 2)
+            ORDER BY pro.pro_codigo ASC;
+        ");
+    
+        // Crear una nueva lista con los códigos modificados
+        $productosConG = [];
+        foreach ($productos as $producto) {
+            $nuevoCodigo = 'G' . $producto->pro_codigo;
+    
+            // Verificar si el producto con el nuevo código existe en la tabla
+            $productoConG = DB::selectOne("
+                SELECT pro.pro_codigo, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, 
+                       pro.pro_stockCalmed, pro.pro_deposito, pro.pro_depositoCalmed, pro.gru_pro_codigo
+                FROM 1_4_cal_producto pro
+                WHERE pro.pro_codigo = ?
+            ", [$nuevoCodigo]);
+    
+            if ($productoConG) {
+                $productosConG[] = $productoConG;
+            }
+        }
+    
+        // Combinar los productos originales con los productos encontrados con 'G'
+        $resultadoFinal = array_merge($productos, $productosConG);
+    
+        return response()->json($resultadoFinal);
     }
 
     public function GuardarDatosEdicionStockMasiva(Request $request) {
@@ -979,83 +1007,83 @@ class _14ProductoController extends Controller {
         }
     }
     //SEGUNDO A APLICAR
-    public function Getstockproductosrestablecer() {
-        // Inicializar las variables de respuesta
-        $query_proforma_y_detalles = [];
-        $query_sumas = [];
-        $producto_actual = [];
+    // public function Getstockproductosrestablecer() {
+    //     // Inicializar las variables de respuesta
+    //     $query_proforma_y_detalles = [];
+    //     $query_sumas = [];
+    //     $producto_actual = [];
 
-        // Obtener los registros principales
-        $query = DB::SELECT("SELECT prof.id, prof.prof_id, prof.prof_estado
-                             FROM f_proforma prof
-                             WHERE prof.prof_estado = 1 OR prof.prof_estado = 3");
+    //     // Obtener los registros principales
+    //     $query = DB::SELECT("SELECT prof.id, prof.prof_id, prof.prof_estado
+    //                          FROM f_proforma prof
+    //                          WHERE prof.prof_estado = 1 OR prof.prof_estado = 3");
 
-        // Recorrer cada registro para agregar los detalles
-        foreach ($query as &$proforma) {
-            // Realizar la consulta de detalles basada en el prof_id
-            $detalles = DB::SELECT("SELECT det.prof_id, det.pro_codigo, det.det_prof_cantidad, det.det_prof_valor_u
-                                    FROM f_detalle_proforma det
-                                    WHERE det.prof_id = ?", [$proforma->id]);
+    //     // Recorrer cada registro para agregar los detalles
+    //     foreach ($query as &$proforma) {
+    //         // Realizar la consulta de detalles basada en el prof_id
+    //         $detalles = DB::SELECT("SELECT det.prof_id, det.pro_codigo, det.det_prof_cantidad, det.det_prof_valor_u
+    //                                 FROM f_detalle_proforma det
+    //                                 WHERE det.prof_id = ?", [$proforma->id]);
 
-            // Agregar los detalles al registro principal
-            $proforma->detalles_proforma = $detalles;
+    //         // Agregar los detalles al registro principal
+    //         $proforma->detalles_proforma = $detalles;
 
-            // Acumular cantidades en query_sumas
-            foreach ($detalles as $detalle) {
-                if (isset($query_sumas[$detalle->pro_codigo])) {
-                    $query_sumas[$detalle->pro_codigo] += $detalle->det_prof_cantidad;
-                } else {
-                    $query_sumas[$detalle->pro_codigo] = $detalle->det_prof_cantidad;
-                }
-            }
-        }
+    //         // Acumular cantidades en query_sumas
+    //         foreach ($detalles as $detalle) {
+    //             if (isset($query_sumas[$detalle->pro_codigo])) {
+    //                 $query_sumas[$detalle->pro_codigo] += $detalle->det_prof_cantidad;
+    //             } else {
+    //                 $query_sumas[$detalle->pro_codigo] = $detalle->det_prof_cantidad;
+    //             }
+    //         }
+    //     }
 
-        // Consultar los datos de cada producto en query_sumas
-        foreach ($query_sumas as $pro_codigo => $cantidad) {
-            $producto = DB::SELECT("SELECT pro_reservar, pro_stock, pro_stockCalmed, pro_deposito, pro_depositoCalmed
-                                    FROM 1_4_cal_producto
-                                    WHERE pro_codigo = ?", [$pro_codigo]);
+    //     // Consultar los datos de cada producto en query_sumas
+    //     foreach ($query_sumas as $pro_codigo => $cantidad) {
+    //         $producto = DB::SELECT("SELECT pro_reservar, pro_stock, pro_stockCalmed, pro_deposito, pro_depositoCalmed
+    //                                 FROM 1_4_cal_producto
+    //                                 WHERE pro_codigo = ?", [$pro_codigo]);
 
-                                    // Calcular la cantidad a restar
-            $cantidad_a_restar = $query_sumas[$pro_codigo];
+    //                                 // Calcular la cantidad a restar
+    //         $cantidad_a_restar = $query_sumas[$pro_codigo];
 
-            if (!empty($producto)) {
-                $producto = $producto[0]; // Acceder al primer resultado
-                $suma = $producto->pro_stock + $producto->pro_stockCalmed + $producto->pro_deposito + $producto->pro_depositoCalmed;
-                $producto_actual[] = [
-                    'pro_codigo' => $pro_codigo,
-                    'pro_reservar' => $producto->pro_reservar,
-                    'pro_stock' => $producto->pro_stock,
-                    'pro_stockCalmed' => $producto->pro_stockCalmed,
-                    'pro_deposito' => $producto->pro_deposito,
-                    'pro_depositoCalmed' => $producto->pro_depositoCalmed,
-                    'suma' => $suma,
-                    'cantidad_a_restar' => $cantidad_a_restar,
-                    'sumamenos_querysumas' => $suma - $cantidad_a_restar,
-                ];
-            }
-        }
+    //         if (!empty($producto)) {
+    //             $producto = $producto[0]; // Acceder al primer resultado
+    //             $suma = $producto->pro_stock + $producto->pro_stockCalmed + $producto->pro_deposito + $producto->pro_depositoCalmed;
+    //             $producto_actual[] = [
+    //                 'pro_codigo' => $pro_codigo,
+    //                 'pro_reservar' => $producto->pro_reservar,
+    //                 'pro_stock' => $producto->pro_stock,
+    //                 'pro_stockCalmed' => $producto->pro_stockCalmed,
+    //                 'pro_deposito' => $producto->pro_deposito,
+    //                 'pro_depositoCalmed' => $producto->pro_depositoCalmed,
+    //                 'suma' => $suma,
+    //                 'cantidad_a_restar' => $cantidad_a_restar,
+    //                 'sumamenos_querysumas' => $suma - $cantidad_a_restar,
+    //             ];
+    //         }
+    //     }
 
-        // Actualizar los valores en la base de datos
-        foreach ($producto_actual as $producto) {
-            DB::UPDATE("UPDATE 1_4_cal_producto
-                        SET pro_reservar = ?
-                        WHERE pro_codigo = ?", [
-                $producto['sumamenos_querysumas'],
-                $producto['pro_codigo']
-            ]);
-        }
+    //     // Actualizar los valores en la base de datos
+    //     foreach ($producto_actual as $producto) {
+    //         DB::UPDATE("UPDATE 1_4_cal_producto
+    //                     SET pro_reservar = ?
+    //                     WHERE pro_codigo = ?", [
+    //             $producto['sumamenos_querysumas'],
+    //             $producto['pro_codigo']
+    //         ]);
+    //     }
 
-        // Asignar el resultado al query_proforma_y_detalles
-        $query_proforma_y_detalles = $query;
+    //     // Asignar el resultado al query_proforma_y_detalles
+    //     $query_proforma_y_detalles = $query;
 
-        // Retornar las dos variables en un arreglo asociativo
-        return [
-            'query_proforma_y_detalles' => $query_proforma_y_detalles,
-            'query_sumas' => $query_sumas,
-            'producto_actual' => $producto_actual,
-        ];
-    }
+    //     // Retornar las dos variables en un arreglo asociativo
+    //     return [
+    //         'query_proforma_y_detalles' => $query_proforma_y_detalles,
+    //         'query_sumas' => $query_sumas,
+    //         'producto_actual' => $producto_actual,
+    //     ];
+    // }
     //SOLO VERIFICACION_STOCK
     public function Getstockproductosrestablecer_SINACTUALIZAR() {
         // Inicializar las variables de respuesta
@@ -1140,16 +1168,16 @@ class _14ProductoController extends Controller {
         // Retornar los resultados
         return $query;
     }
-    // PRIMERO A APLICAR
-    public function GetSumarTodo_ProductosFinal() {
-        try {
-            DB::statement("
-                UPDATE 1_4_cal_producto
-                SET pro_reservar = pro_stock + pro_stockCalmed + pro_deposito + pro_depositoCalmed
-            ");
-            return response()->json(['message' => 'Las filas fueron actualizadas correctamente.'], 200);
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Ocurrió un error al actualizar los productos: ' . $e->getMessage()], 500);
-        }
-    }
+    //PRIMERO A APLICAR
+    // public function GetSumarTodo_ProductosFinal() {
+    //     try {
+    //         DB::statement("
+    //             UPDATE 1_4_cal_producto
+    //             SET pro_reservar = pro_stock + pro_stockCalmed + pro_deposito + pro_depositoCalmed
+    //         ");
+    //         return response()->json(['message' => 'Las filas fueron actualizadas correctamente.'], 200);
+    //     } catch (\Exception $e) {
+    //         return response()->json(['error' => 'Ocurrió un error al actualizar los productos: ' . $e->getMessage()], 500);
+    //     }
+    // }
 }

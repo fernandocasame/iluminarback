@@ -1,76 +1,29 @@
 <?php
 namespace App\Repositories\Facturacion;
 
+use App\Models\CodigosLibros;
 use App\Models\CodigosLibrosDevolucionHeader;
 use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\CodigosLibrosDevolucionSonFacturador;
 use App\Repositories\BaseRepository;
+use App\Traits\Codigos\TraitCodigosGeneral;
 use Illuminate\Support\Facades\DB;
 class  DevolucionRepository extends BaseRepository
 {
+    use TraitCodigosGeneral;
+ 
     public function __construct(CodigosLibrosDevolucionHeader $devolucionHeader)
     {
         parent::__construct($devolucionHeader);
     }
-    public function getDisponibilidadCodigoPrefactura($request){
+  
+    public function getFacturaAvailable($request, $cantidadNecesaria, $idtipodoc=[1], $documentoEspecifico=null, $codigo=null) {
         $pro_codigo     = $request->pro_codigo;
         $id_institucion = $request->id_institucion;
         $id_periodo     = $request->id_periodo;
         $id_empresa     = $request->id_empresa;
-        // Obtener la cantidad facturada
-        $facturado = \DB::table('f_detalle_venta_agrupado as dg')
-            ->join('f_venta_agrupado as dv', 'dg.id_factura', '=', 'dv.id_factura')
-            ->where('dg.pro_codigo', '=', $pro_codigo)
-            ->where('dv.id_empresa', $id_empresa)
-            ->where('dg.id_empresa', $id_empresa)
-            ->where('dv.institucion_id', $id_institucion)
-            ->where('dv.periodo_id', $id_periodo)
-            ->selectRaw('COALESCE(SUM(dg.det_ven_cantidad), 0) as cantidad')
-            ->value('cantidad');
-        // Obtener la cantidad disponible en prefactura
-        $disponiblePrefactura = \DB::table('f_detalle_venta as dg')
-        ->join('f_venta as dv', function ($join) use ($id_empresa) {
-            $join->on('dg.ven_codigo', '=', 'dv.ven_codigo')
-                 ->where('dg.id_empresa', '=', $id_empresa)
-                 ->where('dv.id_empresa', '=', $id_empresa);
-        })
-        ->where('dg.pro_codigo', $pro_codigo)
-        ->where('dv.institucion_id', $id_institucion)
-        ->where('dv.periodo_id', $id_periodo)
-        ->where('dv.idtipodoc', '1')
-        ->where('dv.estadoPerseo', '0')
-        ->where('dv.est_ven_codigo', '<>', 3)
-        ->whereNull('dv.doc_intercambio')
-        ->selectRaw('COALESCE(SUM(dg.det_ven_cantidad - dg.det_ven_dev), 0) as cantidad')
-        ->value('cantidad') ?? 0;
-
-
-        // Obtener la cantidad reservada creada
-        $cantidadReservadaCreada = \DB::table('codigoslibros_devolucion_son as cs')
-        ->join('f_venta as v', function ($join) use ($id_empresa) {
-            $join->on('cs.documento', '=', 'v.ven_codigo')
-                 ->where('v.id_empresa', '=', $id_empresa);
-        })
-        ->where('cs.id_empresa', $id_empresa)
-        ->where('cs.id_cliente', $id_institucion)
-        ->where('cs.id_periodo', $id_periodo)
-        ->where('cs.pro_codigo', $pro_codigo)
-        ->where('cs.estado', '0')
-        ->where('v.idtipodoc', '1')
-        ->where('v.est_ven_codigo', '<>', 3)
-        ->whereNull('v.doc_intercambio')
-        ->count();
-
-        // Realizar la operación
-        $resultado = abs($disponiblePrefactura - $facturado) - $cantidadReservadaCreada;
-        return $resultado;
-    }
-    public function getFacturaAvailable($request){
-        $pro_codigo      = $request->pro_codigo;
-        $id_institucion  = $request->id_institucion;
-        $id_periodo      = $request->id_periodo;
-        $id_empresa      = $request->id_empresa;
-        // Obtener la cantidad facturada
+        
+        // Obtener todas las facturas disponibles que cumplen con los criterios
         $disponiblePrefactura = \DB::table('f_detalle_venta as dg')
             ->join('f_venta as dv', function ($join) use ($id_empresa) {
                 $join->on('dg.ven_codigo', '=', 'dv.ven_codigo')
@@ -82,16 +35,77 @@ class  DevolucionRepository extends BaseRepository
             ->where('dg.id_empresa', $id_empresa)
             ->where('dv.institucion_id', $id_institucion)
             ->where('dv.periodo_id', $id_periodo)
-            ->where('dv.idtipodoc', '1')
-            ->where('dv.estadoPerseo', '0')
             ->where('dv.est_ven_codigo', '<>', 3)
+            ->when($documentoEspecifico, function ($query) use ($documentoEspecifico) {
+                // Si se proporciona un documento específico, filtrar solo por ese documento
+                $query->where('dv.ven_codigo', $documentoEspecifico);
+            })
+            ->when(is_null($documentoEspecifico), function ($query) use ($idtipodoc) {
+                // Si no se proporciona un documento específico, filtrar por el tipo de documento
+                $query->whereIn('dv.idtipodoc', $idtipodoc);
+            })
             ->whereNull('dv.doc_intercambio')
-            ->selectRaw('COALESCE(SUM(dg.det_ven_cantidad - dg.det_ven_dev), 0) as cantidad, dv.ven_codigo, dg.pro_codigo')
-            ->groupBy('dv.ven_codigo') // Necesario para usar agregados
-            ->first();
-
-        return $disponiblePrefactura;
+            ->selectRaw('COALESCE(SUM(dg.det_ven_cantidad - dg.det_ven_dev), 0) as cantidad, dv.ven_codigo, dg.pro_codigo, dv.idtipodoc')
+            ->groupBy('dv.ven_codigo') // Agrupar por ven_codigo para obtener los totales
+            ->havingRaw('COALESCE(SUM(dg.det_ven_cantidad - dg.det_ven_dev), 0) >= ?', [$cantidadNecesaria])
+            ->get(); // Obtener todas las facturas disponibles
+        
+        if ($disponiblePrefactura->isEmpty()) {
+            return null; // Si no hay prefactura disponible que cumpla con la cantidad necesaria
+        }
+    
+        // Iterar sobre las facturas disponibles para calcular la cantidad disponible
+        foreach ($disponiblePrefactura as $factura) {
+            // Obtener la cantidad reservada (creada o en reserva) para cada factura
+            $cantidadReservadaCreada = \DB::table('codigoslibros_devolucion_son as cs')
+                ->where('cs.id_empresa', $id_empresa)
+                ->where('cs.id_cliente', $id_institucion)
+                ->where('cs.id_periodo', $id_periodo)
+                ->where('cs.pro_codigo', $pro_codigo)
+                ->where('documento', $factura->ven_codigo)
+                ->whereNull('cs.combo') 
+                ->where('cs.tipo_codigo', '0') 
+                ->where('cs.estado', 0) 
+                ->when($codigo, function($query) use ($codigo) {
+                    $query->where('cs.codigo', '<>', $codigo); // Excluir el código si se pasa como parámetro
+                })
+                ->count();
+    
+            // Calcular la cantidad disponible restando la cantidad reservada
+            $cantidadDisponible = $factura->cantidad - $cantidadReservadaCreada;
+    
+            // Verificar si la cantidad disponible es suficiente
+            if ($cantidadDisponible >= $cantidadNecesaria) {
+                // Si hay suficiente cantidad, asignamos la cantidad disponible
+                $factura->cantidadDisponible = $cantidadDisponible;
+                return $factura; // Devolver solo esta factura disponible
+            }
+        }
+    
+        return null; // Si no se encuentra ninguna prefactura con suficiente cantidad
     }
+    
+    public function actualizarCodigo($codigo, $codigo_proforma, $nuevo_codigo, $id_institucion, $id_periodo, $id_usuario) {
+        $codigoUpdate = CodigosLibros::find($codigo);
+        if ($codigoUpdate) {
+            $codigo_union = $codigoUpdate->codigo_union;
+            if ($codigo_union && $codigo_union != "null") {
+                CodigosLibros::where('codigo', $codigo_union)
+                    ->update(['codigo_proforma' => $nuevo_codigo]);
+            }
+    
+            // Actualizar la pre factura en el código
+            CodigosLibros::where('codigo', $codigo)
+                ->update(['codigo_proforma' => $nuevo_codigo]);
+    
+            // Guardar en histórico
+            $mensajeHistorico = 'Se intercambió del documento ' . $codigo_proforma . ' al documento ' . $nuevo_codigo;
+            $this->GuardarEnHistorico(0,$id_institucion,$id_periodo,$codigo,$id_usuario,$mensajeHistorico,null,null,null,null);
+        }
+    }
+       
+    
+    
     public function detallePrefactura($ven_codigo,$id_empresa,$id_institucion,$combos = 0)
     {
         $disponiblePrefactura = \DB::table('f_detalle_venta as dg')
