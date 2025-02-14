@@ -6,7 +6,7 @@ use App\Models\f_movimientos_detalle_producto;
 use App\Models\f_movimientos_producto;
 use App\Models\f_tipo_documento;
 use App\Models\_14Producto;
-use DB;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
@@ -126,49 +126,90 @@ class f_MovimientosDetalleProductoController extends Controller
         // Obtener los datos del request
         $librosConCantidad = $request->input('librosConCantidad', []);
         $id_movimientoproducto = $request->input('id_movimientoproducto');
+        $tipoMovimiento = $request->input('tipoMovimiento');
 
         try {
-            // Si hay libros, procesar los detalles del pedido
-            foreach ($librosConCantidad as $libro) {
-                if($libro['emp_id'] == 1 && $libro['fmdp_tipo_bodega'] == 1){
-                    //Producto
-                    // Actualizar los datos del producto
-                    $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
-                    $actualizacionproducto->pro_deposito = $actualizacionproducto->pro_deposito + $libro['cantidad'];
-                    $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
-                    $actualizacionproducto->save();
-                }else if($libro['emp_id'] == 1 && $libro['fmdp_tipo_bodega'] == 2){
-                    //Producto
-                    // Actualizar los datos del producto
-                    $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
-                    $actualizacionproducto->pro_stock = $actualizacionproducto->pro_stock + $libro['cantidad'];
-                    $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
-                    $actualizacionproducto->save();
-                }else if($libro['emp_id'] == 3 && $libro['fmdp_tipo_bodega'] == 1){
-                    //Producto
-                    // Actualizar los datos del producto
-                    $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
-                    $actualizacionproducto->pro_depositoCalmed = $actualizacionproducto->pro_depositoCalmed + $libro['cantidad'];
-                    $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
-                    $actualizacionproducto->save();
-                }else if($libro['emp_id'] == 3 && $libro['fmdp_tipo_bodega'] == 2){
-                    //Producto
-                    // Actualizar los datos del producto
-                    $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
-                    $actualizacionproducto->pro_stockCalmed = $actualizacionproducto->pro_stockCalmed + $libro['cantidad'];
-                    $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
-                    $actualizacionproducto->save();
+            if($tipoMovimiento == 0){
+                // Si hay libros, procesar los detalles del pedido
+                foreach ($librosConCantidad as $libro) {
+                    if($libro['emp_id'] == 1 && $libro['fmdp_tipo_bodega'] == 1){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_deposito = $actualizacionproducto->pro_deposito + $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }else if($libro['emp_id'] == 1 && $libro['fmdp_tipo_bodega'] == 2){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_stock = $actualizacionproducto->pro_stock + $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }else if($libro['emp_id'] == 3 && $libro['fmdp_tipo_bodega'] == 1){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_depositoCalmed = $actualizacionproducto->pro_depositoCalmed + $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }else if($libro['emp_id'] == 3 && $libro['fmdp_tipo_bodega'] == 2){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_stockCalmed = $actualizacionproducto->pro_stockCalmed + $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar + $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }
                 }
+                // Actualizar los datos del pedido principal
+                $pedidoLibrosObsequios = f_movimientos_producto::findOrFail($id_movimientoproducto);
+                $pedidoLibrosObsequios->fmp_estado = 1;//Pasa a estado finalizado el movimiento
+                $pedidoLibrosObsequios->updated_at = now();
+                $pedidoLibrosObsequios->save();
+                DB::commit();
+                return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
+            }else if($tipoMovimiento == 1){
+                // Si hay libros, procesar los detalles del pedido
+                foreach ($librosConCantidad as $libro) {
+                    if($libro['emp_id'] == 1 && $libro['fmdp_tipo_bodega'] == 1){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_deposito = $actualizacionproducto->pro_deposito - $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar - $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }else if($libro['emp_id'] == 1 && $libro['fmdp_tipo_bodega'] == 2){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_stock = $actualizacionproducto->pro_stock - $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar - $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }else if($libro['emp_id'] == 3 && $libro['fmdp_tipo_bodega'] == 1){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_depositoCalmed = $actualizacionproducto->pro_depositoCalmed - $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar - $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }else if($libro['emp_id'] == 3 && $libro['fmdp_tipo_bodega'] == 2){
+                        //Producto
+                        // Actualizar los datos del producto
+                        $actualizacionproducto = _14Producto::findOrFail($libro['pro_codigo']);
+                        $actualizacionproducto->pro_stockCalmed = $actualizacionproducto->pro_stockCalmed - $libro['cantidad'];
+                        $actualizacionproducto->pro_reservar = $actualizacionproducto->pro_reservar - $libro['cantidad'];
+                        $actualizacionproducto->save();
+                    }
+                }
+                // Actualizar los datos del pedido principal
+                $pedidoLibrosObsequios = f_movimientos_producto::findOrFail($id_movimientoproducto);
+                $pedidoLibrosObsequios->fmp_estado = 3;//Pasa a estado finalizado el movimiento
+                $pedidoLibrosObsequios->updated_at = now();
+                $pedidoLibrosObsequios->save();
+                DB::commit();
+                return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
             }
-
-            // Actualizar los datos del pedido principal
-            $pedidoLibrosObsequios = f_movimientos_producto::findOrFail($id_movimientoproducto);
-            $pedidoLibrosObsequios->fmp_estado = 1;//Pasa a estado finalizado el movimiento
-            $pedidoLibrosObsequios->updated_at = now();
-            $pedidoLibrosObsequios->save();
-
-            DB::commit();
-            return response()->json(["status" => "1", 'message' => 'Datos actualizados correctamente'], 200);
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
@@ -191,7 +232,7 @@ class f_MovimientosDetalleProductoController extends Controller
         $movimientoegreso->fmp_cantidad_total = $request->fmp_cantidad_total;
         $movimientoegreso->prov_codigo = $request->prov_codigo;
 
-        
+
         // Verificar si es un nuevo registro o una actualización
         if ($movimientoegreso->exists) {
             return "No puede editar un egreso";
@@ -252,7 +293,7 @@ class f_MovimientosDetalleProductoController extends Controller
             return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
         }
     }
-    
+
     public function eliminarDetalleMovimientoProducto(Request $request) {
         // Valida y filtra los datos de entrada
         // return $request;
