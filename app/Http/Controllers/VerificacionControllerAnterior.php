@@ -1729,7 +1729,7 @@ class VerificacionControllerAnterior extends Controller
             return count($verificaciones);
         }
         //si no se quiere obtener las solicitudes de verificación
-        if(!$sinSolicitud){
+        // if(!$sinSolicitud){
             //obtener solicitudes de verificación
             foreach ($verificaciones as $key => $value) {
                 $arraySolicitudes = [];
@@ -1747,7 +1747,7 @@ class VerificacionControllerAnterior extends Controller
 
                 $value->solicitudes = $arraySolicitudes;
             }
-        }
+        // }
         if($conValores){
             //obtener valores de verificación
             // Agrupar por contrato
@@ -1789,7 +1789,7 @@ class VerificacionControllerAnterior extends Controller
                             'id_pedido' => $item->id_pedido,
                             'valorLiquidaciones' => floatval($item->valorLiquidaciones),
                             'pagosPorCerrarse' => $item->pagosPorCerrarse,
-
+                            'solicitudes' => $item->solicitudes,
                         ];
                     })->values(), // Asegura que las claves sean reindexadas
                 ];
