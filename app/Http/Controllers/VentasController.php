@@ -2766,8 +2766,57 @@ ORDER BY f.ven_fecha;");
             usa.telefono
         ORDER BY
             fv.ven_fecha DESC");
-    return $query;
+        return $query;
     }
+
+    public function Regresar_A_Pendiente_Documento(Request $request)
+    {
+        // Iniciar la transacción antes del try
+        DB::beginTransaction();
+        try {
+            // Validar los datos recibidos en el request
+            $request->validate([
+                'ven_codigo' => 'required|string',
+                'id_empresa' => 'required|integer',
+                'observacionRegresarAPendiente' => 'required|string'
+            ]);
+            // Buscar la venta en la tabla f_venta
+            $venta = DB::table('f_venta')
+                ->where('ven_codigo', $request->ven_codigo)
+                ->where('id_empresa', $request->id_empresa)
+                ->first();
+
+            if (!$venta) {
+                // Si no se encuentra, hacer rollback y devolver error
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'No se encontró la venta con los datos proporcionados'
+                ], 404);
+            }
+            // Actualizar los campos requeridos
+            DB::table('f_venta')
+                ->where('ven_codigo', $request->ven_codigo)
+                ->where('id_empresa', $request->id_empresa)
+                ->update([
+                    'observacionRegresarAPendiente' => $request->observacionRegresarAPendiente . ' Fecha: ' . now(),
+                    'est_ven_codigo' => 2,
+                    'updated_at' => now() // Registrar la fecha de actualización
+                ]);
+            // Confirmar la transacción
+            DB::commit();
+            return response()->json([
+                'message' => 'Venta actualizada correctamente'
+            ], 200);
+        } catch (\Exception $e) {
+            // Si hay un error, hacer rollback
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Error al actualizar la venta',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+    
     // METODOS JEYSON FIN
 
 }

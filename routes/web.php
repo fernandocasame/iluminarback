@@ -1220,6 +1220,7 @@ Route::post('Post_ActualizarPorcentaje_Venta','AdminController@Post_ActualizarPo
 Route::post('anularretencion_quitarevidencia','AbonoController@anularretencion_quitarevidencia');
 Route::post('VerifcarMetodosPost_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosPost_AbonoRetencionPorcentaje');
 Route::post('EliminarPedidoCompleto_SinContrato','PedidosController@EliminarPedidoCompleto_SinContrato');
+Route::post('Regresar_A_Pendiente_Documento','VentasController@Regresar_A_Pendiente_Documento');
 //FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -2035,3 +2036,6 @@ Route::group([], function () {
 Route::post('restaurarALiquidado_devueltos','CodigoLibrosController@restaurarALiquidado_devueltos');
 
 Route::post('docentes_x_institucion', 'UsuarioController@docentes_x_institucion');
+
+Route::get('get_novedades_institucion/{id}','InstitucionController@get_novedades_institucion');
+Route::post('new_novedades', 'InstitucionController@new_novedades_add');

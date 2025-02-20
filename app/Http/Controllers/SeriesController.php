@@ -826,7 +826,7 @@ class SeriesController extends Controller
     }
 
     public function getSeries_new(){
-        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('ruta', 'ruta PLUS', 'conexiones')");
+        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('conexiones')");
         return $query;
     }
 

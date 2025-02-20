@@ -23,12 +23,14 @@ class ProformaController extends Controller
     use TraitPedidosGeneral;
     //consultas
     public function Get_MinStock(Request $request){
-        $query = DB::SELECT("SELECT minimo as min, maximo as max  from configuracion_general where nombre='$request->nombre'");
+        $query = DB::SELECT("SELECT minimo as min, maximo as max  from configuracion_general where id='$request->nombre'");
         if(!empty($query)){
-            if($request->nombre=='RESERVAR'){
+            //reservar
+            if($request->nombre=='1'){
                 $codi=(int)$query[0]->min;
                 return $codi;
-            }else if($request->nombre=='DESCUENTO'){
+                //descuento
+            }else if($request->nombre=='6'){
                 $codi=(int)$query[0]->min;
                 $cod=(int)$query[0]->max;
                 $array = array($codi,$cod);
@@ -124,17 +126,32 @@ class ProformaController extends Controller
 
     public function Get_DatosFactura(Request $request){
         $datos = [];
-        $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
-            ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock  as facturas,
-             p.pro_deposito as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie
-              FROM f_detalle_proforma as dpr
-            INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
-            INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
-            INNER JOIN 1_4_cal_producto as p on dpr.pro_codigo=p.pro_codigo
-            INNER JOIN series as s ON ls.id_serie=s.id_serie
-            INNER JOIN libro l ON ls.idLibro = l.idlibro
-            WHERe dpr.prof_id='$request->prof_id'
-        ");
+        if($request->empresa == 1){
+            $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
+                ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock  as facturas,
+                p.pro_deposito as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie
+                FROM f_detalle_proforma as dpr
+                INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
+                INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
+                INNER JOIN 1_4_cal_producto as p on dpr.pro_codigo=p.pro_codigo
+                INNER JOIN series as s ON ls.id_serie=s.id_serie
+                INNER JOIN libro l ON ls.idLibro = l.idlibro
+                WHERe dpr.prof_id='$request->prof_id'
+            ");
+        }else if($request->empresa == 3){
+            $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
+                ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stockCalmed  as facturas,
+                p.pro_depositoCalmed as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie
+                FROM f_detalle_proforma as dpr
+                INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
+                INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
+                INNER JOIN 1_4_cal_producto as p on dpr.pro_codigo=p.pro_codigo
+                INNER JOIN series as s ON ls.id_serie=s.id_serie
+                INNER JOIN libro l ON ls.idLibro = l.idlibro
+                WHERe dpr.prof_id='$request->prof_id'
+            ");
+        }
+       
         foreach($array1 as $key => $item){
             if($item->prof_id&&$item->emp_id){
                     $array2 = DB::SELECT(" SELECT dfv.pro_codigo, SUM(dfv.det_ven_cantidad) AS cant from f_detalle_venta AS dfv
@@ -418,17 +435,16 @@ class ProformaController extends Controller
        {
 
         try{
-            set_time_limit(6000000);
-            ini_set('max_execution_time', 6000000);
-            $miarray=json_decode($request->data_detalle);
-            DB::beginTransaction();
-            $letraDocumento = f_tipo_documento::getLetra(5)->tdo_letra;
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $miarray=json_decode($request->data_detalle);
+        DB::beginTransaction();
             $proforma = new Proforma;
             if($request->id_group == 1 || $request->id_group == 22|| $request->id_group == 23){
                 $id_empresa         = $request->emp_id;
                 $cod_usuario        = $request->cod_usuario;
                 $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                $ven_codigo         = $letraDocumento."-".$cod_usuario."-".$getNumeroDocumento;
+                $ven_codigo         = "PP-".$cod_usuario."-".$getNumeroDocumento;
                 $proforma->prof_id = $ven_codigo;
             }
 

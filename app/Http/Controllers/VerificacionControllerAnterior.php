@@ -337,14 +337,6 @@ class VerificacionControllerAnterior extends Controller
          if($request->getAllCodigosXContrato_new){
             return $this->getAllCodigosXContrato_new($request);
          }
-          //para calcular la venta real x Tipo de venta
-         if($request->getVentaRealXVerificacionXTipoVenta){
-            return $this->obtenerVentaRealXVerificacionXTipoVenta($request);
-         }
-         //para calcular la venta real x Tipo de venta new SE UTILIZA LOS TRAITS
-         if($request->getVentaRealXVerificacionXTipoVenta_new){
-            return $this->obtenerVentaRealXVerificacionXTipoVenta_new($request);
-         }
          //para traer todos los codigos individuales por contrato
             if($request->getAllCodigosIndividualesContrato){
                 return $this->getAllCodigosIndividualesContrato($request);
@@ -481,93 +473,101 @@ class VerificacionControllerAnterior extends Controller
             return $this->getHistoricoVerificacionesCambios($request);
         }
      }
+     //api:get/n_verificacion?getAllCodigosXContrato=1&periodo_id=25&institucion_id=1611&porInstitucion=1&sinPrecio=1
      public function getAllCodigosXContrato($request){
-        //limpiar cache
-        Cache::flush();
-        $periodo                = $request->periodo_id;
-        $institucion            = $request->institucion_id;
-        $verif                  = "verif".$request->verificacion_id;
-        $IdVerificacion         = $request->IdVerificacion;
-        $contrato               = $request->contrato;
-        $detalles               = $this->codigoRepository->getCodigosIndividuales($request);
-        // $detalles = DB::SELECT("SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
-        //     c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
-        //     c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion,
-        //     ls.year
-        //     FROM codigoslibros c
-        //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-        //     LEFT JOIN libro l ON ls.idLibro = l.idlibro
-        //     LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-        //     WHERE c.bc_periodo          = ?
-        //     AND c.prueba_diagnostica    = '0'
-        //     AND `$verif`                = '$IdVerificacion'
-        //     AND (c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
-        //     -- AND c.contrato           = '$contrato'
-        //     ",
-        //     [$periodo,$institucion]
-        // );
-        $datos = [];
-        $contador = 0;
-        foreach($detalles as $key => $item){
-            //plan lector
-            $precio = 0;
-            $query = [];
-            if($item->id_serie == 6){
-                $query = DB::SELECT("SELECT f.pvp AS precio
-                FROM pedidos_formato f
-                WHERE f.id_serie    = '6'
-                AND f.id_area       = '69'
-                AND f.id_libro      = '$item->libro_idReal'
-                AND f.id_periodo    = '$periodo'");
-            }else{
-                $query = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,
-                (
-                    SELECT f.pvp AS precio
+        try{
+            //limpiar cache
+            Cache::flush();
+            $periodo                = $request->periodo_id;
+            $IdVerificacion         = $request->IdVerificacion;
+            $contrato               = $request->contrato;
+            $detalles               = $this->codigoRepository->getCodigosIndividuales($request);
+            $getCombos              = $this->codigoRepository->getCombos();
+            $sinPrecio              = $request->sinPrecio;
+            //formData filtrar del detalles los codigos que tenga combo diferente de null y codigo_combo diferente de null
+            $formData               = collect($detalles)->filter(function ($item) {
+                return $item->combo != null && $item->codigo_combo != null && ($item->quitar_de_reporte == 0 || $item->quitar_de_reporte == null);
+            })->values();
+            $getAgrupadoCombos      = $this->codigoRepository->getAgrupadoCombos($formData,$getCombos);
+            //unir $detalles con $getAgrupadoCombos
+            $detalles               = collect($detalles)->merge($getAgrupadoCombos);
+            if($sinPrecio){
+                return $detalles;
+            }
+            $datos                  = [];
+            $contador = 0;
+            foreach($detalles as $key => $item){
+                //plan lector
+                $precio = 0;
+                $query = [];
+                if($item->id_serie == 6){
+                    $query = DB::SELECT("SELECT f.pvp AS precio
                     FROM pedidos_formato f
-                    WHERE f.id_serie = ls.id_serie
-                    AND f.id_area = a.area_idarea
-                    AND f.id_periodo = '$periodo'
-                )as precio
-                FROM libros_series ls
-                LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-                WHERE ls.id_serie = '$item->id_serie'
-                AND a.area_idarea  = '$item->area_idarea'
-                AND l.Estado_idEstado = '1'
-                AND a.estado = '1'
-                AND ls.year = '$item->year'
-                LIMIT 1
-                ");
+                    WHERE f.id_serie    = '6'
+                    AND f.id_area       = '69'
+                    AND f.id_libro      = '$item->libro_idReal'
+                    AND f.id_periodo    = '$periodo'");
+                }else{
+                    $query = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,
+                    (
+                        SELECT f.pvp AS precio
+                        FROM pedidos_formato f
+                        WHERE f.id_serie = ls.id_serie
+                        AND f.id_area = a.area_idarea
+                        AND f.id_periodo = '$periodo'
+                    )as precio
+                    FROM libros_series ls
+                    LEFT JOIN libro l ON ls.idLibro = l.idlibro
+                    LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                    WHERE ls.id_serie = '$item->id_serie'
+                    AND a.area_idarea  = '$item->area_idarea'
+                    AND l.Estado_idEstado = '1'
+                    AND a.estado = '1'
+                    AND ls.year = '$item->year'
+                    LIMIT 1
+                    ");
+                }
+                if(count($query) > 0){
+                    $precio = $query[0]->precio;
+                }
+                $datos[$contador] = [
+                    "codigo_libro"              => $item->codigo_libro,
+                    "IdVerificacion"            => $IdVerificacion,
+                    "verificacion_id"           => $request->verificacion_id,
+                    "contrato"                  => $contrato,
+                    "codigo"                    => $item->codigo,
+                    "nombre_libro"              => $item->nombrelibro,
+                    "libro_id"                  => $item->libro_idlibro,
+                    "libro_idlibro"             => $item->libro_idlibro,
+                    "id_serie"                  => $item->id_serie,
+                    "id_periodo"                => $periodo,
+                    "precio"                    => $precio,
+                    "estado_liquidacion"        => $item->estado_liquidacion ?? null,
+                    "estado"                    => $item->estado ?? null,
+                    "bc_estado"                 => $item->bc_estado?? null,
+                    "venta_estado"              => $item->venta_estado?? null,
+                    "liquidado_regalado"        => $item->liquidado_regalado?? null,
+                    "bc_institucion"            => $item->bc_institucion?? null,
+                    "contrato"                  => $item->contrato?? null,
+                    "venta_lista_institucion"   => $item->venta_lista_institucion?? null,
+                    "plus"                      => $item->plus?? null,
+                    'quitar_de_reporte'         => $item->quitar_de_reporte?? null,
+                    'combo'                     => $item->combo?? null,
+                    'codigo_combo'              => $item->codigo_combo?? null,
+                    'tipo_codigo'               => $item->tipo_codigo,
+                    'codigos_combos'            => $item->codigos_combos?? null,
+                    'cantidad_combos'           => $item->cantidad_combos?? null,
+                    'hijos'                     => $item->hijos?? null,
+                    'cantidad_items'            => $item->cantidad_items?? null,
+                    'cantidad_subitems'         => $item->cantidad_subitems?? null,
+                ];
+                $contador++;
             }
-            if(count($query) > 0){
-                $precio = $query[0]->precio;
-            }
-            $datos[$contador] = [
-                "codigo_libro"              => $item->codigo_libro,
-                "IdVerificacion"            => $IdVerificacion,
-                "verificacion_id"           => $request->verificacion_id,
-                "contrato"                  => $contrato,
-                "codigo"                    => $item->codigo,
-                "nombre_libro"              => $item->nombrelibro,
-                "libro_id"                  => $item->libro_idlibro,
-                "libro_idlibro"             => $item->libro_idlibro,
-                "id_serie"                  => $item->id_serie,
-                "id_periodo"                => $periodo,
-                "precio"                    => $precio,
-                "estado_liquidacion"        => $item->estado_liquidacion,
-                "estado"                    => $item->estado,
-                "bc_estado"                 => $item->bc_estado,
-                "venta_estado"              => $item->venta_estado,
-                "liquidado_regalado"        => $item->liquidado_regalado,
-                "bc_institucion"            => $item->bc_institucion,
-                "contrato"                  => $item->contrato,
-                "venta_lista_institucion"   => $item->venta_lista_institucion,
-                "plus"                      => $item->plus,
-                'quitar_de_reporte'         => $item->quitar_de_reporte,
-            ];
-            $contador++;
+            return $datos;
         }
-        return $datos;
+        catch(\Exception $e){
+            return ["status"=>"0","message"=> $e->getMessage(), "error" => $e->getLine() ];
+        }
      }
      public function getVentaRealXVerificacion($request){
         $periodo        = $request->periodo_id;
@@ -1124,12 +1124,13 @@ class VerificacionControllerAnterior extends Controller
     public function getHistoricoVerificaciones(Request $request){
         $query = DB::SELECT("SELECT th.*,
             CONCAT(u.nombres,' ', u.apellidos) AS asesor, i.nombreInstitucion,
-            c.nombre AS ciudad
+            c.nombre AS ciudad, p.id_pedido
             FROM temporadas_verificacion_historico th
             LEFT JOIN temporadas t ON th.contrato = t.contrato
             LEFT JOIN usuario u ON t.id_asesor = u.idusuario
             LEFT JOIN institucion i ON t.idInstitucion = i.idInstitucion
             LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            LEFT JOIN pedidos p ON th.contrato = p.contrato_generado
             ORDER BY th.id DESC
         ");
         return $query;
@@ -1577,29 +1578,23 @@ class VerificacionControllerAnterior extends Controller
         //limpiar cache
         Cache::flush();
         try{
-            $periodo        = $request->periodo_id;
-            $institucion    = $request->institucion_id;
-            $verif          = "verif".$request->verificacion_id;
-            $IdVerificacion = $request->IdVerificacion;
-            $contrato       = $request->contrato;
-            $detalles       = $this->codigoRepository->getCodigosIndividuales($request);
-            // $detalles = DB::SELECT("SELECT  ls.codigo_liquidacion AS codigo, c.codigo as codigo_libro, c.serie,
-            //     c.libro_idlibro,l.nombrelibro as nombrelibro,ls.id_serie,a.area_idarea,c.estado_liquidacion,
-            //     c.estado,c.bc_estado,c.venta_estado,c.liquidado_regalado,c.bc_institucion,c.contrato,c.venta_lista_institucion,
-            //     ls.year
-            //     FROM codigoslibros c
-            //     LEFT JOIN  libros_series ls ON ls.idLibro = c.libro_idlibro
-            //     LEFT JOIN libro l ON ls.idLibro = l.idlibro
-            //     LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-            //     WHERE c.bc_periodo          = ?
-            //     AND c.prueba_diagnostica    = '0'
-            //     AND `$verif`                = '$IdVerificacion'
-            //     AND (c.bc_institucion       = '$institucion' OR c.venta_lista_institucion = '$institucion')
-            //     -- AND c.contrato           = '$contrato'
-            //     ",
-            //     [$periodo,$institucion]
-            // );
-            // return $detalles;
+            $periodo                = $request->periodo_id;
+            $IdVerificacion         = $request->IdVerificacion;
+            $contrato               = $request->contrato;
+            $detalles               = $this->codigoRepository->getCodigosIndividuales($request);
+            $getCombos              = $this->codigoRepository->getCombos();
+            $sinPrecio              = $request->sinPrecio;
+            //formData filtrar del detalles los codigos que tenga combo diferente de null y codigo_combo diferente de null
+            $formData               = collect($detalles)->filter(function ($item) {
+                return $item->combo != null && $item->codigo_combo != null && ($item->quitar_de_reporte == 0 || $item->quitar_de_reporte == null);
+            })->values();
+            $getAgrupadoCombos      = $this->codigoRepository->getAgrupadoCombos($formData,$getCombos);
+            //unir $detalles con $getAgrupadoCombos
+            $detalles               = collect($detalles)->merge($getAgrupadoCombos);
+            if($sinPrecio){
+                return $detalles;
+            }
+            
             $datos = [];
             $contador = 0;
             foreach($detalles as $key => $item){
@@ -1620,16 +1615,24 @@ class VerificacionControllerAnterior extends Controller
                     "id_serie"                  => $item->id_serie,
                     "id_periodo"                => $periodo,
                     "precio"                    => $pfn_pvp_result,
-                    "estado_liquidacion"        => $item->estado_liquidacion,
-                    "estado"                    => $item->estado,
-                    "bc_estado"                 => $item->bc_estado,
-                    "venta_estado"              => $item->venta_estado,
-                    "liquidado_regalado"        => $item->liquidado_regalado,
-                    "bc_institucion"            => $item->bc_institucion,
-                    "contrato"                  => $item->contrato,
-                    "venta_lista_institucion"   => $item->venta_lista_institucion,
-                    "plus"                      => $item->plus,
-                    "quitar_de_reporte"         => $item->quitar_de_reporte,
+                    "estado_liquidacion"        => $item->estado_liquidacion ?? null,
+                    "estado"                    => $item->estado ?? null,
+                    "bc_estado"                 => $item->bc_estado?? null,
+                    "venta_estado"              => $item->venta_estado?? null,
+                    "liquidado_regalado"        => $item->liquidado_regalado?? null,
+                    "bc_institucion"            => $item->bc_institucion?? null,
+                    "contrato"                  => $item->contrato?? null,
+                    "venta_lista_institucion"   => $item->venta_lista_institucion?? null,
+                    "plus"                      => $item->plus?? null,
+                    'quitar_de_reporte'         => $item->quitar_de_reporte?? null,
+                    'combo'                     => $item->combo?? null,
+                    'codigo_combo'              => $item->codigo_combo?? null,
+                    'tipo_codigo'               => $item->tipo_codigo,
+                    'codigos_combos'            => $item->codigos_combos?? null,
+                    'cantidad_combos'           => $item->cantidad_combos?? null,
+                    'hijos'                     => $item->hijos?? null,
+                    'cantidad_items'            => $item->cantidad_items?? null,
+                    'cantidad_subitems'         => $item->cantidad_subitems?? null,
                 ];
                 $contador++;
             }
@@ -1929,5 +1932,4 @@ class VerificacionControllerAnterior extends Controller
             return response()->json(["error" => "0", "message" => $e->getMessage()], 200);
         }
     }
-
 }

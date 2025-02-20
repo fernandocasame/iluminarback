@@ -2045,6 +2045,7 @@ class AbonoController extends Controller
         $clientesBase = DB::table('f_venta AS f')
             ->leftJoin('institucion AS i', 'i.idInstitucion', '=', 'f.institucion_id')
             ->leftJoin('usuario AS u', 'u.idusuario', '=', 'f.ven_cliente')
+            ->leftJoin('usuario AS usu', 'usu.idusuario', '=', 'i.asesor_id')
             ->select(
                 'f.ven_cliente',
                 'f.institucion_id',
@@ -2053,7 +2054,8 @@ class AbonoController extends Controller
                 'f.id_empresa',
                 'i.nombreInstitucion',
                 'i.punto_venta',
-                DB::raw('CONCAT(u.nombres, " ", u.apellidos) AS cliente')
+                DB::raw('CONCAT(u.nombres, " ", u.apellidos) AS cliente'),
+                DB::raw('CONCAT(usu.nombres, " ", usu.apellidos) AS asesor'),
             )
             ->where('f.est_ven_codigo', '<>', 3)
             ->where('f.periodo_id', $periodo)
@@ -2208,6 +2210,7 @@ class AbonoController extends Controller
             $institucionId = $cliente->institucion_id;
             $rucCliente = $cliente->ruc_cliente;
             $puntoVenta = $cliente->punto_venta;
+            $asesor = $cliente->asesor;
             
             // Verificar si el cliente ya fue procesado
             $clienteKey = $clienteId . '-' . $institucionId;
@@ -2294,6 +2297,7 @@ class AbonoController extends Controller
                 'retenciones' => $totalretenciones,
                 'cruces' => $totalCruces,
                 'crucesNotas' => $totalCrucesNotas,
+                'asesor' => $asesor,
             ];
         }
 

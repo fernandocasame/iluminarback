@@ -339,7 +339,7 @@ trait TraitPedidosGeneral
         return $query;
     }
     public function tr_getPreproformas($ca_codigo_agrupado){
-        $query = DB::SELECT("SELECT DISTINCT fp.prof_id
+        $query = DB::SELECT("SELECT DISTINCT fp.prof_id, fp.emp_id, fp.prof_estado
         FROM  f_proforma fp
         WHERE fp.idPuntoventa = '$ca_codigo_agrupado'
         ORDER BY fp.created_at DESC

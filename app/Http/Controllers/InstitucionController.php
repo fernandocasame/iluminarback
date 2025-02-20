@@ -997,4 +997,32 @@ class InstitucionController extends Controller
         }
     }
     //METODOS JEYSON FIN
+     //novedades institucion
+     public function get_novedades_institucion($id){
+        $dato = DB::table('novedades_institucion as nit')
+        ->leftjoin('periodoescolar as per','per.idperiodoescolar','=','nit.id_periodo')
+        ->leftjoin('usuario as usu','nit.id_editor','=','usu.idusuario')
+        ->where('nit.idInstitucion','=',$id)
+        ->select([
+            'nit.*',
+            'per.descripcion','per.idperiodoescolar',
+            DB::raw("CONCAT(usu.nombres, ' ', usu.apellidos) as usuario")
+        ])
+        ->orderBy('nit.created_at', 'DESC') // Ordenar por el más reciente
+        ->get();
+        return $dato;
+    }
+
+    public function new_novedades_add(Request $request){
+        $dato = DB::table('novedades_institucion')->insertGetId([
+            'idInstitucion' => $request->idInstitucion,
+            'id_periodo'    => $request->id_periodo,
+            'id_editor'     => $request->id_editor,
+            'novedades'     => $request->novedades,
+            'estado'        => '0',
+        ]);
+        return response()->json([
+            'message' => 'Novedad creada exitosamente'
+        ], 201);
+    }
 }
