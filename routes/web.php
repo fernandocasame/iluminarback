@@ -180,22 +180,25 @@ Route::post('traerprofesor','TemporadaController@traerprofesores');
 
 //=========================API PARA LIQUIDACIONES==========================
 //api verificacion nueva
-Route::resource('n_verificacion','VerificacionControllerAnterior');
+Route::resource('n_verificacion', 'VerificacionControllerAnterior');
 Route::get('metodosGetVerificaciones', 'VerificacionControllerAnterior@metodosGetVerificaciones');
 Route::post('metodosPostVerificaciones', 'VerificacionControllerAnterior@metodosPostVerificaciones');
-Route::get('nliquidacion/verificacion/{contrato}','VerificacionControllerAnterior@liquidacionVerificacion');
-Route::get('nliquidacion/liquidar/{contrato}','VerificacionControllerAnterior@liquidarFacturacion');
+Route::get('nliquidacion/verificacion/{contrato}', 'VerificacionControllerAnterior@liquidacionVerificacion');
+Route::get('nliquidacion/liquidar/{contrato}', 'VerificacionControllerAnterior@liquidarFacturacion');
+Route::get('getcodigosLiquidar/{contrato}','VerificacionControllerAnterior@getcodigosLiquidar');
+Route::get('liquidarFacturacionVersion2/{contrato}/{user_created}','VerificacionControllerAnterior@liquidarFacturacionVersion2');
 Route::get('liquidacionTest/{contrato}', 'VerificacionControllerAnterior@liquidacionTest');
-Route::get('nliquidacion/verificacion/{contrato}/{numero}','VerificacionControllerAnterior@liquidacionVerificacionNumero');
-Route::get('changeLiquidacion','VerificacionControllerAnterior@changeLiquidacion');
-Route::post('guardarChangeLiquidacion','VerificacionControllerAnterior@guardarChangeLiquidacion');
-Route::post('crearVerificacion','VerificacionControllerAnterior@crearVerificacion');
-Route::post('solicitarVerificacion','VerificacionControllerAnterior@solicitarVerificacion');
-Route::get('notificacionesVerificaciones','VerificacionControllerAnterior@notificacionesVerificaciones');
-Route::get('getTrazabilidadVerificacion','VerificacionControllerAnterior@getTrazabilidadVerificacion');
-Route::get('getHistoricoVerificaciones','VerificacionControllerAnterior@getHistoricoVerificaciones');
-Route::get('getVerificacionXId/{id}','VerificacionControllerAnterior@getVerificacionXId');
-Route::post('saveDatosVerificacion','VerificacionControllerAnterior@saveDatosVerificacion');
+Route::get('nliquidacion/verificacion/{contrato}/{numero}', 'VerificacionControllerAnterior@liquidacionVerificacionNumero');
+Route::get('changeLiquidacion', 'VerificacionControllerAnterior@changeLiquidacion');
+Route::post('guardarChangeLiquidacion', 'VerificacionControllerAnterior@guardarChangeLiquidacion');
+Route::post('crearVerificacion', 'VerificacionControllerAnterior@crearVerificacion');
+Route::post('solicitarVerificacion', 'VerificacionControllerAnterior@solicitarVerificacion');
+Route::get('notificacionesVerificaciones', 'VerificacionControllerAnterior@notificacionesVerificaciones');
+Route::get('getTrazabilidadVerificacion', 'VerificacionControllerAnterior@getTrazabilidadVerificacion');
+Route::get('getHistoricoVerificaciones', 'VerificacionControllerAnterior@getHistoricoVerificaciones');
+Route::get('getVerificacionXId/{id}', 'VerificacionControllerAnterior@getVerificacionXId');
+Route::post('saveDatosVerificacion', 'VerificacionControllerAnterior@saveDatosVerificacion');
+Route::post('aceptarCambioVerificacion','TemporadaController@aceptarCambioVerificacion');
 //=========================FIN DE API DE LIQUIDACIONES=======================
 
 //=========================API PARA LIQUIDACIONES CON CODIGOS DE BARRAS==========================

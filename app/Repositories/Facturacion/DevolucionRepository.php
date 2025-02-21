@@ -162,6 +162,7 @@ class  DevolucionRepository extends BaseRepository
         $validar = CodigosLibrosDevolucionSonFacturador::where('pro_codigo',$datos->pro_codigo)
         ->where('codigoslibros_devolucion_header_facturador_id',$datos->documentoPadre)
         ->where('descuento',$datos->descuento)
+        ->where('cantidad',$datos->cantidad)
         ->where('id_empresa',$datos->id_empresa)->first();
         if($validar){
             return $validar;
