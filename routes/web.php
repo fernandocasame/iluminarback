@@ -1128,7 +1128,7 @@ Route::get('verNotificacionPedidos','PedidosController@verNotificacionPedidos');
 Route::get('getTransabilidad/{id_pedido}','PedidosController@getTransabilidad');
 Route::get('mostrarMensajesPedido','PedidosController@mostrarMensajesPedido');
 //actualizar fecha creacion pedido
-RRoute::get('UpdateFechaCreacionPedido/{id_pedido}', 'PedidosController@UpdateFechaCreacionPedido');
+Route::get('UpdateFechaCreacionPedido/{id_pedido}', 'PedidosController@UpdateFechaCreacionPedido');
 Route::apiResource('pedidos', 'PedidosController');
 Route::get('get_pedido/{usuario}/{periodo}/{institucion}', 'PedidosController@get_pedido');
 Route::get('get_datos_pedido/{pedido}', 'PedidosController@get_datos_pedido');
