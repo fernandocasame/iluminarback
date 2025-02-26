@@ -28,9 +28,305 @@ class PrefacturaController extends Controller
     {
         $this->proformaRepository   = $proformaRepository;
     }
-    public function index()
+    //api:get/prefactura_documentos
+    public function index(Request $request)
     {
-        //
+        if($request->getReportePrefacturaAgrupado) { return $this->getReportePrefacturaAgrupado($request); }
+    }
+
+    //api:get/prefactura_documentos?getReportePrefacturaAgrupado=1&periodo_id=25
+    // public function getReportePrefacturaAgrupado(Request $request)
+    // {
+    //     try{
+
+    //         $periodo_id = $request->get('periodo_id');
+    //         $empresa = 1; // O el valor que necesites
+    //         $tipoInstitucion = 0; // 0 para directa, 1 para punto de venta
+            
+    //         // Valida que se envíe el periodo_id
+    //         if (!$periodo_id) {
+    //             return $this->response()->setStatusCode(200)->json(['error' => 'Falta el periodo_id']);
+    //         }
+            
+    //         // Obtén las instituciones
+    //         $getInstituciones = $this->proformaRepository->listadoInstitucionesXVenta($periodo_id, $empresa, $tipoInstitucion);
+    //         if (count($getInstituciones) == 0) {
+    //             return $this->response()->setStatusCode(200)->json(['error' => 'No se encontraron instituciones']);
+    //         }   
+            
+    //         foreach ($getInstituciones as $key => $item) {
+    //             // Obtener los datos de venta PREFACTURAS
+    //             $getDatosVenta = $this->proformaRepository->listadoDocumentosVenta($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
+    //             // Obtener los datos de venta AGRUPADOS
+    //             $getDatosVentaAgrupado = $this->proformaRepository->listadoDocumentosAgrupado($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id);
+
+    //             // Inicializamos los arrays
+    //             $resultadosUnicos = [];
+    //             $agrupadosPorProCodigo = [];
+    //             $agrupadosPorProCodigoAgrupado = [];
+    //             $resultadoProductos = [];
+
+    //             // Agrupamos datos de getDatosVenta
+    //             foreach ($getDatosVenta as $documento) {
+    //                 $venCodigo = $documento->ven_codigo;
+    //                 $idEmpresa = $documento->id_empresa;
+    //                 $proCodigo = $documento->pro_codigo;
+    //                 $detVenCantidad = $documento->det_ven_cantidad;
+    //                 $detVenDev = $documento->det_ven_dev;
+    //                 $detVenValorU = $documento->det_ven_valor_u;
+
+    //                 // Resultados únicos por ven_codigo e id_empresa
+    //                 $resultadosUnicos["$venCodigo-$idEmpresa"] = [
+    //                     'ven_codigo' => $venCodigo,
+    //                     'id_empresa' => $idEmpresa
+    //                 ];
+
+    //                 // Agrupamos por pro_codigo (getDatosVenta)
+    //                 if (isset($agrupadosPorProCodigo[$proCodigo])) {
+    //                     $agrupadosPorProCodigo[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
+    //                     $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] += ($detVenCantidad - $detVenDev);
+    //                 } else {
+    //                     $agrupadosPorProCodigo[$proCodigo] = [
+    //                         'proCodigo' => $proCodigo,
+    //                         'det_ven_cantidad' => $detVenCantidad,
+    //                         'cantidad_real' => $detVenCantidad - $detVenDev,
+    //                         'det_ven_valor_u' => $detVenValorU
+    //                     ];
+    //                 }
+    //             }
+
+    //             // Agrupamos datos de getDatosVentaAgrupado
+    //             foreach ($getDatosVentaAgrupado as $documento) {
+    //                 $proCodigo = $documento->pro_codigo;
+    //                 $detVenCantidad = $documento->det_ven_cantidad;
+    //                 $detVenValorU = $documento->det_ven_valor_u;
+
+    //                 // Agrupamos por pro_codigo (getDatosVentaAgrupado)
+    //                 if (isset($agrupadosPorProCodigoAgrupado[$proCodigo])) {
+    //                     $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
+    //                 } else {
+    //                     $agrupadosPorProCodigoAgrupado[$proCodigo] = [
+    //                         'proCodigo' => $proCodigo,
+    //                         'det_ven_cantidad' => $detVenCantidad,
+    //                         'det_ven_valor_u' => $detVenValorU
+    //                     ];
+    //                 }
+    //             }
+
+    //             // Unimos los productos de ambos arrays
+    //             $todosLosProductos = array_merge($agrupadosPorProCodigo, $agrupadosPorProCodigoAgrupado);
+    //             // Combinamos los productos
+    //             foreach ($todosLosProductos as $proCodigo => $producto) {
+    //                 // Si el producto existe en ambos arrays, lo unimos
+    //                 $resultadoProductos[$proCodigo] = [
+    //                     'proCodigo' => $proCodigo,
+    //                     // Si el producto está en $agrupadosPorProCodigo, asignamos su cantidad real, sino a 0
+    //                     'cantidad_real' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] : 0,
+    //                     // Si el producto está en $agrupadosPorProCodigoAgrupado, asignamos su cantidad, sino a 0
+    //                     'cantidad_perseo' => isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] : 0,
+    //                     // Valor unitario del producto (del primer array que tenga el producto)
+    //                     'det_ven_valor_u' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['det_ven_valor_u'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_valor_u'] : 0)
+    //                 ];
+    //             }
+
+    //             // Asignamos los resultados únicos de ven_codigo y id_empresa
+    //             $item->prefacturas = array_values($resultadosUnicos);
+
+    //             // Asignamos los productos agrupados por pro_codigo (getDatosVenta)
+    //             $item->productos_prefactura = array_values($agrupadosPorProCodigo);
+
+    //             // Asignamos los productos agrupados por pro_codigo (getDatosVentaAgrupado)
+    //             $item->productos_agrupados = array_values($agrupadosPorProCodigoAgrupado);
+
+    //             // Asignamos los productos combinados con cantidad_real de ambos arrays
+    //             $item->resultadoProductos = array_values($resultadoProductos);
+    //         }
+    //         return $getInstituciones;
+    //     }
+    //     catch (\Exception $e) {
+    //         return ['status' => '0', 'message' => $e->getMessage()];
+    //     }
+    // }
+
+    public function getReportePrefacturaAgrupado(Request $request)
+    {
+        try {
+            $periodo_id = $request->get('periodo_id');
+            $empresa = 1; // O el valor que necesites
+            $tipoInstitucion = 0; // 0 para directa, 1 para punto de venta
+            
+            // Valida que se envíe el periodo_id
+            if (!$periodo_id) {
+                return $this->response()->setStatusCode(200)->json(['error' => 'Falta el periodo_id']);
+            }
+            
+            // Obtén las instituciones
+            $getInstituciones = $this->proformaRepository->listadoInstitucionesXVenta($periodo_id, $empresa, $tipoInstitucion);
+            if (count($getInstituciones) == 0) {
+                return $this->response()->setStatusCode(200)->json(['error' => 'No se encontraron instituciones']);
+            }
+
+            // Inicializamos los arrays para los productos agrupados por precio
+            $productosAgrupadosPorPrecioReal = [];
+            $productosAgrupadosPorPrecioPerseo = [];
+
+            foreach ($getInstituciones as $key => $item) {
+                // Obtener los datos de venta PREFACTURAS
+                $getDatosVenta = $this->proformaRepository->listadoDocumentosVenta($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
+                // Obtener los datos de venta AGRUPADOS
+                $getDatosVentaAgrupado = $this->proformaRepository->listadoDocumentosAgrupado($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
+                // Inicializamos los arrays para cada institución
+                $resultadosUnicos = [];
+                $agrupadosPorProCodigo = [];
+                $agrupadosPorProCodigoAgrupado = [];
+                $resultadoProductos = [];
+
+                // Agrupamos datos de getDatosVenta
+                foreach ($getDatosVenta as $documento) {
+                    $venCodigo = $documento->ven_codigo;
+                    $idEmpresa = $documento->id_empresa;
+                    $proCodigo = $documento->pro_codigo;
+                    $detVenCantidad = $documento->det_ven_cantidad;
+                    $detVenDev = $documento->det_ven_dev;
+                    $detVenValorU = $documento->det_ven_valor_u;
+                    $nombreSerie = $documento->nombre_serie;
+
+                    // Resultados únicos por ven_codigo e id_empresa
+                    $resultadosUnicos["$venCodigo-$idEmpresa"] = [
+                        'ven_codigo' => $venCodigo,
+                        'id_empresa' => $idEmpresa
+                    ];
+
+                    // Agrupamos por pro_codigo (getDatosVenta)
+                    if (isset($agrupadosPorProCodigo[$proCodigo])) {
+                        $agrupadosPorProCodigo[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
+                        $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] += ($detVenCantidad - $detVenDev);
+                    } else {
+                        $agrupadosPorProCodigo[$proCodigo] = [
+                            'proCodigo' => $proCodigo,
+                            'det_ven_cantidad' => $detVenCantidad,
+                            'cantidad_real' => $detVenCantidad - $detVenDev,
+                            'det_ven_valor_u' => $detVenValorU,
+                            'nombre_serie' => $nombreSerie
+                        ];
+                    }
+
+                    // Agrupamos por precio (det_ven_valor_u) para cantidad real
+                    // if (isset($productosAgrupadosPorPrecioReal[$detVenValorU])) {
+                    //     $productosAgrupadosPorPrecioReal[$detVenValorU]['cantidad_real'] += ($detVenCantidad - $detVenDev);
+                    // } else {
+                    //     $productosAgrupadosPorPrecioReal[$detVenValorU] = [
+                    //         'det_ven_valor_u' => $detVenValorU,
+                    //         'cantidad_real' => ($detVenCantidad - $detVenDev)
+                    //     ];
+                    // }
+                    // Agrupamos por precio (det_ven_valor_u) y nombre_serie para cantidad real
+                    $clave = $detVenValorU . '|' . $nombreSerie;
+
+                    if (isset($productosAgrupadosPorPrecioReal[$clave])) {
+                        $productosAgrupadosPorPrecioReal[$clave]['cantidad_real'] += ($detVenCantidad - $detVenDev);
+                    } else {
+                        $productosAgrupadosPorPrecioReal[$clave] = [
+                            'det_ven_valor_u' => $detVenValorU,
+                            'nombre_serie' => $nombreSerie,
+                            'cantidad_real' => ($detVenCantidad - $detVenDev)
+                        ];
+                    }
+
+                }
+
+                // Agrupamos datos de getDatosVentaAgrupado
+                foreach ($getDatosVentaAgrupado as $documento) {
+                    $proCodigo = $documento->pro_codigo;
+                    $detVenCantidad = $documento->det_ven_cantidad;
+                    $detVenValorU = $documento->det_ven_valor_u;
+                    $nombreSerie = $documento->nombre_serie;
+
+                    // Agrupamos por pro_codigo (getDatosVentaAgrupado)
+                    if (isset($agrupadosPorProCodigoAgrupado[$proCodigo])) {
+                        $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
+                    } else {
+                        $agrupadosPorProCodigoAgrupado[$proCodigo] = [
+                            'proCodigo' => $proCodigo,
+                            'det_ven_cantidad' => $detVenCantidad,
+                            'det_ven_valor_u' => $detVenValorU,
+                            'nombre_serie' => $nombreSerie
+                        ];
+                    }
+
+                   
+                    // Agrupamos por precio (det_ven_valor_u) y nombre_serie para cantidad perseo
+                    $clave = $detVenValorU . '|' . $nombreSerie;
+
+                    if (isset($productosAgrupadosPorPrecioPerseo[$clave])) {
+                        $productosAgrupadosPorPrecioPerseo[$clave]['cantidad_perseo'] += $detVenCantidad;
+                    } else {
+                        $productosAgrupadosPorPrecioPerseo[$clave] = [
+                            'det_ven_valor_u' => $detVenValorU,
+                            'nombre_serie' => $nombreSerie,
+                            'cantidad_perseo' => $detVenCantidad
+                        ];
+                    }
+                }
+
+                // Asignamos los resultados únicos de ven_codigo y id_empresa
+                $item->prefacturas = array_values($resultadosUnicos);
+
+                // Asignamos los productos agrupados por pro_codigo (getDatosVenta)
+                $item->productos_prefactura = array_values($agrupadosPorProCodigo);
+
+                // Asignamos los productos agrupados por pro_codigo (getDatosVentaAgrupado)
+                $item->productos_agrupados = array_values($agrupadosPorProCodigoAgrupado);
+
+                // Combinamos los productos de ambos arrays
+                $todosLosProductos = array_merge($agrupadosPorProCodigo, $agrupadosPorProCodigoAgrupado);
+                // Combinamos los productos
+                foreach ($todosLosProductos as $proCodigo => $producto) {
+                    // Si el producto existe en ambos arrays, lo unimos
+                    $resultadoProductos[$proCodigo] = [
+                        'proCodigo' => $proCodigo,
+                        // Si el producto está en $agrupadosPorProCodigo, asignamos su cantidad real, sino a 0
+                        'cantidad_real' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] : 0,
+                        // Si el producto está en $agrupadosPorProCodigoAgrupado, asignamos su cantidad, sino a 0
+                        'cantidad_perseo' => isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] : 0,
+                        // Valor unitario del producto (del primer array que tenga el producto)
+                        'det_ven_valor_u' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['det_ven_valor_u'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_valor_u'] : 0),
+                        'nombre_serie' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['nombre_serie'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['nombre_serie'] : 0)
+                    ];
+                }
+
+                // Asignamos los productos combinados con cantidad_real de ambos arrays
+                $item->resultadoProductos = array_values($resultadoProductos);
+            }
+
+            // Excluimos los productos con precio cero
+            $productosAgrupadosPorPrecioReal = array_filter($productosAgrupadosPorPrecioReal, function($producto) {
+                return $producto['det_ven_valor_u'] > 0;
+            });
+
+            $productosAgrupadosPorPrecioPerseo = array_filter($productosAgrupadosPorPrecioPerseo, function($producto) {
+                return $producto['det_ven_valor_u'] > 0;
+            });
+
+            // Ordenamos los productos agrupados por precio real en orden ascendente
+            usort($productosAgrupadosPorPrecioReal, function($a, $b) {
+                return $a['det_ven_valor_u'] <=> $b['det_ven_valor_u'];  // Orden ascendente
+            });
+
+            // Ordenamos los productos agrupados por precio perseo en orden ascendente
+            usort($productosAgrupadosPorPrecioPerseo, function($a, $b) {
+                return $a['det_ven_valor_u'] <=> $b['det_ven_valor_u'];  // Orden ascendente
+            });
+
+            return [
+                'getInstituciones' => $getInstituciones,
+                'productos_agrupados_por_precio_real' => $productosAgrupadosPorPrecioReal,
+                'productos_agrupados_por_precio_perseo' => $productosAgrupadosPorPrecioPerseo
+            ];
+        }
+        catch (\Exception $e) {
+            return ['status' => '0', 'message' => $e->getMessage()];
+        }
     }
 
     /**

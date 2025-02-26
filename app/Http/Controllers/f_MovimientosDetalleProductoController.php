@@ -32,6 +32,16 @@ class f_MovimientosDetalleProductoController extends Controller
         return $query;
     }
 
+    public function reporteCombosDetalleMovimientoProductos(Request $request){
+        $query = DB::SELECT("SELECT fdp.*, cpro.pro_nombre, em.descripcion_corta
+        FROM f_movimientos_detalle_producto fdp
+        INNER JOIN 1_4_cal_producto cpro ON fdp.pro_codigo = cpro.pro_codigo
+        INNER JOIN f_movimientos_producto fmp ON fdp.fmp_id = fmp.fmp_id
+        LEFT JOIN empresas em ON fdp.emp_id = em.id
+        WHERE fdp.fmp_id = '$request->fmp_id'");
+        return $query;
+    }
+
     public function reporteEgresoDetalleMovimientoProductos(Request $request){
         $query = DB::SELECT("SELECT mp.*, fdp.*, cpro.pro_nombre, em.descripcion_corta FROM f_movimientos_producto mp
         INNER JOIN f_movimientos_detalle_producto fdp ON mp.fmp_id_referencia = fdp.fmp_id

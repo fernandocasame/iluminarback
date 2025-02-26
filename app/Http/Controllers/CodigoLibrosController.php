@@ -4174,7 +4174,7 @@ class CodigoLibrosController extends Controller
                         if ($codigoUnion) {
                             $codigoUnion->plus = ($tipo == 0) ? 1 : 0;
                             $codigoUnion->save();
-                            $this->GuardarEnHistorico(0, 0, $periodo_id, $codigo->codigo, $id_usuario, $comentario, $codigoUnion, json_encode($codigoUnion->getAttributes()));
+                            $this->GuardarEnHistorico(0, 0, $periodo_id, $codigo->codigo_union, $id_usuario, $comentario, $codigoUnion, json_encode($codigoUnion->getAttributes()));
                         }
                     }
 

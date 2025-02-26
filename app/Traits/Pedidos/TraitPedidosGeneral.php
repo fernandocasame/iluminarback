@@ -405,19 +405,35 @@ trait TraitPedidosGeneral
        return $query;
     }
     public function tr_getInstitucionesVentaXTipoVentaAsesor($id_periodo,$tipo_venta,$asesor){
-        $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
-        CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
-        FROM pedidos p
-        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        WHERE p.tipo_venta = '$tipo_venta'
-        AND p.estado = '1'
-        AND p.id_periodo = '$id_periodo'
-        AND p.contrato_generado IS NOT NULL
-        AND p.id_asesor = '$asesor'
-        ORDER BY p.id_pedido DESC
-        ");
+        if($tipo_venta == 1 || $tipo_venta == 2){
+            $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
+            CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
+            FROM pedidos p
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            WHERE p.tipo_venta = '$tipo_venta'
+            AND p.estado = '1'
+            AND p.id_periodo = '$id_periodo'
+            AND p.contrato_generado IS NOT NULL
+            AND p.id_asesor = '$asesor'
+            ORDER BY p.id_pedido DESC
+            ");
+        }else{
+            $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
+            CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
+            FROM pedidos p
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+            WHERE p.estado = '1'
+            AND p.id_periodo = '$id_periodo'
+            AND p.contrato_generado IS NOT NULL
+            AND p.id_asesor = '$asesor'
+            ORDER BY p.id_pedido DESC
+            ");
+        }
+       
        return $query;
     }
     public function tr_getInstitucionesPeriodo($id_periodo){

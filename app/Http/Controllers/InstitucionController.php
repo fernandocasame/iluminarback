@@ -201,6 +201,8 @@ class InstitucionController extends Controller
         $cambio->evaluacion_personalizada       = $request->evaluacion_personalizada;
         $cambio->cantidad_cambio_ventana_evaluacion     = $request->cantidad_cambio_ventana_evaluacion;
         $cambio->ifcodigoEvaluacion             = $request->ifcodigoEvaluacion;
+        $cambio->tipo_evaluacion                = $request->tipo_evaluacion;
+        $cambio->mensaje_tipo_evaluacion        = $request->mensaje_tipo_evaluacion;
         $cambio->ruc                            = $request->ruc;
         $cambio->save();
         return $cambio;

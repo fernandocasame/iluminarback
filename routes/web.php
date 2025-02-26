@@ -1128,13 +1128,13 @@ Route::get('verNotificacionPedidos','PedidosController@verNotificacionPedidos');
 Route::get('getTransabilidad/{id_pedido}','PedidosController@getTransabilidad');
 Route::get('mostrarMensajesPedido','PedidosController@mostrarMensajesPedido');
 //actualizar fecha creacion pedido
-Route::get('UpdateFechaCreacionPedido/{id_pedido}','PedidosController@UpdateFechaCreacionPedido');
-Route::apiResource('pedidos','PedidosController');
-Route::get('get_pedido/{usuario}/{periodo}/{institucion}','PedidosController@get_pedido');
-Route::get('get_datos_pedido/{pedido}','PedidosController@get_datos_pedido');
-Route::get('get_datos_pedido_guias/{pedido}','PedidosController@get_datos_pedido_guias');
-Route::get('get_libros_plan_pedido/{serie}/{periodo}','PedidosController@get_libros_plan_pedido');
-Route::post('save_val_pedido','PedidosController@save_val_pedido');
+RRoute::get('UpdateFechaCreacionPedido/{id_pedido}', 'PedidosController@UpdateFechaCreacionPedido');
+Route::apiResource('pedidos', 'PedidosController');
+Route::get('get_pedido/{usuario}/{periodo}/{institucion}', 'PedidosController@get_pedido');
+Route::get('get_datos_pedido/{pedido}', 'PedidosController@get_datos_pedido');
+Route::get('get_datos_pedido_guias/{pedido}', 'PedidosController@get_datos_pedido_guias');
+Route::get('get_libros_plan_pedido/{serie}/{periodo}', 'PedidosController@get_libros_plan_pedido');
+Route::post('save_val_pedido', 'PedidosController@save_val_pedido');
 Route::post('save_val_pedido_alcance', 'PedidosController@save_val_pedido_alcance');
 Route::get('get_val_pedido/{pedido}', 'PedidosController@get_val_pedido');
 Route::get('get_val_pedido_alcance/{pedido}/{alcance}', 'PedidosController@get_val_pedido_alcance');
@@ -1143,13 +1143,14 @@ Route::get('get_val_pedidoInfoTodo/{pedido}', 'PedidosController@get_val_pedidoI
 Route::get('get_val_pedidoInfoTodoSuma/{pedido}', 'PedidosController@get_val_pedidoInfoTodoSuma');
 Route::get('get_val_pedidoLibrosObsequiosInfoTodo/{pedido}', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodo');
 Route::get('get_val_pedidoLibrosObsequiosInfoTodoSinPedido', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodoSinPedido');
-Route::post('delete_pedido_asesor','PedidosController@delete_pedido_asesor');
-Route::post('save_pvp_area_formato','PedidosController@save_pvp_area_formato');
-Route::get('series_full','SeriesController@series_full');
-Route::get('series_formato_full/{periodo}','SeriesController@series_formato_full');
-Route::get('series_formato_periodo/{periodo}','SeriesController@series_formato_periodo');
-Route::get('get_pvp_planes_periodo/{periodo}','PedidosController@get_pvp_planes_periodo');
-Route::post('save_niveles_area_formato','PedidosController@save_niveles_area_formato');
+Route::post('delete_pedido_asesor', 'PedidosController@delete_pedido_asesor');
+Route::post('save_pvp_area_formato', 'PedidosController@save_pvp_area_formato');
+Route::get('series_full', 'SeriesController@series_full');
+Route::get('series_formato_full/{periodo}', 'SeriesController@series_formato_full');
+Route::get('series_formato_periodo/{periodo}', 'SeriesController@series_formato_periodo');
+Route::get('series_formato_periodo_guias/{periodo}', 'SeriesController@series_formato_periodo_guias');
+Route::get('get_pvp_planes_periodo/{periodo}', 'PedidosController@get_pvp_planes_periodo');
+Route::post('save_niveles_area_formato', 'PedidosController@save_niveles_area_formato');
 //api para traer los periodos que tienen cargado formato pedidos
 Route::get('cargarPeriodoFormatoPedidos', 'PedidosController@cargarPeriodoFormatoPedidos');
 Route::get('getAllPedidos', 'PedidosController@getAllPedidos');
@@ -1176,6 +1177,7 @@ Route::get('areasxSerie_FullPedido', 'SeriesController@areasxSerie_FullPedido');
 Route::get('cargarPeriodoFormatoPedidosNew', 'PedidosController@cargarPeriodoFormatoPedidosNew');
 Route::get('get_val_pedido_new/{pedido}', 'PedidosController@get_val_pedido_new');
 Route::get('series_formato_periodo_new/{periodo}/{id_pedido}/{pvn_tipo}', 'SeriesController@series_formato_periodo_new');
+Route::get('series_formato_periodo_new_guias/{periodo}/{id_pedido}/{pvn_tipo}', 'SeriesController@series_formato_periodo_new_guias');
 Route::get('areasxSeriePlanLector_FullPedido', 'SeriesController@areasxSeriePlanLector_FullPedido');
 Route::get('areasxSeriePlanLector_FormatoPedido', 'SeriesController@areasxSeriePlanLector_FormatoPedido');
 Route::get('guardar_total_pedido_new/{id_pedido}/{total_usd}/{total_unid}/{total_guias}/{total_serie_basicas}/{anticipoSugerido}', 'PedidosController@guardar_total_pedido_new');
@@ -1207,6 +1209,7 @@ Route::get('GetSumarTodo_Productos', '_14ProductoController@GetSumarTodo_Product
 Route::get('GetSumarTodo_ProductosFinal', '_14ProductoController@GetSumarTodo_ProductosFinal');
 Route::get('Getstockproductosrestablecer_SINACTUALIZAR', '_14ProductoController@Getstockproductosrestablecer_SINACTUALIZAR');
 Route::get('GetSacarAreasxSerieProducto', 'SeriesController@GetSacarAreasxSerieProducto');
+Route::get('GetSacarAreasxSerieComboProducto', 'SeriesController@GetSacarAreasxSerieComboProducto');
 Route::get('GetObtenerProductosxSerieoArea', 'SeriesController@GetObtenerProductosxSerieoArea');
 Route::get('GetFacturasxAgrupa_SoloEnviados','VentasController@GetFacturasxAgrupa_SoloEnviados');
 Route::get('GetListadoRetenciones','AbonoController@GetListadoRetenciones');
@@ -1704,8 +1707,9 @@ Route::get('Get_Movimientos_NO_Producto', 'f_MovimientosProductoController@Get_M
 Route::get('Get_Movimientos_NO_ProductoreporteEgreso', 'f_MovimientosProductoController@Get_Movimientos_NO_ProductoreporteEgreso');
 Route::get('GetMovimientos_NO_Producto_xfiltro', 'f_MovimientosProductoController@GetMovimientos_NO_Producto_xfiltro');
 Route::post('Post_Registrar_modificar_movimiento_producto', 'f_MovimientosProductoController@Post_Registrar_modificar_movimiento_producto');
-Route::post('Post_Registrar_modificar_movimiento_producto', 'f_MovimientosProductoController@Post_Registrar_modificar_movimiento_producto');
+//Route::post('Post_Registrar_modificar_movimiento_producto', 'f_MovimientosProductoController@Post_Registrar_modificar_movimiento_producto');
 Route::post('Modificarproveedor_MovientoProducto', 'f_MovimientosProductoController@Modificarproveedor_MovientoProducto');
+Route::post('ModificarObservacion_MovientoProducto', 'f_MovimientosProductoController@ModificarObservacion_MovientoProducto');
 Route::post('Eliminar_MovimientoProducto', 'f_MovimientosProductoController@Eliminar_MovimientoProducto');
 Route::post('Post_Registrar_modificar_movimiento_productoEgreso', 'f_MovimientosProductoController@Post_Registrar_modificar_movimiento_productoEgreso');
 //FIN MOVIMIENTO PRODUCTO
@@ -1714,6 +1718,7 @@ Route::post('Post_Registrar_modificar_movimiento_productoEgreso', 'f_Movimientos
 Route::get('obtenerDetallesMovimientosProductos/{idmovimientoproducto}', 'f_MovimientosDetalleProductoController@obtenerDetallesMovimientosProductos');
 Route::get('reporteIngresoDetalleMovimientoProductos', 'f_MovimientosDetalleProductoController@reporteIngresoDetalleMovimientoProductos');
 Route::get('reporteEgresoDetalleMovimientoProductos', 'f_MovimientosDetalleProductoController@reporteEgresoDetalleMovimientoProductos');
+Route::get('reporteCombosDetalleMovimientoProductos', 'f_MovimientosDetalleProductoController@reporteCombosDetalleMovimientoProductos');
 Route::post('guardarDatosMovimientosProducto', 'f_MovimientosDetalleProductoController@guardarDatosMovimientosProducto');
 Route::post('guardarDatosMovimientosProducto_Stock', 'f_MovimientosDetalleProductoController@guardarDatosMovimientosProducto_Stock');
 Route::post('guardarDatosMovimientosProducto_EgresoStock', 'f_MovimientosDetalleProductoController@guardarDatosMovimientosProducto_EgresoStock');
@@ -2042,3 +2047,8 @@ Route::post('docentes_x_institucion', 'UsuarioController@docentes_x_institucion'
 
 Route::get('get_novedades_institucion/{id}','InstitucionController@get_novedades_institucion');
 Route::post('new_novedades', 'InstitucionController@new_novedades_add');
+
+//prefactura controller
+Route::group([], function () {
+    Route::resource('/prefactura_documentos', 'PrefacturaController');
+});

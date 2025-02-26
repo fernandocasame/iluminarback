@@ -802,54 +802,54 @@ class AdminController extends Controller
         // return ["contadorSolinfaGONZALEZ" => $contadorSolinfaGONZALEZ, "contadorSolinfaCOBACANGO" => $contadorSolinfaCOBACANGO];
 
 
-        try {
-            $contadorProlipa = 0;
-            $contadorCalmed  = 0;
+        // try {
+        //     $contadorProlipa = 0;
+        //     $contadorCalmed  = 0;
 
-            // $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
-            // WHERE p.pro_codigo  = 'IKAD';
-            // ");
-            // //PROLIPA
-            // // $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
-            // // WHERE p.id_perseo_prolipa_produccion IS NULL
-            // // LIMIT 90
-            // // ");
-            // foreach($queryProlipa as $key => $item){
-            //     $formData = [
-            //         "productocodigo"=> $item->pro_codigo,
-            //     ];
-            //     $url                = "productos_consulta";
-            //     $processProlipa     = $this->tr_PerseoPost($url, $formData,1);
-            //     return $processProlipa;
-            //     $getContador        = $this->guardarIdProducto($processProlipa,$item->pro_codigo,"id_perseo_prolipa_produccion");
-            //     //contadorProlipa + getContador
-            //     $contadorProlipa    = $contadorProlipa + $getContador;
-            // }
-            //CALMED
-            $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
-            WHERE p.pro_codigo  = 'SMLL2';
-            ");
-            // $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
-            // WHERE p.id_perseo_calmed_produccion IS NULL
-            // LIMIT 100
-            // ");
-            foreach($queryCalmed as $key => $item){
-                $formData = [
-                    "productocodigo"=> $item->pro_codigo,
-                ];
-                $url                = "productos_consulta";
-                $processCalmed      = $this->tr_PerseoPost($url, $formData,1);
-                return $processCalmed;
-                $getContador        = $this->guardarIdProducto($processCalmed,$item->pro_codigo,"id_perseo_calmed_produccion");
-                //contadorCalmed + getContador
-                $contadorCalmed     = $contadorCalmed + $getContador;
-            }
-            return ["contadorProlipa" => $contadorProlipa,"contadorCalmed" => $contadorCalmed];
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        //     // $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+        //     // WHERE p.pro_codigo  = 'IKAD';
+        //     // ");
+        //     // //PROLIPA
+        //     // // $queryProlipa = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+        //     // // WHERE p.id_perseo_prolipa_produccion IS NULL
+        //     // // LIMIT 90
+        //     // // ");
+        //     // foreach($queryProlipa as $key => $item){
+        //     //     $formData = [
+        //     //         "productocodigo"=> $item->pro_codigo,
+        //     //     ];
+        //     //     $url                = "productos_consulta";
+        //     //     $processProlipa     = $this->tr_PerseoPost($url, $formData,1);
+        //     //     return $processProlipa;
+        //     //     $getContador        = $this->guardarIdProducto($processProlipa,$item->pro_codigo,"id_perseo_prolipa_produccion");
+        //     //     //contadorProlipa + getContador
+        //     //     $contadorProlipa    = $contadorProlipa + $getContador;
+        //     // }
+        //     //CALMED
+        //     $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+        //     WHERE p.pro_codigo  = 'SMLL2';
+        //     ");
+        //     // $queryCalmed = DB::SELECT("SELECT * FROM 1_4_cal_producto p
+        //     // WHERE p.id_perseo_calmed_produccion IS NULL
+        //     // LIMIT 100
+        //     // ");
+        //     foreach($queryCalmed as $key => $item){
+        //         $formData = [
+        //             "productocodigo"=> $item->pro_codigo,
+        //         ];
+        //         $url                = "productos_consulta";
+        //         $processCalmed      = $this->tr_PerseoPost($url, $formData,1);
+        //         return $processCalmed;
+        //         $getContador        = $this->guardarIdProducto($processCalmed,$item->pro_codigo,"id_perseo_calmed_produccion");
+        //         //contadorCalmed + getContador
+        //         $contadorCalmed     = $contadorCalmed + $getContador;
+        //     }
+        //     return ["contadorProlipa" => $contadorProlipa,"contadorCalmed" => $contadorCalmed];
+        // } catch (\Exception $e) {
+        //     return response()->json([
+        //         'error' => $e->getMessage()
+        //     ], 500);
+        // }
     }
     public function guardarIdProducto($process,$pro_codigo,$campoPerseo){
         $contador = 0;

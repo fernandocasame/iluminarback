@@ -32,7 +32,7 @@ class f_MovimientosProductoController extends Controller
         INNER JOIN usuario u ON t.user_created = u.idusuario
         LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
         -- WHERE t.fmp_id like 'MINO%'
-        WHERE (t.fmp_id LIKE 'MINO%' OR t.fmp_id LIKE 'MENO%')
+        WHERE (t.fmp_id LIKE 'MINO%' OR t.fmp_id LIKE 'MENO%' OR t.fmp_id LIKE 'MCNO%')
         ORDER BY t.created_at ASC");
         return $query;
     }
@@ -57,33 +57,45 @@ class f_MovimientosProductoController extends Controller
             INNER JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
             INNER JOIN usuario u ON t.user_created = u.idusuario
             LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
-            WHERE t.fmp_id LIKE '%$request->razonbusqueda%' and t.fmp_id like 'MINO%'
+            WHERE t.fmp_id LIKE '%$request->razonbusqueda%'
             ORDER BY t.created_at ASC
             ");
             return $query;
-        }
-        if ($request->busqueda == 'periodomovimiento') {
-            $query = DB::SELECT("SELECT pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos ) AS nombreusuario, t.*, t.updated_at as dupdatedmov,
-            t.created_at as dcreatedmov, t.fmp_id as codigoanterior, p.*
-            FROM f_movimientos_producto t
-            INNER JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
-            INNER JOIN usuario u ON t.user_created = u.idusuario
-            LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
-            WHERE t.id_periodo = '$request->razonbusqueda' and t.fmp_id like 'MINO%'
-            ORDER BY t.created_at ASC
-            ");
-            return $query;
-        }if ($request->busqueda == 'EstadoMovimiento') {
-            $query = DB::SELECT("SELECT pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos ) AS nombreusuario, t.*, t.updated_at as dupdatedmov,
-            t.created_at as dcreatedmov, t.fmp_id as codigoanterior, p.*
-            FROM f_movimientos_producto t
-            INNER JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
-            INNER JOIN usuario u ON t.user_created = u.idusuario
-            LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
-            WHERE t.fmp_estado = '$request->razonbusqueda' and t.fmp_id like 'MINO%'
-            ORDER BY t.created_at ASC
-            ");
-            return $query;
+        }else if ($request->busqueda == 'TipoMovimiento') {
+            if ($request->razonbusqueda == 0) {
+                $query = DB::SELECT("SELECT pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos ) AS nombreusuario, t.*, t.updated_at as dupdatedmov,
+                t.created_at as dcreatedmov, t.fmp_id as codigoanterior, p.*
+                FROM f_movimientos_producto t
+                INNER JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
+                INNER JOIN usuario u ON t.user_created = u.idusuario
+                LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
+                WHERE t.fmp_id like 'MINO%'
+                ORDER BY t.created_at ASC
+                ");
+                return $query;   
+            }else if ($request->razonbusqueda == 1) {
+                $query = DB::SELECT("SELECT pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos ) AS nombreusuario, t.*, t.updated_at as dupdatedmov,
+                t.created_at as dcreatedmov, t.fmp_id as codigoanterior, p.*
+                FROM f_movimientos_producto t
+                INNER JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
+                INNER JOIN usuario u ON t.user_created = u.idusuario
+                LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
+                WHERE t.fmp_id like 'MENO%'
+                ORDER BY t.created_at ASC
+                ");
+                return $query;   
+            }else if ($request->razonbusqueda == 2) {
+                $query = DB::SELECT("SELECT pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos ) AS nombreusuario, t.*, t.updated_at as dupdatedmov,
+                t.created_at as dcreatedmov, t.fmp_id as codigoanterior, p.*
+                FROM f_movimientos_producto t
+                INNER JOIN periodoescolar pe ON t.id_periodo = pe.idperiodoescolar
+                INNER JOIN usuario u ON t.user_created = u.idusuario
+                LEFT JOIN 1_4_proveedor p ON t.prov_codigo = p.prov_codigo
+                WHERE t.fmp_id like 'MCNO%'
+                ORDER BY t.created_at ASC
+                ");
+                return $query;   
+            }
         }
     }
 
@@ -273,6 +285,28 @@ class f_MovimientosProductoController extends Controller
         } catch (\Exception $e) {
             DB::rollback();
             return response()->json(["status" => "0", 'message' => 'Error al actualizar los datos: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function ModificarObservacion_MovientoProducto(Request $request)
+    {
+        // Buscar el movimiento por su fmp_id
+        $movimientoproducto_prov = f_movimientos_producto::where('fmp_id', $request->fmp_id)->first();
+        // Verificar si el movimiento existe
+        if (!$movimientoproducto_prov) {
+            return response()->json(['message' => 'No existe el movimiento en el que desea agregar la observación'], 404);
+        }
+        // Construir la observación según el estado
+        if ($request->fmp_estado == 4) {
+            $movimientoproducto_prov->observacion = $request->observacion . ' Documento generado a partir de la edición de stock masiva de combos.';
+        } else {
+            $movimientoproducto_prov->observacion = $request->observacion;
+        }
+        // Guardar cambios en la base de datos
+        if ($movimientoproducto_prov->save()) {
+            return response()->json(['message' => 'Se guardó correctamente']);
+        } else {
+            return response()->json(['message' => 'No se pudo guardar/actualizar'], 500);
         }
     }
 }

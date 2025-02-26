@@ -149,7 +149,7 @@ class AbonoController extends Controller
             LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta
             WHERE bn.abono_notas > 0
             AND bn.abono_facturas = 0
-            AND bn.idClientePerseo ='$request->cliente'
+            AND bn.abono_ruc_cliente ='$request->cliente'
             -- AND bn.abono_institucion = $request->institucion
             AND bn.abono_periodo = $request->periodo
             AND bn.abono_empresa = '$request->empresa'
@@ -160,7 +160,7 @@ class AbonoController extends Controller
             LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta
             WHERE bn.abono_facturas > 0
             AND bn.abono_notas = 0
-            AND bn.idClientePerseo ='$request->cliente'
+            AND bn.abono_ruc_cliente ='$request->cliente'
             -- AND bn.abono_institucion = $request->institucion
             AND bn.abono_periodo = $request->periodo
             AND bn.abono_empresa = $request->empresa
@@ -169,7 +169,7 @@ class AbonoController extends Controller
 
         $abonosAll = DB::SELECT("SELECT bn.*, cp.cue_pag_nombre FROM abono bn
             LEFT JOIN 1_1_cuenta_pago cp ON cp.cue_pag_codigo = bn.abono_cuenta
-            WHERE bn.idClientePerseo ='$request->cliente'
+            WHERE bn.abono_ruc_cliente ='$request->cliente'
             -- AND bn.abono_institucion = $request->institucion
             AND bn.abono_periodo = $request->periodo
             AND bn.abono_empresa = $request->empresa
@@ -1389,9 +1389,11 @@ class AbonoController extends Controller
             ->select(
                 'fd.ven_codigo',
                 'fd.id_empresa',
-                DB::raw('SUM(det_ven_dev * det_ven_valor_u) as total_precio'),
                 'fv.ven_desc_por',
-                'fv.institucion_id'
+                DB::raw('SUM(fd.det_ven_dev * fd.det_ven_valor_u) as total_precio'),
+                'fv.institucion_id',
+                DB::raw('GROUP_CONCAT(fd.pro_codigo) AS todos_los_codigos'),
+                DB::raw('GROUP_CONCAT(fd.det_ven_valor_u) AS todos_los_precios')
             )
             ->groupBy('fd.ven_codigo', 'fd.id_empresa', 'fv.ven_desc_por', 'fv.institucion_id')
             ->get();
@@ -1418,6 +1420,8 @@ class AbonoController extends Controller
                 'total_precio' => $totalDevoluciones,
                 'descuento' => $devolucion->ven_desc_por,
                 'ValorConDescuento' => $valorConDescuento,
+                'todos_los_codigos' => $devolucion->todos_los_codigos,
+                'todos_los_precios' => $devolucion->todos_los_precios,
             ];
         }
 
@@ -1563,6 +1567,7 @@ class AbonoController extends Controller
             ->where('fv.institucion_id', $institucionId)
             ->where('fv.periodo_id', $periodoId)
             ->where('fv.est_ven_codigo','<>', 3)
+            ->whereNull('fv.doc_intercambio')
             ->get();
 
         $result = [];
@@ -1570,14 +1575,32 @@ class AbonoController extends Controller
         $valorVentaBruta = 0;
         $valorAbonoTotal = 0;
         $descuentoPorcentaje = 0;
+        $valorDevolucionTotal = 0;
 
         $rucs = [];
         $descuentos = [];
         $result['documentos'] = [];
 
         foreach ($ventas as $venta) {
+            $valorDevolucionDescuento = 0;
             $valorVentaNeta += round($venta->ven_valor, 2);
             $valorVentaBruta += round($venta->ven_subtotal, 2);
+
+            $valorDevolucion = DB::table('f_detalle_venta as f')
+                ->join('f_venta as fv', function($join) {
+                    $join->on('fv.ven_codigo', '=', 'f.ven_codigo')
+                        ->on('fv.id_empresa', '=', 'f.id_empresa');
+                })
+                ->where('f.ven_codigo', '=', $venta->ven_codigo)
+                ->where('f.id_empresa', '=', $venta->id_empresa)
+                ->where('fv.est_ven_codigo', '<>', 3)
+                ->where('f.det_ven_dev', '>', 0)
+                ->sum(DB::raw('(f.det_ven_dev * f.det_ven_valor_u)'));
+
+            $valorDevolucion = round($valorDevolucion,2);
+            $valorDevolucionDescuento = round($valorDevolucion - (($valorDevolucion * $venta->ven_desc_por) / 100), 2);
+
+            $valorDevolucionTotal += $valorDevolucionDescuento;
 
             if ($venta->ven_desc_por) {
                 if($venta->idtipodoc==1||$venta->idtipodoc==3||$venta->idtipodoc==4){
@@ -1597,12 +1620,17 @@ class AbonoController extends Controller
                 'descuento_porcentaje' => $venta->ven_desc_por,
                 'valor_desvuento' => $venta->ven_descuento,
                 'idtipodoc'=> $venta->idtipodoc,
+                'valorDevolucion' => $valorDevolucion,
+                'valorDevolucionDescuento' => $valorDevolucionDescuento,
             ];
         }
 
         foreach ($rucs as $ruc) {
             $valorAbono = DB::table('abono as ab')
                 ->where('ab.abono_ruc_cliente', $ruc)
+                ->where('ab.abono_estado', 0)
+                // ->where('ab.abono_cuenta','<>','6')
+                // ->where('ab.abono_tipo', '<>', '4')
                 ->sum(DB::raw('ab.abono_facturas + ab.abono_notas'));
 
             $valorAbono = round($valorAbono, 2);
@@ -1614,6 +1642,7 @@ class AbonoController extends Controller
         $result['total_venta'] = $valorVentaNeta;
         $result['total_ventaBruta'] = $valorVentaBruta;
         $result['total_abono'] = $valorAbonoTotal;
+        $result['total_devolucion'] = $valorDevolucionTotal;
         $result['porcentaje_descuento'] = !empty($descuentosUnicos) ? $descuentosUnicos[0] : 0;
 
 
@@ -1778,7 +1807,7 @@ class AbonoController extends Controller
             ->where('cls.documento', '=', $documento)
             ->where('cls.id_empresa', '=', $empresa)
             ->where('cls.tipo_codigo', '=', 1)  // Solo tipo_codigo = 1
-            ->whereNotNull('cls.combo')
+            // ->whereNotNull('cls.combo')
             ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
             ->select(
                 'cdh.id',
@@ -1843,6 +1872,7 @@ class AbonoController extends Controller
             } else {
                 // Si no hay una venta asociada, asignamos 0 al descuento y el valor con descuento
                 $detallesDevolucionArray[$key]->descuento = 0;
+                $detallesDevolucionArray[$key]->ValorConDescuento = round($item->total_precio, 2);
                 $detallesDevolucionArray[$key]->total_precio = round($item->total_precio, 2);
             }
         }
@@ -2045,7 +2075,6 @@ class AbonoController extends Controller
         $clientesBase = DB::table('f_venta AS f')
             ->leftJoin('institucion AS i', 'i.idInstitucion', '=', 'f.institucion_id')
             ->leftJoin('usuario AS u', 'u.idusuario', '=', 'f.ven_cliente')
-            ->leftJoin('usuario AS usu', 'usu.idusuario', '=', 'i.asesor_id')
             ->select(
                 'f.ven_cliente',
                 'f.institucion_id',
@@ -2054,8 +2083,7 @@ class AbonoController extends Controller
                 'f.id_empresa',
                 'i.nombreInstitucion',
                 'i.punto_venta',
-                DB::raw('CONCAT(u.nombres, " ", u.apellidos) AS cliente'),
-                DB::raw('CONCAT(usu.nombres, " ", usu.apellidos) AS asesor'),
+                DB::raw('CONCAT(u.nombres, " ", u.apellidos) AS cliente')
             )
             ->where('f.est_ven_codigo', '<>', 3)
             ->where('f.periodo_id', $periodo)
@@ -2210,7 +2238,6 @@ class AbonoController extends Controller
             $institucionId = $cliente->institucion_id;
             $rucCliente = $cliente->ruc_cliente;
             $puntoVenta = $cliente->punto_venta;
-            $asesor = $cliente->asesor;
             
             // Verificar si el cliente ya fue procesado
             $clienteKey = $clienteId . '-' . $institucionId;
@@ -2297,7 +2324,6 @@ class AbonoController extends Controller
                 'retenciones' => $totalretenciones,
                 'cruces' => $totalCruces,
                 'crucesNotas' => $totalCrucesNotas,
-                'asesor' => $asesor,
             ];
         }
 
