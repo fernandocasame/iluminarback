@@ -184,7 +184,8 @@ class InstitucionController extends Controller
         $cambio->nombreInstitucion              = $request->nombreInstitucion;
         $cambio->direccionInstitucion           = $request->direccionInstitucion;
         $cambio->telefonoInstitucion            = $request->telefonoInstitucion;
-        $cambio->email                          = $request->email == null || $request->email == "null" ? null : $request->email == null;
+        $cambio->email                          = $request->email == null || $request->email == "null" ? null : $request->email;
+        $cambio->representante_legal            = $request->representante_legal == null || $request->representante_legal == "null" ? null : $request->representante_legal;
         $cambio->solicitudInstitucion           = $request->solicitudInstitucion;
         $cambio->codigo_institucion_milton      = $request->codigo_institucion_milton;
         $cambio->vendedorInstitucion            = $request->vendedorInstitucion;
@@ -202,7 +203,7 @@ class InstitucionController extends Controller
         $cambio->cantidad_cambio_ventana_evaluacion     = $request->cantidad_cambio_ventana_evaluacion;
         $cambio->ifcodigoEvaluacion             = $request->ifcodigoEvaluacion;
         $cambio->tipo_evaluacion                = $request->tipo_evaluacion;
-        $cambio->mensaje_tipo_evaluacion        = $request->mensaje_tipo_evaluacion;
+        $cambio->mensaje_tipo_evaluacion       = $request->mensaje_tipo_evaluacion;
         $cambio->ruc                            = $request->ruc;
         $cambio->save();
         return $cambio;

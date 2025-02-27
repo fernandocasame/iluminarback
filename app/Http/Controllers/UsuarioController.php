@@ -224,8 +224,7 @@ class UsuarioController extends Controller
         // return $datos;
     }
     //visitas docente
-   //visitas docente
-   public function docentesVisitas(Request $request)
+    public function docentesVisitas(Request $request)
     {
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
@@ -304,7 +303,6 @@ class UsuarioController extends Controller
         // Devuelve el resultado modificado
         return $result;
     }
-
     public function usuarioVisitas(Request $request){
         $datos = DB::SELECT("SELECT h.*, i.nombreInstitucion, p.periodoescolar AS periodo,
         g.deskripsi AS rol,
@@ -964,6 +962,7 @@ class UsuarioController extends Controller
         $usuario->estado_idEstado   = $request->estado;
         $usuario->fecha_nacimiento  = $request->fecha_nacimiento;
         $usuario->capacitador       = $request->capacitador;
+        $usuario->iniciales         = $request->iniciales;
         $usuario->cli_ins_codigo    = $request->cli_ins_codigo == null || $request->cli_ins_codigo == "null" || $request->cli_ins_codigo == "" ? null : $request->cli_ins_codigo;
         if($request->grupo == 6){
             $usuario->cargo_id      = $request->cargo_id;
@@ -1054,6 +1053,15 @@ class UsuarioController extends Controller
     //api::>>post/quitarAsignacion
     public function quitarAsignacion(Request $request){
         DirectorHasInstitucion::findOrFail($request->id)->delete();
+    }
+    public function institucionesAsesor(Request $request){
+        $instituciones =   DB::SELECT("SELECT i.* , zn.zn_nombre as nombreZona
+        from institucion i
+        LEFT JOIN i_zona zn ON zn.idzona = i.zona_id
+        WHERE i.vendedorInstitucion = '$request->cedula'
+        AND i.estado_idEstado = '1'
+        AND (i.zona_id IS NULL OR i.zona_id ='')");
+        return $instituciones;
     }
     //api:get>>/escuelasAsesor
     public function escuelasAsesor(Request $request){
@@ -1699,4 +1707,37 @@ class UsuarioController extends Controller
 
     return response()->json($docentesAgrupados);
     }
+
+    //Inicio Metodos Jeyson
+    public function VerifcarMetodosGet_UsuarioController(Request $request)
+    {
+        $action = $request->query('action'); // Leer el parámetro `action` desde la URL
+
+        switch ($action) {
+            case 'Get_Busqueda_Representante_Institucion':
+                return $this->busquedaUsuarioxCedula_Nombre_Apellido($request);
+            case 'Get_Busqueda_Representante_InstitucionxID':
+                return $this->busquedaUsuarioxidusuario($request);
+            default:
+                return response()->json(['error' => 'Acción no válida'], 400);
+        }
+    }
+    public function busquedaUsuarioxCedula_Nombre_Apellido($request)
+    {
+        $busquedarepresentante  = $request->filtrorepresentante;
+        $usuarios = DB::SELECT("SELECT us.*, sg.level 
+        FROM usuario us 
+        INNER JOIN sys_group_users sg on us.id_group = sg.id
+        WHERE us.nombres LIKE '%$busquedarepresentante%' OR us.cedula LIKE '%$busquedarepresentante%' OR us.apellidos LIKE '%$busquedarepresentante%' ");
+        return $usuarios;
+    }
+    public function busquedaUsuarioxidusuario($request)
+    {
+        $busquedaxid  = $request->idusuario;
+        $usuarios = DB::SELECT("SELECT us.*
+        FROM usuario us 
+        WHERE us.idusuario = '$busquedaxid'");
+        return $usuarios;
+    }
+    //Fin Metodos Jeyson
 }
