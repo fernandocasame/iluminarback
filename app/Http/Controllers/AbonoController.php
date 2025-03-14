@@ -1563,12 +1563,16 @@ class AbonoController extends Controller
 
         $institucionId = $request->institucion;
         $periodoId = $request->periodo;
-        $ventas = DB::table('f_venta as fv')
-            ->where('fv.institucion_id', $institucionId)
-            ->where('fv.periodo_id', $periodoId)
-            ->where('fv.est_ven_codigo','<>', 3)
-            ->whereNull('fv.doc_intercambio')
-            ->get();
+        $ventas = DB::select("SELECT * 
+            FROM f_venta AS fv
+            WHERE fv.institucion_id = :institucionId
+            AND fv.periodo_id = :periodoId
+            AND fv.est_ven_codigo <> 3
+            AND NOT (fv.idtipodoc IN (3, 4) AND fv.doc_intercambio IS NOT NULL);
+        ", [
+            'institucionId' => $institucionId,
+            'periodoId' => $periodoId
+        ]);
 
         $result = [];
         $valorVentaNeta = 0;
@@ -1803,9 +1807,10 @@ class AbonoController extends Controller
         $detallesDevolucionTipo1 = DB::table('codigoslibros_devolucion_header as cdh')
             ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
             ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
-            ->where('cdh.estado', '<>', 0)
+            ->where('cdh.estado', '<>', '0')
             ->where('cls.documento', '=', $documento)
             ->where('cls.id_empresa', '=', $empresa)
+            ->where('cls.estado', '<>', 0)
             ->where('cls.tipo_codigo', '=', 1)  // Solo tipo_codigo = 1
             // ->whereNotNull('cls.combo')
             ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
@@ -1825,10 +1830,11 @@ class AbonoController extends Controller
         $detallesDevolucionTipo0 = DB::table('codigoslibros_devolucion_header as cdh')
             ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
             ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')  // LEFT JOIN para traer nombreInstitucion
-            ->where('cdh.estado', '<>', 0)
+            ->where('cdh.estado', '<>', '0')
             ->where('cls.documento', '=', $documento)
             ->where('cls.id_empresa', '=', $empresa)
             ->where('cls.tipo_codigo', '=', 0)  // Solo tipo_codigo = 0
+            ->where('cls.estado', '<>', 0)
             ->whereNull('cls.combo')
             ->groupBy('cdh.codigo_devolucion', 'cdh.estado', 'cls.documento', 'cls.id_empresa', 'cls.id_cliente', 'i.nombreInstitucion')
             ->select(

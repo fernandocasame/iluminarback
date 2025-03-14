@@ -1161,6 +1161,7 @@ Route::get('get_pedidos_periodoxContrato/{contrato}', 'PedidosController@get_ped
 Route::get('get_pedidos_periodo_Only_contrato/{contrato}/{beneficiario}', 'PedidosController@get_pedidos_periodo_Only_contrato');
 Route::get('getConvenio','PedidosController@getConvenio');
 Route::get('getConvenioGlobalActivo','PedidosController@getConvenioGlobalActivo');
+Route::get('getConvenioGlobalActivoXPeriodo','PedidosController@getConvenioGlobalActivoXPeriodo');
 Route::get('getAnticipoPedido','PedidosController@getAnticipoPedido');
 Route::get('get_pedidos_periodo_Only_pedido/{contrato}/{beneficiario}', 'PedidosController@get_pedidos_periodo_Only_pedido');
 Route::get('get_pedidos_asesor/{periodo}/{asesor}', 'PedidosController@get_pedidos_asesor');
@@ -1954,9 +1955,13 @@ Route::post('PostSucursalesInstitucion_Registrar_modificar','InstitucionSucursal
 Route::post('Post_Eliminar_SucursalesInstitucion','InstitucionSucursalesController@Post_Eliminar_SucursalesInstitucion');
 Route::post('Desactivar_SucursalesInstitucion','InstitucionSucursalesController@Desactivar_SucursalesInstitucion');
 //FIN INSTITUCION SUCURSALES
+//REPORTE DESPACHADOS
+Route::get('despachos', 'VentasController@despachos');
+//FIN REPORTE DESPACHADOS
 //FIN FACTURACION 10_10_1_4
 Route::resource('empresa','_14EmpresaController');
-
+Route::get('usuarioConVentas/{cedula}','UsuarioController@usuarioConVentas');
+Route::post('CambiarEmpresaPedido', 'ProformaController@CambiarEmpresaPedido');
 
 ///=======FACTURACION=========
 require_once "others/facturacion/inventario/RouterInventario.php";
@@ -2052,3 +2057,4 @@ Route::post('new_novedades', 'InstitucionController@new_novedades_add');
 Route::group([], function () {
     Route::resource('/prefactura_documentos', 'PrefacturaController');
 });
+Route::post('getEvaluacionesAdminPeriodo', 'EvaluacionController@getEvaluacionesUltimoPeriodo');

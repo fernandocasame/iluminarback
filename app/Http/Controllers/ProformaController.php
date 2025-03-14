@@ -844,6 +844,90 @@ class ProformaController extends Controller
 
         return $query;
     }
+    
+    public function CambiarEmpresaPedido(Request $request)
+    {
+        $this->validate($request, [
+            'id' => 'required',  // Validar que el pedido exista
+            'empresa' => 'required',  // Validar que la empresa exista
+        ]);
+    
+        $id_proforma = $request->id;
+        $id_empresa = $request->empresa;
+    
+        // Iniciar la transacción
+        DB::beginTransaction();
+    
+        try {
+            // Buscar el pedido
+            $pedido = DB::table('f_proforma')->where('id', $id_proforma)->first();
+    
+            if (!$pedido) {
+                // Si el pedido no existe, lanzar una excepción para que se haga rollback
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Pedido no encontrado',
+                ]);
+            }
+    
+            // Buscar la empresa
+            $empresa = DB::table('empresas')->where('id', $id_empresa)->first();
+    
+            if (!$empresa) {
+                // Si la empresa no existe, lanzar una excepción para que se haga rollback
+                return response()->json([
+                    'status' => 404,
+                    'message' => 'Empresa no encontrada',
+                ]);
+            }
+    
+            // Cambiar la empresa del pedido
+            $updatedRows = DB::table('f_proforma')
+                ->where('id', $id_proforma)
+                ->update(['emp_id' => $empresa->id]);
+    
+            // Verificar si la actualización se realizó con éxito
+            if ($updatedRows === 0) {
+                // Si no se actualizó ningún registro, lanzar una excepción
+                throw new \Exception('No se pudo actualizar el pedido. Hubo un error en la actualización.');
+            }
+
+            $pedidoActualizado = DB::SELECT("SELECT fpr.*,  em.nombre, em.img_base64,
+            us.nombres as username, us.apellidos as lastname, COUNT(dpr.pro_codigo) AS item, SUM(dpr.det_prof_cantidad) AS libros,
+            CONCAT(COALESCE(usa.nombres, ''), ' ', COALESCE(usa.apellidos, '')) AS cliente,
+            i.nombreInstitucion,i.ruc as rucPuntoVenta
+            FROM f_proforma fpr
+            LEFT JOIN usuario us ON fpr.user_editor = us.idusuario
+            LEFT JOIN empresas em ON fpr.emp_id =em.id
+            INNER JOIN f_detalle_proforma dpr ON dpr.prof_id=fpr.id
+            left join usuario usa on fpr.ven_cliente = usa.idusuario
+            LEFT JOIN institucion i ON fpr.id_ins_depacho = i.idInstitucion
+            WHERE fpr.id= '$id_proforma'
+            GROUP BY fpr.id, fpr.prof_id,fpr.prof_observacion,em.nombre, em.img_base64
+            order by fpr.created_at desc");
+
+            // Si todo es correcto, hacer commit de la transacción
+            DB::commit();
+    
+            return response()->json([
+                'status' => 200,
+                'message' => 'Pedido cambiado con éxito',
+                'data' => $pedidoActualizado
+            ]);
+    
+        } catch (\Exception $e) {
+            // Si ocurre algún error, hacer rollback
+            DB::rollback();
+    
+            return response()->json([
+                'status' => 500,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+    
+    
+    
 }
 
 

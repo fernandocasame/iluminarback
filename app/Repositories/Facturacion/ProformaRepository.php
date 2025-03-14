@@ -23,7 +23,8 @@ class  ProformaRepository extends BaseRepository
         $query = DB::SELECT("SELECT * FROM f_venta v
         WHERE v.institucion_id = ?
         AND v.est_ven_codigo <> '3'
-        AND v.doc_intercambio IS NULL
+        -- AND v.doc_intercambio IS NULL
+        AND NOT (v.idtipodoc IN (3, 4) AND v.doc_intercambio IS NOT NULL)
         ",[$institucion]);
         return $query;
     }
@@ -34,16 +35,23 @@ class  ProformaRepository extends BaseRepository
             ->distinct()  // Evitamos repetir resultados
             ->join('institucion as i', 'v.institucion_id', '=', 'i.idInstitucion')  // LEFT JOIN equivalente
             ->where('v.est_ven_codigo', '<>', '3')  // Aseguramos que no sea '3'
-            ->whereNull('v.doc_intercambio')  // Aseguramos que sea NULL
+            // ->whereNull('v.doc_intercambio')
+            ->where(function ($query) {
+                // Validamos que no se cumpla la condición: idtipodoc es 3 o 4 y doc_intercambio no es nulo
+                $query->whereNotIn('v.idtipodoc', [3, 4])  // Excluye idtipodoc 3 o 4
+                      ->orWhereNull('v.doc_intercambio');  // O donde doc_intercambio sea nulo
+            })
             ->where('v.periodo_id', $periodo)  // Usamos los parámetros correctamente
             ->where('v.id_empresa', $empresa)
             ->where('i.punto_venta', $tipoInstitucion)  // Filtro adicional de la tabla 'institucion'
             ->select('v.institucion_id', 'i.nombreInstitucion')  // Campos que deseas obtener
             ->orderBy('i.nombreInstitucion', 'asc')  // Ordenamos por nombre
             ->get();  // Obtenemos el resultado
-
+    
         return $query;
     }
+    
+    
 
     public function listadoDocumentosVenta($periodo, $empresa, $tipoInstitucion, $institucion, $tipoDocumento = [1])
     {
@@ -56,15 +64,21 @@ class  ProformaRepository extends BaseRepository
             ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'v2.institucion_id')  
             ->leftJoin('libros_series as ls', 'ls.codigo_liquidacion', '=', 'v.pro_codigo')
             ->leftJoin('series as s', 's.id_serie', '=', 'ls.id_serie')
+            ->leftJoin('f_proforma as pr', 'pr.prof_id', '=', 'v2.ven_idproforma')
             ->where('v2.institucion_id', '=', $institucion)
             ->where('v2.est_ven_codigo', '<>', '3')
-            ->whereNull('v2.doc_intercambio')
+            // ->whereNull('v2.doc_intercambio')
+            ->where(function ($query) {
+                // Validamos que no se cumpla la condición: idtipodoc es 3 o 4 y doc_intercambio no es nulo
+                $query->whereNotIn('v2.idtipodoc', [3, 4])  // Excluye idtipodoc 3 o 4
+                      ->orWhereNull('v2.doc_intercambio');  // O donde doc_intercambio sea nulo
+            })
             ->where('i.punto_venta', '=', $tipoInstitucion)
             ->where('i.idInstitucion', '=', $institucion)
             ->where('v2.id_empresa', '=', $empresa)
             ->where('v2.periodo_id', '=', $periodo)
             ->whereIn('v2.idtipodoc', $tipoDocumento)
-            ->select('v.*','s.nombre_serie')  // Seleccionamos los campos necesarios
+            ->select('v.*','s.nombre_serie','pr.idPuntoventa')  // Seleccionamos los campos necesarios
             ->orderBy('v.pro_codigo', 'asc')
             ->get();  // Ejecutamos la consulta y obtenemos los resultados
 
@@ -92,6 +106,23 @@ class  ProformaRepository extends BaseRepository
         ->get();
 
         return $query;
+    }
+    public function listadoContratosAgrupadoInstitucion($getDatosVenta)
+    {
+        if ($getDatosVenta->isEmpty()) {
+            return [];
+        }
+
+        // Extraer todos los ca_codigo_agrupado en un solo array usando pluck()
+        $idsPuntosVenta = $getDatosVenta->pluck('idPuntoventa');
+
+        // Consultar todos los datos en una sola consulta para evitar N+1
+        $contratos = DB::table('pedidos')
+            ->whereIn('ca_codigo_agrupado', $idsPuntosVenta)
+            ->where('estado', '1')
+            ->select('id_pedido', 'ca_codigo_agrupado', 'contrato_generado')
+            ->get();
+        return $contratos->isNotEmpty() ? $contratos->unique('id_pedido')->values() : [];
     }
 
 

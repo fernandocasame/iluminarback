@@ -32,128 +32,16 @@ class PrefacturaController extends Controller
     public function index(Request $request)
     {
         if($request->getReportePrefacturaAgrupado) { return $this->getReportePrefacturaAgrupado($request); }
+        if($request->notasMovidasAnteriores)       { return $this->getNotasMovidasAnteriores($request); }
     }
-
-    //api:get/prefactura_documentos?getReportePrefacturaAgrupado=1&periodo_id=25
-    // public function getReportePrefacturaAgrupado(Request $request)
-    // {
-    //     try{
-
-    //         $periodo_id = $request->get('periodo_id');
-    //         $empresa = 1; // O el valor que necesites
-    //         $tipoInstitucion = 0; // 0 para directa, 1 para punto de venta
-            
-    //         // Valida que se envíe el periodo_id
-    //         if (!$periodo_id) {
-    //             return $this->response()->setStatusCode(200)->json(['error' => 'Falta el periodo_id']);
-    //         }
-            
-    //         // Obtén las instituciones
-    //         $getInstituciones = $this->proformaRepository->listadoInstitucionesXVenta($periodo_id, $empresa, $tipoInstitucion);
-    //         if (count($getInstituciones) == 0) {
-    //             return $this->response()->setStatusCode(200)->json(['error' => 'No se encontraron instituciones']);
-    //         }   
-            
-    //         foreach ($getInstituciones as $key => $item) {
-    //             // Obtener los datos de venta PREFACTURAS
-    //             $getDatosVenta = $this->proformaRepository->listadoDocumentosVenta($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
-    //             // Obtener los datos de venta AGRUPADOS
-    //             $getDatosVentaAgrupado = $this->proformaRepository->listadoDocumentosAgrupado($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id);
-
-    //             // Inicializamos los arrays
-    //             $resultadosUnicos = [];
-    //             $agrupadosPorProCodigo = [];
-    //             $agrupadosPorProCodigoAgrupado = [];
-    //             $resultadoProductos = [];
-
-    //             // Agrupamos datos de getDatosVenta
-    //             foreach ($getDatosVenta as $documento) {
-    //                 $venCodigo = $documento->ven_codigo;
-    //                 $idEmpresa = $documento->id_empresa;
-    //                 $proCodigo = $documento->pro_codigo;
-    //                 $detVenCantidad = $documento->det_ven_cantidad;
-    //                 $detVenDev = $documento->det_ven_dev;
-    //                 $detVenValorU = $documento->det_ven_valor_u;
-
-    //                 // Resultados únicos por ven_codigo e id_empresa
-    //                 $resultadosUnicos["$venCodigo-$idEmpresa"] = [
-    //                     'ven_codigo' => $venCodigo,
-    //                     'id_empresa' => $idEmpresa
-    //                 ];
-
-    //                 // Agrupamos por pro_codigo (getDatosVenta)
-    //                 if (isset($agrupadosPorProCodigo[$proCodigo])) {
-    //                     $agrupadosPorProCodigo[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
-    //                     $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] += ($detVenCantidad - $detVenDev);
-    //                 } else {
-    //                     $agrupadosPorProCodigo[$proCodigo] = [
-    //                         'proCodigo' => $proCodigo,
-    //                         'det_ven_cantidad' => $detVenCantidad,
-    //                         'cantidad_real' => $detVenCantidad - $detVenDev,
-    //                         'det_ven_valor_u' => $detVenValorU
-    //                     ];
-    //                 }
-    //             }
-
-    //             // Agrupamos datos de getDatosVentaAgrupado
-    //             foreach ($getDatosVentaAgrupado as $documento) {
-    //                 $proCodigo = $documento->pro_codigo;
-    //                 $detVenCantidad = $documento->det_ven_cantidad;
-    //                 $detVenValorU = $documento->det_ven_valor_u;
-
-    //                 // Agrupamos por pro_codigo (getDatosVentaAgrupado)
-    //                 if (isset($agrupadosPorProCodigoAgrupado[$proCodigo])) {
-    //                     $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
-    //                 } else {
-    //                     $agrupadosPorProCodigoAgrupado[$proCodigo] = [
-    //                         'proCodigo' => $proCodigo,
-    //                         'det_ven_cantidad' => $detVenCantidad,
-    //                         'det_ven_valor_u' => $detVenValorU
-    //                     ];
-    //                 }
-    //             }
-
-    //             // Unimos los productos de ambos arrays
-    //             $todosLosProductos = array_merge($agrupadosPorProCodigo, $agrupadosPorProCodigoAgrupado);
-    //             // Combinamos los productos
-    //             foreach ($todosLosProductos as $proCodigo => $producto) {
-    //                 // Si el producto existe en ambos arrays, lo unimos
-    //                 $resultadoProductos[$proCodigo] = [
-    //                     'proCodigo' => $proCodigo,
-    //                     // Si el producto está en $agrupadosPorProCodigo, asignamos su cantidad real, sino a 0
-    //                     'cantidad_real' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] : 0,
-    //                     // Si el producto está en $agrupadosPorProCodigoAgrupado, asignamos su cantidad, sino a 0
-    //                     'cantidad_perseo' => isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] : 0,
-    //                     // Valor unitario del producto (del primer array que tenga el producto)
-    //                     'det_ven_valor_u' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['det_ven_valor_u'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_valor_u'] : 0)
-    //                 ];
-    //             }
-
-    //             // Asignamos los resultados únicos de ven_codigo y id_empresa
-    //             $item->prefacturas = array_values($resultadosUnicos);
-
-    //             // Asignamos los productos agrupados por pro_codigo (getDatosVenta)
-    //             $item->productos_prefactura = array_values($agrupadosPorProCodigo);
-
-    //             // Asignamos los productos agrupados por pro_codigo (getDatosVentaAgrupado)
-    //             $item->productos_agrupados = array_values($agrupadosPorProCodigoAgrupado);
-
-    //             // Asignamos los productos combinados con cantidad_real de ambos arrays
-    //             $item->resultadoProductos = array_values($resultadoProductos);
-    //         }
-    //         return $getInstituciones;
-    //     }
-    //     catch (\Exception $e) {
-    //         return ['status' => '0', 'message' => $e->getMessage()];
-    //     }
-    // }
-
+    //api:get/prefactura_documentos?getReportePrefacturaAgrupado=1&periodo_id=25&tipoVenta=1
     public function getReportePrefacturaAgrupado(Request $request)
     {
         try {
-            $periodo_id = $request->get('periodo_id');
-            $empresa = 1; // O el valor que necesites
-            $tipoInstitucion = 0; // 0 para directa, 1 para punto de venta
+            $periodo_id         = $request->get('periodo_id');
+            $tipoVenta          = $request->get('tipoVenta');
+            $empresa            = 1; // O el valor que necesites
+            $tipoInstitucion    = $tipoVenta == 1 ? 0 : 1; // 0 para directa, 1 para punto de venta
             
             // Valida que se envíe el periodo_id
             if (!$periodo_id) {
@@ -173,6 +61,10 @@ class PrefacturaController extends Controller
             foreach ($getInstituciones as $key => $item) {
                 // Obtener los datos de venta PREFACTURAS
                 $getDatosVenta = $this->proformaRepository->listadoDocumentosVenta($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
+                
+                // Obtener los contratos de la institucion
+                $getContratos = $this->proformaRepository->listadoContratosAgrupadoInstitucion($getDatosVenta );
+
                 // Obtener los datos de venta AGRUPADOS
                 $getDatosVentaAgrupado = $this->proformaRepository->listadoDocumentosAgrupado($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
                 // Inicializamos los arrays para cada institución
@@ -201,25 +93,18 @@ class PrefacturaController extends Controller
                     if (isset($agrupadosPorProCodigo[$proCodigo])) {
                         $agrupadosPorProCodigo[$proCodigo]['det_ven_cantidad'] += $detVenCantidad;
                         $agrupadosPorProCodigo[$proCodigo]['cantidad_real'] += ($detVenCantidad - $detVenDev);
+                        $agrupadosPorProCodigo[$proCodigo]['det_ven_dev'] += $detVenDev;
                     } else {
                         $agrupadosPorProCodigo[$proCodigo] = [
                             'proCodigo' => $proCodigo,
                             'det_ven_cantidad' => $detVenCantidad,
                             'cantidad_real' => $detVenCantidad - $detVenDev,
                             'det_ven_valor_u' => $detVenValorU,
-                            'nombre_serie' => $nombreSerie
+                            'nombre_serie' => $nombreSerie,
+                            'det_ven_dev' => $detVenDev
                         ];
                     }
-
-                    // Agrupamos por precio (det_ven_valor_u) para cantidad real
-                    // if (isset($productosAgrupadosPorPrecioReal[$detVenValorU])) {
-                    //     $productosAgrupadosPorPrecioReal[$detVenValorU]['cantidad_real'] += ($detVenCantidad - $detVenDev);
-                    // } else {
-                    //     $productosAgrupadosPorPrecioReal[$detVenValorU] = [
-                    //         'det_ven_valor_u' => $detVenValorU,
-                    //         'cantidad_real' => ($detVenCantidad - $detVenDev)
-                    //     ];
-                    // }
+                    
                     // Agrupamos por precio (det_ven_valor_u) y nombre_serie para cantidad real
                     $clave = $detVenValorU . '|' . $nombreSerie;
 
@@ -272,6 +157,9 @@ class PrefacturaController extends Controller
                 // Asignamos los resultados únicos de ven_codigo y id_empresa
                 $item->prefacturas = array_values($resultadosUnicos);
 
+                // Asignamos los contratos de la institucion
+                $item->contratos = $getContratos;
+
                 // Asignamos los productos agrupados por pro_codigo (getDatosVenta)
                 $item->productos_prefactura = array_values($agrupadosPorProCodigo);
 
@@ -291,7 +179,12 @@ class PrefacturaController extends Controller
                         'cantidad_perseo' => isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] : 0,
                         // Valor unitario del producto (del primer array que tenga el producto)
                         'det_ven_valor_u' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['det_ven_valor_u'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_valor_u'] : 0),
-                        'nombre_serie' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['nombre_serie'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['nombre_serie'] : 0)
+                        // Serie
+                        'nombre_serie' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['nombre_serie'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['nombre_serie'] : 0),
+                        //det_ven_dev devolucion
+                        'det_ven_dev' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['det_ven_dev'] : 0,
+                        //det_ven_cantidad
+                        'det_ven_cantidad' => isset($agrupadosPorProCodigo[$proCodigo]) ? $agrupadosPorProCodigo[$proCodigo]['det_ven_cantidad'] : (isset($agrupadosPorProCodigoAgrupado[$proCodigo]) ? $agrupadosPorProCodigoAgrupado[$proCodigo]['det_ven_cantidad'] : 0)
                     ];
                 }
 
@@ -327,6 +220,49 @@ class PrefacturaController extends Controller
         catch (\Exception $e) {
             return ['status' => '0', 'message' => $e->getMessage()];
         }
+    }
+
+      // $notas = DB::table('f_venta_historico_notas_cambiadas')->get();
+
+        // foreach ($notas as $nota) {
+        //     // Mostrar la observacion para ver qué contiene
+        //     echo "Observación: " . $nota->observacion . "\n"; // Verificar la cadena
+
+        //     // Usamos preg_match para extraer la parte entre "Se movió de la nota" y "a la prefactura"
+        //     if (preg_match('/se\s*movi[oó]\s*de\s*la\s*nota\s*(N-C-[^ ]+)/i', $nota->observacion, $matches)) {
+        //         // Mostrar lo que captura la expresión regular
+        //         echo "Coincidencia: " . $matches[1] . "\n";  // Esto debería imprimir el valor capturado
+
+        //         // Si se encuentra una coincidencia, actualizamos el campo 'origen'
+        //         DB::table('f_venta_historico_notas_cambiadas')
+        //             ->where('id', $nota->id) // Asumiendo que tienes una columna 'id' en la tabla
+        //             ->update(['origen' => $matches[1]]);
+        //     } else {
+        //         echo "No se encontró una coincidencia\n"; // Si no encuentra coincidencia
+        //     }
+        // }
+    //api:get/prefactura_documentos?notasMovidasAnteriores=1&periodo_id=25
+    public function getNotasMovidasAnteriores(Request $request)
+    {
+        // Obtener todos los registros con 'origen' no nulo
+        $todas = DB::table('f_venta_historico_notas_cambiadas')
+            ->whereNotNull('origen')
+            ->where('id_periodo', $request->get('periodo_id'))
+            ->get();
+
+        // Obtener combinaciones únicas de 'origen', 'id_empresa' y 'nueva_prefactura'
+        $notas = DB::table('f_venta_historico_notas_cambiadas')
+            ->select('origen', 'id_empresa', 'nueva_prefactura')  // Seleccionamos los campos que necesitamos
+            ->whereNotNull('origen')
+            ->where('id_periodo', $request->get('periodo_id'))
+            ->distinct()  // Nos aseguramos de que las combinaciones sean únicas
+            ->get();
+
+        // Retornar ambas consultas
+        return [
+            "todas" => $todas,
+            "notas" => $notas
+        ];
     }
 
     /**
@@ -377,14 +313,12 @@ class PrefacturaController extends Controller
         try {
             // Iniciar la transacción
             DB::beginTransaction();
-
             // Buscar la venta existente
             $f_venta = DB::table('f_venta')
                 ->where('id_empresa', $id_empresa)
                 ->where('ven_codigo', $ven_codigoAnterior)
-                ->where('ven_valor','>',0)
+                // ->where('ven_valor','>',0)
                 ->first();
-
             if (!$f_venta) {
                 return ["status" => "0", "message" => "El registro de venta no existe."];
             }

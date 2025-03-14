@@ -13,6 +13,7 @@ use App\Models\CodigosLibros;
 use App\Models\CodigosLibrosDevolucionHeader;
 use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\CodigosPaquete;
+use App\Models\CombosCodigos;
 use App\Models\f_tipo_documento;
 use App\Models\Facturacion\Inventario\ConfiguracionGeneral;
 use App\Models\HistoricoCodigos;
@@ -2499,7 +2500,7 @@ class CodigoLibrosController extends Controller
                         $getcodigoPrimero = CodigosLibros::Where('codigo',$item->codigo)->get();
                         $getcodigoUnion   = CodigosLibros::Where('codigo',$codigo_union)->get();
                         //ACTIVACION CON CODIGO DE UNION
-                        $ingreso =  $this->codigosRepository->updateActivacion($item->codigo,$codigo_union,$getcodigoUnion,false,1);
+                        $ingreso =  $this->codigosRepository->updateActivacion($item->codigo,$codigo_union,$getcodigoUnion,false,1,$request);
                         //si ingresa correctamente
                         if($ingreso == 1){
                             $porcentaje++;
@@ -2518,7 +2519,7 @@ class CodigoLibrosController extends Controller
                     }
                     //ACTUALIZAR CODIGO SIN UNION
                     else{
-                        $ingreso =  $this->codigosRepository->updateActivacion($item->codigo,0,null,false,1);
+                        $ingreso =  $this->codigosRepository->updateActivacion($item->codigo,0,null,false,1,$request);
                         if($ingreso == 1){
                             $porcentaje++;
                             //ingresar en el historico
@@ -3877,12 +3878,19 @@ class CodigoLibrosController extends Controller
             return ['error' => 'Invalid JSON data'];
         }
         $paquetes       = json_decode($request->data_codigos);
+        $mostrarCombos  = $request->mostrarCombos?? null;
+
         // Extraer solo los códigos a buscar
         $paquetesBuscar = array_column($paquetes, 'codigo');
         $mostrarSoloCodigos     = $request->mostrarSoloCodigos;
 
-        // Buscar códigos en la base de datos
-        $codigosPaquete = CodigosPaquete::whereIn('codigo', $paquetesBuscar)->get();
+        if($mostrarCombos == 1){
+            // Buscar códigos en la base de datos
+            $codigosPaquete = CombosCodigos::whereIn('codigo', $paquetesBuscar)->get();
+        }else{
+            // Buscar códigos en la base de datos
+            $codigosPaquete = CodigosPaquete::whereIn('codigo', $paquetesBuscar)->get();
+        }
 
         // Extraer los códigos encontrados
         $paquetesEncontrados = $codigosPaquete->pluck('codigo')->toArray();
@@ -3897,27 +3905,34 @@ class CodigoLibrosController extends Controller
         $arrayPaquetesNoEncontrados = $paquetesNoEncontrados;
 
         // Realizar la consulta con joins, añadiendo el filtro de prueba_diagnostica
-        $resultados = CodigosLibros::whereIn('codigo_paquete', $paquetesEncontrados)
-            ->where('prueba_diagnostica', '0') // Filtrar por prueba_diagnostica
-            ->leftJoin('institucion', 'codigoslibros.bc_institucion', '=', 'institucion.idInstitucion')
-            ->leftJoin('institucion as i2', 'codigoslibros.venta_lista_institucion', '=', 'i2.idInstitucion')
-            ->leftJoin('periodoescolar as pe', 'codigoslibros.bc_periodo', '=', 'pe.idperiodoescolar')
-            ->leftJoin('libros_series as ls', 'codigoslibros.libro_idlibro', '=', 'ls.idLibro')
-            ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
-            ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
-            ->select(
-                'codigoslibros.codigo', 'codigoslibros.bc_periodo', 'codigoslibros.bc_institucion',
-                'codigoslibros.venta_lista_institucion', 'codigoslibros.libro_idlibro', 'codigoslibros.documento_devolucion',
-                'codigoslibros.combo','codigoslibros.codigo_combo', 'codigoslibros.proforma_empresa', 'codigoslibros.codigo_proforma',
-                'codigoslibros.estado_liquidacion', 'codigoslibros.liquidado_regalado', 'codigoslibros.venta_estado',
-                'codigoslibros.codigo_paquete', 'ls.codigo_liquidacion', 'ls.nombre as nombrelibro',
-                'codigoslibros.permitir_devolver_nota', 'codigoslibros.plus',
-                'codigoslibros.estado', 'institucion.nombreInstitucion as institucionDirecta',
-                'i2.nombreInstitucion as institucionPuntoVenta', 'pe.periodoescolar',
-                'ls.id_serie', 'a.area_idarea', 'ls.year'
-            )
-            ->get();
+        $query = CodigosLibros::query()
+        ->where('prueba_diagnostica', '0') // Filtrar por prueba_diagnostica
+        ->leftJoin('institucion', 'codigoslibros.bc_institucion', '=', 'institucion.idInstitucion')
+        ->leftJoin('institucion as i2', 'codigoslibros.venta_lista_institucion', '=', 'i2.idInstitucion')
+        ->leftJoin('periodoescolar as pe', 'codigoslibros.bc_periodo', '=', 'pe.idperiodoescolar')
+        ->leftJoin('libros_series as ls', 'codigoslibros.libro_idlibro', '=', 'ls.idLibro')
+        ->leftJoin('libro as l', 'ls.idLibro', '=', 'l.idlibro')
+        ->leftJoin('asignatura as a', 'l.asignatura_idasignatura', '=', 'a.idasignatura')
+        ->select(
+            'codigoslibros.codigo', 'codigoslibros.codigo_union', 'codigoslibros.bc_periodo', 'codigoslibros.bc_institucion',
+            'codigoslibros.venta_lista_institucion', 'codigoslibros.libro_idlibro', 'codigoslibros.documento_devolucion',
+            'codigoslibros.combo','codigoslibros.codigo_combo', 'codigoslibros.proforma_empresa', 'codigoslibros.codigo_proforma',
+            'codigoslibros.estado_liquidacion', 'codigoslibros.liquidado_regalado', 'codigoslibros.venta_estado',
+            'codigoslibros.codigo_paquete', 'ls.codigo_liquidacion', 'ls.nombre as nombrelibro',
+            'codigoslibros.permitir_devolver_nota', 'codigoslibros.plus',
+            'codigoslibros.estado', 'institucion.nombreInstitucion as institucionDirecta',
+            'i2.nombreInstitucion as institucionPuntoVenta', 'pe.periodoescolar',
+            'ls.id_serie', 'a.area_idarea', 'ls.year'
+        )
+        //Aquí usamos `when()` para agregar la condición de acuerdo con el valor de `mostrarCombos`
+        ->when($mostrarCombos == 1, function ($query) use ($paquetesEncontrados) {
+            return $query->whereIn('codigo_combo', $paquetesEncontrados);
+        })
+        ->when($mostrarCombos != 1, function ($query) use ($paquetesEncontrados) {
+            return $query->whereIn('codigo_paquete', $paquetesEncontrados);
+        });
 
+        $resultados = $query->get();
         // Traer el precio del libro
         foreach ($resultados as $item) {
             $periodo = $item->bc_periodo;
@@ -3946,12 +3961,31 @@ class CodigoLibrosController extends Controller
                 }
             }
         }
+        $arrayAgrupadosCombos = [];
+        if ($request->agrupadoCombos) {
+            $arrayAgrupadosCombos = $resultados->groupBy(function ($item) {
+                return $item->codigo_combo;
+            })->values()
+            ->map(function ($items) {
+                return [
+                    'codigoCombo'  => $items->first()->codigo_combo,
+                    'codigosHijos' => $items->map(function ($item) {
+                        return [
+                            'codigoActivacion'   => $item->codigo,
+                            'codigoDiagnostico'  => $item->codigo_union,
+                        ];
+                    }),
+                ];
+            });
+        }
+        
         //MOSTRAR SOLO LOS CODIGOS
         if($mostrarSoloCodigos){
             return [
                 'paquetesEncontrados'   => $paquetesEncontrados,
                 'no_encontrados'        => $arrayPaquetesNoEncontrados,
                 'encontrados'           => $resultados,
+                'arrayAgrupadosCombos'  => $arrayAgrupadosCombos,
             ];
         }
         // Agrupamos los resultados según la lógica proporcionada
@@ -4007,10 +4041,7 @@ class CodigoLibrosController extends Controller
             }
         }
 
-        // Convertir la colección a array antes de aplicar array_map
-        // $allData = array_merge(...array_map(function($item) {
-        //     return $item['data']->toArray(); // Convertir `data` a array
-        // }, $agrupadosPorInstitucion->toArray()));
+        
 
         // Retornar los resultados finales
         return [
@@ -4125,11 +4156,12 @@ class CodigoLibrosController extends Controller
             'tipo'         => 'required|integer',
         ]);
 
-        $codigos    = json_decode($request->data_codigos);
-        $periodo_id = $request->periodo_id;
-        $id_usuario = $request->id_usuario;
-        $comentario = $request->comentario;
-        $tipo       = $request->tipo;
+        $codigos            = json_decode($request->data_codigos);
+        $periodo_id         = $request->periodo_id;
+        $id_usuario         = $request->id_usuario;
+        $comentario         = $request->comentario;
+        $tipo               = $request->tipo;
+        $permitirRegalados  = $request->permitirRegalados;
 
         $codigosNoCambiados         = [];
         $contador                   = 0;
@@ -4164,6 +4196,13 @@ class CodigoLibrosController extends Controller
                         $item->mensaje = "El código no pertenece a la serie plus configurada";
                         $codigosNoCambiados[] = $item;
                         continue;
+                    }
+                    if($permitirRegalados == 0){
+                        if($codigo->estado_liquidacion == '2'){
+                            $item->mensaje = "El código ya se encuentra en estado regalado";
+                            $codigosNoCambiados[] = $item;
+                            continue;
+                        }
                     }
 
                     $codigo->plus = ($tipo == 0) ? 1 : 0;
@@ -4672,7 +4711,7 @@ class CodigoLibrosController extends Controller
                     'message' => 'El contrato del código no coincide con el contrato que se está restaurando.',
                 ], 200);
             }
-            if ($getquitar_de_reporte == '1' && $estado_liquidacion == '0') {
+            if ($getquitar_de_reporte == '1' && ($estado_liquidacion == '0' || $estado_liquidacion == '2')) {
                 // Activación
                 $getCodigo->quitar_de_reporte = '0';
                 $getCodigo->save();

@@ -1651,6 +1651,9 @@ class VerificacionControllerAnterior extends Controller
        if($request->getReporteLiquidadosPorLibros){
            return $this->getReporteLiquidadosPorLibros($request);
        }
+       if($request->getReportePorAnio){
+           return $this->getReportePorAnio($request);
+       }
     }
     // api:get/metodosGetVerificaciones?getVerificaciones=1&id_asesor=4179&pendientesNot=1&soloLongitud=1
     public function getVerificaciones($request){
@@ -1872,6 +1875,97 @@ class VerificacionControllerAnterior extends Controller
         return $query;
 
     }
+    //api:get/metodosGetVerificaciones?getReportePorAnio=1&id_periodo=25
+    public function getReportePorAnio($request){
+        $id_periodo = $request->input("id_periodo", 0);
+        if(!$id_periodo){
+            return ["status" => "0","message" => "Falta el id_periodo"];
+        }
+        // $formatoNiveles =  DB::select("SELECT * FROM nivel WHERE orden <> 0 AND orden IS NOT NULL
+        // order by orden + 0
+        //  ");
+        $getLibros      = DB::SELECT("SELECT
+            i.nombreInstitucion,            -- Nombre de la institución
+            (
+                SELECT p2.tipo_venta_descr FROM  pedidos p2
+                WHERE p2.contrato_generado = c.contrato
+            ) as tipo_venta_descr,
+            c.contrato,                     -- Contrato
+            l.nombrelibro,                  -- Nombre del libro
+            ls.codigo_liquidacion,          -- Código de liquidación
+            ls.id_serie,                    -- ID de la serie
+            ls.year,                        -- Año
+            ls.version,
+            CASE 
+                WHEN ls.version = 'INICIAL' AND ls.year = 1 THEN 'Inicial 1'
+                WHEN ls.version = 'INICIAL' AND ls.year = 2 THEN 'Inicial 2'
+                
+                WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 1 THEN '1ero Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 2 THEN '2do Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 3 THEN '3ero Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 4 THEN '4to Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 5 THEN '5to Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 6 THEN '6to Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 7 THEN '7mo Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 8 THEN '8vo Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 9 THEN '9no Basica'
+                    WHEN (ls.version IS NULL OR TRIM(ls.version) = '') AND ls.year = 10 THEN '10mo Basica'
+                
+                
+                WHEN ls.version = 'BGU' AND ls.year = 1 THEN '1ero BGU'
+                WHEN ls.version = 'BGU' AND ls.year = 2 THEN '2do BGU'
+                WHEN ls.version = 'BGU' AND ls.year = 3 THEN '3ero BGU'
+                ELSE n.nombrenivel
+            END AS nombrenivel,             -- Nivel con la lógica aplicada
+            c.bc_institucion AS idInstitucion,  -- ID de la institución
+            COUNT(c.codigo) AS cantidad     -- Contamos los códigos por libro e institución
+        FROM
+            codigoslibros c
+        JOIN
+            institucion i ON c.bc_institucion = i.idInstitucion  -- Relacionamos la institución
+        JOIN
+            libro l ON c.libro_idlibro = l.idlibro  -- Relacionamos el nombre del libro
+        LEFT JOIN
+            libros_series ls ON ls.idLibro = l.idlibro  -- Relacionamos las series de libros
+        LEFT JOIN nivel n ON n.orden = ls.year
+        WHERE
+            c.bc_periodo = '$id_periodo'  -- Filtro por periodo
+            AND c.estado_liquidacion IN ('0', '2')  -- Filtro por estado de liquidación
+            AND c.prueba_diagnostica = '0'  -- Filtro para no incluir prueba diagnóstica
+            AND c.contrato IS NOT NULL
+            AND TRIM(c.contrato) != ''  -- Contrato no vacío
+            AND c.contrato != '0'  -- Contrato no igual a 0
+            AND ls.id_serie != '6'
+            AND c.libro_idlibro <> '945'
+            AND c.libro_idlibro <> '946'
+            AND c.libro_idlibro <> '947'
+            AND c.libro_idlibro <> '948'
+            AND c.libro_idlibro <> '949'
+            AND c.libro_idlibro <> '950'
+            AND c.libro_idlibro <> '951'
+            AND c.libro_idlibro <> '952'
+            AND c.libro_idlibro <> '953'
+        GROUP BY
+            i.nombreInstitucion, 
+            c.contrato, 
+            l.nombrelibro, 
+            ls.codigo_liquidacion, 
+            ls.id_serie, 
+            ls.year, 
+            ls.version,
+            c.bc_institucion,
+            n.nombrenivel
+        ORDER BY
+            i.nombreInstitucion, l.nombrelibro
+
+        ");
+        return $getLibros;
+        // return [
+        //     "formatoNiveles" => $formatoNiveles,
+        //     "getLibros" => $getLibros
+        // ];
+    }
+       
     //api:post/metodosPostVerificaciones
     public function metodosPostVerificaciones(Request $request){
         if($request->guardarNotificacionVerificacion){ return $this->guardarNotificacionVerificacion($request); }

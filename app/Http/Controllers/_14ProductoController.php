@@ -1242,7 +1242,10 @@ class _14ProductoController extends Controller {
                     'pro_depositoCalmed_diferencia' => [3, 1],
                 ];
                 foreach ($diferencias as $campo => [$emp_id, $fmdp_tipo_bodega]) {
-                    if (isset($diferencia[$campo])) {
+                    // Verifica que el campo exista
+                    // if (isset($diferencia[$campo])) {
+                    // Verifica que el campo exista y si es diferente de cero
+                    if (isset($diferencia[$campo]) && $diferencia[$campo] != 0) { 
                         // Registrar para pro_codigo
                         f_movimientos_detalle_producto::create([
                             'fmp_id'                 => $nombre_movimiento_combo,

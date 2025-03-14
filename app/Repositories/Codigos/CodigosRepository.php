@@ -122,9 +122,10 @@ class  CodigosRepository extends BaseRepository
         ->update($arrayResutado);
         return $codigo;
     }
-    public function updateActivacion($codigo,$codigo_union,$objectCodigoUnion,$ifOmitirA=false,$todo){
+    public function updateActivacion($codigo,$codigo_union,$objectCodigoUnion,$ifOmitirA=false,$todo,$request){
         //si es regalado guia o bloqueado no se actualiza
         $arrayCombinar = [];
+        $arrayPlus     = [];
         if($ifOmitirA) { return 1; }
         $withCodigoUnion = 1;
         $estadoIngreso   = 0;
@@ -165,7 +166,6 @@ class  CodigosRepository extends BaseRepository
             'documento_devolucion'      => null,
             'permitir_devolver_nota'    => '0',
             'quitar_de_reporte'         => null,
-            'plus'                      => 0,
         ];
         $arrayPaquete = [
             'codigo_paquete'            => null,
@@ -175,8 +175,15 @@ class  CodigosRepository extends BaseRepository
             'codigo_combo'              => null,
             'fecha_registro_combo'      => null,
         ];
-        if($todo == 1) { $arrayCombinar = array_merge($arrayLimpiar, $arrayPaquete); }
+        if($todo == 1) { $arrayCombinar = array_merge($arrayLimpiar, $arrayPaquete, $arrayCombo); }
         else           { $arrayCombinar = $arrayLimpiar;}
+        //PLUS
+        if($request->Removeplus == '1'){
+            $arrayPlus = [
+                'plus'              => 0,
+            ];
+            $arrayCombinar = array_merge($arrayCombinar, $arrayPlus);
+        }
 
         //si hay codigo de union lo actualizo
         if($withCodigoUnion == 1){

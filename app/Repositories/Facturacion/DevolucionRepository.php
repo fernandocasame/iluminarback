@@ -22,7 +22,6 @@ class  DevolucionRepository extends BaseRepository
         $id_institucion = $request->id_institucion;
         $id_periodo     = $request->id_periodo;
         $id_empresa     = $request->id_empresa;
-        
         // Obtener todas las facturas disponibles que cumplen con los criterios
         $disponiblePrefactura = \DB::table('f_detalle_venta as dg')
             ->join('f_venta as dv', function ($join) use ($id_empresa) {
@@ -45,6 +44,11 @@ class  DevolucionRepository extends BaseRepository
                 $query->whereIn('dv.idtipodoc', $idtipodoc);
             })
             ->whereNull('dv.doc_intercambio')
+            ->where(function ($query) {
+                // Validamos que no se cumpla la condición: idtipodoc es 3 o 4 y doc_intercambio no es nulo
+                $query->whereNotIn('dv.idtipodoc', [3, 4])  // Excluye idtipodoc 3 o 4
+                      ->orWhereNull('dv.doc_intercambio');  // O donde doc_intercambio sea nulo
+            })
             ->selectRaw('COALESCE(SUM(dg.det_ven_cantidad - dg.det_ven_dev), 0) as cantidad, dv.ven_codigo, dg.pro_codigo, dv.idtipodoc')
             ->groupBy('dv.ven_codigo') // Agrupar por ven_codigo para obtener los totales
             ->havingRaw('COALESCE(SUM(dg.det_ven_cantidad - dg.det_ven_dev), 0) >= ?', [$cantidadNecesaria])
@@ -121,7 +125,6 @@ class  DevolucionRepository extends BaseRepository
             ->where('dv.institucion_id', $id_institucion)
             ->where('dv.idtipodoc', '1')
             ->where('dv.est_ven_codigo', '<>', 3)
-            ->whereNull('dv.doc_intercambio')
             ->where('dv.estadoPerseo', '0')
             ->when($combos == 1, function($query) use ($combos) {
                 $query->where('pro.ifcombo', '=', 1);
@@ -194,10 +197,9 @@ class  DevolucionRepository extends BaseRepository
             ->where('v.id_empresa', $id_empresa)
             ->where('v.periodo_id', $id_periodo)
             ->where('v.est_ven_codigo', '<>', '3')
-            ->whereNull('v.doc_intercambio')
+            // ->whereNull('v.doc_intercambio')
             ->where('v.idtipodoc', '1')
             ->where('dv.pro_codigo', $pro_codigo)
-            ->whereNull('dv.doc_intercambio')
             ->having('disponible', '>', $cantidadNecesaria)
             ->get();
 

@@ -1595,6 +1595,17 @@ class PedidosController extends Controller
         ",[$institucion]);
         return $query;
     }
+    //api:get/getConvenioGlobalActivoXPeriodo?institucion=840&periodo=25
+    public function getConvenioGlobalActivoXPeriodo(Request $request){
+        $institucion = $request->institucion;
+        $periodo_id = $request->periodo;
+        $query = DB::SELECT("SELECT * FROM pedidos_convenios c
+        WHERE c.institucion_id = ?
+        AND c.estado <> '2'
+        AND c.periodo_id = $periodo_id
+        ",[$institucion]);
+        return $query;
+    }
     //api:get/getAnticipoPedido?pedido=1540
     public function getAnticipoPedido(Request $request){
         $pedido = $request->pedido;
@@ -1823,7 +1834,7 @@ class PedidosController extends Controller
           FROM usuario u
           LEFT JOIN sys_group_users g ON g.id = id_group
           WHERE u.estado_idEstado = 1
-          AND (u.id_group = 6 OR u.id_group = 10 OR u.id_group = 11)
+          AND (u.id_group = 6 OR u.id_group = 10 OR u.id_group = 11 OR u.id_group = '33')
           AND u.cedula like '%$request->cedula%'
           ");
         return $responsables;
@@ -5158,53 +5169,141 @@ class PedidosController extends Controller
             return ["status" => "0", "message" => "No se pudo enviar"];
         }
     }
+    // public function AnularLibrosObsequios(Request $request) {
+    //     // Iniciar transacción
+    //     DB::beginTransaction();
+
+    //     try {
+    //         // Encontrar el pedido de libro obsequio
+    //         $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
+
+    //         // Actualizar el estado del pedido de libro obsequio
+    //         $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
+    //         $pedidoLibroObsequio->save();
+
+    //         // Buscar todas las ventas asociadas en la tabla F_venta
+    //         $ventas = DB::table('f_venta')
+    //                     ->where('ven_p_libros_obsequios', $request->id)
+    //                     ->get();
+
+    //         if ($ventas->isEmpty()) {
+    //             throw new \Exception('No se encontraron ventas asociadas');
+    //         }
+
+    //         // Iterar sobre todas las ventas encontradas
+    //         foreach ($ventas as $venta) {
+    //             // Actualizar el estado de la venta
+    //             DB::table('f_venta')
+    //                 ->where('ven_codigo', $venta->ven_codigo)
+    //                 ->where('id_empresa', $venta->id_empresa)
+    //                 ->update(['est_ven_codigo' => 3]);
+
+    //             // Obtener detalles de la venta
+    //             $detalles = DB::table('f_detalle_venta')
+    //                           ->where('ven_codigo', $venta->ven_codigo)
+    //                           ->where('id_empresa', $venta->id_empresa)
+    //                           ->get();
+
+    //             // Iterar sobre los detalles y actualizar los productos
+    //             foreach ($detalles as $detalle) {
+    //                 $producto = DB::table('1_4_cal_producto')
+    //                               ->where('pro_codigo', $detalle->pro_codigo)
+    //                               ->first();
+
+    //                 if (!$producto) {
+    //                     // Deshacer la transacción en caso de error con un producto
+    //                     DB::rollBack();
+    //                     return ["status" => "0", "message" => "Producto no encontrado"];
+    //                 }
+
+    //                 // Ajustar el stock según la empresa
+    //                 if ($venta->id_empresa == 1) {
+    //                     DB::table('1_4_cal_producto')
+    //                         ->where('pro_codigo', $detalle->pro_codigo)
+    //                         ->update([
+    //                             'pro_deposito' => $producto->pro_deposito + (int)$detalle->det_ven_cantidad,
+    //                             'pro_reservar' => $producto->pro_reservar + (int)$detalle->det_ven_cantidad
+    //                         ]);
+    //                 } else if ($venta->id_empresa == 3) {
+    //                     DB::table('1_4_cal_producto')
+    //                         ->where('pro_codigo', $detalle->pro_codigo)
+    //                         ->update([
+    //                             'pro_depositoCalmed' => $producto->pro_depositoCalmed + (int)$detalle->det_ven_cantidad,
+    //                             'pro_reservar' => $producto->pro_reservar + (int)$detalle->det_ven_cantidad
+    //                         ]);
+    //                 }
+    //             }
+    //         }
+
+    //         // Confirmar la transacción
+    //         DB::commit();
+
+    //         return ["status" => "1", "message" => "Se anuló correctamente"];
+    //     } catch (\Exception $e) {
+    //         // Deshacer la transacción en caso de error
+    //         DB::rollBack();
+
+    //         // Opcional: Loguear el error
+    //         // Log::error('Error al anular libros obsequios: ' . $e->getMessage());
+
+    //         return ["status" => "0", "message" => "No se pudo anular"];
+    //     }
+    // }
     public function AnularLibrosObsequios(Request $request) {
         // Iniciar transacción
         DB::beginTransaction();
-
+    
         try {
             // Encontrar el pedido de libro obsequio
             $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
-
+    
             // Actualizar el estado del pedido de libro obsequio
             $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
             $pedidoLibroObsequio->save();
-
+    
             // Buscar todas las ventas asociadas en la tabla F_venta
             $ventas = DB::table('f_venta')
                         ->where('ven_p_libros_obsequios', $request->id)
                         ->get();
-
+    
+            // Validar que se encontraron ventas
             if ($ventas->isEmpty()) {
                 throw new \Exception('No se encontraron ventas asociadas');
             }
-
+    
             // Iterar sobre todas las ventas encontradas
             foreach ($ventas as $venta) {
+                // Validar que el estado de la venta sea 2 o diferente de 3
+                if ($venta->est_ven_codigo != 2 && $venta->est_ven_codigo != 3) {
+                    // Deshacer la transacción si encontramos un estado incorrecto
+                    DB::rollBack();
+                    return ["status" => "0", "message" => "El documento " . $venta->ven_codigo . " ya no se encuentra pendiente de despacho. No se puede anular."];
+                }
+    
                 // Actualizar el estado de la venta
                 DB::table('f_venta')
                     ->where('ven_codigo', $venta->ven_codigo)
                     ->where('id_empresa', $venta->id_empresa)
                     ->update(['est_ven_codigo' => 3]);
-
+    
                 // Obtener detalles de la venta
                 $detalles = DB::table('f_detalle_venta')
                               ->where('ven_codigo', $venta->ven_codigo)
                               ->where('id_empresa', $venta->id_empresa)
                               ->get();
-
+    
                 // Iterar sobre los detalles y actualizar los productos
                 foreach ($detalles as $detalle) {
                     $producto = DB::table('1_4_cal_producto')
                                   ->where('pro_codigo', $detalle->pro_codigo)
                                   ->first();
-
+    
                     if (!$producto) {
                         // Deshacer la transacción en caso de error con un producto
                         DB::rollBack();
                         return ["status" => "0", "message" => "Producto no encontrado"];
                     }
-
+    
                     // Ajustar el stock según la empresa
                     if ($venta->id_empresa == 1) {
                         DB::table('1_4_cal_producto')
@@ -5223,21 +5322,22 @@ class PedidosController extends Controller
                     }
                 }
             }
-
+    
             // Confirmar la transacción
             DB::commit();
-
+    
             return ["status" => "1", "message" => "Se anuló correctamente"];
         } catch (\Exception $e) {
             // Deshacer la transacción en caso de error
             DB::rollBack();
-
+    
             // Opcional: Loguear el error
             // Log::error('Error al anular libros obsequios: ' . $e->getMessage());
 
             return ["status" => "0", "message" => "No se pudo anular"];
         }
     }
+    
     public function eliminarPedidoLibrosObsequios(Request $request){
         $detallePedidosObsequios = DetallePedidoLibroObsequio::where('p_libros_obsequios_id', $request->id)->delete();
         $pedido = PedidosLibroObsequio::findOrFail($request->id)->delete();

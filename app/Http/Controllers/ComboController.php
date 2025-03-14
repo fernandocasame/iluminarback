@@ -305,7 +305,7 @@ class ComboController extends Controller
         $contadorErrCombos          = 0;
         $contadorResumen            = 0;
         $institucion_id             = 0;
-        $variosCodigos              =  $request->varios_codigos;
+        $variosCodigos              = $request->varios_codigos;
 
         try {
             DB::beginTransaction();
@@ -341,7 +341,14 @@ class ComboController extends Controller
                         $tipoRegalado           = $tr->tipoRegalado;
                         $errorA                 = 1;
                         $errorB                 = 1;
-                        $comentario             = "Se agregó al combo " . $codigoCombo;
+                        $mensajeRegalado        = '';
+                        if($libroSeleccionado == '1'){
+                            $mensajeRegalado = '_Regalado';
+                        }
+                        IF($tipoRegalado == '2'){
+                            $mensajeRegalado = '_Regalado_y_bloqueado';
+                        }
+                        $comentario             = "Se agregó al combo " . $codigoCombo.$mensajeRegalado;
                         if($variosCodigos == '1'){
                             $codigoA            = strtoupper($tr->codigoActivacion);
                             $codigoB            = strtoupper($tr->codigoDiagnostico);
@@ -389,7 +396,7 @@ class ComboController extends Controller
                                     //CODIGO_LIQUIDADO_REGALADO
                                     if($if_liquidado_regaladoA == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorA = 1; }
                                     //bloqueado
-                                    if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorA = 1; }
+                                    // if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorA = 1; }
                                     //if($if_estado_liquidacionA == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorA = 1; }
                                     if($if_estado_liquidacionA == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorA = 1; }
                                     //codigo B
@@ -397,7 +404,7 @@ class ComboController extends Controller
                                     //CODIGO_LIQUIDADO_REGALADO
                                     if($if_liquidado_regaladoB == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorB = 1; }
                                     //bloqueado
-                                    if($ifestado == 2 && $if_estado_liquidacionA !=3)  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
+                                    // if($ifestado == 2 && $if_estado_liquidacionA !=3)  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
                                     // if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
                                     if($if_estado_liquidacionB == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
                                     //institucion si bc_institucion o venta_lista_institucion es mayor a 0  seria mensajeError
@@ -424,10 +431,12 @@ class ComboController extends Controller
                                     $ingresoB       = $this->updatecodigosCombo($codigoCombo, $codigoB, $codigoA, $libroSeleccionado, $tipoRegalado,$comboIgualAnteriorB);
 
                                     if($ingresoA && $ingresoB){
-                                        if($comboIgualAnteriorA){}
-                                        else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null); }
-                                        if($comboIgualAnteriorB){}
-                                        else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null); }
+                                        // if($comboIgualAnteriorA){}
+                                        // else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null); }
+                                        // if($comboIgualAnteriorB){}
+                                        // else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null); }
+                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null);
+                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null); 
                                         $contadorA++;
                                         $contadorB++;
                                     }
@@ -535,9 +544,9 @@ class ComboController extends Controller
         $combo->save();
     }
     public function updatecodigosCombo($codigoCombo,$codigo,$codigo_union, $libroSeleccionado, $tipoRegalado,$comboIgualAnterior){
-        if($comboIgualAnterior){
-            return 1;
-        }
+        // if($comboIgualAnterior){
+        //     return 1;
+        // }
         $codigoLibro = CodigosLibros::where('codigo', '=', $codigo)->first();
         $fecha = date('Y-m-d H:i:s');
         if ($codigoLibro) {

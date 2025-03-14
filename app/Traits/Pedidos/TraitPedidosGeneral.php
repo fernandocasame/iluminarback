@@ -869,6 +869,32 @@ trait TraitPedidosGeneral
         return $query;
     }
 
+    public function tr_institucionesVentasPeriodo($id_periodo){
+        $query = DB::SELECT("SELECT DISTINCT i.idInstitucion AS id_institucion, i.nombreInstitucion
+            FROM  f_venta fv 
+            INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+            WHERE fv.periodo_id = ?
+            AND fv.est_ven_codigo <> 3
+            AND fv.idtipodoc IN (1, 2, 3, 4)
+        ",[$id_periodo]);
+        return $query;
+    }
+    
+    //asesores que tiene Ventas
+    public function getAsesoresVentasPeriodo($id_periodo){
+        $query = DB::SELECT("SELECT DISTINCT u.idusuario AS id_asesor, 
+            CONCAT(u.nombres, ' ', u.apellidos) AS asesor
+            FROM f_venta fv
+            INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+            INNER JOIN usuario u ON i.asesor_id = u.idusuario
+            WHERE fv.periodo_id = ?
+            AND fv.est_ven_codigo <> 3
+            AND fv.institucion_id IS NOT NULL 
+            AND fv.idtipodoc IN (1, 2, 3, 4);
+        ",[$id_periodo]);
+        return $query;
+    }
+
     //TRAIT JEYSON INICIO
     public function tr_get_val_pedidoInfo($pedido){
         try{

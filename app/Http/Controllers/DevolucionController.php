@@ -673,13 +673,14 @@ class DevolucionController extends Controller
         $query = DB::SELECT("SELECT
             ins.ruc AS rucPuntoVenta, em.nombre AS empresa,
             CONCAT(usa.nombres, ' ', usa.apellidos) AS cliente, fv.ven_codigo,
-            fv.ven_fecha, fv.user_created, fv.ven_valor, ins.nombreInstitucion, ins.direccionInstitucion, ins.telefonoInstitucion, ins.asesor_id,
+            fv.ven_fecha, fv.user_created, fv.ven_valor, ins.nombreInstitucion, ins.direccionInstitucion, ins.telefonoInstitucion as telefono, ins.asesor_id,
             CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
             usa.nombres, usa.apellidos, fpr.prof_observacion, fpr.idPuntoventa,
             COUNT(DISTINCT dfv.pro_codigo) AS item, CONCAT(us.nombres, ' ', us.apellidos) AS responsable,
             (SELECT SUM(det_ven_cantidad) FROM f_detalle_venta WHERE ven_codigo = fv.ven_codigo AND id_empresa = fv.id_empresa) AS libros,
-            fv.ruc_cliente AS cedula, usa.email, usa.telefono,fv.idtipodoc, em.id AS empresa_id, fv.ven_tipo_inst, fv.ven_idproforma, fv.ven_observacion,
-            fv.ven_subtotal, fv.ven_desc_por, fv.ven_descuento, fv.ven_iva, fv.ven_transporte, fv.ven_p_libros_obsequios,fv.institucion_id
+            fv.ruc_cliente AS cedula, usa.email, usa.telefono as telefono_cliente ,fv.idtipodoc, em.id AS empresa_id, fv.ven_tipo_inst, fv.ven_idproforma, fv.ven_observacion,
+            fv.ven_subtotal, fv.ven_desc_por, fv.ven_descuento, fv.ven_iva, fv.ven_transporte, fv.ven_p_libros_obsequios,fv.institucion_id,
+            fv.doc_intercambio, fv.fecha_intercambio
             FROM f_venta fv
             LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
             LEFT JOIN p_libros_obsequios plo ON plo.id = fv.ven_p_libros_obsequios
@@ -814,7 +815,6 @@ class DevolucionController extends Controller
         if($request->validateBeforeCreate)      { return $this->validateBeforeCreate($request); }
         if($request->devolverDocumentoBodega)   { return $this->devolverDocumentoBodega($request); }
         if($request->updateDocumentoDevolucion) { return $this->updateDocumentoDevolucion($request); }
-        if($request->changeNotasToPrefacturas)  { return $this->changeNotasToPrefacturas($request); }
         if($request->guardarComboDocumento)     { return $this->guardarComboDocumento($request); }
         if($request->guardarDevolucionCombos)   { return $this->guardarDevolucionCombos($request); }
         if($request->actualizarDatosDevolucion) { return $this->actualizarDatosDevolucion($request); }
@@ -1096,72 +1096,7 @@ class DevolucionController extends Controller
             return response()->json(['status' => '0', 'message' => 'Error al actualizar el documento: ' . $e->getMessage()], 200);
         }
     }
-    public function changeNotasToPrefacturas($request)
-    {
-        $id_institucion = $request->input('id_institucion');
-        $id_periodo = $request->input('id_periodo');
-        $id_usuario = $request->input('id_usuario');
-        $arrayCodigos = json_decode($request->data_codigos);
-        $codigosNoCambiados = [];
-        $cambiados = 0;
-    
-        // Iniciar una transacción para asegurar la integridad de los datos
-        DB::beginTransaction();
-        try {
-            foreach ($arrayCodigos as $value) {
-                $codigo = $value->codigo;
-                $codigo_liquidacion = $value->codigo_liquidacion;
-                $codigo_proforma = $value->codigo_proforma;
-                $codigo_empresa = $value->proforma_empresa;
-                $permitir_devolver_nota = $value->permitir_devolver_nota;
-                $cantidadLibroDescontar = 1;
-    
-                if (empty($codigo_empresa)) {
-                    continue;
-                }
-    
-                $datos = (object) [
-                    "pro_codigo" => $codigo_liquidacion,
-                    "id_institucion" => $id_institucion,
-                    "id_periodo" => $id_periodo,
-                    "id_empresa" => $codigo_empresa
-                ];
-    
-                // Intentar obtener la prefactura
-                $getPrefactura = $this->devolucionRepository->getFacturaAvailable($datos, $cantidadLibroDescontar, [1]);
-    
-                if (!$getPrefactura) {
-                    // Si no hay prefactura disponible, intentar obtener una nota
-                    $getPrefactura = $this->devolucionRepository->getFacturaAvailable($datos, $cantidadLibroDescontar, [3, 4]);
-                    if (!$getPrefactura) {
-                        // No hay notas ni prefacturas disponibles
-                        $value->mensaje = 'No hay suficientes en notas ni pre facturas disponibles';
-                        $codigosNoCambiados[] = $value;
-                        continue;
-                    }
-                }
-    
-                // Llamada a la función de actualización de código, pasando los parámetros correctos
-                $this->devolucionRepository->actualizarCodigo($codigo, $codigo_proforma, $getPrefactura->ven_codigo,  $id_institucion, $id_periodo, $id_usuario);
-    
-                $cambiados++;
-            }
-    
-            // Si no hay errores, se confirma la transacción
-            DB::commit();
-        } catch (\Exception $e) {
-            // Si hay un error, se revierte la transacción
-            DB::rollBack();
-            return response()->json(['status' => '0', 'message' => $e->getMessage()], 200);
-        }
-    
-        return [
-            'codigosNoCambiados' => $codigosNoCambiados,
-            'cambiados' => $cambiados
-        ];
-    }
- 
-    
+
     //api:post/devoluciones?guardarComboDocumento=1
     public function guardarComboDocumento($request)
     {
@@ -1587,8 +1522,16 @@ class DevolucionController extends Controller
                 ->where('fv.institucion_id', $institucion)
                 ->where('fv.id_empresa', $empresa)
                 ->where('fv.est_ven_codigo','<>',3) // Excluir documentos anulados (estado 3)
-                ->where('fv.idtipodoc', '<>', 16) // Excluir documentos notas de credito
-                ->whereNull('fv.doc_intercambio') // Excluir documentos con intercambio
+                ->where('fv.idtipodoc', '<>', 16) // Excluir documentos notas de crédito
+                // ->whereNot(function ($query) {
+                //     $query->whereIn('fv.idtipodoc', [3, 4])
+                //         ->whereNotNull('fv.doc_intercambio');
+                // }) // Excluir documentos con intercambio
+                ->where(function ($query) {
+                    // Validamos que no se cumpla la condición: idtipodoc es 3 o 4 y doc_intercambio no es nulo
+                    $query->whereNotIn('fv.idtipodoc', [3, 4])  // Excluye idtipodoc 3 o 4
+                          ->orWhereNull('fv.doc_intercambio');  // O donde doc_intercambio sea nulo
+                })
                 ->select('fv.ven_codigo', 'fv.id_empresa')
                 ->get();
 

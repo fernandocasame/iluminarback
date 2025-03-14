@@ -44,6 +44,7 @@ class Pedidos2Controller extends Controller
         if($request->getLibrosXAreaXSerieUsados)    { return $this->getLibrosXAreaXSerieUsados($request->periodo_id,$request->area,$request->serie); }
         //api:get/pedidos2/pedidos?getAsesoresPedidos=1
         if($request->getAsesoresPedidos)            { return $this->getAsesoresPedidos(); }
+        if($request->getAsesoresVentasPeriodo)      { return $this->getAsesoresVentasPeriodo($request->id_periodo); }
         if($request->getInstitucionesDespacho)      { return $this->getInstitucionesDespacho($request); }
         if($request->getLibrosXDespacho)            { return $this->getLibrosXDespacho($request); }
         if($request->getLibrosXDespacho_new)        { return $this->getLibrosXDespacho_new($request); }

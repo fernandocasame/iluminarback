@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 
 class AreaController extends Controller
 {
+    
     /**
      * Display a listing of the resource.
      *
@@ -15,6 +16,7 @@ class AreaController extends Controller
      */
     public function index()
     {
+        
         // return csrf_token();
         $area = DB::SELECT("SELECT a.*, t.nombretipoarea
          FROM area a

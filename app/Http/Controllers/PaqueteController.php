@@ -940,6 +940,7 @@ class PaqueteController extends Controller
         $arregloProblemaPaquetes    = [];
         $arregloResumen             = [];
         $informacion                = [];
+        $arrayPaqueteComboSinHijos  = [];
         $contadorErrPaquetes        = 0;
         $contadorResumen            = 0;
         $letraProceso               = $tipoBodega == 3 ? 'paquete' : 'combo';
@@ -965,6 +966,9 @@ class PaqueteController extends Controller
                 }else{
                     $codigosHijos = $this->getCodigos($codigoPaquete, 0, 5);
                     $arrayDiagnosticos = collect($this->getCodigos($codigoPaquete, 0, 6));
+                }
+                if(count($codigosHijos) == 0){
+                    $arrayPaqueteComboSinHijos[] = [ "codigo" => $codigoPaquete];
                 }
                 foreach($codigosHijos as $key2 => $tr){
                     $validarA               = [];
@@ -1022,6 +1026,7 @@ class PaqueteController extends Controller
             "arregloResumen"                   => $arregloResumen,
             "informacion"                      => $informacion,
             "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
+            "arrayPaqueteComboSinHijos"        => $arrayPaqueteComboSinHijos,
         ];
     }
     //API:POST/paquetes/devolucion_paquete
@@ -1372,7 +1377,7 @@ class PaqueteController extends Controller
                                     $old_valuesA = json_encode($validarA);
                                     $old_valuesD = json_encode($validarD);
                                     // Transactional operation
-                                    $ingreso = $this->codigosRepository->updateActivacion($codigoActivacion, $codigoDiagnostico, $validarD, $ifOmitirA, 0);
+                                    $ingreso = $this->codigosRepository->updateActivacion($codigoActivacion, $codigoDiagnostico, $validarD, $ifOmitirA, 0,$request);
 
                                     if ($ingreso == 1) {
                                         $contadorA++;
