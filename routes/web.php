@@ -170,6 +170,10 @@ Route::post('traerperiodos','TemporadaController@traerperiodos');
 Route::post('usuariosXperiodoSierra','PeriodoController@usuariosXperiodoSierra');
 Route::post('usuariosXperiodoCosta','PeriodoController@usuariosXperiodoCosta');
 
+//api para trar el periodo por id
+Route::get('GetPeriodo_xID', 'PeriodoController@GetPeriodo_xID');
+Route::get('GetPeriodoescolarTodo', 'PeriodoController@GetPeriodoescolarTodo');
+
 //api para traer las instituciones por ciudad
 Route::post('traerprofesor','TemporadaController@traerprofesores');
 
