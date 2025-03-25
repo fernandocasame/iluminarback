@@ -1823,7 +1823,6 @@ Route::get('SearchMotivo', 'MotivoRemisionController@SearchMotivo');
 //INICIO Remision
 Route::get('GetRemision', 'RemisionController@GetRemision');
 Route::get('GetRemision_xfiltro', 'RemisionController@GetRemision_xfiltro');
-Route::get('GetRemisionCALMED_FECHA_TRANSPORTE', 'RemisionController@GetRemisionCALMED_FECHA_TRANSPORTE');
 Route::get('GetRemisionCALMED_FECHA', 'RemisionController@GetRemisionCALMED_FECHA');
 Route::get('genCodigoE', 'RemisionController@genCodigoE');
 Route::post('PostRemision_Registrar_modificar','RemisionController@PostRemision_Registrar_modificar');
@@ -1935,7 +1934,6 @@ Route::get('getDventas','VentasController@getDventas');
 Route::get('Get_DatoFactura','VentasController@Get_DatoFactura');
 Route::post('Postventa_Registra','VentasController@Postventa_Registra');
 Route::post('Postventa_factura','VentasController@Postventa_factura');
-Route::post('despachar','VentasController@despachar');
 Route::post('Desactivar_venta','VentasController@Desactivar_venta');
 Route::post('/ventas/subtotal', 'VentasController@updateSubtotal');
 Route::get('prefacturasCliente','VentasController@prefacturasCliente');
@@ -1966,6 +1964,17 @@ Route::get('despachos', 'VentasController@despachos');
 Route::resource('empresa','_14EmpresaController');
 Route::get('usuarioConVentas/{cedula}','UsuarioController@usuarioConVentas');
 Route::post('CambiarEmpresaPedido', 'ProformaController@CambiarEmpresaPedido');
+
+//REVISION VERIFICACIONES
+Route::get('getRevisionVerificaciones', 'VerificacionControllerAnterior@getRevisionVerificaciones');
+Route::get('getVerificacionesAll', 'VerificacionControllerAnterior@getVerificacionesALL');
+Route::get('getArchivosRevision', 'VerificacionControllerAnterior@getArchivosRevision');
+Route::post('saveObservacionRevision', 'VerificacionControllerAnterior@saveObservacionRevision');
+Route::post('guardarObservacion', 'VerificacionControllerAnterior@guardarObservacion');
+Route::post('eliminarObservacion', 'VerificacionControllerAnterior@eliminarObservacion');
+Route::post('actualizarObservacion', 'VerificacionControllerAnterior@actualizarObservacion');
+Route::post('eliminarNotificacion', 'VerificacionControllerAnterior@eliminarNotificacion');
+//FIN REVISION VERIFICACIONES
 
 ///=======FACTURACION=========
 require_once "others/facturacion/inventario/RouterInventario.php";
@@ -2062,3 +2071,4 @@ Route::group([], function () {
     Route::resource('/prefactura_documentos', 'PrefacturaController');
 });
 Route::post('getEvaluacionesAdminPeriodo', 'EvaluacionController@getEvaluacionesUltimoPeriodo');
+Route::get('cod_evaluacion_institucion/{id}','InstitucionController@cod_evaluacion_institucion');

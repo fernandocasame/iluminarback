@@ -29,7 +29,8 @@ class f_MovimientosDetalleProductoController extends Controller
         INNER JOIN 1_4_cal_producto cpro ON fdp.pro_codigo = cpro.pro_codigo
         INNER JOIN f_movimientos_producto fmp ON fdp.fmp_id = fmp.fmp_id
         LEFT JOIN empresas em ON fdp.emp_id = em.id
-        WHERE fdp.fmp_id = '$request->fmp_id'");
+        WHERE fdp.fmp_id = '$request->fmp_id'
+        ORDER BY fdp.fmdp_id ASC");
         return $query;
     }
 

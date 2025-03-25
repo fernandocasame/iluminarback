@@ -1131,6 +1131,7 @@ class AbonoController extends Controller
             ->join('institucion as i', 'i.idInstitucion', '=', 'fv.institucion_id')
             ->join('empresas as ep', 'ep.id', '=', 'fv.id_empresa')
             ->leftJoin('usuario as usu', 'usu.idusuario', '=', 'i.asesor_id')
+            ->leftJoin('usuario as u', 'u.idusuario', '=', 'fv.ven_cliente')
             ->where('fv.est_ven_codigo', '<>', 3)
             ->where('fv.periodo_id', '=', $request->periodo)
             ->where('fv.ven_desc_por', '<', 100)
@@ -1144,6 +1145,7 @@ class AbonoController extends Controller
                 'ep.id AS id_empresa',
                 'i.nombreInstitucion',
                 DB::raw("CONCAT(usu.nombres, ' ', usu.apellidos) AS asesor"),
+                DB::raw("CONCAT(u.nombres, ' ', u.apellidos) AS cliente_facturado"),
                 'i.idInstitucion',
                 'i.punto_venta',
                 'fv.institucion_id',
@@ -1308,6 +1310,7 @@ class AbonoController extends Controller
                     $join->on('ab.abono_ruc_cliente', '=', 'fv.ruc_cliente')
                         ->on('ab.abono_empresa', '=', 'fv.id_empresa');
                 })
+                ->leftJoin('usuario as u', 'u.idusuario', '=', 'ab.abono_ruc_cliente')
                 ->whereNull('fv.ven_codigo') // Solo si no tiene documentos en f_venta
                 ->whereRaw('(ab.abono_facturas > 0 OR ab.abono_notas > 0)') // Corrección de whereRaw
                 ->where('ab.abono_ruc_cliente', '=', $ruc) // Corrección de espacio extra
@@ -1316,7 +1319,8 @@ class AbonoController extends Controller
                 ->select(
                     'ab.abono_ruc_cliente',
                     'ab.abono_empresa',
-                    DB::raw('SUM(ab.abono_facturas) + SUM(ab.abono_notas) AS suma_abonos')
+                    DB::raw('SUM(ab.abono_facturas) + SUM(ab.abono_notas) AS suma_abonos'),
+                    DB::raw("CONCAT(u.nombres, ' ', u.apellidos) AS cliente_facturado"),
                 )
                 ->groupBy('ab.abono_ruc_cliente', 'ab.abono_empresa')
                 ->limit(2) // Limita a máximo 2 registros
@@ -1333,6 +1337,7 @@ class AbonoController extends Controller
                         'empresa' => $abono->abono_empresa == 1 ? 'PROLIPA' : 'GRUPOCALMED CIA.LTDA.',
                         'id_empresa' => $abono->abono_empresa,
                         'nombreInstitucion' => $clienteReporte->nombreInstitucion, // Tomar del reporte original
+                        'cliente_facturado' => $clienteReporte->cliente_facturado, // Tomar del reporte original
                         'asesor' => $clienteReporte->asesor, // Tomar del reporte original
                         'idInstitucion' => $clienteReporte->idInstitucion,
                         'punto_venta' => $clienteReporte->punto_venta, // Tomar del reporte original

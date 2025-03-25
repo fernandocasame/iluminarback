@@ -251,13 +251,31 @@ class PrefacturaController extends Controller
             ->get();
 
         // Obtener combinaciones únicas de 'origen', 'id_empresa' y 'nueva_prefactura'
-        $notas = DB::table('f_venta_historico_notas_cambiadas')
-            ->select('origen', 'id_empresa', 'nueva_prefactura')  // Seleccionamos los campos que necesitamos
-            ->whereNotNull('origen')
-            ->where('id_periodo', $request->get('periodo_id'))
+        $notas = DB::table('f_venta_historico_notas_cambiadas as h')
+            ->whereNotNull('h.origen')
+            ->where('h.id_periodo', $request->get('periodo_id'))
+            ->select('h.origen', 'h.id_empresa', 'h.nueva_prefactura')  // Seleccionamos los campos que necesitamos
             ->distinct()  // Nos aseguramos de que las combinaciones sean únicas
             ->get();
-
+        foreach($notas as $item){
+            $getDatosDocumentos = DB::SELECT("SELECT i.nombreInstitucion,
+                CONCAT(u.nombres,' ', u.apellidos) AS cliente, u.cedula
+                FROM f_venta v
+                LEFT JOIN institucion i ON i.idInstitucion = v.institucion_id
+                LEFT JOIN usuario u ON u.idusuario = v.ven_cliente
+                WHERE v.ven_codigo = '$item->origen'
+                AND v.id_empresa = '$item->id_empresa'
+            ");
+            if(count($getDatosDocumentos) > 0){
+                $item->nombreInstitucion = $getDatosDocumentos[0]->nombreInstitucion;
+                $item->cliente = $getDatosDocumentos[0]->cliente;
+                $item->cedula = $getDatosDocumentos[0]->cedula;
+            }else{
+                $item->nombreInstitucion = null;
+                $item->cliente = null;
+                $item->cedula = null;
+            }
+        }
         // Retornar ambas consultas
         return [
             "todas" => $todas,

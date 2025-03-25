@@ -493,6 +493,8 @@ class InstitucionController extends Controller
         // return $configuracion;
         return $configuracion;
     }
+  
+
     public function listaInsitucion(Request $request)
     {
         $todas = $request->query('todas');
@@ -582,7 +584,6 @@ class InstitucionController extends Controller
                 "maximo_porcentaje_autorizado" => $item->maximo_porcentaje_autorizado,
                 "ruc" => $item->ruc,
                 "ifcodigoEvaluacion" => $item->ifcodigoEvaluacion,
-
                 // Último periodo escolar por institución
                 "periodo_id" => $item->periodo_id,
                 "periodo" => $item->periodo,
@@ -601,6 +602,9 @@ class InstitucionController extends Controller
         }
         return $datos->where('estadoInstitucion', '1')->values();
     }
+
+    
+    
     
     public function listaInsitucionAsesor(Request $request)
     {
@@ -975,6 +979,7 @@ class InstitucionController extends Controller
     //        return "No se pudo guardar/actualizar";
     //    }
     // }
+
     //METODOS JEYSON INICIO
     public function MoverInstitucionxAsesor(Request $request)
     {
@@ -1000,8 +1005,8 @@ class InstitucionController extends Controller
         }
     }
     //METODOS JEYSON FIN
-     //novedades institucion
-     public function get_novedades_institucion($id){
+    //novedades institucion
+    public function get_novedades_institucion($id){
         $dato = DB::table('novedades_institucion as nit')
         ->leftjoin('periodoescolar as per','per.idperiodoescolar','=','nit.id_periodo')
         ->leftjoin('usuario as usu','nit.id_editor','=','usu.idusuario')
@@ -1027,5 +1032,15 @@ class InstitucionController extends Controller
         return response()->json([
             'message' => 'Novedad creada exitosamente'
         ], 201);
+    }
+    public function cod_evaluacion_institucion($id){ 
+        $dato = DB::table('institucion')
+        ->where('idInstitucion','=',$id)
+        ->select([
+            'ifcodigoEvaluacion',
+            'idInstitucion'
+        ])
+        ->get();
+        return $dato;
     }
 }

@@ -1740,4 +1740,19 @@ class UsuarioController extends Controller
         return $usuarios;
     }
     //Fin Metodos Jeyson
+
+    public function usuarioConVentas($cedula)
+    {
+        $usuarios = DB::SELECT("SELECT fv.ven_codigo,fv.id_empresa, fv.ruc_cliente, u.cedula 
+        FROM f_venta fv
+        INNER JOIN usuario u ON fv.ven_cliente = u.idusuario
+        WHERE fv.est_ven_codigo <> 3
+        AND fv.idtipodoc IN (1, 3, 4)
+        AND fv.ruc_cliente = '$cedula'");
+        if(count($usuarios) > 0){
+            return response()->json(['SinVentas' => false, 'ventas' => $usuarios]);
+        }else{
+            return response()->json(['SinVentas' => true]);
+        }
+    }
 }

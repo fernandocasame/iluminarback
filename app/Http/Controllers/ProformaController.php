@@ -128,8 +128,8 @@ class ProformaController extends Controller
         $datos = [];
         if($request->empresa == 1){
             $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
-                ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock  as facturas,
-                p.pro_deposito as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie
+                ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock as facturas_prolipa, p.pro_stockCalmed as facturas_calmed,
+                p.pro_deposito as bodega_prolipa, p.pro_depositoCalmed as bodega_calmed, p.pro_reservar, l.descripcionlibro, ls.id_serie
                 FROM f_detalle_proforma as dpr
                 INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
                 INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
@@ -140,8 +140,8 @@ class ProformaController extends Controller
             ");
         }else if($request->empresa == 3){
             $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
-                ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stockCalmed  as facturas,
-                p.pro_depositoCalmed as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie
+                ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock as facturas_prolipa, p.pro_stockCalmed as facturas_calmed,
+                p.pro_deposito as bodega_prolipa, p.pro_depositoCalmed as bodega_calmed, p.pro_reservar, l.descripcionlibro, ls.id_serie
                 FROM f_detalle_proforma as dpr
                 INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
                 INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
@@ -153,6 +153,7 @@ class ProformaController extends Controller
         }
        
         foreach($array1 as $key => $item){
+            $cantidad = 0;
             if($item->prof_id&&$item->emp_id){
                     $array2 = DB::SELECT(" SELECT dfv.pro_codigo, SUM(dfv.det_ven_cantidad) AS cant from f_detalle_venta AS dfv
                     inner join f_venta AS fv ON dfv.ven_codigo = fv.ven_codigo
@@ -162,7 +163,6 @@ class ProformaController extends Controller
                         $cantidad = $array2[0]->cant;
                     }
             }
-            $cantidad = 0;
 
             $datos[] = array(
                 'det_prof_id' => $item->det_prof_id,
@@ -172,8 +172,10 @@ class ProformaController extends Controller
                 'det_prof_valor_u' => $item->det_prof_valor_u,
                 'nombre' => $item->nombre,
                 'nombre_serie' => $item->nombre_serie,
-                'facturas' => $item->facturas,
-                'bodega' => $item->bodega,
+                'facturas_prolipa' => $item->facturas_prolipa,
+                'facturas_calmed' => $item->facturas_calmed,
+                'bodega_prolipa' => $item->bodega_prolipa,
+                'bodega_calmed' => $item->bodega_calmed,
                 'cant'   => (int)$cantidad,
                 'pro_reservar' => $item->pro_reservar,
                 'descripcion' => $item->descripcionlibro,
@@ -660,69 +662,286 @@ class ProformaController extends Controller
         }
     }
     //Cambiar el estado de proforma
-     public function Desactivar_Proforma(Request $request)
+    // public function Desactivar_Proforma(Request $request)
+    // {
+    //     if (!$request->id) {
+    //         return response()->json(["error" => "No está ingresando ningún prof_id"], 400);
+    //     }
+    
+    //     DB::beginTransaction();
+    
+    //     try {
+    //         // Obtener la proforma
+    //         $proform = Proforma::findOrFail($request->id);
+            
+    //         // Actualizar la proforma
+    //         $oldvalue = clone $proform; // Crear copia del valor antiguo
+    //         $proform->prof_estado = $request->prof_estado;
+    //         $proform->user_editor = $request->id_usua;
+    //         $proform->save();
+    
+    //         // Verificar si el tipo es 'anular'
+    //         if ($request->tipo === 'anular') {
+    //             // Obtener las ventas asociadas
+    //             $ventas = DB::table('f_venta')->where('ven_idproforma', $proform->prof_id)->get();
+    
+    //             if ($ventas->isEmpty()) {
+    //                 throw new \Exception('No se encontraron ventas asociadas');
+    //             }
+    
+    //             foreach ($ventas as $venta) {
+    //                 // Verificar estado de la venta
+    //                 if ($venta->est_ven_codigo != 2 && $venta->est_ven_codigo != 3) {
+    //                     return response()->json([
+    //                         "status" => "0", 
+    //                         "message" => "El documento " . $venta->ven_codigo . " ya no se encuentra pendiente de despacho. No se puede anular."
+    //                     ]);
+    //                 }
+    
+    //                 // Actualizar stock en los productos relacionados
+    //                 $detalles = DB::table('f_detalle_venta')->where('ven_codigo', $venta->ven_codigo)->get();
+    //                 if ($detalles->isEmpty()) {
+    //                     return response()->json(["error" => "0", "message" => "No se encontró detalles del documento: " . $venta->ven_codigo]);
+    //                 }
+    
+    //                 foreach ($detalles as $detalle) {
+    //                     $producto = DB::table('1_4_cal_producto')->where('pro_codigo', $detalle->pro_codigo)->first();
+    
+    //                     if (!$producto) {
+    //                         return response()->json(["status" => "0", "message" => "Producto no encontrado"]);
+    //                     }
+    
+    //                     // Ajustar stock según la empresa
+    //                     if ($venta->id_empresa == 1) {
+    //                         DB::table('1_4_cal_producto')
+    //                             ->where('pro_codigo', $detalle->pro_codigo)
+    //                             ->update([
+    //                                 'pro_deposito' => $producto->pro_deposito + (int)$detalle->det_ven_cantidad,
+    //                                 'pro_reservar' => $producto->pro_reservar + (int)$detalle->det_ven_cantidad
+    //                             ]);
+    //                     } elseif ($venta->id_empresa == 3) {
+    //                         DB::table('1_4_cal_producto')
+    //                             ->where('pro_codigo', $detalle->pro_codigo)
+    //                             ->update([
+    //                                 'pro_depositoCalmed' => $producto->pro_depositoCalmed + (int)$detalle->det_ven_cantidad,
+    //                                 'pro_reservar' => $producto->pro_reservar + (int)$detalle->det_ven_cantidad
+    //                             ]);
+    //                     }
+    //                 }
+    //             }
+    //         } else {
+    //             // Si no es 'anular', entonces es una actualización normal
+    //             try {
+    //                 $oldvalue = Proforma::findOrFail($request->id);
+    //                 $proform = Proforma::find($request->id);
+    
+    //                 if (!$proform) {
+    //                     return response()->json(['error' => 'El prof_id no existe en la base de datos'], 400);
+    //                 }
+    
+    //                 // Actualizar los campos de la proforma
+    //                 $proform->prof_estado = $request->prof_estado;
+    //                 $proform->user_editor = $request->id_usua;
+    //                 $proform->save();
+    
+    //                 // Registrar el cambio en el histórico
+    //                 $newvalue = Proforma::findOrFail($request->id);
+    //                 $this->tr_GuardarEnHistorico($request->id, $request->id_usua, $oldvalue, $newvalue);
+    
+    //                 DB::commit();
+    //                 return response()->json(['message' => 'Proforma actualizada con éxito'], 200);
+    //             } catch (\Exception $e) {
+    //                 DB::rollback();
+    //                 return response()->json(["error" => "0", "message" => "No se pudo actualizar", 'error' => $e->getMessage()], 500);
+    //             }
+    //         }
+    
+    //         // Si la operación fue de 'anular', retornar el mensaje respectivo
+    //         DB::commit();
+    //         return response()->json(['message' => 'Proforma ' . ($request->tipo === 'anular' ? 'anulada' : 'actualizada') . ' con éxito'], 200);
+    //     } catch (\Exception $e) {
+    //         DB::rollback();
+    //         return response()->json(["error" => "0", "message" => "No se pudo procesar la solicitud", 'error' => $e->getMessage()], 500);
+    //     }
+    // }
+    public function Desactivar_Proforma(Request $request)
     {
-        if ($request->id) {
+        DB::beginTransaction();  // Iniciamos la transacción para asegurar la consistencia de los datos
+        $proforma_id = $request->id;
+        $miarray=json_decode($request->dat);
+        try {
+            // Obtener la proforma
+            $proform = DB::table('f_proforma')->where('id', $proforma_id)->first();
+            
+            if (!$proform) {
+                throw new \Exception('Proforma no encontrada');
+            }
 
+            // Verificar que la proforma no esté en estado de "anulada"
+            if ($proform->prof_estado == 0) {
+                return response()->json(["status" => "0", "message" => "La proforma ya está anulada"]);
+            }
 
-            if($request->tipo=='anular'){
-                try{
-                    set_time_limit(6000000);
-                    ini_set('max_execution_time', 6000000);
-                    $miarray=json_decode($request->dat);
-                    DB::beginTransaction();
-                        $oldvalue= Proforma::findOrFail($request->id);
-                        $proform= Proforma::find($request->id);
-                        if (!$proform){
-                            return "El prof_id no existe en la base de datos";
-                        }
-                        $proform->prof_estado = $request->prof_estado;
-                        $proform->user_editor = $request->id_usua;
-                        $proform->save();
-                        if($proform){
-                            $newvalue = Proforma::findOrFail($request->id);
-                            $this->tr_GuardarEnHistorico($request->id,$request->id_usua,$oldvalue,$newvalue);
-                        }
-                        foreach($miarray as $key => $item){
-                            $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->pro_codigo'");
-                            $codi=$query1[0]->stoc;
-                            $co=(int)$codi+(int)$item->det_prof_cantidad;
-                            $pro= _14Producto::findOrFail($item->pro_codigo);
-                            $pro->pro_reservar = $co;
-                            $pro->save();
-                        }
-                    DB::commit();
-                    return response()->json(['message' => 'Proforma anulada'], 200);
-                }catch(\Exception $e){
-                    DB::rollback();
-                    return response()->json(["error"=>"0", "message" => "No se pudo anular", 'error' => $e->getMessage()], 500);
-                }
+            // // Verificar que el estado de la proforma es el adecuado para desactivarla
+            // if ($proform->prof_estado != 'pendiente') {
+            //     return response()->json(["status" => "0", "message" => "La proforma no se encuentra en estado pendiente"]);
+            // }
 
-            }else{
-                try{
-                    DB::beginTransaction();
-                        $oldvalue= Proforma::findOrFail($request->id);
-                        $proform= Proforma::find($request->id);
+            // Obtener las ventas asociadas a la proforma
+            $ventas = DB::table('f_venta')->where('ven_idproforma', $proform->prof_id)->get();
+            
+            if ($ventas->isEmpty()) {
+                throw new \Exception('No se encontraron ventas asociadas a la proforma');
+            }
+            if($ventas){
+                foreach ($ventas as $venta) {
+                    // Verificar si la venta está en estado pendiente de despacho (estado 2)
+                    if ($venta->est_ven_codigo != 2 && $venta->est_ven_codigo != 3) {
+                        return response()->json([
+                            "status" => "0", 
+                            "message" => "La venta " . $venta->ven_codigo . " no está pendiente de despacho y no puede ser anulada."
+                        ]);
+                    }else{
+                        if($venta->est_ven_codigo == 2){
+                            // Anular la venta cambiando su estado
+                            DB::table('f_venta')
+                            ->where('ven_codigo', $venta->ven_codigo)
+                            ->where('id_empresa', $venta->id_empresa)->update([
+                                'est_ven_codigo' => 3,  // El estado "anulado" se debe definir en tu base de datos
+                                'user_anulado' => $request->id_usua,  // El usuario que está realizando la anulación
+                                'observacionAnulacion' => 'Se anulo desde la proforma'  // El usuario que está realizando la anulación
+                            ]);
 
-                        if (!$proform){
-                            return "El prof_id no existe en la base de datos";
+                             // Obtener los detalles de la venta
+                            $detalles = DB::table('f_detalle_venta')->where('ven_codigo', $venta->ven_codigo)->where('id_empresa', $venta->id_empresa)->get();
+                            if ($detalles->isEmpty()) {
+                                return response()->json(["error" => "0", "message" => "No se encontraron detalles para la venta: " . $venta->ven_codigo]);
+                            }
+                
+                            // Recorrer los detalles de la venta y restaurar el stock
+                            foreach ($detalles as $detalle) {
+                                // Obtener el producto asociado al detalle
+                                $producto = DB::table('1_4_cal_producto')->where('pro_codigo', $detalle->pro_codigo)->first();
+                                if (!$producto) {
+                                    return response()->json(["status" => "0", "message" => "Producto no encontrado en la venta"]);
+                                }
+                
+                                // Ajustar el stock según la empresa
+                                if ($venta->id_empresa == 1) {
+                                    if($venta->idtipodoc == 1){
+                                        DB::table('1_4_cal_producto')
+                                            ->where('pro_codigo', $detalle->pro_codigo)
+                                            ->update([
+                                                'pro_stock' => $producto->pro_stock + (int)$detalle->det_ven_cantidad,
+                                            ]);
+                                    }else{
+                                        DB::table('1_4_cal_producto')
+                                            ->where('pro_codigo', $detalle->pro_codigo)
+                                            ->update([
+                                                'pro_deposito' => $producto->pro_deposito + (int)$detalle->det_ven_cantidad,
+                                            ]);
+                                    }
+                                } elseif ($venta->id_empresa == 3) {
+                                    if($venta->idtipodoc == 1){
+                                        DB::table('1_4_cal_producto')
+                                            ->where('pro_codigo', $detalle->pro_codigo)
+                                            ->update([
+                                                'pro_stockCalmed' => $producto->pro_stockCalmed + (int)$detalle->det_ven_cantidad,
+                                            ]);
+                                    }else{
+                                        DB::table('1_4_cal_producto')
+                                            ->where('pro_codigo', $detalle->pro_codigo)
+                                            ->update([
+                                                'pro_depositoCalmed' => $producto->pro_depositoCalmed + (int)$detalle->det_ven_cantidad,
+                                            ]);
+                                    }
+                                }
+                            }
                         }
-                        $proform->prof_estado = $request->prof_estado;
-                        $proform->user_editor = $request->id_usua;
-                        $proform->save();
-                        if($proform){
-                            $newvalue = Proforma::findOrFail($request->id);
-                            $this->tr_GuardarEnHistorico($request->id,$request->id_usua,$oldvalue,$newvalue);
-                        }
-                    DB::commit();
-                    return response()->json(['message' => 'Proforma actualizado con éxito'], 200);
-                }catch(\Exception $e){
-                    DB::rollback();
-                    return response()->json(["error"=>"0", "message" => "No se pudo actualizar", 'error' => $e->getMessage()], 500);
+                    }
                 }
             }
-         } else {
-            return "No está ingresando ningún prof_id";
+
+            // Anular la proforma
+            DB::table('f_proforma')->where('id', $proforma_id)->update([
+                'prof_estado' => 0,
+                'user_editor' => $request->id_usua  // El usuario que está realizando la anulación
+            ]);
+
+            foreach($miarray as $key => $item){
+                $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->pro_codigo'");
+                $codi=$query1[0]->stoc;
+                $co=(int)$codi+(int)$item->det_prof_cantidad;
+                $pro= _14Producto::findOrFail($item->pro_codigo);
+                $pro->pro_reservar = $co;
+                $pro->save();
+            }
+            
+            DB::commit();  // Confirmamos la transacción
+
+            return response()->json([
+                "status" => "1", 
+                "message" => "La proforma y las ventas asociadas han sido anuladas con éxito."
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();  // Si ocurre un error, deshacemos todos los cambios
+
+            return response()->json([
+                "status" => "0", 
+                "message" => "Error: " . $e->getMessage(),
+                "line" => $e->getLine()
+            ]);
+        }
+    }
+
+    public function AprobarProforma(Request $request)
+    {
+        if (!$request->id) {
+            return response()->json(["error" => "No está ingresando ningún prof_id"], 400);
+        }
+    
+        DB::beginTransaction();
+    
+        try {
+            // Obtener la proforma
+            $proform = Proforma::findOrFail($request->id);
+            
+            // Actualizar la proforma
+            $oldvalue = clone $proform; // Crear copia del valor antiguo
+            $proform->prof_estado = $request->prof_estado;
+            $proform->user_editor = $request->id_usua;
+            $proform->save();
+            try {
+                $oldvalue = Proforma::findOrFail($request->id);
+                $proform = Proforma::find($request->id);
+
+                if (!$proform) {
+                    return response()->json(['error' => 'El prof_id no existe en la base de datos'], 400);
+                }
+
+                // Actualizar los campos de la proforma
+                $proform->prof_estado = $request->prof_estado;
+                $proform->user_editor = $request->id_usua;
+                $proform->save();
+
+                // Registrar el cambio en el histórico
+                $newvalue = Proforma::findOrFail($request->id);
+                $this->tr_GuardarEnHistorico($request->id, $request->id_usua, $oldvalue, $newvalue);
+
+                DB::commit();
+                return response()->json(['message' => 'Proforma actualizada con éxito'], 200);
+            } catch (\Exception $e) {
+                DB::rollback();
+                return response()->json(["error" => "0", "message" => "No se pudo actualizar", 'error' => $e->getMessage()], 500);
+            }
+    
+            // Si la operación fue de 'anular', retornar el mensaje respectivo
+            DB::commit();
+            return response()->json(['message' => 'Proforma actualizada con éxito'], 200);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["error" => "0", "message" => "No se pudo procesar la solicitud", 'error' => $e->getMessage()], 500);
         }
     }
     public function DesactivarProforma(Request $request)

@@ -30,13 +30,14 @@ class SeriesController extends Controller
         $datos = array();
         foreach($series as $key => $value){
             $areas = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,
-            t.nombretipoarea, pf.*
+            t.nombretipoarea, pf.*, pr.codigos_combos
             FROM area ar
             INNER JOIN asignatura a ON ar.idarea = a.area_idarea
             INNER JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
             INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
             INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
             INNER JOIN pedidos_formato pf ON pf.id_area = ar.idarea
+            LEFT JOIN 1_4_cal_producto pr ON pr.pro_codigo = ls.codigo_liquidacion
             WHERE ls.id_serie = ?
             AND pf.id_periodo = ?
             AND pf.id_serie = ?
@@ -500,7 +501,6 @@ class SeriesController extends Controller
         // Obtener las series, excluyendo la serie con id 6
         $series = DB::SELECT("SELECT * FROM series s ORDER BY s.nombre_serie DESC");
         $datos = array();
-
         foreach($series as $key => $value) {
             // Obtener las áreas y libros correspondientes
             $areas = DB::SELECT("SELECT DISTINCT
@@ -511,13 +511,15 @@ class SeriesController extends Controller
                     l.nombrelibro,
                     pf.pfn_pvp,
                     pf.pfn_estado,
-                    ls.year
+                    ls.year,
+                    pr.codigos_combos
                 FROM area ar
                 INNER JOIN asignatura a ON ar.idarea = a.area_idarea
                 INNER JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
                 INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
                 INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
                 INNER JOIN pedidos_formato_new pf ON pf.idlibro = l.idlibro
+                LEFT JOIN 1_4_cal_producto pr ON pr.pro_codigo = ls.codigo_liquidacion
                 WHERE ls.id_serie = ?
                 AND pf.idperiodoescolar = ?
                 AND ar.estado = '1'
@@ -572,7 +574,8 @@ class SeriesController extends Controller
                 l.nombrelibro,
                 pf.pfn_pvp,
                 pf.pfn_estado,
-                ls.year
+                ls.year,
+                pr.codigos_combos
             FROM area ar
             INNER JOIN asignatura a ON ar.idarea = a.area_idarea
             INNER JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
@@ -629,6 +632,7 @@ class SeriesController extends Controller
                     "idarea" => $area->idarea,
                     "nombrearea" => $area->nombrearea,
                     "nombretipoarea" => $area->nombretipoarea,
+                    "codigos_combos" => $area->codigos_combos,
                     "libros" => []
                 ];
             }

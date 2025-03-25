@@ -141,18 +141,25 @@ class VerificacionControllerAnterior extends Controller
         $datos = [];
         $contador = 0;
         foreach($query as $key => $item){
+
+           $archivosRevison = $this->obtenerArchivosRevision($item->id);
+           $archivosVerificaciones = $this->obtenerArchivosVerificaciones($item->id);
+           $archivosFacturas = $this->obtenerArchivosFacturas($item->id);
+           $observacion = $this->obtenerObservacion($item->id);
+
            $datos [$contador] = (Object)[
             "id"                            => $item->id,
             "num_verificacion"              => $item->num_verificacion,
             "fecha_inicio"                  => $item->fecha_inicio,
             "fecha_fin"                     => $item->fecha_fin,
             "estado"                        => $item->estado,
+            "estado_revision"               => $item->estado_revision,
             "contrato"                      => $item->contrato,
             "nuevo"                         => $item->nuevo,
-            "file_evidencia"                => $item->file_evidencia,
-            "observacion"                   => $item->observacion,
+            "file_evidencia"                => $archivosVerificaciones,
+            "observacion"                   => $observacion,
             "valor_liquidacion"             => $item->valor_liquidacion,
-            "fecha_subir_evidencia"         => $item->fecha_subir_evidencia,
+            // "fecha_subir_evidencia"         => $item->fecha_subir_evidencia,
             "cobro_venta_directa"           => $item->cobro_venta_directa,
             "tipoPago"                      => $item->tipoPago,
             "personalizado"                 => $item->personalizado,
@@ -167,8 +174,9 @@ class VerificacionControllerAnterior extends Controller
             "permiso_anticipo_deuda"        => $item->permiso_anticipo_deuda,
             "permiso_convenio"              => $item->permiso_convenio,
             "permiso_cobro_venta_directa"   => $item->permiso_cobro_venta_directa,
-            "fecha_subir_factura"           => $item->fecha_subir_factura,
-            "file_factura"                  => $item->file_factura,
+            // "fecha_subir_factura"           => $item->fecha_subir_factura,
+            "file_factura"                  => $archivosFacturas,
+            "files_revision"                => $archivosRevison,
            ];
            $contador++;
         }
@@ -1135,6 +1143,334 @@ class VerificacionControllerAnterior extends Controller
         ");
         return $query;
     }
+    
+
+    public function getVerificacionesRevision($request)
+    {
+        $periodo = $request->periodo;
+    
+        // Realizar la consulta principal para obtener la información
+        $verificaciones = DB::table('verificaciones as v')
+            ->select(
+                'v.num_verificacion',
+                'v.id',
+                'v.contrato',
+                'v.fecha_subir_evidencia',
+                'v.file_evidencia',
+                'i.nombreInstitucion',
+                'v.fecha_subir_factura',
+                'v.file_factura',
+                'v.ifnotificado',
+                'p.id_periodo',
+                'v.ifaprobadoGerencia',
+                'v.fecha_aprobacionGerencia',
+                'p.id_pedido',
+                'p.valor_aprobo_gerencia_verificacion',
+                'v.valor_liquidacion',
+                DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
+                'v.estado_revision'
+            )
+            ->join('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
+            ->join('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+            ->join('usuario as u', 'u.idusuario', '=', 'i.asesor_id')
+            ->leftJoin('temporadas_verificacion_historico as h', 'h.contrato', '=', 'v.contrato')
+            ->where('p.id_periodo', $periodo)
+            ->where('p.tipo', 0)
+            ->groupBy(
+                'v.num_verificacion',
+                'v.id',
+                'v.contrato',
+                'v.fecha_subir_evidencia',
+                'v.file_evidencia',
+                'i.nombreInstitucion',
+                'v.fecha_subir_factura',
+                'v.file_factura',
+                'v.ifnotificado',
+                'p.id_periodo',
+                'v.ifaprobadoGerencia',
+                'v.fecha_aprobacionGerencia',
+                'p.id_pedido',
+                'p.valor_aprobo_gerencia_verificacion',
+                'v.valor_liquidacion',
+                'u.nombres',
+                'u.apellidos',
+                'v.estado_revision',
+            )
+            ->orderByDesc('v.id')
+            ->orderBy('v.contrato')
+            ->get();
+    
+        // Asignar solicitudes a las verificaciones
+        foreach ($verificaciones as $key => $value) {
+            // Buscamos la solicitud correspondiente
+            $solicitudes = DB::table('temporadas_verificacion_historico')
+                ->where('contrato', $value->contrato)
+                ->get();
+    
+            $posicionArray = $value->num_verificacion - 1; // Número de verificación - 1 para índice de array
+            $value->solicitudes = isset($solicitudes[$posicionArray]) ? [$solicitudes[$posicionArray]] : [];
+        }
+    
+        // Agrupar por contrato y aplicar filtros
+        $verificacionesAgrupadas = $verificaciones->groupBy('contrato')->map(function ($items, $contrato) {
+            $ifaprobadoGerenciaPadre = $items->contains('ifaprobadoGerencia', 0) ? 0 : 1;
+    
+            // Obtener la fecha más reciente de la aprobación general
+            $fechaAprobadoGeneral = $items->filter(function ($item) {
+                return !is_null($item->fecha_aprobacionGerencia);
+            })->max('fecha_aprobacionGerencia');
+    
+            // Filtrar las verificaciones que tienen solicitudes
+            $verificacionesFiltradas = $items->filter(function ($item) {
+                return !empty($item->solicitudes);
+            })->sortBy('num_verificacion');
+    
+            // Contadores para las solicitudes revisadas y no revisadas
+            $totalSolicitudesRevisadas = $verificacionesFiltradas->filter(function ($item) {
+                return $item->estado_revision == 1;
+            })->count();
+    
+            $totalSolicitudesNoRevisadas = $verificacionesFiltradas->filter(function ($item) {
+                return $item->estado_revision == 0;
+            })->count();
+    
+            // Agregar los contadores a la respuesta
+            return [
+                'contrato' => $contrato,
+                'nombreInstitucion' => $items->first()->nombreInstitucion,
+                'asesor' => $items->first()->asesor,
+                'id_pedido' => $items->first()->id_pedido,
+                'id_periodo' => $items->first()->id_periodo,
+                'totalContratos' => $items->count(), // Contador de contratos
+                'totalSolicitudesRevisadas' => $totalSolicitudesRevisadas, // Contador de solicitudes revisadas
+                'totalSolicitudesNoRevisadas' => $totalSolicitudesNoRevisadas, // Contador de solicitudes no revisadas
+                'verificaciones' => $verificacionesFiltradas->map(function ($item) {
+                    return [
+                        'num_verificacion' => $item->num_verificacion,
+                        'id' => $item->id,
+                        'fecha_subir_evidencia' => $item->fecha_subir_evidencia,
+                        'file_evidencia' => $item->file_evidencia,
+                        'fecha_subir_factura' => $item->fecha_subir_factura,
+                        'file_factura' => $item->file_factura,
+                        'ifnotificado' => $item->ifnotificado,
+                        'id_pedido' => $item->id_pedido,
+                        'solicitudes' => $item->solicitudes,
+                        'estado_revision' => $item->estado_revision,
+                    ];
+                })->values(), // Reindexamos el array
+            ];
+        })->values();
+    
+        // Retornar la respuesta en formato JSON
+        return response()->json($verificacionesAgrupadas);
+    }
+
+    
+    public function getVerificacionesRevisionCount()
+    {
+        $papa = DB::SELECT("SELECT DISTINCT t.id_periodo FROM verificaciones v
+            LEFT JOIN temporadas t ON v.contrato = t.contrato
+            WHERE v.estado = 0
+            AND v.estado_revision = 1
+            ORDER BY t.id_periodo DESC
+        ");
+    
+        foreach ($papa as $item) {
+            $periodo = DB::table('periodoescolar')
+                ->select('descripcion', 'idperiodoescolar')
+                ->where('idperiodoescolar', $item->id_periodo)
+                ->first();
+            
+            if ($periodo) {
+                $item->descripcion = $periodo->descripcion;
+                $item->idperiodoescolar = $periodo->idperiodoescolar;
+            }
+    
+            $countNoRevisadas =  DB::SELECT("SELECT DISTINCT v.contrato FROM verificaciones v
+            LEFT JOIN temporadas t ON v.contrato = t.contrato
+            WHERE v.estado = 0
+            AND v.estado_revision = 0
+            AND t.id_periodo = $item->id_periodo
+            ;
+            ");
+    
+            $countRevisadas = DB::SELECT("SELECT DISTINCT v.contrato FROM verificaciones v
+            LEFT JOIN temporadas t ON v.contrato = t.contrato
+            WHERE v.estado = 0
+            AND v.estado_revision = 1
+            AND t.id_periodo = $item->id_periodo
+        ;
+        ");
+    
+            $item->totalVerificacionesNoRevisadas = count($countNoRevisadas);
+            $item->totalVerificacionesRevisadas = count($countRevisadas);
+        }
+    
+        return $papa;
+    }
+    
+    
+    private function obtenerArchivosRevision($idVerificacion) {
+        return DB::table('evidencia_global_files as e')
+            ->join('usuario as u', 'u.idusuario', '=', 'e.user_created')
+            ->select('e.egf_id', 'e.egf_archivo', 'e.egf_url', 'e.egf_tamano', 'e.created_at', 'e.updated_at'
+            , DB::raw('CONCAT(u.nombres, " ", u.apellidos) as creador'))
+            ->where('egft_id', 2) // Tipo de archivo
+            ->where('egf_referencia', $idVerificacion) // Relación con la verificación
+            ->get();
+    }
+    private function obtenerArchivosVerificaciones($idVerificacion) {
+        $datos = DB::table('evidencia_global_files as e')
+            ->leftjoin('usuario as u', 'u.idusuario', '=', 'e.user_created')
+            ->select('e.egf_id', 'e.egf_archivo', 'e.egf_url', 'e.egf_tamano', 'e.created_at', 'e.updated_at'
+            , DB::raw('CONCAT(u.nombres, " ", u.apellidos) as creador'))
+            ->where('egft_id', 3) // Tipo de archivo
+            ->where('egf_referencia', $idVerificacion) // Relación con la verificación
+            ->get()
+            ->toArray(); // Convertimos la colección a array
+    
+        // Si `$archivo` tiene valor, agregamos un nuevo elemento
+        // if ($archivo) {
+        //     $nuevoDato = [
+        //         'egf_id' => null,  // Debe ser null
+        //         'egf_archivo' => $archivo,
+        //         'egf_url' => 'archivos/verificaciones/evidencia/',
+        //         'egf_tamano' => null, // Debe ser null
+        //         'created_at' => $fecha,
+        //         'updated_at' => $fecha,
+        //         'creador' => null
+        //     ];
+    
+        //     // Fusionamos los datos existentes con el nuevo
+        //     $datos = array_merge($datos, [$nuevoDato]);
+        // }
+    
+        return $datos;
+    }
+    
+    private function obtenerArchivosFacturas($idVerificacion) {
+        $datos = DB::table('evidencia_global_files as e')
+        ->leftjoin('usuario as u', 'u.idusuario', '=', 'e.user_created')
+        ->select('e.egf_id', 'e.egf_archivo', 'e.egf_url', 'e.egf_tamano', 'e.created_at', 'e.updated_at'
+        , DB::raw('CONCAT(u.nombres, " ", u.apellidos) as creador'))
+        ->where('egft_id', 4) // Tipo de archivo
+        ->where('egf_referencia', $idVerificacion) // Relación con la verificación
+        ->get()
+        ->toArray(); // Convertimos la colección a array
+
+        // // Si `$archivo` tiene valor, agregamos un nuevo elemento
+        // if ($archivo) {
+        //     $nuevoDato = [
+        //         'egf_id' => null,  // Debe ser null
+        //         'egf_archivo' => $archivo,
+        //         'egf_url' => 'archivos/verificaciones/evidencia/',
+        //         'egf_tamano' => null, // Debe ser null
+        //         'created_at' => $fecha,
+        //         'updated_at' => $fecha,
+        //         'creador' => null
+        //     ];
+
+        //     // Fusionamos los datos existentes con el nuevo
+        //     $datos = array_merge($datos, [$nuevoDato]);
+        // }
+
+        return $datos;
+    }
+
+    public function obtenerObservacion($id) {
+        $datos = DB::table('observaciones as o')
+            ->leftjoin('usuario as u', 'u.idusuario', '=', 'o.user_created')
+            ->leftjoin('usuario as a', 'a.idusuario', '=', 'o.user_updated')
+            ->select(
+                'o.*', 
+                DB::raw('CONCAT(u.nombres, " ", u.apellidos) as creador'), 
+                DB::raw('CONCAT(a.nombres, " ", a.apellidos) as modificador')
+            )
+            ->where('o.identificador', $id)
+            ->where('o.tipo_observacion', 0)
+            ->get();
+    
+        return $datos;
+    }
+    
+    
+
+    public function getArchivosRevision(Request $request) {
+        // Validar que el parámetro `idVerificacion` esté presente en la solicitud
+        $idVerificacion = $request->query('idVerificacion'); 
+    
+        if (!$idVerificacion) {
+            return response()->json(["error" => "ID de verificación no proporcionado"], 400);
+        }
+    
+        if($request->tipo == 'factura'){
+            $archivos = $this->obtenerArchivosFacturas($idVerificacion);
+        }
+        if($request->tipo == 'verificacion'){
+            $archivos = $this->obtenerArchivosVerificaciones($idVerificacion);
+        }
+        if($request->tipo == 'revision'){
+            $archivos = $this->obtenerArchivosRevision($idVerificacion);
+        }
+    
+        return response()->json($archivos);
+    }
+    
+    //api:post/saveObservacionRevision
+    public function saveObservacionRevision(Request $request) {
+        // Verificar si el ID de la verificación existe
+        $verificacion = Verificacion::find($request->id);
+        if (!$verificacion) {
+            return ["status" => "0", "message" => "Verificación no encontrada"];
+        }
+    
+        // Preparar la observación
+        $observacion_revision = ($request->observacion == null || $request->observacion == "null") ? null : $request->observacion;
+    
+        // Iniciar una transacción para asegurar que los cambios sean atómicos
+        DB::beginTransaction();
+        try {
+            // Actualizar el campo en el modelo
+            $verificacion->observacion_revision = $observacion_revision;
+            $verificacion->save();
+            
+            if ($request->contrato) {
+                // Usar consultas preparadas para evitar SQL Injection
+                $dato = DB::table('verificaciones as v')
+                    ->join('temporadas as t', 'v.contrato', '=', 't.contrato')
+                    ->select('t.idInstitucion', 't.id_periodo')
+                    ->where('v.estado', 0)
+                    ->where('v.estado_revision', 1)
+                    ->where('v.id', $request->identificador)
+                    ->where('v.contrato', $request->contrato)
+                    ->first();  // Usamos first() para obtener un solo registro
+    
+                // Verificar si se obtuvo el dato
+                if (!$dato) {
+                    return ["status" => "0", "message" => "No se encontró la información de temporada"];
+                }
+    
+                // Insertar datos en la tabla 'novedades_institucion'
+                $ingreso = DB::table('novedades_institucion')->insertGetId([
+                    'idInstitucion' => $dato->idInstitucion,
+                    'id_periodo'    => $dato->id_periodo,
+                    'id_editor'     => $request->usuario,
+                    'novedades'     => $observacion_revision,
+                    'estado'        => '0',
+                ]);
+            }
+    
+            // Si la actualización fue exitosa, commit
+            DB::commit();
+    
+            return ["status" => "1", "message" => "Se guardó correctamente"];
+        } catch (\Exception $e) {
+            // Si algo sale mal, rollback
+            DB::rollback();
+            return ["status" => "0", "message" => "No se pudo guardar. Error: " . $e->getMessage()];
+        }
+    }
+
     public function tipoPago($id_institucion,$id_periodo,$tipo){
         $query = DB::SELECT("SELECT * FROM 1_4_documento_liq l
         WHERE l.institucion_id  = ?
@@ -1203,16 +1539,22 @@ class VerificacionControllerAnterior extends Controller
             AND d.restar               = '1'
             ",[$item->id]);
 
+            $archivosRevison = $this->obtenerArchivosRevision($item->id);
+            $archivosVerificaciones = $this->obtenerArchivosVerificaciones($item->id);
+            $archivosFacturas = $this->obtenerArchivosFacturas($item->id);
+            $observacion = $this->obtenerObservacion($item->id);
+
             $datos[$key] = [
                 "id"                            => $item->id,
                 "num_verificacion"              => $item->num_verificacion,
                 "fecha_inicio"                  => $item->fecha_inicio,
                 "fecha_fin"                     => $item->fecha_fin,
                 "estado"                        => $item->estado,
+                "estado_revision"               => $item->estado_revision,
                 "contrato"                      => $item->contrato,
                 "nuevo"                         => $item->nuevo,
-                "file_evidencia"                => $item->file_evidencia,
-                "observacion"                   => $item->observacion,
+                "file_evidencia"                => $archivosVerificaciones,
+                "observacion"                   => $observacion,
                 "valor_liquidacion"             => $item->valor_liquidacion,
                 "fecha_subir_evidencia"         => $item->fecha_subir_evidencia,
                 "cobro_venta_directa"           => $item->cobro_venta_directa,
@@ -1233,26 +1575,231 @@ class VerificacionControllerAnterior extends Controller
                 "campo_dinamico"                => $campo_dinamico,
                 "devolucionEscuela"             => $sumaDevolucionEsc,
                 "totalVenta"                    => $item->totalVenta,
-                "valoresLiquidadosReporte"      => $valoresLiquidadosReporte
+                "valoresLiquidadosReporte"      => $valoresLiquidadosReporte,
+                "file_factura"                  => $archivosFacturas,
+                "files_revision"                => $archivosRevison,
             ];
         }
         return $datos;
     }
     //api:post/saveDatosVerificacion
-    public function saveDatosVerificacion(Request $request){
-        $verificacion =  Verificacion::findOrFail($request->id);
-        $observacion = "";
-        if($request->observacion == null || $request->observacion == "null"){
-            $observacion  = null;
-        }else{
-            $observacion = $request->observacion;
+    // public function saveDatosVerificacion(Request $request){
+    //     $verificacion =  Verificacion::findOrFail($request->id);
+    //     $observacion = "";
+    //     if($request->observacion == null || $request->observacion == "null"){
+    //         $observacion  = null;
+    //     }else{
+    //         $observacion = $request->observacion;
+    //     }
+    //     $verificacion->observacion = $observacion;
+    //     $verificacion->save();
+    //     if($verificacion){
+    //         return ["status" => "1", "message" => "Se guardo correctamente"];
+    //     }else{
+    //         return ["status" => "0", "message" => "No se pudo guardar"];
+    //     }
+    // }
+    public function guardarObservacion(Request $request)
+    {
+        // Validar si se proporciona la observación
+        if (!$request->has('observacion') || !$request->has('identificador')) {
+            return response()->json(["status" => "0", "message" => "Datos faltantes"]);
         }
-        $verificacion->observacion = $observacion;
-        $verificacion->save();
-        if($verificacion){
-            return ["status" => "1", "message" => "Se guardo correctamente"];
-        }else{
-            return ["status" => "0", "message" => "No se pudo guardar"];
+
+        $observacion = json_decode($request->observacion);
+        $identificador = $request->identificador;
+        $tipo_observacion = $request->tipo_observacion ?? 0;
+        $usuario = $request->usuario;
+
+        // Iniciar una transacción
+        DB::beginTransaction();
+
+        try {
+            $ingreso = null; // Inicializar $ingreso como null
+
+            // Si se proporciona un contrato, procesar la inserción en 'novedades_institucion'
+            if ($request->contrato) {
+                // Usar consultas preparadas para evitar SQL Injection
+                $dato = DB::table('verificaciones as v')
+                    ->join('temporadas as t', 'v.contrato', '=', 't.contrato')
+                    ->select('t.idInstitucion', 't.id_periodo')
+                    ->where('v.estado', 0)
+                    ->where('v.id', $identificador)
+                    ->where('v.contrato', $request->contrato)
+                    ->first();  // Usamos first() para obtener un solo registro
+
+                // Verificar si se obtuvo el dato
+                if (!$dato) {
+                    DB::rollBack(); // Revertir la transacción
+                    return response()->json(["status" => "0", "message" => "No se encontró la información de temporada"]);
+                }
+
+                // Insertar datos en la tabla 'novedades_institucion'
+                $ingreso = DB::table('novedades_institucion')->insertGetId([
+                    'idInstitucion'  => $dato->idInstitucion,
+                    'id_periodo'     => $dato->id_periodo,
+                    'id_editor'      => $usuario,
+                    'novedades'      => $observacion->observacion, // Insertar solo el contenido de la observación
+                    'estado'         => '0',
+                ]);
+
+                // Verificar si la inserción en 'novedades_institucion' fue exitosa
+                if (!$ingreso) {
+                    DB::rollBack(); // Revertir la transacción
+                    return response()->json(["status" => "0", "message" => "Error al guardar la novedad"]);
+                }
+            } else {
+                // Si no se proporciona un contrato, no se puede continuar
+                DB::rollBack();
+                return response()->json(["status" => "0", "message" => "El contrato es obligatorio"]);
+            }
+
+            // Preparar los datos para la inserción en 'observaciones'
+            $datosObservacion = [
+                'observacion' => $observacion->observacion,
+                'identificador' => $identificador,
+                'tipo_observacion' => $tipo_observacion,
+                'user_created' => $usuario,
+                'created_at' => now(),
+                'updated_at' => now(),
+                'novedad_id' => $ingreso, // $ingreso siempre estará definido aquí
+            ];
+
+            // Insertar la nueva observación
+            $observacionCreada = DB::table('observaciones')->insertGetId($datosObservacion);
+
+            // Confirmar la transacción
+            DB::commit();
+
+            return response()->json(["status" => "1", "message" => "Observación guardada correctamente"]);
+
+        } catch (\Exception $e) {
+            // Revertir la transacción en caso de error
+            DB::rollBack();
+
+            // Log del error (opcional)
+            Log::error('Error al guardar la observación: ' . $e->getMessage());
+
+            return response()->json(["status" => "0", "message" => "Error al guardar la observación"]);
+        }
+    }
+
+    public function eliminarObservacion(Request $request)
+    {
+        // Validar si el 'id' está presente en el request
+        if (!$request->has('id')) {
+            return response()->json(["status" => "0", "message" => "ID no proporcionado"]);
+        }
+    
+        // Iniciar una transacción
+        DB::beginTransaction();
+    
+        try {
+            // Obtener el registro de la observación para encontrar el novedad_id
+            $observacion = DB::table('observaciones')
+                ->where('id', $request->id)
+                ->first();
+    
+            // Verificar si la observación existe
+            if (!$observacion) {
+                throw new \Exception("No se encontró la observación con el ID proporcionado");
+            }
+    
+            // Obtener el novedad_id de la observación
+            $novedad_id = $observacion->novedad_id;
+    
+            // 1. Eliminar la observación de la tabla 'observaciones'
+            DB::table('observaciones')->where('id', $request->id)->delete();
+    
+            // 2. Eliminar la novedad correspondiente en la tabla 'novedades_institucion'
+            if ($novedad_id) {
+                DB::table('novedades_institucion')->where('id', $novedad_id)->delete();
+            }
+    
+            // Confirmar la transacción
+            DB::commit();
+    
+            return response()->json(["status" => "1", "message" => "Observación y novedad eliminadas correctamente"]);
+    
+        } catch (\Exception $e) {
+            // Revertir la transacción en caso de error
+            DB::rollBack();
+    
+            // Log del error (opcional)
+            Log::error('Error al eliminar la observación: ' . $e->getMessage());
+    
+            return response()->json(["status" => "0", "message" => $e->getMessage()]);
+        }
+    }
+
+    public function actualizarObservacion(Request $request)
+    {
+        // Validar si los parámetros necesarios están presentes
+        if (!$request->has('id') || !$request->has('observacion') || !$request->has('novedad_id')) {
+            return response()->json(["status" => "0", "message" => "Datos faltantes: ID, Observación o Novedad ID no proporcionados"]);
+        }
+    
+        // Obtener los datos del request
+        $id = $request->id;
+        $observacion = $request->observacion;
+        $usuario = $request->usuario;
+        $novedad_id = $request->novedad_id;
+    
+        // Iniciar una transacción
+        DB::beginTransaction();
+    
+        try {
+            // 1. Actualizar la observación en la tabla 'observaciones'
+            $updatedObservacion = DB::table('observaciones')
+                ->where('id', $id)
+                ->update([
+                    'observacion' => $observacion,
+                    'user_updated' => $usuario,
+                    'updated_at' => now(),
+                ]);
+    
+            // Verificar si la actualización en 'observaciones' fue exitosa
+            if (!$updatedObservacion) {
+                throw new \Exception("Error al actualizar la observación en la tabla 'observaciones'");
+            }
+    
+            // 2. Obtener la novedad por el ID proporcionado
+            $novedad = DB::table('novedades_institucion')
+                ->where('id', $novedad_id)
+                ->first();
+    
+            // Verificar si se encontró la novedad
+            if (!$novedad) {
+                throw new \Exception("No se encontró la novedad con el ID proporcionado");
+            }
+    
+            // 3. Actualizar la novedad en la tabla 'novedades_institucion'
+            $updatedNovedad = DB::table('novedades_institucion')
+                ->where('id', $novedad_id)
+                ->update([
+                    'novedades' => $observacion, // Actualizar el campo 'novedades' con la nueva observación
+                    'id_editor' => $usuario, // Actualizar el campo 'novedades' con la nueva observación
+                    'updated_at' => now(),
+                ]);
+    
+            // Verificar si la actualización en 'novedades_institucion' fue exitosa
+            if (!$updatedNovedad) {
+                throw new \Exception("Error al actualizar la novedad en la tabla 'novedades_institucion'");
+            }
+    
+            // Confirmar la transacción si todo fue exitoso
+            DB::commit();
+    
+            return response()->json(["status" => "1", "message" => "Observación y novedad actualizadas correctamente"]);
+    
+        } catch (\Exception $e) {
+            // Revertir la transacción en caso de error
+            DB::rollBack();
+    
+            // Log del error (opcional)
+            Log::error('Error en actualizarObservacion: ' . $e->getMessage());
+    
+            return response()->json(["status" => "0", "message" => $e->getMessage()]);
         }
     }
     /***LIQUIDAR EN SISTEMA DE FACUTRACION */
@@ -1394,153 +1941,320 @@ class VerificacionControllerAnterior extends Controller
      /***LIQUIDAR EN SISTEMA DE FACTURACION VERSION */
     //api:Get/liquidarFacturacionVersion2/{contrato}
     public function liquidarFacturacionVersion2($contrato,$user_created){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $idVerificacionActual           = 0;
-        $estadoVerificacion             = 0;
-        $num_verificacionaActual        = 0;
-        ///====VALIDAR SI LA LIQUIDACION SE ENCUENTRA EN PROCESO
-        $verificacion   = $this->getVerificacionXcontrato($contrato);
-        //si ya existe verificaciones
-        if(count($verificacion) > 0) {
-            $idVerificacionActual       = $verificacion[0]->id;
-            $estadoVerificacion         = $verificacion[0]->estado;
-            $num_verificacionaActual    = $verificacion[0]->num_verificacion;
+        try{
+            set_time_limit(6000000);
+            ini_set('max_execution_time', 6000000);
+            //transaccion
+            DB::beginTransaction();
+            $idVerificacionActual           = 0;
+            $estadoVerificacion             = 0;
+            $num_verificacionaActual        = 0;
+            ///====VALIDAR SI LA LIQUIDACION SE ENCUENTRA EN PROCESO
+            $verificacion   = $this->getVerificacionXcontrato($contrato);
+            //si ya existe verificaciones
+            if(count($verificacion) > 0) {
+                $idVerificacionActual       = $verificacion[0]->id;
+                $estadoVerificacion         = $verificacion[0]->estado;
+                $num_verificacionaActual    = $verificacion[0]->num_verificacion;
+            }
+            //si no existe lo creo
+            else{
+                $saveV                      = $this->saveVerificacion(1,$contrato);
+                $idVerificacionActual       = $saveV->id;
+                $estadoVerificacion         = $saveV->estado;
+                $num_verificacionaActual    = $saveV->num_verificacion;
+            }
+            ///================VALIDACIONES======================
+                //validar si el contrato esta activo
+                $validarContrato = Temporada::where('contrato',$contrato)->get();
+                if(empty($validarContrato)){ return ["status" => "0", "message" => "No existe el contrato"]; }
+                $estado = $validarContrato[0]->estado;
+                if($estado == '0')         { return ["status" => "0", "message" => "El contrato esta inactivo"]; }
+                //almacenar el id de la institucion
+                $institucion    = $validarContrato[0]->idInstitucion;
+                //almancenar el periodo
+                $periodo        =  $validarContrato[0]->id_periodo;
+                //validar que el contrato este en pedidos
+                $pedido = Pedidos::where('contrato_generado',$contrato)->get();
+                if(count($pedido) == 0){ return ["status"=>"0","message"=>"No existe el contrato"]; }
+                //validar que el pedido no tenga alcaces abiertos o activos
+                // $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id_pedido = ? AND pa.estado_alcance = '0'",[$id_pedido]);
+                // if(count($query2) > 0){ return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; }
+            if($periodo ==  null || $periodo == 0 || $periodo == ""){ return ["status"=>"0", "message" => "El contrato no tiene asignado a un período"]; }
+            //======================FIN VALIDACIONES=========================================================
+            else{
+                DB::commit();
+                // //estadoVerificacion: 0 => ya realizada; 1 =>  la verificacion abierta; 2 => pendientes
+                if ($estadoVerificacion == 1) {
+                    $result = $this->generateLiquidacionAntes2000($institucion, $periodo, $contrato, $idVerificacionActual, $num_verificacionaActual, $user_created);
+                    // Si la liquidación fue exitosa (status 1), confirmar la transacción
+                    if ($result['status'] == 1) {
+                        DB::commit();  // Confirmar transacción si la liquidación fue exitosa
+                        return $result;  // Retornar el resultado exitoso
+                    }
+                }
+                if ($estadoVerificacion == 2) {
+                    $result = $this->generateLiquidacionDespues2000($institucion, $periodo, $contrato, $idVerificacionActual, $num_verificacionaActual, $user_created);
+                    // Si la liquidación fue exitosa (status 1), confirmar la transacción
+                    if ($result['status'] == 1) {
+                        DB::commit();  // Confirmar transacción si la liquidación fue exitosa
+                        return $result;  // Retornar el resultado exitoso
+                    }
+                }
+                return ["status" => "0", "message" => "El estado de la verificación no es válido para realizar la liquidación"];
+            }
+           
         }
-        //si no existe lo creo
-        else{
-            $saveV                      = $this->saveVerificacion(1,$contrato);
-            $idVerificacionActual       = $saveV->id;
-            $estadoVerificacion         = $saveV->estado;
-            $num_verificacionaActual    = $saveV->num_verificacion;
-        }
-        ///================VALIDACIONES======================
-            //validar si el contrato esta activo
-            $validarContrato = Temporada::where('contrato',$contrato)->get();
-            if(empty($validarContrato)){ return ["status" => "0", "message" => "No existe el contrato"]; }
-            $estado = $validarContrato[0]->estado;
-            if($estado == '0')         { return ["status" => "0", "message" => "El contrato esta inactivo"]; }
-            //almacenar el id de la institucion
-            $institucion    = $validarContrato[0]->idInstitucion;
-            //almancenar el periodo
-            $periodo        =  $validarContrato[0]->id_periodo;
-            //validar que el contrato este en pedidos
-            $pedido = Pedidos::where('contrato_generado',$contrato)->get();
-            if(count($pedido) == 0){ return ["status"=>"0","message"=>"No existe el contrato"]; }
-            $id_pedido      = $pedido[0]->id_pedido;
-            //validar que el pedido no tenga alcaces abiertos o activos
-            // $query2 = DB::SELECT("SELECT * FROM pedidos_alcance pa WHERE pa.id_pedido = ? AND pa.estado_alcance = '0'",[$id_pedido]);
-            // if(count($query2) > 0){ return ["status"=>"0", "message" => "El contrato tiene alcances abiertos"]; }
-        if($periodo ==  null || $periodo == 0 || $periodo == ""){ return ["status"=>"0", "message" => "El contrato no tiene asignado a un período"]; }
-        //======================FIN VALIDACIONES=========================================================
-        else{
-            //estadoVerificacion: 0 => ya realizada; 1 =>  la verificacion abierta; 2 => pendientes
-            //Verificacion abierta
-            if($estadoVerificacion == 1)    { return $this->generateLiquidacionAntes2000($institucion,$periodo,$contrato,$idVerificacionActual,$num_verificacionaActual,$user_created); }
-            //Verificacion pendiente
-            if($estadoVerificacion == 2)    { return $this->generateLiquidacionDespues2000($institucion,$periodo,$contrato,$idVerificacionActual,$num_verificacionaActual,$user_created); }
+        catch(\Exception $e){
+            DB::rollBack(); // Deshacer los cambios si ocurre un error
+            return ["status"=>"0","message"=>$e->getMessage()];
         }
     }
-    public function generateLiquidacionAntes2000($institucion,$periodo,$contrato,$idVerificacionActual,$num_verificacionaActual,$user_created){
-        //traigo la liquidacion actual por cantidad GRUPAL
-        $data                   = $this->getCodigosGrupalLiquidar($institucion,$periodo);
-        //INVIVIDUAL VERSION 1
-        //traigo la liquidacion  con los codigos invidivuales con limite de 2000
-        $traerCodigosIndividual = $this->getCodigosIndividualLiquidar($institucion,$periodo);
-        //TRAER LOS CODIGOS REGALADOS
-        $arregloRegalados       = $this->getRegaladosXLiquidar($institucion,$periodo);
-        //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
-        if(count($data) >0){
-            //====PROCESO GUARDAR EN FACTURACION=======
-            //obtener la fecha actual
-            $fechaActual  = date('Y-m-d');
-            //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
-            $traerNumeroVerificacion = $num_verificacionaActual;
-            $traeridVerificacion     = $idVerificacionActual;
-            //Para guardar la verificacion si  existe el contrato
-            //SI EXCEDE LAS 10 VERIFICACIONES
-            $finVerificacion         = "no";
-            if($traerNumeroVerificacion > 10){ $finVerificacion = "yes"; }
-            if($finVerificacion =="yes"){
-                return ["status"=>"0", "message" => "Ha alzancado el limite de verificaciones permitidas"];
-            }
-            else{
-                //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
-                $this->updateCodigoIndividualInicial($traeridVerificacion,$traerCodigosIndividual,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"liquidacion",$user_created);
-                //ACTUALIZAR EN LOS CODIGOS REGALADOS LOS DATOS DE VERIFICACION
-                if(count($arregloRegalados) > 0) {
-                    $this->updateCodigoIndividualInicial($traeridVerificacion,$arregloRegalados,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"regalado",$user_created);
+    // public function generateLiquidacionAntes2000($institucion,$periodo,$contrato,$idVerificacionActual,$num_verificacionaActual,$user_created){
+    //     //traigo la liquidacion actual por cantidad GRUPAL
+    //     $data                   = $this->getCodigosGrupalLiquidar($institucion,$periodo);
+    //     //INVIVIDUAL VERSION 1
+    //     //traigo la liquidacion  con los codigos invidivuales con limite de 2000
+    //     $traerCodigosIndividual = $this->getCodigosIndividualLiquidar($institucion,$periodo);
+    //     //TRAER LOS CODIGOS REGALADOS
+    //     $arregloRegalados       = $this->getRegaladosXLiquidar($institucion,$periodo);
+    //     //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
+    //     if(count($data) >0){
+    //         //====PROCESO GUARDAR EN FACTURACION=======
+    //         //obtener la fecha actual
+    //         $fechaActual  = date('Y-m-d');
+    //         //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
+    //         $traerNumeroVerificacion = $num_verificacionaActual;
+    //         $traeridVerificacion     = $idVerificacionActual;
+    //         //Para guardar la verificacion si  existe el contrato
+    //         //SI EXCEDE LAS 10 VERIFICACIONES
+    //         $finVerificacion         = "no";
+    //         if($traerNumeroVerificacion > 10){ $finVerificacion = "yes"; }
+    //         if($finVerificacion =="yes"){
+    //             return ["status"=>"0", "message" => "Ha alzancado el limite de verificaciones permitidas"];
+    //         }
+    //         else{
+    //             //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
+    //             $this->updateCodigoIndividualInicial($traeridVerificacion,$traerCodigosIndividual,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"liquidacion",$user_created);
+    //             //ACTUALIZAR EN LOS CODIGOS REGALADOS LOS DATOS DE VERIFICACION
+    //             if(count($arregloRegalados) > 0) {
+    //                 $this->updateCodigoIndividualInicial($traeridVerificacion,$arregloRegalados,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"regalado",$user_created);
+    //             }
+    //             //Ingresar la liquidacion en la base
+    //             $this->guardarLiquidacionCodigosDemasiados($data,$traerNumeroVerificacion,$contrato);
+    //             //consultar si todavia existe codigos individual
+    //             $codigosFaltante = $this->getCodigosIndividualLiquidar($institucion,$periodo);
+    //             //de lo contrario coloco en estado 2 la verificacion como pendiente para liquidar en 2000 en 2000
+    //             if(count($codigosFaltante) > 0){
+    //                 DB::table('verificaciones')
+    //                 ->where('id', $traeridVerificacion)
+    //                 ->update([
+    //                     'estado' => "2"
+    //                 ]);
+    //             }
+    //             else{
+    //                 //Actualizo a estado 0 la verificacion anterior para cerrar
+    //                 DB::table('verificaciones')
+    //                 ->where('id', $traeridVerificacion)
+    //                 ->update([
+    //                     'fecha_fin' => $fechaActual,
+    //                     'estado' => "0"
+    //                 ]);
+    //                 $fecha2 = date('Y-m-d H:i:s');
+    //                 DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+    //                 DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' ,id_verificacion = '$traeridVerificacion' , usuario_verificacion = '$user_created' WHERE contrato = '$contrato' AND estado = '1'");
+    //                 //  Para generar una verficacion y que quede abierta
+    //                 $this->saveVerificacion($traerNumeroVerificacion+1,$contrato);
+    //             }
+    //             return ['guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante) ];
+    //         }
+    //     }else{
+    //         return ["status"=>"1", "message" => "Se guardo correctamente ya no mas libros por liquidar"];
+    //     }
+    // }
+    public function generateLiquidacionAntes2000($institucion, $periodo, $contrato, $idVerificacionActual, $num_verificacionaActual, $user_created){
+        DB::beginTransaction();  // Iniciar transacción
+    
+        try {
+            //traigo la liquidacion actual por cantidad GRUPAL
+            $data = $this->getCodigosGrupalLiquidar($institucion, $periodo);
+    
+            //INVIVIDUAL VERSION 1
+            //traigo la liquidacion con los codigos invidivuales con limite de 2000
+            $traerCodigosIndividual = $this->getCodigosIndividualLiquidar($institucion, $periodo);
+    
+            //TRAER LOS CODIGOS REGALADOS
+            $arregloRegalados = $this->getRegaladosXLiquidar($institucion, $periodo);
+    
+            //SI TODO HA SALIDO BIEN TRAEMOS LA DATA
+            if (count($data) > 0) {
+                //====PROCESO GUARDAR EN FACTURACION=======
+                //obtener la fecha actual
+                $fechaActual = date('Y-m-d');
+    
+                //======PARA REALIZAR LA VERIFICACION EN CASO QUE EL CONTRATO YA TENGA VERIFICACIONES====
+                $traerNumeroVerificacion = $num_verificacionaActual;
+                $traeridVerificacion = $idVerificacionActual;
+    
+                //Para guardar la verificacion si existe el contrato
+                //SI EXCEDE LAS 10 VERIFICACIONES
+                $finVerificacion = "no";
+                if ($traerNumeroVerificacion > 10) { $finVerificacion = "yes"; }
+    
+                if ($finVerificacion == "yes") {
+                    DB::rollBack(); // Revertir transacción en caso de error
+                    return ["status" => "0", "message" => "Ha alcanzado el límite de verificaciones permitidas"];
+                } else {
+                    //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
+                    $this->updateCodigoIndividualInicial($traeridVerificacion, $traerCodigosIndividual, $contrato, $traerNumeroVerificacion, $periodo, $institucion, "liquidacion", $user_created);
+    
+                    //ACTUALIZAR EN LOS CODIGOS REGALADOS LOS DATOS DE VERIFICACION
+                    if (count($arregloRegalados) > 0) {
+                        $this->updateCodigoIndividualInicial($traeridVerificacion, $arregloRegalados, $contrato, $traerNumeroVerificacion, $periodo, $institucion, "regalado", $user_created);
+                    }
+    
+                    //Ingresar la liquidacion en la base
+                    $this->guardarLiquidacionCodigosDemasiados($data, $traerNumeroVerificacion, $contrato);
+    
+                    //consultar si todavía existe codigos individuales
+                    $codigosFaltante = $this->getCodigosIndividualLiquidar($institucion, $periodo);
+    
+                    //si no hay códigos faltantes, actualizar el estado de la verificación
+                    if (count($codigosFaltante) > 0) {
+                        DB::table('verificaciones')
+                            ->where('id', $traeridVerificacion)
+                            ->update(['estado' => "2"]); // Cambiar estado a "pendiente"
+                    } else {
+                        //Actualizar la verificación a estado 0 para cerrarla
+                        DB::table('verificaciones')
+                            ->where('id', $traeridVerificacion)
+                            ->update([
+                                'fecha_fin' => $fechaActual,
+                                'estado' => "0"
+                            ]);
+    
+                        $fecha2 = date('Y-m-d H:i:s');
+                        DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+                        DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' , id_verificacion = '$traeridVerificacion', usuario_verificacion = '$user_created' WHERE contrato = '$contrato' AND estado = '1'");
+    
+                        //  Para generar una nueva verificación y que quede abierta
+                        $this->saveVerificacion($traerNumeroVerificacion + 1, $contrato);
+                    }
+    
+                    // Confirmar los cambios realizados en la transacción
+                    DB::commit();
+    
+                    return ['status' => 1, 'guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante)];
                 }
-                //Ingresar la liquidacion en la base
-                $this->guardarLiquidacionCodigosDemasiados($data,$traerNumeroVerificacion,$contrato);
-                //consultar si todavia existe codigos individual
-                $codigosFaltante = $this->getCodigosIndividualLiquidar($institucion,$periodo);
-                //de lo contrario coloco en estado 2 la verificacion como pendiente para liquidar en 2000 en 2000
-                if(count($codigosFaltante) > 0){
-                    DB::table('verificaciones')
+            } else {
+                DB::rollBack(); // Revertir transacción si no hay datos
+                // return ["status" => "2", "message" => "Se guardó correctamente ya no más libros por liquidar"];
+            }
+        } catch (\Exception $e) {
+            DB::rollBack(); // Revertir la transacción en caso de cualquier error
+            return ["status" => "0", "message" => $e->getMessage()];
+        }
+    }
+    
+    // public function generateLiquidacionDespues2000($institucion,$periodo,$contrato,$idVerificacionActual,$num_verificacionaActual,$user_created){
+    //     //obtener la fecha actual
+    //     $fechaActual                = date('Y-m-d');
+    //     $traerNumeroVerificacion    = $num_verificacionaActual;
+    //     $traeridVerificacion        = $idVerificacionActual;
+    //     //traigo la liquidacion  con los codigos invidivuales
+    //     $traerCodigosIndividual     = $this->getCodigosIndividualLiquidar($institucion,$periodo);
+    //     //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
+    //     $this->updateCodigoIndividualInicial($traeridVerificacion,$traerCodigosIndividual,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"liquidacion",$user_created);
+    //     //consultar si todavia existe codigos individual
+    //     $codigosFaltante = $this->getCodigosIndividualLiquidar($institucion,$periodo);
+    //     //de lo contrario coloco en estado 2 la verificacion como pendiente para liquidar en 2000 en 2000
+    //     if(count($codigosFaltante) > 0){
+    //         DB::table('verificaciones')
+    //         ->where('id', $traeridVerificacion)
+    //         ->update([
+    //             'estado' => "2"
+    //         ]);
+    //         return ['guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante) ];
+    //     }
+    //     else{
+    //         //Actualizo a estado 0 la verificacion anterior para cerrar
+    //         DB::table('verificaciones')
+    //         ->where('id', $traeridVerificacion)
+    //         ->update([
+    //             'fecha_fin' => $fechaActual,
+    //             'estado' => "0"
+    //         ]);
+    //         $fecha2 = date('Y-m-d H:i:s');
+    //         DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+    //         DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' WHERE contrato = '$contrato' AND estado = '1'");
+    //         //  Para generar una verficacion y que quede abierta
+    //         $this->saveVerificacion($traerNumeroVerificacion+1,$contrato);
+    //         //COLOCAR EL CAMPO datos_verificacion_por_ingresar EN ESTADO 1 PARA QUE SE EJECUTE Y SE GUARDE LOS VALORES
+    //         $this->updateDatosVerificacionPorIngresar($contrato,1);
+    //     }
+    //     return ['guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante) ];
+    // }
+    public function generateLiquidacionDespues2000($institucion, $periodo, $contrato, $idVerificacionActual, $num_verificacionaActual, $user_created){
+        DB::beginTransaction();  // Iniciar transacción
+    
+        try {
+            // Obtener la fecha actual
+            $fechaActual = date('Y-m-d');
+            $traerNumeroVerificacion = $num_verificacionaActual;
+            $traeridVerificacion = $idVerificacionActual;
+    
+            // Traer la liquidación con los códigos individuales
+            $traerCodigosIndividual = $this->getCodigosIndividualLiquidar($institucion, $periodo);
+    
+            // Obtener la cantidad de la verificación actual
+            $this->updateCodigoIndividualInicial($traeridVerificacion, $traerCodigosIndividual, $contrato, $traerNumeroVerificacion, $periodo, $institucion, "liquidacion", $user_created);
+    
+            // Consultar si todavía existe códigos individuales
+            $codigosFaltante = $this->getCodigosIndividualLiquidar($institucion, $periodo);
+    
+            // Si existen códigos faltantes, actualizar el estado de la verificación a pendiente
+            if (count($codigosFaltante) > 0) {
+                DB::table('verificaciones')
                     ->where('id', $traeridVerificacion)
                     ->update([
-                        'estado' => "2"
+                        'estado' => "2"  // Estado 2: Pendiente
                     ]);
-                }
-                else{
-                    //Actualizo a estado 0 la verificacion anterior para cerrar
-                    DB::table('verificaciones')
+                
+                // Confirmar transacción y devolver respuesta
+                DB::commit();
+                return ['status' => 1, 'guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante)];
+            } else {
+                // Actualizar la verificación anterior a estado 0 para cerrarla
+                DB::table('verificaciones')
                     ->where('id', $traeridVerificacion)
                     ->update([
                         'fecha_fin' => $fechaActual,
-                        'estado' => "0"
+                        'estado' => "0"  // Estado 0: Cerrada
                     ]);
-                    $fecha2 = date('Y-m-d H:i:s');
-                    DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
-                    DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' WHERE contrato = '$contrato' AND estado = '1'");
-                    //  Para generar una verficacion y que quede abierta
-                    $this->saveVerificacion($traerNumeroVerificacion+1,$contrato);
-                }
-                return ['guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante) ];
+    
+                // Actualizar los registros en las tablas relacionadas
+                $fecha2 = date('Y-m-d H:i:s');
+                DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0', fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+                DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' WHERE contrato = '$contrato' AND estado = '1'");
+    
+                // Para generar una nueva verificación y que quede abierta
+                $this->saveVerificacion($traerNumeroVerificacion + 1, $contrato);
+    
+                // Colocar el campo datos_verificacion_por_ingresar en estado 1 para que se ejecute y se guarde los valores
+                $this->updateDatosVerificacionPorIngresar($contrato, 1);
+    
+                // Confirmar transacción después de todas las operaciones
+                DB::commit();
+    
+                return ['status' => 1, 'guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante)];
             }
-        }else{
-            return ["status"=>"1", "message" => "Se guardo correctamente ya no mas libros por liquidar"];
+        } catch (\Exception $e) {
+            // En caso de error, revertir la transacción
+            DB::rollBack();
+            return ["status" => "0", "message" => $e->getMessage()];
         }
     }
-    public function generateLiquidacionDespues2000($institucion,$periodo,$contrato,$idVerificacionActual,$num_verificacionaActual,$user_created){
-        //obtener la fecha actual
-        $fechaActual                = date('Y-m-d');
-        $traerNumeroVerificacion    = $num_verificacionaActual;
-        $traeridVerificacion        = $idVerificacionActual;
-        //traigo la liquidacion  con los codigos invidivuales
-        $traerCodigosIndividual     = $this->getCodigosIndividualLiquidar($institucion,$periodo);
-        //OBTENER LA CANTIDAD DE LA VERIFICACION ACTUAL
-        $this->updateCodigoIndividualInicial($traeridVerificacion,$traerCodigosIndividual,$contrato,$traerNumeroVerificacion,$periodo,$institucion,"liquidacion",$user_created);
-        //consultar si todavia existe codigos individual
-        $codigosFaltante = $this->getCodigosIndividualLiquidar($institucion,$periodo);
-        //de lo contrario coloco en estado 2 la verificacion como pendiente para liquidar en 2000 en 2000
-        if(count($codigosFaltante) > 0){
-            DB::table('verificaciones')
-            ->where('id', $traeridVerificacion)
-            ->update([
-                'estado' => "2"
-            ]);
-            return ['guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante) ];
-        }
-        else{
-            //Actualizo a estado 0 la verificacion anterior para cerrar
-            DB::table('verificaciones')
-            ->where('id', $traeridVerificacion)
-            ->update([
-                'fecha_fin' => $fechaActual,
-                'estado' => "0"
-            ]);
-            $fecha2 = date('Y-m-d H:i:s');
-            DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
-            DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' WHERE contrato = '$contrato' AND estado = '1'");
-            //  Para generar una verficacion y que quede abierta
-            $this->saveVerificacion($traerNumeroVerificacion+1,$contrato);
-            //COLOCAR EL CAMPO datos_verificacion_por_ingresar EN ESTADO 1 PARA QUE SE EJECUTE Y SE GUARDE LOS VALORES
-            $this->updateDatosVerificacionPorIngresar($contrato,1);
-        }
-        return ['guardados' => count($traerCodigosIndividual), "faltante" => count($codigosFaltante) ];
-    }
+    
     //api:get/getcodigosLiquidar/{contrato}
     public function getcodigosLiquidar($contrato){
         $pedido = Pedidos::where('contrato_generado',$contrato)->get();
@@ -1653,6 +2367,12 @@ class VerificacionControllerAnterior extends Controller
        }
        if($request->getReportePorAnio){
            return $this->getReportePorAnio($request);
+       }
+       if($request->getVerificacionesRevision){
+            return $this->getVerificacionesRevision($request);
+       }
+       if($request->getVerificacionesRevisionCount){
+            return $this->getVerificacionesRevisionCount($request);
        }
     }
     // api:get/metodosGetVerificaciones?getVerificaciones=1&id_asesor=4179&pendientesNot=1&soloLongitud=1
@@ -2026,4 +2746,35 @@ class VerificacionControllerAnterior extends Controller
             return response()->json(["error" => "0", "message" => $e->getMessage()], 200);
         }
     }
+
+    public function eliminarNotificacion(Request $request)
+    {
+        try {
+            $idPadres = $request->id_padre; // El array de ids que recibimos en la solicitud
+            $eliminadas = 0; // Contador para las notificaciones eliminadas
+            
+            foreach ($idPadres as $id) {
+                // Buscar la notificación correspondiente por el id_padre y tipo 0
+                $notificacion = NotificacionGeneral::where('id_padre', $id)->where('tipo', 0)->first();
+                
+                if ($notificacion) { // Si se encuentra una notificación
+                    // Eliminar la notificación
+                    $notificacion->delete();
+                    $eliminadas++; // Incrementar el contador de eliminadas
+                }
+            }
+            
+            // Verificar si se eliminaron notificaciones
+            if ($eliminadas > 0) {
+                return response()->json(["error" => 0, "message" => "$eliminadas notificación(es) actualizadas(s) correctamente"], 200);
+            } else {
+                return response()->json(["error" => 1, "message" => "No se encontraron notificaciones para actualizar"], 200);
+            }
+            
+        } catch (\Exception $e) {
+            // Manejo de errores
+            return response()->json(["error" => 1, "message" => $e->getMessage()], 200);
+        }
+    }
+
 }

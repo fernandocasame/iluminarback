@@ -17,9 +17,12 @@ use App\Models\CodigosLibrosDevolucionSon;
 use App\Models\Pedidos;
 use App\Models\Periodo;
 use App\Models\User;
+use App\Models\_14ProductoStockHistorico;
 use App\Traits\Pedidos\TraitProforma;
 use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
+use App\Traits\Pedidos\TraitPedidosGeneral;
+
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -27,6 +30,7 @@ class VentasController extends Controller
 {
     use TraitProforma;
     use TraitCodigosGeneral;
+    use TraitPedidosGeneral;
     protected $pedidosRepository;
     protected $proformaRepository;
     public function __construct(PedidosRepository $pedidosRepository, ProformaRepository $proformaRepository)
@@ -105,31 +109,108 @@ class VentasController extends Controller
         where dp.prof_id='$request->id'");
     }
 
+
     public function VerificacionDVentaProforma(Request $request) {
         if ($request->id) {
+            // Buscar la proforma por el ID proporcionado
             $proforma = DB::table('f_proforma')
                 ->where('id', $request->id)
-                ->where('prof_estado', 3)
+                ->whereIn('prof_estado', [3,6])  // Solo proformas con estado 'Finalizada' (prof_estado = 3)
                 ->first();
+    
             if ($proforma) {
-
+                // Verificar si hay detalles de la proforma para este ID
+                $detallesProforma = DB::table('f_detalle_proforma as fp')
+                    ->where('fp.prof_id', $proforma->id)
+                    ->select('fp.pro_codigo', DB::raw('SUM(fp.det_prof_cantidad) as cantidad_proforma'))
+                    ->groupBy('fp.pro_codigo')  // Agrupar por pro_codigo
+                    ->get();
+    
+                // Verificar si los detalles de la proforma están vacíos
+                if ($detallesProforma->isEmpty()) {
+                    return response()->json(['message' => 'No hay detalles para esta proforma', 'status' => '0']);
+                }
+    
+                // Obtener ventas relacionadas con esta proforma que no estén anuladas
                 $ventas = DB::table('f_venta')
                     ->where('ven_idproforma', $proforma->prof_id)
-                    ->where('est_ven_codigo', '!=', 3)
+                    ->where('est_ven_codigo', '!=', 3)  // Excluir ventas anuladas
                     ->get();
+    
+                if ($ventas->isNotEmpty()) {
+                    // Variable para almacenar ventas que no cumplieron los detalles de la proforma
+                    $ventasIncompletas = [];
+                    $detallesCoinciden = true; // Inicializamos la variable como verdadera
+    
+                    // Iterar sobre cada venta para verificar sus detalles
+                    foreach ($ventas as $venta) {
+                        // Obtener los detalles de la venta agrupados por pro_codigo
+                        $detalleVentas = DB::table('f_detalle_venta as fv')
+                            ->where('fv.ven_codigo', $venta->ven_codigo)
+                            ->groupBy('fv.pro_codigo')
+                            ->select('fv.pro_codigo', DB::raw('SUM(fv.det_ven_cantidad) as cantidad_venta'))
+                            ->get();
+    
+                        // Comparar los detalles de la venta con los de la proforma
+                        foreach ($detallesProforma as $detalleProforma) {
+                            $detalleVenta = $detalleVentas->firstWhere('pro_codigo', $detalleProforma->pro_codigo);
+    
+                            // Si no se encuentra el producto en los detalles de la venta
+                            if (!$detalleVenta) {
+                                $ventasIncompletas[] = $venta;
+                                $detallesCoinciden = false; // Si no coincide, cambia el valor a false
+                                break;
+                            }
+    
+                            // Si la cantidad de la venta no es suficiente según lo detallado en la proforma
+                            if ($detalleVenta->cantidad_venta < $detalleProforma->cantidad_proforma) {
+                                $ventasIncompletas[] = $venta;
+                                $detallesCoinciden = false; // Si no coincide, cambia el valor a false
+                                break;
+                            }
+                        }
+                    }
+    
+                    // Si alguna venta está incompleta, retornarla
+                    if (!empty($ventasIncompletas)) {
+                        $result = [
+                            'ventas' => $ventasIncompletas,
+                            'count' => count($ventasIncompletas),
+                            'detallesCoinciden' => $detallesCoinciden,  // Agregar si los detalles coinciden
+                            'detallesProforma' => $detallesProforma,    // Agregar detalles de la proforma
+                            'detallesVentas' => $detalleVentas,         // Agregar detalles de la venta
+                        ];
+                        return response()->json($result);
+                    }
+    
+                    // Si todas las ventas cumplen con los detalles de la proforma
+                    $result = [
+                        'ventas' => $ventas,
+                        'count' => $ventas->count(),
+                        'detallesCoinciden' => $detallesCoinciden,  // Agregar si los detalles coinciden
+                        'detallesProforma' => $detallesProforma,    // Agregar detalles de la proforma
+                        'detallesVentas' => $detalleVentas,         // Agregar detalles de la venta
+                    ];
+                    return response()->json($result);
+    
+                } else {
+                    $detallesCoinciden = false; 
 
-
-                $result = [
-                    'ventas' => $ventas,
-                    'count' => $ventas->count(),
-                ];
-
-                return response()->json($result);
+                    // Si no se encontraron ventas
+                    $result = [
+                        'ventas' => [],
+                        'count' => 0,
+                        'detallesCoinciden' => $detallesCoinciden,  // Agregar si los detalles coinciden
+                        'detallesProforma' => $detallesProforma,    // Agregar detalles de la proforma
+                        'detallesVentas' => [],                     // No hay detalles de venta si no hay ventas
+                    ];
+                    return response()->json($result);
+                }
             } else {
-                return response()->json(['message' => 'Proforma not found or not approved', 'status'=>'0']);
+                return response()->json(['message' => 'Proforma no encontrada', 'status' => '0']);
             }
         }
-        return response()->json(['message' => 'No ID provided', 'status'=>'0']);
+        return response()->json(['message' => 'No ID provided', 'status' => '0']);
     }
 
     //api:get/GetFacturasTodas
@@ -596,18 +677,44 @@ class VentasController extends Controller
                             }
                         }
                         $codi=$query2[0]->stoc;
-                        $this->descontarStock($codi,$item,$request->l,$id_empresa);
+                        //INICIO SECCION HISTORICO PRODUCTOS
+                        $return_descontarStock = $this->descontarStock($codi,$item,$request->l,$id_empresa);
+                        // DB::rollback();
+                        // return [
+                        //     'codi' => $codi,
+                        //     'item' => $item,
+                        //     'requestl' => $request->l,
+                        //     'id_empresa' => $id_empresa,
+                        //     'resultado' => $this->descontarStock($codi, $item, $request->l, $id_empresa),
+                        //     'mensaje' => 0
+                        // ];
+                        // Agregar al historial
+                        $HistoricoStock[] = [
+                            'psh_old_values' => json_encode($return_descontarStock['old_values']),
+                            'psh_new_values' => json_encode($return_descontarStock['new_values']),
+                        ];
+                        //FIN SECCION HISTORICO PRODUCTOS
                         $venta1=new DetalleVentas;
                         $venta1->ven_codigo         = $request->ven_codigo;
                         $venta1->id_empresa         = $request->id_empresa;
                         $venta1->pro_codigo         = $item->pro_codigo;
-                        $venta1->det_ven_cantidad   = $item->cantidad;
+                        $venta1->det_ven_cantidad   = $return_descontarStock['totalRestado'];
                         $venta1->det_ven_valor_u    = $item->det_prof_valor_u;
                         $venta1->idProforma         = $idProforma;
                         $venta1->save();
                     }
                 }
             }
+            $registroHistorial = [
+                'psh_old_values' => json_encode(array_column($HistoricoStock, 'psh_old_values', 'pro_codigo')),
+                'psh_new_values' => json_encode(array_column($HistoricoStock, 'psh_new_values', 'pro_codigo')),
+                'psh_tipo' => 4, //Tipo generacion documento venta
+                'psh_id_ven_codigo' => $request->ven_codigo,
+                'user_created' => $request->user_creator_doc,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            _14ProductoStockHistorico::insert($registroHistorial);
             $this->finalizarDocumento($idProforma);
             //finalizar documento
             DB::commit();
@@ -662,31 +769,81 @@ class VentasController extends Controller
             $proforma->save();
             return "finalizado";
         }else{
+            $venta = Ventas::where('ven_idproforma', $proforma->prof_id)
+             ->where('est_ven_codigo','<>', 3)
+             ->count();
+            if($venta >0){
+                $proforma->prof_estado = 6;
+            }else{
+                $proforma->prof_estado = 3;
+            }
+            $proforma->save();
             return "no finalizado";
         }
     }
-    public function descontarStock($codi,$item,$tipo,$id_empresa){
-        //tipo 1 => facturas; 3 y 4 notas
-        //id_empresa 1 => Prolipa; 2 = Iluminar; 3 = Grupo Calmed
-        $co         = (int) $codi-(int)$item->cantidad;
-        $pro        = _14Producto::findOrFail($item->pro_codigo);
-        //PROLIPA
-        if($id_empresa ==1){
-            if($tipo==1){
-                $pro->pro_stock = $co;
-            }else{
-                $pro->pro_deposito= $co;
+    public function descontarStock($codi, $item, $tipo, $id_empresa)
+    {
+        $pro_codigo_recibido = _14Producto::findOrFail($item->pro_codigo);
+        if (!in_array($id_empresa, [1, 3])) {
+            return 'Empresa no controlada';
+        }
+        // Guardar valores antes de actualizar (old_values)
+        $old_values = [
+            'pro_codigo' => $pro_codigo_recibido->pro_codigo,
+            'pro_reservar' => $pro_codigo_recibido->pro_reservar,
+            'pro_stock' => $pro_codigo_recibido->pro_stock,
+            'pro_stockCalmed' => $pro_codigo_recibido->pro_stockCalmed,
+            'pro_deposito' => $pro_codigo_recibido->pro_deposito,
+            'pro_depositoCalmed' => $pro_codigo_recibido->pro_depositoCalmed,
+        ];
+        // Definir los campos en el orden correcto según empresa y tipo
+        if ($id_empresa == 1) {
+            if ($tipo == 1) {
+                $campos = ['pro_stock', 'pro_deposito', 'pro_stockCalmed', 'pro_depositoCalmed'];
+            } else if ($tipo == 3 || $tipo == 4) {
+                $campos = ['pro_deposito', 'pro_stock', 'pro_depositoCalmed', 'pro_stockCalmed'];
+            } else {
+                return 'Tipo no controlado';
+            }
+        } else { // id_empresa == 3
+            if ($tipo == 1) {
+                $campos = ['pro_stockCalmed', 'pro_depositoCalmed', 'pro_stock', 'pro_deposito'];
+            } else if ($tipo == 3 || $tipo == 4) {
+                $campos = ['pro_depositoCalmed', 'pro_stockCalmed', 'pro_deposito', 'pro_stock'];
+            } else {
+                return 'Tipo no controlado';
             }
         }
-        //CALMED
-        if($id_empresa ==3){
-            if($tipo==1){
-                $pro->pro_stockCalmed = $co;
-            }else{
-                $pro->pro_depositoCalmed= $co;
+        // Inicializar variables
+        $cantidadRestante = $item->cantidad;
+        $totalRestado = 0;
+        // Recorrer los campos y descontar stock
+        foreach ($campos as $campo) {
+            if ($cantidadRestante <= 0) {
+                break;
+            }
+            if ($pro_codigo_recibido->$campo > 0) {
+                $aRestar = min($cantidadRestante, $pro_codigo_recibido->$campo);
+                $pro_codigo_recibido->$campo -= $aRestar;
+                $pro_codigo_recibido->save();
+                $cantidadRestante -= $aRestar;
+                $totalRestado += $aRestar;
             }
         }
-        $pro->save();
+        // Guardar valores después de actualizar (new_values)
+        $new_values = [
+            'pro_codigo' => $pro_codigo_recibido->pro_codigo,
+            'pro_reservar' => $pro_codigo_recibido->pro_reservar,
+            'pro_stock' => $pro_codigo_recibido->pro_stock,
+            'pro_stockCalmed' => $pro_codigo_recibido->pro_stockCalmed,
+            'pro_deposito' => $pro_codigo_recibido->pro_deposito,
+            'pro_depositoCalmed' => $pro_codigo_recibido->pro_depositoCalmed,
+        ];
+        return [
+            'old_values' => $old_values,
+            'new_values' => $new_values,
+            'totalRestado' => $totalRestado
+        ];
     }
     //Cambiar el estado de venta
     public function Desactivar_venta(Request $request)
@@ -739,9 +896,10 @@ class VentasController extends Controller
                         $this->regresarStock($codi,$item,$request->tipodoc,$request->empresa);
 
                     }
-                    $proform= Proforma::where('prof_id', $request->proforma)->where('emp_id', $request->empresa)->firstOrFail();
-                    $proform->prof_estado = 3;
-                    $proform->save();
+                    $proform= Proforma::where('prof_id', $venta->ven_idproforma)->where('emp_id', $venta->id_empresa)->firstOrFail();
+                    $this->finalizarDocumento($proform->id);
+                    // $proform->prof_estado = 3;
+                    // $proform->save();
                 DB::commit();
                 return response()->json(['message' => 'Anulación exitosa de la venta.'], 200);
             }catch(\Exception $e){
@@ -793,10 +951,36 @@ class VentasController extends Controller
             $pro->save();
         }
     }
-    //APIS PARA DESPACHO
+ 
     // public function GetVentasPendientes(Request $request) {
-    //     if($request->op==0){
-    //         $query=DB::SELECT("SELECT f.*,
+    //     // Definir el estado basado en la opción proporcionada
+    //     $estado = null;
+    //     switch ($request->op) {
+    //         case 0:
+    //             $estado = 2; // Pendientes
+    //             break;
+    //         case 1:
+    //             $estado = 11; // Excluir
+    //             break;
+    //         case 2:
+    //             $estado = 12; // Preparado
+    //             break;
+    //         case 3:
+    //             $estado = 10; // Empacado
+    //             break;
+    //         case 4:
+    //             $estado = 1; // Despachadas
+    //             break;
+    //         case 5:
+    //             $estado = [11, 12, 10, 2]; // Todos los estados
+    //             break;
+    //         default:
+    //             $estado = 2; // Por defecto, estado pendiente
+    //             break;
+    //     }
+    
+    //     // Consulta principal
+    //     $query = DB::SELECT("SELECT f.*, 
     //             tv.tip_ven_nombre,
     //             i.nombreInstitucion,
     //             us.cedula,
@@ -815,7 +999,8 @@ class VentasController extends Controller
     //             pr.prof_observacion,
     //             pl.id_pedido AS pedido_id,
     //             SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //             pl.porcentaje_descuento
+    //             pl.porcentaje_descuento,
+    //             camb.ven_codigo as documentoOrigen, camb.idtipodoc as tipoDocumentoOrigen
     //         FROM f_venta f
     //         INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
     //         INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
@@ -823,310 +1008,56 @@ class VentasController extends Controller
     //         INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
     //         INNER JOIN usuario u ON f.user_created = u.idusuario
     //         LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
+    //         LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente = pb.id_beneficiario_pedido
+    //         LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
     //         INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
     //         LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
     //         LEFT JOIN f_proforma pr ON pr.prof_id = f.ven_idproforma
     //         LEFT JOIN p_libros_obsequios pl ON pl.id = f.ven_p_libros_obsequios
-    //         WHERE f.est_ven_codigo = 2
-    //         AND NOT (f.idtipoDoc IN (3,4) AND f.doc_intercambio IS NOT NULL)
+    //         LEFT JOIN f_venta camb ON camb.doc_intercambio = f.ven_codigo  AND camb.id_empresa = f.id_empresa
+    //         WHERE f.est_ven_codigo " . (is_array($estado) ? 'IN (' . implode(',', $estado) . ')' : '= ' . $estado) . "
+    //         AND NOT (f.idtipodoc IN (3, 4) AND f.doc_intercambio IS NOT NULL)
     //         GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
     //                 us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
     //                 CONCAT(usa.nombres,' ',usa.apellidos), em.nombre,
     //                 pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
     //                 CONCAT(us.nombres,' ',us.apellidos),
     //                 pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //         ORDER BY f.ven_fecha;");
-    //        foreach($query as $key => $item){
-    //         if($item->idPuntoventa){
-    //             $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
-    //             $query[$key]->contratos =$quer1;
-    //         }else{
-    //             if($item->pedido_id){
-    //                 $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.id_pedido= '$item->pedido_id'");
-    //                 $query[$key]->contratos =$quer1;
-    //             }
-    //         }
-
-    //       }
-    //     }else if($request->op==1){
-    //         $query=DB::SELECT("SELECT f.*, tv.tip_ven_nombre,i.nombreInstitucion,
-    //        us.cedula,
-    //        us.email,
-    //        us.telefono,
-    //        i.telefonoInstitucion,
-    //        i.direccionInstitucion,
-    //        i.asesor_id,
-    //        concat(usa.nombres,' ',usa.apellidos) as asesor,
-    //        em.nombre,
-    //        user.cedula as cedula1,
-    //        pe.periodoescolar,
-    //        CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-    //        CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-    //        CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
-    //        pr.pedido_id,
-    //        pr.idPuntoventa,
-    //        pr.prof_observacion,
-    //        pl.id_pedido AS pedido_id,
-    //       SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //       pl.porcentaje_descuento
-    //       FROM f_venta f
-    //       INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
-    //       INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
-    //       INNER JOIN empresas em ON f.id_empresa = em.id
-    //       INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
-    //       INNER JOIN usuario u ON f.user_created = u.idusuario
-    //       LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-    //       LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-    //       LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
-    //       INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
-    //       LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
-    //       LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
-    //       LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
-    //       WHERE f.est_ven_codigo = 11
-    //       GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
-    //      us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
-    //      CONCAT(usa.nombres,' ',usa.apellidos), em.nombre, user.cedula,
-    //      pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
-    //      CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
-    //      pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //        order by f.ven_fecha");
-    //        foreach($query as $key => $item){
-    //         if($item->idPuntoventa){
-    //             $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
-    //             $query[$key]->contratos =$quer1;
-    //         }else{
-    //             if($item->pedido_id){
-    //                 $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.id_pedido= '$item->pedido_id'");
-    //                 $query[$key]->contratos =$quer1;
-    //             }
-    //         }
-
-    //       }
-    //     } else if($request->op==2)
-    //     {
-    //         $query=DB::SELECT("SELECT f.*, tv.tip_ven_nombre,i.nombreInstitucion,
-    //        us.cedula,
-    //        us.email,
-    //        us.telefono,
-    //        i.telefonoInstitucion,
-    //        i.direccionInstitucion,
-    //        i.asesor_id,
-    //        concat(usa.nombres,' ',usa.apellidos) as asesor,
-    //        em.nombre,
-    //        user.cedula as cedula1,
-    //        pe.periodoescolar,
-    //        CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-    //        CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-    //        CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
-    //        pr.pedido_id,
-    //        pr.idPuntoventa,
-    //        pr.prof_observacion,
-    //        pl.id_pedido AS pedido_id,
-    //       SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //       pl.porcentaje_descuento
-    //       FROM f_venta f
-    //       INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
-    //       INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
-    //       INNER JOIN empresas em ON f.id_empresa = em.id
-    //       INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
-    //       INNER JOIN usuario u ON f.user_created = u.idusuario
-    //       LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-    //       LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-    //       LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
-    //       INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
-    //       LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
-    //       LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
-    //       LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
-    //       WHERE f.est_ven_codigo = 12
-    //       GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
-    //      us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
-    //      CONCAT(usa.nombres,' ',usa.apellidos), em.nombre, user.cedula,
-    //      pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
-    //      CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
-    //      pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //       order by f.ven_fecha");
-    //        foreach($query as $key => $item){
-    //         if($item->idPuntoventa){
-    //             $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
-    //             $query[$key]->contratos =$quer1;
-    //         }else{
-    //             if($item->pedido_id){
-    //                 $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.id_pedido= '$item->pedido_id'");
-    //                 $query[$key]->contratos =$quer1;
-    //             }
-    //         }
-
-    //       }
-    //     }
-    //     else if($request->op==3)
-    //     {
-    //         $query=DB::SELECT("SELECT f.*, tv.tip_ven_nombre,i.nombreInstitucion,
-    //        us.cedula,
-    //        us.email,
-    //        us.telefono,
-    //        i.telefonoInstitucion,
-    //        i.direccionInstitucion,
-    //        i.asesor_id,
-    //        concat(usa.nombres,' ',usa.apellidos) as asesor,
-    //        em.nombre,
-    //        user.cedula as cedula1,
-    //        pe.periodoescolar,
-    //        CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-    //        CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-    //        CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
-    //        pr.pedido_id,
-    //        pr.idPuntoventa,
-    //        pr.prof_observacion,
-    //        pl.id_pedido AS pedido_id,
-    //       SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //       pl.porcentaje_descuento
-    //       FROM f_venta f
-    //       INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
-    //       INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
-    //       INNER JOIN empresas em ON f.id_empresa = em.id
-    //       INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
-    //       INNER JOIN usuario u ON f.user_created = u.idusuario
-    //       LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-    //       LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-    //       LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
-    //       INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
-    //       LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
-    //       LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
-    //       LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
-    //       WHERE f.est_ven_codigo = 10
-    //       GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
-    //      us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
-    //      CONCAT(usa.nombres,' ',usa.apellidos), em.nombre, user.cedula,
-    //      pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
-    //      CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
-    //      pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //        order by f.ven_fecha");
-    //        foreach($query as $key => $item){
-    //         if($item->idPuntoventa){
-    //             $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
-    //             $query[$key]->contratos =$quer1;
-    //         }else{
-    //             if($item->pedido_id){
-    //                 $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.id_pedido= '$item->pedido_id'");
-    //                 $query[$key]->contratos =$quer1;
-    //             }
-    //         }
-
-    //       }
-    //     }else if($request->op==4)
-    //     {
-    //         $query=DB::SELECT("SELECT f.*, tv.tip_ven_nombre,i.nombreInstitucion,
-    //        us.cedula,
-    //        us.email,
-    //        us.telefono,
-    //        i.telefonoInstitucion,
-    //        i.direccionInstitucion,
-    //        i.asesor_id,
-    //        concat(usa.nombres,' ',usa.apellidos) as asesor,
-    //        em.nombre,
-    //        user.cedula as cedula1,
-    //        pe.periodoescolar,
-    //        CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-    //        CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-    //        CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
-    //        pr.pedido_id,
-    //        pr.idPuntoventa,
-    //        pr.prof_observacion,
-    //        pl.id_pedido AS pedido_id,
-    //       SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //       pl.porcentaje_descuento
-    //       FROM f_venta f
-    //       INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
-    //       INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
-    //       INNER JOIN empresas em ON f.id_empresa = em.id
-    //       INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
-    //       INNER JOIN usuario u ON f.user_created = u.idusuario
-    //       LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-    //       LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-    //       LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
-    //       INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
-    //       LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
-    //       LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
-    //       LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
-    //       WHERE f.est_ven_codigo = 3
-    //       GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
-    //      us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
-    //      CONCAT(usa.nombres,' ',usa.apellidos), em.nombre, user.cedula,
-    //      pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
-    //      CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
-    //      pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //        order by f.ven_fecha");
-    //        foreach($query as $key => $item){
-    //         if($item->idPuntoventa){
-    //             $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
-    //             $query[$key]->contratos =$quer1;
-    //         }else{
-    //             if($item->pedido_id){
-    //                 $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.id_pedido= '$item->pedido_id'");
-    //                 $query[$key]->contratos =$quer1;
-    //             }
-    //         }
-
-    //       }
-    //     }else if($request->op==5)
-    //     {
-    //         $query=DB::SELECT("SELECT f.*, tv.tip_ven_nombre,i.nombreInstitucion,
-    //         us.cedula,
-    //         us.email,
-    //         us.telefono,
-    //         i.telefonoInstitucion,
-    //         i.direccionInstitucion,
-    //         i.asesor_id,
-    //         concat(usa.nombres,' ',usa.apellidos) as asesor,
-    //         em.nombre,
-    //         user.cedula as cedula1,
-    //         pe.periodoescolar,
-    //         CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-    //         CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-    //         CONCAT(user.nombres,' ',user.apellidos) AS cliente1,
-    //         pr.pedido_id,
-    //         pr.idPuntoventa,
-    //         pr.prof_observacion,
-    //         pl.id_pedido AS pedido_id,
-    //         SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //         pl.porcentaje_descuento
-    //         FROM f_venta f
-    //         INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
-    //         INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
-    //         INNER JOIN empresas em ON f.id_empresa = em.id
-    //         INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
-    //         INNER JOIN usuario u ON f.user_created = u.idusuario
-    //         LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-    //         LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente =pb.id_beneficiario_pedido
-    //         LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
-    //         INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
-    //         LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
-    //         LEFT JOIN  f_proforma  pr on pr.prof_id=f.ven_idproforma
-    //         LEFT JOIN p_libros_obsequios pl ON pl.id=f.ven_p_libros_obsequios
-    //         WHERE f.est_ven_codigo = 11 OR f.est_ven_codigo = 12 OR f.est_ven_codigo = 10 OR f.est_ven_codigo = 2
-    //         GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
-    //         us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
-    //         CONCAT(usa.nombres,' ',usa.apellidos), em.nombre, user.cedula,
-    //         pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
-    //         CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
-    //         pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //         order by f.ven_fecha");
-    //         foreach($query as $key => $item){
-    //             if($item->idPuntoventa){
-    //                 $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
-    //                 $query[$key]->contratos =$quer1;
-    //             }else{
-    //                 if($item->pedido_id){
-    //                     $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.id_pedido= '$item->pedido_id'");
-    //                     $query[$key]->contratos =$quer1;
-    //                 }
-    //             }
-    //         }
-    //     }
+    //         ORDER BY COALESCE(f.fecha_proceso_despacho, f.ven_fecha) DESC
+    //     ");
     
+    //     // Adicionar la lógica para obtener los contratos
+    //     foreach ($query as $key => $item) {
+    //         if ($item->idPuntoventa) {
+    //             $quer1 = DB::SELECT("SELECT pe.contrato_generado FROM pedidos pe WHERE pe.ca_codigo_agrupado = '$item->idPuntoventa'");
+    //             $query[$key]->contratos = $quer1;
+    //         } else {
+    //             if ($item->pedido_id) {
+    //                 $quer1 = DB::SELECT("SELECT pe.contrato_generado FROM pedidos pe WHERE pe.id_pedido = '$item->pedido_id'");
+    //                 $query[$key]->contratos = $quer1;
+    //             }else{
+    //                 $query[$key]->contratos = [];
+    //             }
+    //         }
+    //         //reempacado
+    //         $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+    //         FROM empacado_remision r
+    //         INNER JOIN empacado_rempacado e ON e.remision_id = r.id
+    //         WHERE r.remi_num_factura = '$item->ven_codigo'
+    //         AND r.remi_estado <> '0'
+    //         ");
+    //         if(count($getReempacado) > 0){
+    //             $query[$key]->empacado = $getReempacado;
+    //         }else{
+    //             $query[$key]->empacado = [];
+    //         }
+    //     }
+    //     if($request->contarArray){
+    //         return count($query);
+    //     }
     //     return $query;
     // }
-
+    //api:get/GetVentasPendientes?op=1&anio=2021&mes=12
     public function GetVentasPendientes(Request $request) {
         // Definir el estado basado en la opción proporcionada
         $estado = null;
@@ -1153,6 +1084,10 @@ class VentasController extends Controller
                 $estado = 2; // Por defecto, estado pendiente
                 break;
         }
+    
+        // Recibir el año y el mes desde el request
+        $anio = $request->anio;
+        $mes = $request->mes;
     
         // Consulta principal
         $query = DB::SELECT("SELECT f.*, 
@@ -1192,6 +1127,8 @@ class VentasController extends Controller
             LEFT JOIN f_venta camb ON camb.doc_intercambio = f.ven_codigo  AND camb.id_empresa = f.id_empresa
             WHERE f.est_ven_codigo " . (is_array($estado) ? 'IN (' . implode(',', $estado) . ')' : '= ' . $estado) . "
             AND NOT (f.idtipodoc IN (3, 4) AND f.doc_intercambio IS NOT NULL)
+            " . ($anio ? " AND YEAR(f.ven_fecha) = $anio" : "") . "
+            " . ($mes ? " AND MONTH(f.ven_fecha) = $mes" : "") . "
             GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
                     us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
                     CONCAT(usa.nombres,' ',usa.apellidos), em.nombre,
@@ -1214,8 +1151,23 @@ class VentasController extends Controller
                     $query[$key]->contratos = [];
                 }
             }
+            //reempacado
+            $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+            FROM empacado_remision r
+            INNER JOIN empacado_rempacado e ON e.remision_id = r.id
+            WHERE r.remi_num_factura = '$item->ven_codigo'
+            AND r.remi_estado <> '0'
+            ");
+            if(count($getReempacado) > 0){
+                $query[$key]->empacado = $getReempacado;
+            }else{
+                $query[$key]->empacado = [];
+            }
         }
     
+        if($request->contarArray){
+            return count($query);
+        }
         return $query;
     }
     
@@ -1255,8 +1207,7 @@ class VentasController extends Controller
                 LEFT JOIN p_libros_obsequios pl ON pl.id = f.ven_p_libros_obsequios
                 LEFT JOIN usuario AS interc ON f.user_intercambio = interc.idusuario
                 LEFT JOIN usuario ua ON f.user_anulado = ua.idusuario
-                WHERE f.est_ven_codigo = 1
-                AND (f.ven_codigo LIKE ? OR f.ven_cliente LIKE ? OR i.nombreInstitucion LIKE ?)
+                WHERE (f.ven_codigo LIKE ? OR f.ven_cliente LIKE ? OR i.nombreInstitucion LIKE ?)
                 GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email, 
                     us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
                     CONCAT(u.nombres,' ',u.apellidos), em.nombre, user.cedula,
@@ -1279,6 +1230,18 @@ class VentasController extends Controller
                     }else{
                         $query[$key]->contratos = [];
                     }
+                }
+                  //reempacado
+                $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+                FROM empacado_remision r
+                INNER JOIN empacado_rempacado e ON e.remision_id = r.id
+                WHERE r.remi_num_factura = '$item->ven_codigo'
+                AND r.remi_estado <> '0'
+                ");
+                if(count($getReempacado) > 0){
+                    $query[$key]->empacado = $getReempacado;
+                }else{
+                    $query[$key]->empacado = [];
                 }
             }
         
@@ -1325,7 +1288,7 @@ class VentasController extends Controller
              CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
              pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
               order by f.ven_fecha");
-               foreach($query as $key => $item){
+            foreach($query as $key => $item){
                 if($item->idPuntoventa){
                     $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
                     $query[$key]->contratos =$quer1;
@@ -1336,6 +1299,18 @@ class VentasController extends Controller
                     }else{
                         $query[$key]->contratos = [];
                     }
+                }
+                //reempacado
+                $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+                FROM empacado_remision r
+                INNER JOIN empacado_rempacado e ON e.remision_id = r.id
+                WHERE r.remi_num_factura = '$item->ven_codigo'
+                AND r.remi_estado <> '0'
+                ");
+                if(count($getReempacado) > 0){
+                    $query[$key]->empacado = $getReempacado;
+                }else{
+                    $query[$key]->empacado = [];
                 }
             }
         }
@@ -1381,7 +1356,7 @@ class VentasController extends Controller
              CONCAT(us.nombres,' ',us.apellidos), CONCAT(user.nombres,' ',user.apellidos),
              pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
               order by f.ven_fecha");
-               foreach($query as $key => $item){
+            foreach($query as $key => $item){
                 if($item->idPuntoventa){
                     $quer1=DB::SELECT("select pe.contrato_generado from pedidos pe where pe.ca_codigo_agrupado= '$item->idPuntoventa'");
                     $query[$key]->contratos =$quer1;
@@ -1392,6 +1367,18 @@ class VentasController extends Controller
                     }else{
                         $query[$key]->contratos = [];
                     }
+                }
+                //reempacado
+                $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+                FROM empacado_remision r
+                INNER JOIN empacado_rempacado e ON e.remision_id = r.id
+                WHERE r.remi_num_factura = '$item->ven_codigo'
+                AND r.remi_estado <> '0'
+                ");
+                if(count($getReempacado) > 0){
+                    $query[$key]->empacado = $getReempacado;
+                }else{
+                    $query[$key]->empacado = [];
                 }
             }
         }
@@ -1468,13 +1455,31 @@ class VentasController extends Controller
                    return $query;
     }
     public function getDventas(Request $request){
-        $query = DB::SELECT(" SELECT dv.*, dv.det_ven_cantidad as despacho, pro.*
+        // $query = DB::SELECT("SELECT dv.*, 
+        //         CASE 
+        //             WHEN dv.det_ven_cantidad_despacho = 0 THEN dv.det_ven_cantidad 
+        //             ELSE dv.det_ven_cantidad_despacho 
+        //         END as despacho,
+        //         (dv.det_ven_cantidad - dv.det_ven_cantidad_despacho) as cantidad_pendiente,
+        //         pro.*
+        //     FROM f_detalle_venta dv
+        //     INNER JOIN 1_4_cal_producto pro ON pro.pro_codigo = dv.pro_codigo
+        //     WHERE dv.ven_codigo = '$request->id'
+        //     AND dv.id_empresa = $request->idemp
+        //     ORDER BY dv.pro_codigo
+        // ");
+        $query = DB::SELECT("SELECT dv.*, 
+                (dv.det_ven_cantidad - dv.det_ven_cantidad_despacho) as despacho,
+                (dv.det_ven_cantidad - dv.det_ven_cantidad_despacho) as cantidad_pendiente,
+                pro.*
             FROM f_detalle_venta dv
             INNER JOIN 1_4_cal_producto pro ON pro.pro_codigo = dv.pro_codigo
             WHERE dv.ven_codigo = '$request->id'
-            and dv.id_empresa = $request->idemp
-            order by dv.pro_codigo");
+            AND dv.id_empresa = $request->idemp
+            ORDER BY dv.pro_codigo
+        ");
         return $query;
+    
     }
    
     //agrupados para pedidos
