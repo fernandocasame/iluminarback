@@ -1373,7 +1373,7 @@ class _14ProductoController extends Controller {
         // Obtener los registros principales
         $query = DB::SELECT("SELECT prof.id, prof.prof_id, prof.prof_estado
                              FROM f_proforma prof
-                             WHERE prof.prof_estado = 1 OR prof.prof_estado = 3 OR prof.prof_estado = 6");
+                             WHERE prof.prof_estado = 1 OR prof.prof_estado = 3");
 
         // Recorrer cada registro para agregar los detalles
         foreach ($query as &$proforma) {
