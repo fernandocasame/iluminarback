@@ -243,9 +243,6 @@ trait TraitPedidosGeneral
         ");
         return $query;
     }
-    public function updateDatosVerificacionPorIngresar($contrato,$estado){
-        $query = Pedidos::Where('contrato_generado','=',$contrato)->update(['datos_verificacion_por_ingresar' => $estado]);
-    }
     //asesores que tiene pedidos
     public function getAsesoresPedidos(){
         $query = DB::SELECT("SELECT DISTINCT p.id_asesor,
@@ -357,8 +354,9 @@ trait TraitPedidosGeneral
         return $query;
     }
     public function tr_getDocumentos($ca_codigo_agrupado){
-        $query = DB::SELECT("SELECT DISTINCT fv.ven_codigo FROM f_venta fv
+        $query = DB::SELECT("SELECT DISTINCT fv.ven_codigo, fv.est_ven_codigo, ev.est_ven_nombre FROM f_venta fv
         INNER JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
+        LEFT JOIN 1_4_estado_venta ev on fv.est_ven_codigo = ev.est_ven_codigo
         WHERE fpr.idPuntoventa = '$ca_codigo_agrupado'
         AND fv.est_ven_codigo <> 3
         ");

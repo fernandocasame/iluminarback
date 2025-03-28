@@ -1224,6 +1224,7 @@ Route::get('VerifcarMetodosGet_AbonoRetencionPorcentaje','AbonoRetencionPorcenta
 Route::get('get_VerificacionAntesEliminarPedido','PedidosController@get_VerificacionAntesEliminarPedido');
 Route::get('getSeries_EdicionStock','SeriesController@getSeries_EdicionStock');
 Route::get('VerifcarMetodosGet_UsuarioController','UsuarioController@VerifcarMetodosGet_UsuarioController');
+Route::get('Get_Estado_Venta','Pedidos2Controller@Get_Estado_Venta');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
 Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
@@ -1900,6 +1901,7 @@ Route::post('Proforma_Registrar_modificar','ProformaController@Proforma_Registra
 Route::post('PostProforma_Editar','ProformaController@PostProforma_Editar');
 Route::post('PostProformaDetalle_Editar','ProformaController@PostProformaDetalle_Editar');
 Route::post('Desactivar_Proforma','ProformaController@Desactivar_Proforma');
+Route::post('AprobarProforma','ProformaController@AprobarProforma');
 Route::post('DesactivarProforma','ProformaController@DesactivarProforma');
 Route::post('Eliminar_DetaProforma','ProformaController@Eliminar_DetaProforma');
 Route::post('Eliminar_Proforma','ProformaController@Eliminar_Proforma');
@@ -1957,6 +1959,8 @@ Route::post('PostSucursalesInstitucion_Registrar_modificar','InstitucionSucursal
 Route::post('Post_Eliminar_SucursalesInstitucion','InstitucionSucursalesController@Post_Eliminar_SucursalesInstitucion');
 Route::post('Desactivar_SucursalesInstitucion','InstitucionSucursalesController@Desactivar_SucursalesInstitucion');
 //FIN INSTITUCION SUCURSALES
+Route::resource('empresa','_14EmpresaController');
+Route::post('verificarStock', 'VentasController@verificarStock');
 //REPORTE DESPACHADOS
 Route::get('despachos', 'VentasController@despachos');
 //FIN REPORTE DESPACHADOS

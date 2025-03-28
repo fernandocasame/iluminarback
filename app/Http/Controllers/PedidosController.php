@@ -1838,12 +1838,15 @@ class PedidosController extends Controller
         pe.codigo_contrato, pe.region_idregion,
         CONCAT(fac.nombres,' ',fac.apellidos) as facturador, pe.periodoescolar as periodo,
         pe.pedido_facturacion, pe.pedido_bodega, pe.pedido_asesor, e.nombre as empresa,
-        p.facturacion_vee
+        p.facturacion_vee,
+        CONCAT(ua.nombres,' ',ua.apellidos) as usuario_anulado,
+        p.message_anulado
         FROM pedidos p
         LEFT JOIN usuario u ON p.id_asesor = u.idusuario
         LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = p.id_periodo
         LEFT JOIN usuario fac ON p.id_usuario_verif  = fac.idusuario
         LEFT JOIN empresas e ON p.empresa_id = e.id
+        LEFT JOIN usuario ua on ua.idusuario = p.user_anulado
         WHERE p.tipo = '1'
         ORDER BY p.id_pedido DESC
         ");

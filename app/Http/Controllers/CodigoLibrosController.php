@@ -1058,48 +1058,125 @@ class CodigoLibrosController extends Controller
         return $data;
 
      }
-     public function getTipoVenta(Request $request){
+    // public function getTipoVenta(Request $request){
+    //     set_time_limit(6000000);
+    //     ini_set('max_execution_time', 6000000);
+    //     $tipoVenta = DB::SELECT("SELECT
+    //     c.libro as book,c.serie,
+    //     c.prueba_diagnostica,c.factura,c.codigo_union,
+    //     IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+    //     c.contrato,c.porcentaje_descuento,
+    //     c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
+    //     c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,l.nombrelibro as libro,
+    //     ib.nombreInstitucion as institucion_barras,
+    //     pb.periodoescolar as periodo_barras,
+    //     IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+    //     (case when (c.estado_liquidacion = '0') then 'liquidado'
+    //         when (c.estado_liquidacion = '1') then 'sin liquidar'
+    //         when (c.estado_liquidacion = '2') then 'codigo regalado'
+    //         when (c.estado_liquidacion = '3') then 'codigo devuelto'
+    //         when (c.estado_liquidacion = '4') then 'Código Guia'
+    //     end) as liquidacion,
+    //     (case when (c.bc_estado = '2') then 'codigo leido'
+    //     when (c.bc_estado = '1') then 'codigo sin leer'
+    //     end) as barrasEstado,
+    //     (case when (c.venta_estado = '0') then ''
+    //         when (c.venta_estado = '1') then 'Venta directa'
+    //         when (c.venta_estado = '2') then 'Venta por lista'
+    //     end) as ventaEstado,
+    //     ib.nombreInstitucion as institucionBarra,
+    //     pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
+    //     c.codigo_proforma,c.proforma_empresa, c.combo,c.codigo_combo, ls.codigo_liquidacion
+    //     FROM codigoslibros c
+    //     LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+    //     LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+    //     LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+    //     LEFT JOIN libro l ON c.libro_idlibro = l.idlibro
+    //     LEFT JOIN libros_series ls on ls.idLibro = l.idlibro
+    //     WHERE (c.bc_institucion = '$request->institucion_id' OR venta_lista_institucion = '$request->institucion_id')
+    //     AND c.bc_periodo = '$request->periodo_id'
+    //     AND c.prueba_diagnostica = '0'
+    //     AND c.estado_liquidacion <> '3'
+    //     ");
+    //     return $tipoVenta;
+    // }
+    public function getTipoVenta(Request $request)
+    {
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
+
+        // Obtener los detalles de tipoVenta
         $tipoVenta = DB::SELECT("SELECT
-        c.libro as book,c.serie,
-        c.prueba_diagnostica,c.factura,c.codigo_union,
-        IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
-        c.contrato,c.porcentaje_descuento,
-        c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,
-        c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,l.nombrelibro as libro,
-        ib.nombreInstitucion as institucion_barras,
-        pb.periodoescolar as periodo_barras,
-        IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-        (case when (c.estado_liquidacion = '0') then 'liquidado'
-            when (c.estado_liquidacion = '1') then 'sin liquidar'
-            when (c.estado_liquidacion = '2') then 'codigo regalado'
-            when (c.estado_liquidacion = '3') then 'codigo devuelto'
-            when (c.estado_liquidacion = '4') then 'Código Guia'
-        end) as liquidacion,
-        (case when (c.bc_estado = '2') then 'codigo leido'
-        when (c.bc_estado = '1') then 'codigo sin leer'
-        end) as barrasEstado,
-        (case when (c.codigos_barras = '1') then 'con código de barras'
-            when (c.codigos_barras = '0')  then 'sin código de barras'
-        end) as status,
-        (case when (c.venta_estado = '0') then ''
-            when (c.venta_estado = '1') then 'Venta directa'
-            when (c.venta_estado = '2') then 'Venta por lista'
-        end) as ventaEstado,
-        ib.nombreInstitucion as institucionBarra,
-        pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista
-        FROM codigoslibros c
-        LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
-        LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
-        LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
-        LEFT JOIN libro l ON c.libro_idlibro = l.idlibro
-        WHERE (c.bc_institucion = '$request->institucion_id' OR venta_lista_institucion = '$request->institucion_id')
-        AND c.bc_periodo = '$request->periodo_id'
-        AND c.prueba_diagnostica = '0'
+            c.libro as book, c.serie, c.prueba_diagnostica, c.factura, c.codigo_union,
+            IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
+            c.contrato, c.porcentaje_descuento, c.codigo, c.bc_estado, c.estado, c.estado_liquidacion, contador,
+            c.venta_estado, c.bc_periodo, c.bc_institucion, c.idusuario, c.id_periodo, c.contrato, l.nombrelibro as libro,
+            ib.nombreInstitucion as institucion_barras, pb.periodoescolar as periodo_barras,
+            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+            (case when (c.estado_liquidacion = '0') then 'liquidado'
+                when (c.estado_liquidacion = '1') then 'sin liquidar'
+                when (c.estado_liquidacion = '2') then 'codigo regalado'
+                when (c.estado_liquidacion = '3') then 'codigo devuelto'
+                when (c.estado_liquidacion = '4') then 'Código Guia'
+            end) as liquidacion,
+            (case when (c.bc_estado = '2') then 'codigo leido'
+            when (c.bc_estado = '1') then 'codigo sin leer'
+            end) as barrasEstado,
+            (case when (c.venta_estado = '0') then ''
+                when (c.venta_estado = '1') then 'Venta directa'
+                when (c.venta_estado = '2') then 'Venta por lista'
+            end) as ventaEstado,
+            ib.nombreInstitucion as institucionBarra,
+            pb.periodoescolar as periodo_barras, ivl.nombreInstitucion as InstitucionLista,
+            c.codigo_proforma, c.proforma_empresa, c.combo, c.codigo_combo, ls.codigo_liquidacion
+            FROM codigoslibros c
+            LEFT JOIN institucion ib ON c.bc_institucion = ib.idInstitucion
+            LEFT JOIN institucion ivl ON c.venta_lista_institucion = ivl.idInstitucion
+            LEFT JOIN periodoescolar pb ON c.bc_periodo = pb.idperiodoescolar
+            LEFT JOIN libro l ON c.libro_idlibro = l.idlibro
+            LEFT JOIN libros_series ls on ls.idLibro = l.idlibro
+            WHERE (c.bc_institucion = '$request->institucion_id' OR c.venta_lista_institucion = '$request->institucion_id')
+            AND c.bc_periodo = '$request->periodo_id'
+            AND c.prueba_diagnostica = '0'
+            AND c.estado_liquidacion <> '3'
         ");
-        return $tipoVenta;
-     }
+
+        // Convertimos a una colección de Laravel
+        $tipoVentaCollection = collect($tipoVenta);
+
+        // Agrupamos por 'codigo_proforma' y 'proforma_empresa'
+        $proformasGrouped = $tipoVentaCollection->groupBy(function ($item) {
+            return $item->codigo_proforma . '-' . $item->proforma_empresa; // Agrupamos por codigo_proforma y proforma_empresa
+        });
+
+        // Ahora, procesamos cada grupo para contar cuántos códigos tiene y asignar el nombre de la empresa
+        $proformas = $proformasGrouped->map(function ($group) {
+            $codigoProforma = $group->first()->codigo_proforma;
+            $proformaEmpresa = $group->first()->proforma_empresa;
+
+            // Determinamos el nombre de la empresa
+            $empresa = 'sin documentos';
+            if ($proformaEmpresa == '1') {
+                $empresa = 'Prolipa';
+            } elseif ($proformaEmpresa == '3') {
+                $empresa = 'Grupo Calmed';
+            }
+
+            // Contamos cuántos registros hay en este grupo
+            return [
+                'codigo_proforma' => $codigoProforma,
+                'empresa' => $empresa,
+                'cantidad_codigos' => $group->count(),
+            ];
+        });
+
+        // Retornar los resultados en formato JSON
+        return response()->json([
+            'tipoVenta' => $tipoVentaCollection, // Los detalles originales
+            'documentos' => $proformas->values(), // La agrupación y el conteo
+        ]);
+    }
+
     //api:post/codigos/bloquear
     public function bloquearCodigos(Request $request){
         set_time_limit(6000000);
@@ -1504,7 +1581,6 @@ class CodigoLibrosController extends Controller
                             "email" => $validar[0]->email,
                             "estado_liquidacion" => $validar[0]->estado_liquidacion,
                             "estado" => $validar[0]->estado,
-                            "status" => $validar[0]->status,
                             "contador" => $validar[0]->contador,
                             "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                             "factura"               => $validar[0]->factura,
@@ -1584,7 +1660,6 @@ class CodigoLibrosController extends Controller
                         "email"              => $validar[0]->email,
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado"             => $validar[0]->estado,
-                        "status"             => $validar[0]->status,
                         "contador"           => $validar[0]->contador,
                         "porcentaje_descuento" => $validar[0]->porcentaje_descuento,
                         "factura"            => $validar[0]->factura,

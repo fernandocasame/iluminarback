@@ -1795,5 +1795,10 @@ class Pedidos2Controller extends Controller
         return $query;
 
     }
+
+    public function Get_Estado_Venta(){
+        $query = DB::SELECT("SELECT * FROM `1_4_estado_venta` WHERE est_ven_codigo NOT IN (5, 6, 7, 8, 9, 11, 13, 14, 15)");
+        return $query;
+    }
     //FIN METODOS JEYSON
 }

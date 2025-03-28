@@ -282,6 +282,11 @@ class  ProformaRepository extends BaseRepository
                 }
             }
 
+            // Comprobar si hay suficiente stock para restar
+            if ($stockEmpresa < $valorNew) {
+                throw new Exception('No hay suficiente stock para restar en "'.$codigo_liquidacion.  '". Stock disponible: ' . $stockEmpresa . ', cantidad a restar: ' . $valorNew);
+            }
+
             $nuevoStockReserva          = $stockAnteriorReserva - $valorNew;
             $nuevoStockEmpresa          = $stockEmpresa - $valorNew;
 

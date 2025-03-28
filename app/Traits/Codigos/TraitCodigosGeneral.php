@@ -74,7 +74,7 @@ trait TraitCodigosGeneral{
         return $consulta;
     }
     //conDevolucion => 1 si; 0 no;
-    public function getCodigos($codigo,$conDevolucion,$busqueda = 0,$primerParametro=0,$segundoParametro=0){
+    public function getCodigos($codigo,$conDevolucion,$busqueda = 0,$primerParametro=0,$segundoParametro=0,$request=null){
         $resultado = DB::table('codigoslibros as c')
         ->select(DB::raw('c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
         IF(c.prueba_diagnostica ="1", "Prueba de diagnóstico","Código normal") as tipoCodigo,
@@ -96,9 +96,6 @@ trait TraitCodigosGeneral{
         (case when (c.bc_estado = "2") then "codigo leido"
         when (c.bc_estado = "1") then "codigo sin leer"
         end) as barrasEstado,
-        (case when (c.codigos_barras = "1") then "con código de barras"
-            when (c.codigos_barras = "0")  then "sin código de barras"
-        end) as status,
         (case when (c.venta_estado = "0") then ""
             when (c.venta_estado = "1") then "Venta directa"
             when (c.venta_estado = "2") then "Venta por lista"
@@ -147,6 +144,15 @@ trait TraitCodigosGeneral{
         if($busqueda == 5) {  $resultado->where('c.codigo_combo', '=', $codigo)->where('prueba_diagnostica','0'); }
         //todos los codigos de un combo
         if($busqueda == 6) {  $resultado->where('c.codigo_combo', '=', $codigo); }
+        //reporte detalle de venta
+        if($busqueda == 7) {
+            $resultado->where(function($query) use ($request) {
+                $query->where('c.bc_institucion', '=', $request->institucion_id)
+                      ->orWhere('venta_lista_institucion', '=', $request->institucion_id);
+            })
+            ->where('c.bc_periodo', '=', $request->periodo_id)
+            ->where('c.prueba_diagnostica', '=', '0');
+        }
         $consulta = $resultado->get();
         if(empty($consulta)){
             return $consulta;
@@ -199,7 +205,6 @@ trait TraitCodigosGeneral{
                 "porcentaje_descuento"          => $item->porcentaje_descuento,
                 "prueba_diagnostica"            => $item->prueba_diagnostica,
                 "serie"                         => $item->serie,
-                "status"                        => $item->status,
                 "tipoCodigo"                    => $item->tipoCodigo,
                 "ventaEstado"                   => $item->ventaEstado,
                 "venta_estado"                  => $item->venta_estado,
@@ -243,9 +248,6 @@ trait TraitCodigosGeneral{
             (case when (c.bc_estado = '2') then 'codigo leido'
             when (c.bc_estado = '1') then 'codigo sin leer'
             end) as barrasEstado,
-            (case when (c.codigos_barras = '1') then 'con código de barras'
-                when (c.codigos_barras = '0')  then 'sin código de barras'
-            end) as status,
             (case when (c.venta_estado = '0') then ''
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
@@ -318,7 +320,6 @@ trait TraitCodigosGeneral{
                 "porcentaje_descuento"          => $item->porcentaje_descuento,
                 "prueba_diagnostica"            => $item->prueba_diagnostica,
                 "serie"                         => $item->serie,
-                "status"                        => $item->status,
                 "tipoCodigo"                    => $item->tipoCodigo,
                 "ventaEstado"                   => $item->ventaEstado,
                 "venta_estado"                  => $item->venta_estado,

@@ -790,16 +790,16 @@ class ProformaController extends Controller
             // Obtener las ventas asociadas a la proforma
             $ventas = DB::table('f_venta')->where('ven_idproforma', $proform->prof_id)->get();
             
-            if ($ventas->isEmpty()) {
-                throw new \Exception('No se encontraron ventas asociadas a la proforma');
-            }
+            // if ($ventas->isEmpty()) {
+            //     throw new \Exception('No se encontraron ventas asociadas a la proforma');
+            // }
             if($ventas){
                 foreach ($ventas as $venta) {
                     // Verificar si la venta está en estado pendiente de despacho (estado 2)
                     if ($venta->est_ven_codigo != 2 && $venta->est_ven_codigo != 3) {
                         return response()->json([
                             "status" => "0", 
-                            "message" => "La venta " . $venta->ven_codigo . " no está pendiente de despacho y no puede ser anulada."
+                            "message" => "La venta " . $venta->ven_codigo . " ya fue despachada y no puede ser anulada."
                         ]);
                     }else{
                         if($venta->est_ven_codigo == 2){

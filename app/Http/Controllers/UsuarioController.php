@@ -1590,7 +1590,6 @@ class UsuarioController extends Controller
                         "email" => $validar[0]->email,
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
-                        "status" => $validar[0]->status,
                         "contador" => $validar[0]->contador
                     ];
                     $contador++;

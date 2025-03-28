@@ -734,8 +734,6 @@ class TemporadaController extends Controller
                 ]);
             }
         }
-        //COLOCAR EL CAMPO datos_verificacion_por_ingresar EN ESTADO 0 PARA QUE YA SE EJECUTO Y SE GUARDO LOS VALORES
-        $this->updateDatosVerificacionPorIngresar($contrato,0);
     }
     public function updateVerificacion(Request $request){
         $verificacionId = $request->verificacion_id;

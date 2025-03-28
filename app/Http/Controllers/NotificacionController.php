@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\NotificacionGeneral;
+use App\Repositories\pedidos\NotificacionRepository;
 use Pusher\Pusher;
 class NotificacionController extends Controller
 {
@@ -13,6 +14,11 @@ class NotificacionController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+    public $NotificacionRepository;
+    public function __construct(NotificacionRepository $NotificacionRepository)
+    {
+        $this->NotificacionRepository   = $NotificacionRepository;
+    }
     //api:get/notificaciones
     public function index()
     {
@@ -42,6 +48,7 @@ class NotificacionController extends Controller
 
         // Verificar si ya existe una notificación con id_padre y estado 0
         $notificacion = NotificacionGeneral::where('id_padre', $validatedData['id_padre'])
+            ->where('estado', 0)
             ->first();
 
         if ($notificacion) {
@@ -63,6 +70,16 @@ class NotificacionController extends Controller
             // Crear una nueva notificación
             $notificacion = new NotificacionGeneral($validatedData);
             $success      = $notificacion->save();
+        }
+
+        if($success){
+            $channel = 'admin.notifications_verificaciones';
+            $event = 'NewNotification';
+            $data = [
+                'message' => 'Nueva notificación',
+            ];
+            $this->NotificacionRepository->notificacionVerificacionAdmin($channel, $event, $data);
+
         }
 
         // Retornar la respuesta

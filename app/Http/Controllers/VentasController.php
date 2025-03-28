@@ -1689,6 +1689,48 @@ class VentasController extends Controller
         // Devuelve las ventas con los datos combinados
         return response()->json($ventas);
     }
+    public function getAllPrefacturasNotas(Request $request) {
+        $ventas = DB::table('f_venta as fv')
+            ->join('empresas as e', 'fv.id_empresa', '=', 'e.id')
+            ->join('periodoescolar as p', 'fv.periodo_id', '=', 'p.idperiodoescolar')
+            ->select(
+                'fv.*',
+                'e.descripcion_corta',
+                'p.periodoescolar'
+            )
+            ->where('institucion_id', $request->busqueda)
+            ->where('periodo_id', $request->periodo)
+            ->where('fv.est_ven_codigo', '<>', 3)
+            ->whereIn('fv.idtipodoc', [1,3,4])
+            ->get();
+
+        // Recopila los ruc_cliente para hacer la segunda consulta
+        $rucClientes = $ventas->pluck('ruc_cliente')->unique();
+
+        // Obtiene los usuarios y las instituciones en una sola consulta
+        $usuarios = DB::table('usuario')
+            ->whereIn('cedula', $rucClientes)
+            ->get()
+            ->keyBy('cedula');
+
+        $instituciones = DB::table('institucion')
+            ->whereIn('idInstitucion', $ventas->pluck('institucion_id')->unique())
+            ->get()
+            ->keyBy('idInstitucion');
+
+        // Combina los resultados en un solo array
+        foreach ($ventas as $key => $venta) {
+            $usuario = $usuarios->get($venta->ruc_cliente);
+            $institucion = $instituciones->get($venta->institucion_id);
+
+            // Aquí puedes agregar los datos de cliente e institución directamente a la venta
+            $ventas[$key]->clienteUsuario = $usuario ? $usuario->nombres . ' ' . $usuario->apellidos : null;
+            $ventas[$key]->clienteInstitucion = $institucion ? $institucion->nombreInstitucion : null;
+        }
+
+        // Devuelve las ventas con los datos combinados
+        return response()->json($ventas);
+    }
     public function getCantidadFacturada(Request $request)
     {
         // Validar los parámetros de entrada
@@ -1872,7 +1914,9 @@ class VentasController extends Controller
 
         // Realizar la consulta
         $query = DetalleVentas::where('ven_codigo', $ven_codigo)
+            ->leftjoin('1_4_cal_producto as p','p.pro_codigo','=','f_detalle_venta.pro_codigo')
             ->where('id_empresa', $id_empresa)
+            ->select('f_detalle_venta.*','p.ifcombo')
             ->get(); // Usar 'get()' si esperas varios resultados
 
         // Retornar la respuesta
@@ -2122,6 +2166,56 @@ class VentasController extends Controller
         );
     }
 
+    public function verificarStock(Request $request)
+    {
+        $datos = $request->all(); // Los productos enviados desde el frontend
+        $productosNoDisponibles = []; // Array para almacenar los productos sin stock suficiente
+    
+        // Procesamos cada producto recibido
+        foreach ($datos as $producto) {
+            // Verificamos según la empresa
+            if ($producto['empresa'] == 1) {
+                // Verificamos el stock de la empresa 1
+                $stockDisponible = DB::table('1_4_cal_producto')
+                    ->where('pro_codigo', $producto['codigo'])
+                    ->value('pro_stock');
+            } elseif ($producto['empresa'] == 3) {
+                // Verificamos el stock de la empresa 3
+                $stockDisponible = DB::table('1_4_cal_producto')
+                    ->where('pro_codigo', $producto['codigo'])
+                    ->value('pro_stockCalmed');
+            } else {
+                // Si la empresa no es válida, lo marcamos como no disponible
+                continue;
+            }
+    
+            // Verificamos si hay suficiente stock para restar
+            if ($stockDisponible < $producto['cantidad']) {
+                // Si no hay suficiente stock, lo añadimos al array de productos no disponibles
+                $productosNoDisponibles[] = [
+                    'codigo' => $producto['codigo'],
+                    'cantidad_solicitada' => $producto['cantidad'],
+                    'stock_disponible' => $stockDisponible,
+                ];
+            }
+        }
+    
+        if (count($productosNoDisponibles) > 0) {
+            // Si hay productos sin stock suficiente, devolvemos la lista de productos no disponibles
+            return response()->json([
+                'status' => 0,
+                'message' => 'No hay suficiente stock para algunos productos.',
+                'productos_no_disponibles' => $productosNoDisponibles
+            ]);
+        }
+    
+        // Si todos los productos tienen stock suficiente
+        return response()->json([
+            'status' => 1,
+            'message' => 'Todos los productos tienen stock suficiente.'
+        ]);
+    }
+    
     public function cambioPrefacturasANota(Request $request)
     {
         // Recibimos los datos desde el frontend
@@ -2329,7 +2423,9 @@ class VentasController extends Controller
                         'pro_codigo' => $codigo,
                         'cantidad_original' => $cantidadSolicitada,
                         'cantidad_intercambio' => $devolucion['cantidadConvertir'],
-                        'usuario' => $request->user_created
+                        'usuario' => $request->user_created,
+                        'periodo_id' =>$request->periodo_id,
+                        'empresa_id' => $empresa,
                     ]);
                     
                     // Obtener el código del producto y la empresa
