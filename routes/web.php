@@ -2078,5 +2078,7 @@ Route::post('new_novedades', 'InstitucionController@new_novedades_add');
 Route::group([], function () {
     Route::resource('/prefactura_documentos', 'PrefacturaController');
 });
+Route::post('getEvaluacionesAdminPeriodo', 'EvaluacionController@getEvaluacionesUltimoPeriodo');
+
 Route::get('cod_evaluacion_institucion/{id}','InstitucionController@cod_evaluacion_institucion');
 Route::post('contarLibrosPorPeriodo','PedidosController@contarLibrosPorPeriodo');
