@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Http;
 trait TraitPedidosGeneral
 {
     //=====PERSEO=======
-    public $api_keyProlipaProduction    = "RfVaC9hIMhn49J4jSq2_I7GbWYHrlGRtitYwIuTepQg-";
-    public $api_keyCalmedProduction     = "RfVaC9hIMhn49J4jSq2_IzB1.iNzqGb9M38jmd1DfQs-";
-    public $api_keyProlipaLocal         = "RfVaC9hIMhn49J4jSq2_I_.QLazmDGrbZQ8o8ePUEcU-";
-    public $api_keyCalmedLocal          = "RfVaC9hIMhn49J4jSq2_I91geWPRm0IWEft2beVW9NI-";
+    public $api_keyProlipaProduction    = "RfVaC9hIMhn49J4jSq2_I_50FLWFrX8qOhXa9PacnqU-";
+    public $api_keyCalmedProduction     = "RfVaC9hIMhn49J4jSq2_I8kXMeIRjM.3WlDNPyOqfu0";
+    public $api_keyProlipaLocal         = "RfVaC9hIMhn49J4jSq2_IzB1.iNzqGb9M38jmd1DfQs-";
+    public $api_keyCalmedLocal          = "RfVaC9hIMhn49J4jSq2_I5FdjyUYFOLEGVaHnPJ9Pyw-";
     //=====END PERSEO=======
     //=====SOLINFA==========
     public $api_KeyGONZALEZ             = "RfVaC9hIMhn49J4jSq2_Iw3h5qF1Dg0ecy.kFTzdqnA-";
