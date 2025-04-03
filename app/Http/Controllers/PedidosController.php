@@ -944,6 +944,360 @@ class PedidosController extends Controller
         $libroSolicitados       = $this->pedidosRepository->obtenerLibroxPedidoTodo($pedido);
         return $libroSolicitados;
     }
+    public function get_val_pedidoInfoTodo_Reporte_new($pedido){
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.pvn_id AS id, pv.id_pedido, pv.pvn_cantidad AS valor,
+        CASE
+            WHEN s.id_serie = 6 THEN l.idlibro
+            ELSE ar.idarea
+        END as id_area,
+        s.id_serie,
+        CASE
+            WHEN s.id_serie = 6 THEN 0
+            ELSE ls.year
+        END as year,
+        ls.year as anio,
+        pv.pvn_tipo AS alcance, pv.created_at, pv.updated_at, l.idlibro, p.descuento, p.id_periodo, p.anticipo, p.comision, l.nombrelibro, CONCAT(s.nombre_serie,' ',ar.nombrearea) as serieArea, s.nombre_serie, ls.version, asi.idasignatura,ls.codigo_liquidacion,  0 as cantidad
+        FROM pedidos_val_area_new pv
+        LEFT JOIN libro l ON  pv.idlibro = l.idlibro
+        LEFT JOIN libros_series ls ON pv.idlibro = ls.idLibro
+        LEFT JOIN asignatura asi ON l.asignatura_idasignatura = asi.idasignatura
+        LEFT JOIN area ar ON asi.area_idarea = ar.idarea
+        LEFT JOIN series s ON ls.id_serie = s.id_serie
+        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        WHERE pv.id_pedido = '$pedido'
+        GROUP BY pv.pvn_id;
+        ");
+        if(empty($val_pedido)){
+            return $val_pedido;
+        }
+        $arreglo = [];
+        $cont    = 0;
+        //obtener solo los alcances activos
+        foreach($val_pedido as $k => $tr){
+            //Cuando es el pedido original
+            $alcance_id = 0;
+            $alcance_id = $tr->alcance;
+            if($alcance_id == 0){
+                $arreglo[$cont] =   (object)[
+                    "id"                => $tr->id,
+                    "id_pedido"         => $tr->id_pedido,
+                    "valor"             => $tr->valor,
+                    "id_area"           => $tr->id_area,
+                    "id_serie"          => $tr->id_serie,
+                    "year"              => $tr->year,
+                    "version"           => $tr->version,
+                    "created_at"        => $tr->created_at,
+                    "updated_at"        => $tr->updated_at,
+                    "descuento"         => $tr->descuento,
+                    "anticipo"          => $tr->anticipo,
+                    "comision"          => $tr->comision,
+                    "id_periodo"        => $tr->id_periodo,
+                    "serieArea"         => $tr->serieArea,
+                    "idlibro"           => $tr->idlibro,
+                    "nombre_serie"      => $tr->nombre_serie,
+                    "idasignatura"      => $tr->idasignatura,
+                    "codigo_liquidacion"=> $tr->codigo_liquidacion,
+                    "alcance"           => $alcance_id,
+                    "cantidad"          => $tr->cantidad,
+                    "nombrelibro"       => $tr->nombrelibro,
+                    "anio"              => $tr->anio,
+                ];
+            }else{
+                //validate que el alcance este cerrado o aprobado
+                $query = $this->getAlcanceAbiertoXId($alcance_id);
+                if(count($query) > 0){
+                    $arreglo[$cont] = (object) [
+                        "id"                => $tr->id,
+                        "id_pedido"         => $tr->id_pedido,
+                        "valor"             => $tr->valor,
+                        "id_area"           => $tr->id_area,
+                        "id_serie"          => $tr->id_serie,
+                        "year"              => $tr->year,
+                        "version"           => $tr->version,
+                        "created_at"        => $tr->created_at,
+                        "updated_at"        => $tr->updated_at,
+                        "descuento"         => $tr->descuento,
+                        "anticipo"          => $tr->anticipo,
+                        "comision"          => $tr->comision,
+                        "id_periodo"        => $tr->id_periodo,
+                        "serieArea"         => $tr->serieArea,
+                        "idlibro"           => $tr->idlibro,
+                        "nombre_serie"      => $tr->nombre_serie,
+                        "idasignatura"      => $tr->idasignatura,
+                        "codigo_liquidacion"=> $tr->codigo_liquidacion,
+                        "alcance"           => $alcance_id,
+                        "cantidad"          => $tr->cantidad,
+                        "nombrelibro"       => $tr->nombrelibro,
+                        "anio"              => $tr->anio,
+                    ];
+                }
+            }
+            $cont++;
+        }
+        //mostrar el arreglo bien
+        $renderSet = [];
+        $renderSet = array_values($arreglo);
+        if(count($renderSet) == 0){
+            return $renderSet;
+        }
+        $datos = [];
+        $contador = 0;
+        //return $renderSet;
+        $final_result = [];
+        foreach ($renderSet as $item) {
+            // Busca el pfn_pvp correcto basado en el id_periodo
+            $var_planlector = '';
+            $pfn_pvp_result = (float) DB::table('pedidos_formato_new')
+            ->where('idperiodoescolar', $item->id_periodo)
+            ->where('idlibro', $item->idlibro)
+            ->value('pfn_pvp');
+
+            // Busca el pfn_pvp correcto basado en el id_periodo
+            $stock_producto = (int) DB::table('1_4_cal_producto')
+            ->where('pro_codigo', $item->codigo_liquidacion)
+            ->value('pro_reservar');
+            //Asigna id de libro si es plan lector
+            if($item->id_serie == 6){
+                $var_planlector = $item->idlibro;
+            }else if($item->id_serie <> 6){
+                $var_planlector = 0;
+            }
+            // Construye el array final
+            $final_result[] = [
+                "id"                => $item->id,
+                "id_pedido"         => $item->id_pedido,
+                "valor"             => $item->valor,
+                "id_area"           => $item->id_area,
+                "id_serie"          => $item->id_serie,
+                "year"              => $item->year,
+                "anio"              => $item->anio,
+                "version"           => $item->version,
+                "created_at"        => $item->created_at,
+                "updated_at"        => $item->updated_at,
+                "descuento"         => $item->descuento,
+                "anticipo"          => $item->anticipo,
+                "comision"          => $item->comision,
+                "plan_lector"       => $var_planlector,
+                "id_periodo"        => $item->id_periodo,
+                "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$item->nombrelibro : $item->serieArea,
+                "idlibro"           => $item->idlibro,
+                "nombrelibro"       => $item->nombrelibro,
+                "nombre_serie"      => $item->nombre_serie,
+                "precio"            => $pfn_pvp_result,
+                "stock"             => $stock_producto,
+                "idasignatura"      => $item->idasignatura,
+                "subtotal"          => $item->valor * $pfn_pvp_result,
+                "codigo_liquidacion"=> $item->codigo_liquidacion,
+                "alcance"           => $item->alcance,
+                "cantidad"          => $item->cantidad,
+            ];
+        }
+        // Consulta los libros obsequios
+        $DatosLibrosObsequios = DB::select("
+        SELECT ls.idLibro, CONCAT(ls.nombre,' ',f.ven_desc_por,'%') AS nombrelibro, ls.codigo_liquidacion, fd.det_ven_valor_u AS precio, fd.det_ven_cantidad AS valor
+        FROM  f_detalle_venta fd 
+        JOIN f_venta f ON fd.ven_codigo = f.ven_codigo AND fd.id_empresa = f.id_empresa
+        JOIN p_libros_obsequios o ON o.id = f.ven_p_libros_obsequios
+        JOIN pedidos p ON p.id_pedido = o.id_pedido
+        JOIN libros_series ls ON ls.codigo_liquidacion = fd.pro_codigo
+        JOIN libro l ON ls.idLibro = l.idlibro
+        left join series se ON ls.id_serie = se.id_serie
+        WHERE p.id_pedido = ?;
+        ",[$pedido]);
+
+        // Agregar los libros obsequios al arreglo final
+        foreach($DatosLibrosObsequios as $key => $item){
+        $final_result[$contador] = [
+            "id_pedido"         => $pedido,
+            "valor"             => $item->valor,
+            "idlibro"           => $item->idLibro,
+            "nombrelibro"       => $item->nombrelibro,
+            "precio"            => $item->precio,
+            "subtotal"          => $item->valor * $item->precio,
+            "codigo_liquidacion"=> $item->codigo_liquidacion,
+        ];
+        $contador++;
+        }
+
+        // Retorna los final_result
+        return $final_result;
+    }
+    public function get_val_pedidoInfoTodoReporte($pedido){
+        $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
+        p.descuento, p.id_periodo,
+        p.anticipo, p.comision, CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
+        se.nombre_serie, 0 as cantidad
+        FROM pedidos_val_area pv
+        left join area ar ON  pv.id_area = ar.idarea
+        left join series se ON pv.id_serie = se.id_serie
+        INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        WHERE pv.id_pedido = '$pedido'
+        GROUP BY pv.id;
+        ");
+        if(empty($val_pedido)){
+            return $val_pedido;
+        }
+        $arreglo = [];
+        $cont    = 0;
+        //obtener solo los alcances activos
+        foreach($val_pedido as $k => $tr){
+            //Cuando es el pedido original
+            $alcance_id = 0;
+            $alcance_id = $tr->alcance;
+            if($alcance_id == 0){
+                $arreglo[$cont] =   (object)[
+                    "id"                => $tr->id,
+                    "id_pedido"         => $tr->id_pedido,
+                    "valor"             => $tr->valor,
+                    "id_area"           => $tr->id_area,
+                    "tipo_val"          => $tr->tipo_val,
+                    "id_serie"          => $tr->id_serie,
+                    "year"              => $tr->year,
+                    "plan_lector"       => $tr->plan_lector,
+                    "alcance"           => $tr->alcance,
+                    "descuento"         => $tr->descuento,
+                    "id_periodo"        => $tr->id_periodo,
+                    "anticipo"          => $tr->anticipo,
+                    "comision"          => $tr->comision,
+                    "serieArea"         => $tr->serieArea,
+                    "nombre_serie"      => $tr->nombre_serie,
+                    "alcance"           => $alcance_id,
+                    "cantidad"          => $tr->cantidad,
+                ];
+            }else{
+                //validate que el alcance este cerrado o aprobado
+                $query = $this->getAlcanceAbiertoXId($alcance_id);
+                if(count($query) > 0){
+                    $arreglo[$cont] = (object) [
+                        "id"                => $tr->id,
+                        "id_pedido"         => $tr->id_pedido,
+                        "valor"             => $tr->valor,
+                        "id_area"           => $tr->id_area,
+                        "tipo_val"          => $tr->tipo_val,
+                        "id_serie"          => $tr->id_serie,
+                        "year"              => $tr->year,
+                        "plan_lector"       => $tr->plan_lector,
+                        "alcance"           => $tr->alcance,
+                        "descuento"         => $tr->descuento,
+                        "id_periodo"        => $tr->id_periodo,
+                        "anticipo"          => $tr->anticipo,
+                        "comision"          => $tr->comision,
+                        "serieArea"         => $tr->serieArea,
+                        "nombre_serie"      => $tr->nombre_serie,
+                        "alcance"           => $alcance_id,
+                        "cantidad"          => $tr->cantidad,
+                    ];
+                }
+            }
+            $cont++;
+        }
+        //mostrar el arreglo bien
+        $renderSet = [];
+        $renderSet = array_values($arreglo);
+        if(count($renderSet) == 0){
+            return $renderSet;
+        }
+        $datos = [];
+        $contador = 0;
+        //return $renderSet;
+        foreach($renderSet as $key => $item){
+            $valores = [];
+            //plan lector
+            if($item->plan_lector > 0 ){
+                $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro, pro.pro_reservar, pro.pro_stock, pro.pro_deposito,
+                (
+                    SELECT f.pvp AS precio
+                    FROM pedidos_formato f
+                    WHERE f.id_serie = '6'
+                    AND f.id_area = '69'
+                    AND f.id_libro = '$item->plan_lector'
+                    AND f.id_periodo = '$item->id_periodo'
+                )as precio, ls.codigo_liquidacion,ls.version,ls.year
+                FROM libro l
+                left join libros_series ls  on ls.idLibro = l.idlibro
+                inner join 1_4_cal_producto pro on ls.codigo_liquidacion=pro.pro_codigo
+                WHERE l.idlibro = '$item->plan_lector'
+                ");
+                $valores = $getPlanlector;
+            }else{
+                $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro, pro.pro_reservar, pro.pro_stock, pro.pro_deposito,
+                (
+                    SELECT f.pvp AS precio
+                    FROM pedidos_formato f
+                    WHERE f.id_serie = ls.id_serie
+                    AND f.id_area = a.area_idarea
+                    AND f.id_periodo = '$item->id_periodo'
+                )as precio
+                FROM libros_series ls
+                LEFT JOIN libro l ON ls.idLibro = l.idlibro
+                inner join 1_4_cal_producto pro on ls.codigo_liquidacion=pro.pro_codigo
+                LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                WHERE ls.id_serie = '$item->id_serie'
+                AND a.area_idarea  = '$item->id_area'
+                AND l.Estado_idEstado = '1'
+                AND a.estado = '1'
+                AND ls.year = '$item->year'
+                LIMIT 1
+                ");
+                $valores = $getLibros;
+            }
+            $datos[$contador] = [
+                "id"                => $item->id,
+                "id_pedido"         => $item->id_pedido,
+                "valor"             => $item->valor,
+                "id_area"           => $item->id_area,
+                "tipo_val"          => $item->tipo_val,
+                "id_serie"          => $item->id_serie,
+                "year"              => $item->year,
+                "anio"              => $valores[0]->year,
+                "version"           => $valores[0]->version,
+                "descuento"         => $item->descuento,
+                "anticipo"          => $item->anticipo,
+                "comision"          => $item->comision,
+                "plan_lector"       => $item->plan_lector,
+                "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie." ".$valores[0]->nombrelibro : $item->serieArea,
+                "idlibro"           => $valores[0]->idlibro,
+                "nombrelibro"       => $valores[0]->nombrelibro,
+                "precio"            => $valores[0]->precio,
+                "stock"             => $valores[0]->pro_reservar,
+                "subtotal"          => $item->valor * $valores[0]->precio,
+                "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
+                "alcance"           => $item->alcance,
+                "cantidad"          => $tr->cantidad,
+            ];
+            $contador++;
+        }
+        // Consulta los libros obsequios
+        $DatosLibrosObsequios = DB::select("
+        SELECT ls.idLibro, CONCAT(ls.nombre,' ',f.ven_desc_por,'%') AS nombrelibro, ls.codigo_liquidacion, fd.det_ven_valor_u AS precio, fd.det_ven_cantidad AS valor
+        FROM  f_detalle_venta fd 
+        JOIN f_venta f ON fd.ven_codigo = f.ven_codigo AND fd.id_empresa = f.id_empresa
+        JOIN p_libros_obsequios o ON o.id = f.ven_p_libros_obsequios
+        JOIN pedidos p ON p.id_pedido = o.id_pedido
+        JOIN libros_series ls ON ls.codigo_liquidacion = fd.pro_codigo
+        JOIN libro l ON ls.idLibro = l.idlibro
+        left join series se ON ls.id_serie = se.id_serie
+        WHERE p.id_pedido = ?;
+        ",[$pedido]);
+
+        // Agregar los libros obsequios al arreglo final
+        foreach($DatosLibrosObsequios as $key => $item){
+        $datos[$contador] = [
+            "id_pedido"         => $pedido,
+            "valor"             => $item->valor,
+            "idlibro"           => $item->idLibro,
+            "nombrelibro"       => $item->nombrelibro,
+            "precio"            => $item->precio,
+            "subtotal"          => $item->valor * $item->precio,
+            "codigo_liquidacion"=> $item->codigo_liquidacion,
+        ];
+        $contador++;
+        }
+
+        // Retorna los datos finales
+        return $datos;
+    }
+    
     //Libros de pedido y alcance
     public function get_val_pedidoInfoTodo($pedido){
         $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,

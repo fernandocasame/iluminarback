@@ -1144,6 +1144,7 @@ Route::get('get_val_pedido/{pedido}', 'PedidosController@get_val_pedido');
 Route::get('get_val_pedido_alcance/{pedido}/{alcance}', 'PedidosController@get_val_pedido_alcance');
 Route::get('get_val_pedidoInfo/{pedido}', 'PedidosController@get_val_pedidoInfo');
 Route::get('get_val_pedidoInfoTodo/{pedido}', 'PedidosController@get_val_pedidoInfoTodo');
+Route::get('get_val_pedidoInfoTodoReporte/{pedido}', 'PedidosController@get_val_pedidoInfoTodoReporte');
 Route::get('get_val_pedidoInfoTodoSuma/{pedido}', 'PedidosController@get_val_pedidoInfoTodoSuma');
 Route::get('get_val_pedidoLibrosObsequiosInfoTodo/{pedido}', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodo');
 Route::get('get_val_pedidoLibrosObsequiosInfoTodoSinPedido', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodoSinPedido');
@@ -1190,6 +1191,7 @@ Route::get('generar_contrato_pedido_new/{id_pedido}/{usuario_fact}', 'PedidosCon
 Route::get('get_val_pedido_alcance_new/{pedido}/{alcance}', 'PedidosController@get_val_pedido_alcance_new');
 Route::get('get_val_pedidoInfo_alcance_new/{pedido}/{alcance}', 'PedidosController@get_val_pedidoInfo_alcance_new');
 Route::get('get_val_pedidoInfoTodo_new/{pedido}', 'PedidosController@get_val_pedidoInfoTodo_new');
+Route::get('get_val_pedidoInfoTodo_Reporte_new/{pedido}', 'PedidosController@get_val_pedidoInfoTodo_Reporte_new');
 Route::get('get_val_pedidoInfo_new/{pedido}', 'PedidosController@get_val_pedidoInfo_new');
 Route::get('deletePedidoGuia_new/{id}', 'PedidosController@deletePedidoGuia_new');
 Route::get('get_val_pedidoLibrosObsequiosInfoTodo_new/{pedido}', 'PedidosController@get_val_pedidoLibrosObsequiosInfoTodo_new');
