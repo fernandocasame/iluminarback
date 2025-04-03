@@ -491,6 +491,7 @@ class VerificacionControllerAnterior extends Controller
         try{
             //limpiar cache
             Cache::flush();
+            $institucion_id         = $request->institucion_id;
             $periodo                = $request->periodo_id;
             $IdVerificacion         = $request->IdVerificacion;
             $contrato               = $request->contrato;
@@ -505,6 +506,17 @@ class VerificacionControllerAnterior extends Controller
             //unir $detalles con $getAgrupadoCombos
             $detalles               = collect($detalles)->merge($getAgrupadoCombos);
             if($sinPrecio){
+                $id_pedido = 0;
+                $getPedigo = DB::SELECT("SELECT * FROM pedidos p
+                WHERE p.id_institucion = '$institucion_id'
+                AND p.id_periodo = '$periodo'
+                AND p.estado = '1'");
+                if(count($getPedigo) > 0){
+                    $id_pedido = $getPedigo[0]->id_pedido;
+                }
+                foreach($detalles as $item){
+                    $item->id_pedido = $id_pedido;
+                }
                 return $detalles;
             }
             $datos                  = [];
@@ -1102,7 +1114,7 @@ class VerificacionControllerAnterior extends Controller
                 'message' => 'Nueva notificación',
             ];
             // notificacion en pusher
-            $this->NotificacionRepository->notificacionVerificacionAdmin($channel, $event, $data);
+            $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
 
             DB::commit(); // Confirmar transacción si todo ha ido bien
             return ["status" => "1", "message" => "Solicitud de Verificación guardada correctamente"];
@@ -1154,9 +1166,9 @@ class VerificacionControllerAnterior extends Controller
             ->where('estado', '=', '0')
             ->select('notificaciones_general.*', 'created_at as fecha_solicita')
             ->get()
-            ->map(function ($item) {
+            ->map(function ($item) use ($request,$idFacturador) {
                 //SUBIR FACTURA
-                if ($item->tipo == '0') {
+                if ($item->tipo == '0' || $item->tipo == '3') {
                     $padre = Verificacion::from('verificaciones as v')
                         ->where('v.id', $item->id_padre)
                         ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
@@ -1212,7 +1224,90 @@ class VerificacionControllerAnterior extends Controller
                     $item->id_institucion       = $padre ? $padre->id_institucion : null;
                     $item->nombreInstitucion    = $padre ? $padre->nombreInstitucion : null;
                     $item->tipo_venta_descr     = $padre ? $padre->tipo_venta_descr : null;
+                    // Validación de facturador
+                    if ($idFacturador) {
+                        $validacionFacturador = DB::table('pedidos_asesores_facturador')
+                            ->where('id_facturador', $idFacturador)
+                            ->where('id_asesor', $padre->id_asesor)
+                            ->exists();
+
+                        // Si no existe el registro, devolvemos null para no incluirlo en el array final
+                        if (!$validacionFacturador) {
+                            return null;  // Devolver null aquí eliminará el item en el siguiente filtro
+                        }
+                    }
                 }
+                //Subida evidencia verificacion
+                if($item->tipo == '2' ){
+                    if($request->idAsesor){
+                        $padre = Verificacion::from('verificaciones as v')
+                        ->where('v.id', $item->id_padre)
+                        ->where('i.asesor_id', $request->idAsesor)
+                        ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
+                        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+                        ->leftJoin('usuario as u', 'u.idusuario', '=', 'i.asesor_id')
+                        ->leftJoin('periodoescolar as pe', 'pe.idperiodoescolar', '=', 'p.id_periodo')
+                        ->leftJoin('ciudad as c', 'c.idciudad', '=', 'i.ciudad_id')
+                        ->select(
+                            'v.*',
+                            'p.id_asesor',
+                            'i.nombreInstitucion',
+                            DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
+                            'c.nombre as ciudad',
+                            'pe.region_idregion'
+                        )
+                        ->first();
+                    }else{
+                        $padre = Verificacion::from('verificaciones as v')
+                        ->where('v.id', $item->id_padre)
+                        ->leftJoin('pedidos as p', 'p.contrato_generado', '=', 'v.contrato')
+                        ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'p.id_institucion')
+                        ->leftJoin('usuario as u', 'u.idusuario', '=', 'i.asesor_id')
+                        ->leftJoin('periodoescolar as pe', 'pe.idperiodoescolar', '=', 'p.id_periodo')
+                        ->leftJoin('ciudad as c', 'c.idciudad', '=', 'i.ciudad_id')
+                        ->select(
+                            'v.*',
+                            'p.id_asesor',
+                            'i.nombreInstitucion',
+                            DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
+                            'c.nombre as ciudad',
+                            'pe.region_idregion'
+                        )
+                        ->first();
+                    }
+
+                    // Asignamos los valores al item
+                    $item->contrato_generado    = $padre ? $padre->contrato : null;
+                    $item->asesor               = $padre ? $padre->asesor : null;
+                    $item->ciudad               = $padre ? $padre->ciudad : null;
+                    $item->region_idregion      = $padre ? $padre->region_idregion : null;
+                    $item->id_asesor            = $padre ? $padre->id_asesor : null;
+                    $item->id_institucion       = $padre ? $padre->id_institucion : null;
+                    $item->nombreInstitucion    = $padre ? $padre->nombreInstitucion : null;
+                }
+                if ($item->tipo == '4') {
+                    $padre = DB::TABLE('f_proforma as p')
+                    ->where('p.id', $item->id_padre)
+                    ->leftJoin('usuario as u', 'u.idusuario', '=', 'p.usuario_solicitud')
+                    ->leftJoin('f_contratos_agrupados as fc', 'fc.ca_codigo_agrupado', '=', 'p.idPuntoventa')
+                    ->leftJoin('periodoescolar as pe', 'pe.idperiodoescolar', '=', 'fc.id_periodo')
+                    ->select(
+                        'p.*',
+                        'p.usuario_solicitud as id_asesor',
+                        'fc.ca_descripcion',
+                        DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor')
+                        ,'pe.periodoescolar'
+                    )
+                    ->first();
+
+                    // Asignamos los valores al item
+                    $item->asesor               = $padre ? $padre->asesor : null;
+                    $item->id_asesor            = $padre ? $padre->id_asesor : null;
+                    $item->descripcion          = $padre ? $padre->ca_descripcion : null;
+                    $item->agrupado             = $padre ? $padre->idPuntoventa : null;
+                    $item->periodo              = $padre ? $padre->periodoescolar : null;
+                }
+                // $this->notificacionRepository->notificacionVerificaciones('asesor.notificacionVerificacion', 'NewNotification', ['data' => $item]);
                 return $item;
             })
             ->toArray(); // Convertimos el resultado a array
@@ -1661,39 +1756,41 @@ class VerificacionControllerAnterior extends Controller
             $observacion = $this->obtenerObservacion($item->id);
 
             $datos[$key] = [
-                "id"                            => $item->id,
-                "num_verificacion"              => $item->num_verificacion,
-                "fecha_inicio"                  => $item->fecha_inicio,
-                "fecha_fin"                     => $item->fecha_fin,
-                "estado"                        => $item->estado,
-                "estado_revision"               => $item->estado_revision,
-                "contrato"                      => $item->contrato,
-                "nuevo"                         => $item->nuevo,
-                "file_evidencia"                => $archivosVerificaciones,
-                "observacion"                   => $observacion,
-                "valor_liquidacion"             => $item->valor_liquidacion,
-                "fecha_subir_evidencia"         => $item->fecha_subir_evidencia,
-                "cobro_venta_directa"           => $item->cobro_venta_directa,
-                "tipoPago"                      => $item->tipoPago,
-                "personalizado"                 => $item->personalizado,
-                "totalDescuento"                => $item->totalDescuento,
-                "totalDescuentoVenta"           => $item->totalDescuentoVenta,
-                "abonado"                       => $item->abonado,
-                "estado_pago"                   => $item->estado_pago,
-                "venta_real"                    => $item->venta_real,
-                "venta_real_regalados"          => $item->venta_real_regalados,
-                "permiso_anticipo_deuda"        => $item->permiso_anticipo_deuda,
-                "permiso_convenio"              => $item->permiso_convenio,
-                "permiso_cobro_venta_directa"   => $item->permiso_cobro_venta_directa,
-                "descuentos"                    => $descuentos,
-                "descuentosVenta"               => $descuentosVenta,
-                "otroValoresCancelar"           => $valorOtrosValores,
-                "campo_dinamico"                => $campo_dinamico,
-                "devolucionEscuela"             => $sumaDevolucionEsc,
-                "totalVenta"                    => $item->totalVenta,
-                "valoresLiquidadosReporte"      => $valoresLiquidadosReporte,
-                "file_factura"                  => $archivosFacturas,
-                "files_revision"                => $archivosRevison,
+                "id"                                        => $item->id,
+                "num_verificacion"                          => $item->num_verificacion,
+                "fecha_inicio"                              => $item->fecha_inicio,
+                "fecha_fin"                                 => $item->fecha_fin,
+                "estado"                                    => $item->estado,
+                "estado_revision"                           => $item->estado_revision,
+                "contrato"                                  => $item->contrato,
+                "nuevo"                                     => $item->nuevo,
+                "file_evidencia"                            => $archivosVerificaciones,
+                "observacion"                               => $observacion,
+                "valor_liquidacion"                         => $item->valor_liquidacion,
+                "fecha_subir_evidencia"                     => $item->fecha_subir_evidencia,
+                "cobro_venta_directa"                       => $item->cobro_venta_directa,
+                "tipoPago"                                  => $item->tipoPago,
+                "personalizado"                             => $item->personalizado,
+                "totalDescuento"                            => $item->totalDescuento,
+                "totalDescuentoVenta"                       => $item->totalDescuentoVenta,
+                "abonado"                                   => $item->abonado,
+                "estado_pago"                               => $item->estado_pago,
+                "venta_real"                                => $item->venta_real,
+                "venta_real_regalados"                      => $item->venta_real_regalados,
+                "permiso_anticipo_deuda"                    => $item->permiso_anticipo_deuda,
+                "permiso_convenio"                          => $item->permiso_convenio,
+                "permiso_cobro_venta_directa"               => $item->permiso_cobro_venta_directa,
+                "permiso_acta_obsequios_100_descuento"      => $item->permiso_acta_obsequios_100_descuento,
+                "permiso_acta_obsequios_otros_descuentos"   => $item->permiso_acta_obsequios_otros_descuentos,
+                "descuentos"                                => $descuentos,
+                "descuentosVenta"                           => $descuentosVenta,
+                "otroValoresCancelar"                       => $valorOtrosValores,
+                "campo_dinamico"                            => $campo_dinamico,
+                "devolucionEscuela"                         => $sumaDevolucionEsc,
+                "totalVenta"                                => $item->totalVenta,
+                "valoresLiquidadosReporte"                  => $valoresLiquidadosReporte,
+                "file_factura"                              => $archivosFacturas,
+                "files_revision"                            => $archivosRevison,
             ];
         }
         return $datos;
@@ -2204,7 +2301,7 @@ class VerificacionControllerAnterior extends Controller
                            'message' => 'Nueva notificación',
                        ];
                        // notificacion en pusher
-                       $this->NotificacionRepository->notificacionVerificacionAdmin($channel, $event, $data);
+                       $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
                     }
     
                     // Confirmar los cambios realizados en la transacción
@@ -2777,37 +2874,96 @@ class VerificacionControllerAnterior extends Controller
     {
         try {
             $idPadres = $request->id_padre; // El array de ids que recibimos en la solicitud
-            $eliminadas = 0; // Contador para las notificaciones eliminadas
+            $eliminadasAdmin = 0; // Contador para las notificaciones eliminadas
+            $eliminadasAsesor = 0; // Contador para las notificaciones eliminadas
             
             foreach ($idPadres as $id) {
-                // Buscar la notificación correspondiente por el id_padre y tipo 0
-                $notificacion = NotificacionGeneral::where('id_padre', $id)->where('tipo', 0)->first();
-                
-                if ($notificacion) { // Si se encuentra una notificación
-                    // Eliminar la notificación
-                    $notificacion->delete();
-                    $eliminadas++; // Incrementar el contador de eliminadas
+                // Inicializar los arrays vacíos dentro del ciclo para cada $idPadres
+                $guardarIDsinRevisiones = [];
+                $guardarIDsinVerificaciones = [];
+                $guardarIDsinFacturas = [];
+    
+                // Obtener los archivos relacionados con el id_padre
+                $archivos = DB::table('evidencia_global_files')->where('egf_referencia', $id)->get();
+    
+                // Iterar sobre los archivos y organizar por tipo (revisión, verificación, factura)
+                foreach ($archivos as $item) {
+                    if ($item->egft_id == 2) {
+                        $guardarIDsinRevisiones[] = $item->egf_referencia;
+                    } elseif ($item->egft_id == 3) {
+                        $guardarIDsinVerificaciones[] = $item->egf_referencia;
+                    } elseif ($item->egft_id == 4) {
+                        $guardarIDsinFacturas[] = $item->egf_referencia;
+                    }
+                }
+    
+                // Verificar si no hay archivos de revisión y eliminar notificaciones correspondientes
+                if (empty($guardarIDsinRevisiones)) {
+                    $notificacion = NotificacionGeneral::where('id_padre', $id)->where('tipo', 3)->where('estado', 0)->first();
+                    if ($notificacion) {
+                        $notificacion->delete();
+                        $eliminadasAdmin++;
+                    }
+                }
+    
+                // Verificar si no hay archivos de verificación y eliminar notificaciones correspondientes
+                if (empty($guardarIDsinVerificaciones)) {
+                    $notificacion = NotificacionGeneral::where('id_padre', $id)->where('tipo', 2)->where('estado', 0)->first();
+                    if ($notificacion) {
+                        $notificacion->delete();
+                        $eliminadasAsesor++;
+                    }
+                }
+    
+                // Verificar si no hay archivos de factura y eliminar notificaciones correspondientes
+                if (empty($guardarIDsinFacturas)) {
+                    $notificacion = NotificacionGeneral::where('id_padre', $id)->where('tipo', 0)->where('estado', 0)->first();
+                    if ($notificacion) {
+                        $notificacion->delete();
+                        $eliminadasAdmin++;
+                    }
                 }
             }
-            
+    
             // Verificar si se eliminaron notificaciones
-            if ($eliminadas > 0) {
-                $channel = 'admin.notifications_verificaciones';
-                $event = 'NewNotification';
-                $data = [
-                    'message' => 'Nueva notificación',
-                ];
-                // notificacion en pusher
-                $this->NotificacionRepository->notificacionVerificacionAdmin($channel, $event, $data);
-                return response()->json(["error" => 0, "message" => "$eliminadas notificación(es) actualizadas(s) correctamente"], 200);
+            if ($eliminadasAdmin > 0 || $eliminadasAsesor > 0) {
+                $mensajes = [];
+
+                if ($eliminadasAdmin > 0) {
+                    $channel = 'admin.notifications_verificaciones';
+                    $event = 'NewNotification';
+                    $data = [
+                        'message' => 'Nueva notificación',
+                    ];
+                    $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
+                    $mensajes[] = "$eliminadasAdmin notificación(es) actualizada(s) para Admin.";
+                }
+
+                if ($eliminadasAsesor > 0) {
+                    $channel = 'asesor.notificacionVerificacion';
+                    $event = 'NewNotification';
+                    $data = [
+                        'message' => 'Nueva notificación',
+                    ];
+                    $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
+                    $mensajes[] = "$eliminadasAsesor notificación(es) actualizada(s) para Asesor.";
+                }
+
+                return response()->json(["error" => 0, "message" => implode(" ", $mensajes)], 200);
             } else {
-                return response()->json(["error" => 1, "message" => "No se encontraron notificaciones para actualizar"], 200);
+                return response()->json([
+                    "error" => 1,
+                    "message" => "No se encontraron notificaciones para actualizar",
+                    "data" => [$guardarIDsinRevisiones, $guardarIDsinVerificaciones, $guardarIDsinFacturas]
+                ], 200);
             }
-            
+
+    
         } catch (\Exception $e) {
             // Manejo de errores
             return response()->json(["error" => 1, "message" => $e->getMessage()], 200);
         }
     }
+    
 
 }

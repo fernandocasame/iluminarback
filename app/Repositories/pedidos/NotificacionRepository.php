@@ -26,7 +26,7 @@ class  NotificacionRepository extends BaseRepository
      *
      * @throws \Exception Si no se puede enviar la notificación en Pusher.
      */
-    public function notificacionVerificacionAdmin($channel, $event, $data){
+    public function notificacionVerificaciones($channel, $event, $data){
         try{
             if (empty($channel)) {
                 throw new \InvalidArgumentException("El canal no puede estar vacío.");

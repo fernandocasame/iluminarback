@@ -5294,8 +5294,10 @@ class PedidosController extends Controller
         $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
         if($request->obsequio === 'true'){
             $pedidoLibroObsequio->estado_libros_obsequios = 8;
+            $pedidoLibroObsequio->ifObsequio = 1;
         }else{
             $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
+            $pedidoLibroObsequio->ifObsequio = 0;
         }
         $pedidoLibroObsequio->observacion_asesor = $request->observacion_asesor;
         $pedidoLibroObsequio->save();
@@ -7671,6 +7673,103 @@ class PedidosController extends Controller
 
         }
         return response()->json($liquidaciones);
+    }
+
+    // public function contarLibrosPorPeriodo(Request $request)
+    // {
+    //     $resultado = DB::table('pedidos_val_area_new as pvn')
+    //     ->join('pedidos as p', 'pvn.id_pedido', '=', 'p.id_pedido')
+    //     ->join('libro as l', 'pvn.idlibro', '=', 'l.idlibro')
+    //     ->select(
+    //         'l.idlibro',
+    //         'l.nombrelibro',
+    //         DB::raw('SUM(pvn.pvn_cantidad) as cantidad'),
+    //         DB::raw('COUNT(DISTINCT p.id_pedido) as pedidos')
+    //     )
+    //     ->where('p.id_periodo', $request->id_periodo)
+    //     ->where('pvn.pvn_tipo', 0)
+    //     ->where('l.Estado_idEstado', 1)
+    //     ->groupBy('l.idlibro', 'l.nombrelibro')
+    //     ->orderBy('l.nombrelibro')
+    //     ->get();
+
+    //     return response()->json([
+    //         'periodo' => $request->id_periodo,
+    //         'libros' => $resultado,
+    //         'resumen' => [
+    //             'total_libros' => $resultado->count(),
+    //             'total_ejemplares' => $resultado->sum('cantidad'),
+    //             'total_pedidos' => $resultado->sum('pedidos')
+    //         ]
+    //     ]);
+    // }
+
+    public function contarLibrosPorPeriodo(Request $request)
+    {
+        $request->validate([
+            'id_periodo' => 'required|integer|exists:pedidos,id_periodo',
+            'ifContratos' => 'required|integer'
+        ]);
+
+        $resultado = DB::table('pedidos_val_area_new as pvn')
+            ->join('pedidos as p', 'pvn.id_pedido', '=', 'p.id_pedido')
+            ->join('libro as l', 'pvn.idlibro', '=', 'l.idlibro')
+            ->join('libros_series as ls', 'l.idlibro', '=', 'ls.idLibro') // Nuevo join
+            ->select(
+                'l.idlibro',
+                'ls.nombre as nombrelibro',  // Nombre desde libros_series
+                'ls.codigo_liquidacion',      // Agregado código de liquidación
+                DB::raw('SUM(pvn.pvn_cantidad) as cantidad'),
+                DB::raw('COUNT(DISTINCT p.id_pedido) as pedidos')
+            )
+            ->where('p.id_periodo', $request->id_periodo)
+            ->where('pvn.pvn_tipo', 0)
+            ->where('l.Estado_idEstado', 1)
+            ->where('p.tipo', '0')
+            ->where('p.estado','1')
+            ->where('ls.estado', '1')  // Filtro para libros_series activos
+            ->when($request->ifContratos == 0, function ($query) {
+                $query->whereNull('p.contrato_generado'); // Uso correcto para NULL
+            })
+            ->when($request->ifContratos == 1, function ($query) {
+                $query->whereNotNull('p.contrato_generado'); // Uso correcto para NOT NULL
+            })
+            ->groupBy('l.idlibro', 'ls.nombre', 'ls.codigo_liquidacion') // Agregado a groupBy
+            ->orderBy('ls.nombre')  // Ordenar por nombre de libros_series
+            ->get();
+        //alcances
+        if($request->ifContratos == 1){
+            foreach ($resultado as $key => $value) {
+                // Obtener cantidad de alcances con parámetros enlazados
+                $query = DB::select("SELECT COALESCE(SUM(pv.pvn_cantidad), 0) AS cantidad 
+                    FROM pedidos_val_area_new pv
+                    LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+                    LEFT JOIN pedidos_alcance ac ON ac.id = pv.pvn_tipo
+                    WHERE pv.pvn_tipo <> '0'
+                    AND p.tipo = '0'
+                    AND p.estado = '1'
+                    AND p.id_periodo = ?
+                    AND ac.estado_alcance = '1'
+                    AND pv.idlibro = ?
+                ", [$request->id_periodo, $value->idlibro]);
+            
+                // Asegurar que haya resultados y convertir a float
+                $alcances = !empty($query) ? (float) $query[0]->cantidad : 0.0;
+            
+                // Asignar valores al resultado
+                $resultado[$key]->alcances = $alcances;
+                $resultado[$key]->cantidad = (float) $resultado[$key]->cantidad + $alcances;
+            }
+        }
+        return response()->json([
+            'periodo' => $request->id_periodo,
+            'libros' => $resultado,
+            'resumen' => [
+                'total_libros' => $resultado->count(),
+                'total_ejemplares' => $resultado->sum('cantidad'),
+                'total_pedidos' => $resultado->sum('pedidos')
+            ]
+        ]);
     }
 
 }

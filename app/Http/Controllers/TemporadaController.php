@@ -767,6 +767,10 @@ class TemporadaController extends Controller
             $fieldsToUpdate = [$campo, $campo2, $campo3];
             $valuesToUpdate = [$valor, $valor2, $valor3];
         }
+        if ($request->actualizarCincoCampo) {
+            $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4, $campo5];
+            $valuesToUpdate = [$valor, $valor2, $valor3, $valor4, $valor5];
+        }
         if($request->actualizarSieteCampo){
             $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4 ,$campo5 ,$campo6, $campo7];
             $valuesToUpdate = [$valor, $valor2, $valor3, $valor4, $valor5, $valor6, $valor7];

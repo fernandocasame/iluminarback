@@ -16,11 +16,18 @@ use App\Traits\Pedidos\TraitProforma;
 use Illuminate\Http\Request;
 use Mockery\Undefined;
 use PhpParser\Node\Stmt\ElseIf_;
+use App\Models\NotificacionGeneral;
+use App\Repositories\pedidos\NotificacionRepository;
 
 class ProformaController extends Controller
 {
     use TraitProforma;
     use TraitPedidosGeneral;
+    public $NotificacionRepository;
+    public function __construct(NotificacionRepository $NotificacionRepository)
+    {
+        $this->NotificacionRepository   = $NotificacionRepository;
+    }
     //consultas
     public function Get_MinStock(Request $request){
         $query = DB::SELECT("SELECT minimo as min, maximo as max  from configuracion_general where id='$request->nombre'");
@@ -109,17 +116,35 @@ class ProformaController extends Controller
         return $datos;
     }
     public function Get_proformasCliente(Request $request){
-        $datos = DB::SELECT("SELECT fp.*, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
-            ls.nombre, s.nombre_serie, p.pro_stock  as facturas,
-            p.pro_deposito as bodega,p.pro_reservar, l.descripcionlibro, ls.id_serie, fcg.ca_codigo_agrupado, fcg.id_periodo
-            FROM f_detalle_proforma as dpr
-            INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
-            INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
-            INNER JOIN 1_4_cal_producto as p on dpr.pro_codigo=p.pro_codigo
-            INNER JOIN series as s ON ls.id_serie=s.id_serie
-            INNER JOIN libro l ON ls.idLibro = l.idlibro
-            LEFT JOIN f_contratos_agrupados fcg ON fcg.ca_codigo_agrupado = fp.idPuntoventa
-            WHERE fp.ven_cliente = '$request->usuario'
+        $datos = DB::SELECT("SELECT 
+                fp.id,
+                fp.prof_id,
+                fp.idPuntoventa,
+                fp.prof_estado,
+                SUM(dpr.det_prof_cantidad) AS cantidad,
+                fcg.ca_codigo_agrupado,
+                fcg.id_periodo,
+                pe.descripcion
+            FROM 
+                f_detalle_proforma AS dpr
+            INNER JOIN 
+                f_proforma AS fp ON dpr.prof_id = fp.id
+            INNER JOIN 
+                libros_series AS ls ON dpr.pro_codigo = ls.codigo_liquidacion
+            INNER JOIN 
+                1_4_cal_producto AS p ON dpr.pro_codigo = p.pro_codigo
+            INNER JOIN 
+                series AS s ON ls.id_serie = s.id_serie
+            INNER JOIN 
+                libro AS l ON ls.idLibro = l.idlibro
+            LEFT JOIN 
+                f_contratos_agrupados AS fcg ON fcg.ca_codigo_agrupado = fp.idPuntoventa
+            LEFT JOIN 
+                periodoescolar AS pe ON pe.idperiodoescolar = fcg.id_periodo
+            WHERE 
+                fp.ven_cliente = '$request->usuario' OR fp.usuario_solicitud = '$request->usuario'
+            GROUP BY 
+                fp.id, fp.prof_id, fp.idPuntoventa,fp.prof_estado,fcg.ca_codigo_agrupado,fcg.id_periodo;
         ");
         return $datos;
     }
@@ -150,6 +175,18 @@ class ProformaController extends Controller
                 INNER JOIN libro l ON ls.idLibro = l.idlibro
                 WHERe dpr.prof_id='$request->prof_id'
             ");
+        }else{
+            $array1 = DB::SELECT("SELECT fp.prof_id, fp.emp_id, dpr.det_prof_id, dpr.pro_codigo, dpr.det_prof_cantidad, dpr.det_prof_cantidad AS cantidad,dpr.det_prof_valor_u,
+            ls.nombre, s.nombre_serie, fp.pro_des_por, fp.prof_iva_por, p.pro_stock as facturas_prolipa, p.pro_stockCalmed as facturas_calmed,
+            p.pro_deposito as bodega_prolipa, p.pro_depositoCalmed as bodega_calmed, p.pro_reservar, l.descripcionlibro, ls.id_serie
+            FROM f_detalle_proforma as dpr
+            INNER JOIN  f_proforma as fp on dpr.prof_id=fp.id
+            INNER JOIN libros_series as ls ON dpr.pro_codigo=ls.codigo_liquidacion
+            INNER JOIN 1_4_cal_producto as p on dpr.pro_codigo=p.pro_codigo
+            INNER JOIN series as s ON ls.id_serie=s.id_serie
+            INNER JOIN libro l ON ls.idLibro = l.idlibro
+            WHERe dpr.prof_id='$request->prof_id'
+        ");
         }
        
         foreach($array1 as $key => $item){
@@ -367,6 +404,36 @@ class ProformaController extends Controller
             }
     }
 
+    public function GetProformasSolicitud(Request $request) {
+        $query = DB::select("
+            SELECT 
+                fpr.*,  
+                em.nombre, 
+                em.img_base64,
+                us.nombres AS username, 
+                us.apellidos AS lastname, 
+                COUNT(dpr.pro_codigo) AS total_items, 
+                SUM(dpr.det_prof_cantidad) AS total_libros,
+                CONCAT(COALESCE(usa.nombres, ''), ' ', COALESCE(usa.apellidos, '')) AS cliente,
+                i.nombreInstitucion,
+                i.ruc AS rucPuntoVenta
+            FROM f_proforma fpr
+            LEFT JOIN usuario us ON fpr.user_editor = us.idusuario
+            LEFT JOIN empresas em ON fpr.emp_id = em.id
+            INNER JOIN f_detalle_proforma dpr ON dpr.prof_id = fpr.id
+            LEFT JOIN usuario usa ON fpr.ven_cliente = usa.idusuario
+            LEFT JOIN institucion i ON fpr.id_ins_depacho = i.idInstitucion
+            WHERE fpr.idPuntoventa = ? 
+            AND (fpr.ven_cliente = ? OR fpr.usuario_solicitud = ?)
+            GROUP BY fpr.id, fpr.prof_id, fpr.prof_observacion, em.nombre, em.img_base64, 
+                     us.nombres, us.apellidos, i.nombreInstitucion, i.ruc
+            ORDER BY fpr.created_at DESC
+        ", [$request->prof_id, $request->usuario, $request->usuario]);
+    
+        return $query;
+    }
+    
+
     //generar codigo para la proforma
     public function Get_Cod_Pro(Request $request){
         if($request->id==1){
@@ -434,22 +501,25 @@ class ProformaController extends Controller
     }
     //registro y edicion de datos de la proforma y detalles de proforma
     public function Proforma_Registrar_modificar(Request $request)
-       {
-
-        try{
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $miarray=json_decode($request->data_detalle);
-        DB::beginTransaction();
+    {
+        try {
+            set_time_limit(6000000);
+            ini_set('max_execution_time', 6000000);
+            
+            $miarray = json_decode($request->data_detalle);
+            DB::beginTransaction();
+    
             $proforma = new Proforma;
-            if($request->id_group == 1 || $request->id_group == 22|| $request->id_group == 23){
-                $id_empresa         = $request->emp_id;
-                $cod_usuario        = $request->cod_usuario;
+    
+            if ($request->id_group == 1 || $request->id_group == 22 || $request->id_group == 23) {
+                $id_empresa = $request->emp_id;
+                $cod_usuario = $request->cod_usuario;
                 $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                $ven_codigo         = "PP-".$cod_usuario."-".$getNumeroDocumento;
+                $ven_codigo = "PP-" . $cod_usuario . "-" . $getNumeroDocumento;
                 $proforma->prof_id = $ven_codigo;
             }
-
+    
+            // Asignación de valores al modelo Proforma
             $proforma->usu_codigo = $request->usu_codigo;
             $proforma->pedido_id = $request->pedido_id;
             $proforma->emp_id = $request->emp_id;
@@ -465,57 +535,365 @@ class ProformaController extends Controller
             $proforma->prof_estado = $request->prof_estado;
             $proforma->prof_tipo_proforma = $request->prof_tipo_proforma;
             $proforma->created_at = $request->created_at;
-            if($request->emp_id==1){
+    
+            if ($request->emp_id == 1) {
                 $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_Prolipa as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
-            }else if($request->emp_id==3){
+            } else if ($request->emp_id == 3) {
                 $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_calmed as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
             }
-            if(!empty($query1)){
-                $id=$query1[0]->id;
-                $codi=$query1[0]->cod;
-                $co=(int)$codi+1;
+    
+            if (!empty($query1)) {
+                $id = $query1[0]->id;
+                $codi = $query1[0]->cod;
+                $co = (int)$codi + 1;
                 $tipo_doc = f_tipo_documento::findOrFail($id);
-                if($request->emp_id==1){
+                if ($request->emp_id == 1) {
                     $tipo_doc->tdo_secuencial_Prolipa = $co;
-                }else if($request->emp_id==3){
+                } else if ($request->emp_id == 3) {
                     $tipo_doc->tdo_secuencial_calmed = $co;
                 }
                 $tipo_doc->save();
             }
+    
             $proforma->idtipodoc = 5;
             $proforma->id_ins_depacho = $request->id_ins_depacho;
             $proforma->ven_cliente = $request->ven_cliente;
             $proforma->clientesidPerseo = $request->clientesidPerseo;
-            if($request->ven_cliente){
-            $user                   = User::where('idusuario',$request->ven_cliente)->first();
-            $getCedula              = $user->cedula;
-            $proforma->ruc_cliente  = $getCedula;
+            
+            // Si el cliente está definido, obtener la cédula
+            if ($request->ven_cliente) {
+                $user = User::where('idusuario', $request->ven_cliente)->first();
+                $getCedula = $user->cedula;
+                $proforma->ruc_cliente = $getCedula;
             }
+    
+            // Guardar la proforma
             $proforma->save();
             $ultimo_id = $proforma->id;
-            foreach($miarray as $key => $item){
-                if((int)$item->cantidad != 0){
-                    $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->codigo_liquidacion'");
-                    $codi=$query1[0]->stoc;
-                    $co=(int)$codi-(int)$item->cantidad;
-                    $pro= _14Producto::findOrFail($item->codigo_liquidacion);
-                    $pro->pro_reservar = $co;
-                    $pro->save();
-                    $proforma1 = new DetalleProforma;
-                    $proforma1->prof_id = $ultimo_id;
-                    $proforma1->pro_codigo = $item->codigo_liquidacion;
-                    $proforma1->det_prof_cantidad = (int)$item->cantidad;
-                    $proforma1->det_prof_valor_u = $item->precio;
-                    $proforma1->save();
+    
+            $proformaGuardada = Proforma::find($proforma->id);
+
+            if (!$proformaGuardada) {
+                throw new \Exception("No se pudo guardar la proforma", 500);
+            }else{
+                
+                if($proformaGuardada->prof_id == null){
+                    $proformaGuardada->usuario_solicitud = $request->idusuario;
+                    $guardado = $proformaGuardada->save();
+                    if(!$guardado){
+                         // Manejar el error, quizás retornando un mensaje o ejecutando otra acción
+                         throw new \Exception('Error al guardar usuario de la solicitud', 500);
+                    }
+                    $temporada = DB::table('f_contratos_agrupados')->where('ca_codigo_agrupado', $proforma->idPuntoventa)->first();
+                    if (!$temporada) {
+                        // Manejar el error, quizás retornando un mensaje o ejecutando otra acción
+                         throw new \Exception('No se encontró la temporada', 500);
+                    }
+                    $notificacion = new NotificacionGeneral();
+                    $notificacion->id_padre = $proformaGuardada->id;
+                    $notificacion->tipo = 4;
+                    $notificacion->estado = 0;
+                    $notificacion->descripcion = 'Se creo una Solicitud de proforma';
+                    $notificacion->user_created = $request->idusuario;
+                    $notificacion->id_periodo = $temporada->id_periodo;
+                    $notificacion->nombre = 'Solicitud de proforma';
+                    $success      = $notificacion->save();
+                    if($success){
+                        $channel = 'admin.notifications_verificaciones';
+                        $event = 'NewNotification';
+                        $data = [
+                            'message' => 'Nueva notificación',
+                        ];
+                        $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
+                    }
                 }
             }
-        DB::commit();
-        return response()->json(['message' => 'Proforma creado con éxito'], 200);
-        }catch(\Exception $e){
+    
+    
+            // Guardar los detalles de la proforma
+            foreach ($miarray as $key => $item) {
+                if ((int)$item->cantidad != 0) {
+                    $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->codigo_liquidacion'");
+                    $codi = $query1[0]->stoc;
+                    $co = (int)$codi - (int)$item->cantidad;
+                    $pro = _14Producto::findOrFail($item->codigo_liquidacion);
+                    $pro->pro_reservar = $co;
+                    $pro->save();
+    
+                    // Crear y guardar el detalle de la proforma
+                    $DetalleProforma = new DetalleProforma;
+                    $DetalleProforma->prof_id = $ultimo_id;
+                    $DetalleProforma->pro_codigo = $item->codigo_liquidacion;
+                    $DetalleProforma->det_prof_cantidad = (int)$item->cantidad;
+                    $DetalleProforma->det_prof_valor_u = $item->precio;
+                    $DetalleProforma->save();
+                }
+            }
+    
+            // Confirmar la transacción
+            DB::commit();
+    
+            return response()->json(['message' => 'Proforma y detalles guardados con éxito'], 200);
+        } catch (\Exception $e) {
             DB::rollback();
-            return response()->json(["error"=>"0", "message" => "No se pudo guardar", 'error' => $e->getMessage()], 500);
+            return response()->json(["error" => "0", "message" => "No se pudo guardar", 'error' => $e->getMessage()], 500);
         }
     }
+
+    public function Proforma_Registrar_modificar_solicitud(Request $request)
+    {
+        try {
+            set_time_limit(6000000);
+            ini_set('max_execution_time', 6000000);
+            
+            $miarray = json_decode($request->data_detalle);
+            DB::beginTransaction();
+    
+            $proforma = new Proforma;
+    
+            if ($request->id_group == 1 || $request->id_group == 22 || $request->id_group == 23) {
+                if($request->prof_tipo_proforma != 0){
+                    $id_empresa = $request->emp_id;
+                    $cod_usuario = $request->cod_usuario;
+                    $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
+                    $ven_codigo = "PP-" . $cod_usuario . "-" . $getNumeroDocumento;
+                    $proforma->prof_id = $ven_codigo;
+                }
+                
+            }
+    
+            // Asignación de valores al modelo Proforma
+            $proforma->usu_codigo = $request->usu_codigo;
+            $proforma->pedido_id = $request->pedido_id;
+            $proforma->emp_id = $request->emp_id;
+            $proforma->idPuntoventa = $request->idPuntoventa;
+            $proforma->prof_observacion = $request->prof_observacion;
+            $proforma->prof_observacion_libreria = $request->prof_observacion_libreria;
+            $proforma->prof_com = $request->prof_com;
+            $proforma->prof_descuento = $request->prof_descuento;
+            $proforma->pro_des_por = $request->pro_des_por;
+            $proforma->prof_iva = $request->prof_iva;
+            $proforma->prof_iva_por = $request->prof_iva_por;
+            $proforma->prof_total = $request->prof_total;
+            $proforma->prof_estado = $request->prof_estado;
+            $proforma->prof_tipo_proforma = $request->prof_tipo_proforma;
+            $proforma->created_at = $request->created_at;
+    
+            if ($request->emp_id == 1) {
+                $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_Prolipa as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
+            } else if ($request->emp_id == 3) {
+                $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_calmed as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
+            }
+    
+            if (!empty($query1)) {
+                $id = $query1[0]->id;
+                $codi = $query1[0]->cod;
+                $co = (int)$codi + 1;
+                $tipo_doc = f_tipo_documento::findOrFail($id);
+                if ($request->emp_id == 1) {
+                    $tipo_doc->tdo_secuencial_Prolipa = $co;
+                } else if ($request->emp_id == 3) {
+                    $tipo_doc->tdo_secuencial_calmed = $co;
+                }
+                $tipo_doc->save();
+            }
+    
+            $proforma->idtipodoc = 5;
+            $proforma->id_ins_depacho = $request->id_ins_depacho;
+            $proforma->ven_cliente = $request->ven_cliente;
+            $proforma->clientesidPerseo = $request->clientesidPerseo;
+            
+            // Si el cliente está definido, obtener la cédula
+            if ($request->ven_cliente) {
+                $user = User::where('idusuario', $request->ven_cliente)->first();
+                $getCedula = $user->cedula;
+                $proforma->ruc_cliente = $getCedula;
+            }
+    
+            // Guardar la proforma
+            $proforma->save();
+            $ultimo_id = $proforma->id;
+    
+            $proformaGuardada = Proforma::find($proforma->id);
+
+            if (!$proformaGuardada) {
+                throw new \Exception("No se pudo guardar la proforma", 500);
+            }else{
+                
+                if($proformaGuardada->prof_id == null){
+                    $proformaGuardada->usuario_solicitud = $request->idusuario;
+                    $guardado = $proformaGuardada->save();
+                    if(!$guardado){
+                         // Manejar el error, quizás retornando un mensaje o ejecutando otra acción
+                         throw new \Exception('Error al guardar usuario de la solicitud', 500);
+                    }
+                    $temporada = DB::table('f_contratos_agrupados')->where('ca_codigo_agrupado', $proforma->idPuntoventa)->first();
+                    if (!$temporada) {
+                        // Manejar el error, quizás retornando un mensaje o ejecutando otra acción
+                         throw new \Exception('No se encontró la temporada', 500);
+                    }
+                    $notificacion = new NotificacionGeneral();
+                    $notificacion->id_padre = $proformaGuardada->id;
+                    $notificacion->tipo = 4;
+                    $notificacion->estado = 0;
+                    $notificacion->descripcion = 'Se creo una Solicitud de proforma';
+                    $notificacion->user_created = $request->idusuario;
+                    $notificacion->id_periodo = $temporada->id_periodo;
+                    $notificacion->nombre = 'Solicitud de proforma';
+                    $success      = $notificacion->save();
+                    if($success){
+                        $channel = 'admin.notifications_verificaciones';
+                        $event = 'NewNotification';
+                        $data = [
+                            'message' => 'Nueva notificación',
+                        ];
+                        $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
+                    }
+                }
+            }
+    
+    
+            // Guardar los detalles de la proforma
+            foreach ($miarray as $key => $item) {
+                if ((int)$item->cantidad != 0) {
+                    $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->codigo_liquidacion'");
+                    $codi = $query1[0]->stoc;
+                    $co = (int)$codi - (int)$item->cantidad;
+                    $pro = _14Producto::findOrFail($item->codigo_liquidacion);
+                    $pro->pro_reservar = $co;
+                    $pro->save();
+    
+                    // Crear y guardar el detalle de la proforma
+                    $DetalleProforma = new DetalleProforma;
+                    $DetalleProforma->prof_id = $ultimo_id;
+                    $DetalleProforma->pro_codigo = $item->codigo_liquidacion;
+                    $DetalleProforma->det_prof_cantidad = (int)$item->cantidad;
+                    $DetalleProforma->det_prof_valor_u = $item->precio;
+                    $DetalleProforma->save();
+                }
+            }
+    
+            // Confirmar la transacción
+            DB::commit();
+    
+            return response()->json(['message' => 'Proforma y detalles guardados con éxito'], 200);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(["error" => "0", "message" => "No se pudo guardar", 'error' => $e->getMessage()], 500);
+        }
+    }
+    
+    public function PostProforma_Editar_solicitud(Request $request)
+       {
+        try{
+            set_time_limit(6000000);
+            ini_set('max_execution_time', 6000000);
+            $miarray=json_decode($request->data_detalle);
+            DB::beginTransaction();
+                $oldvalue = Proforma::findOrFail($request->id);
+                $proforma = Proforma::findOrFail($request->id);
+                $emp_idEdit = $proforma->emp_id;
+                $profIdStatus = $oldvalue->prof_id;
+                // $proforma->prof_id = $request->prof_id;
+                $proforma->emp_id = $request->emp_id;
+                if($request->id_group == 1 || $request->id_group == 22|| $request->id_group == 23){
+                    if($request->prof_tipo_proforma != 0){
+                        //CODIGO PROF_IF
+                        if($oldvalue->prof_id == null || $oldvalue->prof_id ==""){
+                            $id_empresa         = $request->emp_id;
+                            $cod_usuario        = $request->cod_usuario;
+                            $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
+                            $ven_codigo         = "PP-".$cod_usuario."-".$getNumeroDocumento;
+                            $proforma->prof_id  = $ven_codigo;
+                        }
+                    }
+                }
+                //CODIGO PROF_IF
+                if($request->prof_observacion){
+                    $proforma->prof_observacion = $request->prof_observacion;
+                }
+                $proforma->prof_observacion_libreria = $request->prof_observacion_libreria == null || $request->prof_observacion_libreria == 'null' ? '' : $request->prof_observacion_libreria;
+                $proforma->prof_descuento = $request->prof_descuento;
+                $proforma->pro_des_por = $request->pro_des_por;
+                $proforma->prof_iva = $request->prof_iva;
+                $proforma->prof_iva_por = $request->prof_iva_por;
+                $proforma->prof_total = $request->prof_total;
+                $proforma->user_editor = $request->id_usua;
+                if($request->estado){
+                    $proforma->prof_estado = $request->estado;
+                }
+                $proforma->id_ins_depacho = $request->id_ins_depacho;
+                $proforma->ven_cliente = $request->ven_cliente;
+                if($request->ven_cliente){
+                $user                   = User::where('idusuario',$request->ven_cliente)->first();
+                $getCedula              = $user->cedula;
+                $proforma->ruc_cliente  = $getCedula;
+                }
+                $proforma->clientesidPerseo = $request->clientesidPerseo;
+                $proforma->save();
+                if($proforma){
+                    //======SECUENCIA======
+                    //si la libreria crea la solicitud y el facturador al editar ricien elige la empresa para asignar el codigo de proforma
+                    if($emp_idEdit == null || $emp_idEdit == 0 || $profIdStatus == null || $profIdStatus == ""){
+                        if($request->emp_id==1){
+                            $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_Prolipa as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
+                        }else if($request->emp_id==3){
+                            $query1 = DB::SELECT("SELECT tdo_id as id, tdo_secuencial_calmed as cod from f_tipo_documento where tdo_nombre='PRE-PROFORMA'");
+                        }
+                        if(!empty($query1)){
+                            $id=$query1[0]->id;
+                            $codi=$query1[0]->cod;
+                            $co=(int)$codi+1;
+                            $tipo_doc = f_tipo_documento::findOrFail($id);
+                            if($request->emp_id==1){
+                                $tipo_doc->tdo_secuencial_Prolipa = $co;
+                            }else if($request->emp_id==3){
+                                $tipo_doc->tdo_secuencial_calmed = $co;
+                            }
+                            $tipo_doc->save();
+                        }
+                    }
+                    //======SECUENCIA======
+                    $newvalue = Proforma::findOrFail($request->id);
+                    $this->tr_GuardarEnHistorico($request->prof_id,$request->id_usua,$oldvalue,$newvalue);
+                }
+                foreach($miarray as $key => $item){
+                    if($item->det_prof_id!=null ||$item->det_prof_id!="" ){
+                        $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->pro_codigo'");
+                        $codi=$query1[0]->stoc;
+                        $co=(int)$codi+(int)$item->nuevo;
+                        $pro= _14Producto::findOrFail($item->pro_codigo);
+                        $pro->pro_reservar = $co;
+                        $pro->save();
+                        $proforma2 = DetalleProforma::findOrFail($item->det_prof_id);
+                        $proforma2->det_prof_cantidad = $item->cantidad;
+                        $proforma2->save();
+                    }  else{
+                        if((int)$item->cantidad != 0){
+                            $query1 = DB::SELECT("SELECT pro_reservar as stoc from 1_4_cal_producto where pro_codigo='$item->pro_codigo'");
+                            $codi=$query1[0]->stoc;
+                            $co=(int)$codi-(int)$item->cantidad;
+                            $pro= _14Producto::findOrFail($item->pro_codigo);
+                            $pro->pro_reservar = $co;
+                            $pro->save();
+                            $proforma1 = new DetalleProforma;
+                            $proforma1->prof_id = $request->id;
+                            $proforma1->pro_codigo = $item->pro_codigo;
+                            $proforma1->det_prof_cantidad = (int)$item->cantidad;
+                            $proforma1->det_prof_valor_u = $item->det_prof_valor_u;
+                            $proforma1->save();
+                        }
+                    }
+
+                }
+            DB::commit();
+            return response()->json(['message' => 'Proforma actualizado con éxito'], 200);
+        }catch(\Exception $e){
+            DB::rollback();
+            return response()->json(["error"=>"0", "message" => "No se pudo actualizar", 'error' => $e->getMessage()], 500);
+        }
+    }
+    
     public function PostProforma_Editar(Request $request)
        {
         try{
@@ -893,6 +1271,34 @@ class ProformaController extends Controller
                 "line" => $e->getLine()
             ]);
         }
+    }
+    public function AceptarSolicitudProforma(Request $request)
+    {
+            if ($request->id) {
+                try{
+                    DB::beginTransaction();
+                        $oldvalue= Proforma::findOrFail($request->id);
+                        $proform= Proforma::find($request->id);
+
+                        if (!$proform){
+                            return "El prof_id no existe en la base de datos";
+                        }
+                        $proform->prof_estado = $request->prof_estado;
+                        $proform->user_editor = $request->id_usua;
+                        $proform->save();
+                        if($proform){
+                            $newvalue = Proforma::findOrFail($request->id);
+                            $this->tr_GuardarEnHistorico($request->id,$request->id_usua,$oldvalue,$newvalue);
+                        }
+                    DB::commit();
+                    return response()->json(['message' => 'Proforma actualizado con éxito'], 200);
+                }catch(\Exception $e){
+                    DB::rollback();
+                    return response()->json(["error"=>"0", "message" => "No se pudo actualizar", 'error' => $e->getMessage()], 500);
+                }
+             } else {
+                return "No está ingresando ningún prof_id";
+            }
     }
 
     public function AprobarProforma(Request $request)

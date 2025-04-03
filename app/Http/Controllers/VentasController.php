@@ -1916,7 +1916,7 @@ class VentasController extends Controller
         $query = DetalleVentas::where('ven_codigo', $ven_codigo)
             ->leftjoin('1_4_cal_producto as p','p.pro_codigo','=','f_detalle_venta.pro_codigo')
             ->where('id_empresa', $id_empresa)
-            ->select('f_detalle_venta.*','p.ifcombo')
+            ->select('f_detalle_venta.*','p.ifcombo',DB::raw('CONCAT(p.pro_codigo, " - ", p.pro_nombre )as combolibro'))
             ->get(); // Usar 'get()' si esperas varios resultados
 
         // Retornar la respuesta

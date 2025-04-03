@@ -25,3 +25,7 @@ Broadcast::channel('admin.notifications_verificaciones', function ($user) {
     // Verifica si el ID del grupo del usuario es 1, 22 o 23
     return in_array($user->id_group, [1, 22, 23]);
 });
+Broadcast::channel('asesor.notificacionVerificacion', function ($user) {
+    return $user->idgroup === 11;
+});
+
