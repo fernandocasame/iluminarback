@@ -110,6 +110,7 @@ trait TraitPedidosGeneral
             OR o.estado_libros_obsequios  = "3"
             OR o.estado_libros_obsequios  = "4"
             OR o.estado_libros_obsequios  = "6"
+            OR o.estado_libros_obsequios  = "7"
             )
         ) as contadorHijosDocentesAbiertosEnviados,
         (
@@ -140,7 +141,7 @@ trait TraitPedidosGeneral
         ) AS contadorPendientesAnticipos,
         pe.periodoescolar as periodo,pe.codigo_contrato,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
-        i.region_idregion as region,uf.cod_usuario,
+        i.region_idregion as region,uf.iniciales as iniciales_facturador,
         ph.fecha_generar_contrato,
         (p.TotalVentaReal - ((p.TotalVentaReal * p.descuento)/100)) AS ven_neta,
         (p.TotalVentaReal * p.descuento)/100 as valorDescuento,
@@ -165,6 +166,7 @@ trait TraitPedidosGeneral
         if($filtro == 2) { $resultado->where('p.id_periodo','=', $parametro1)->where('p.id_asesor','=',$parametro2)->OrderBy('p.id_pedido','DESC'); }
         //filtro facturador no admin
         if($filtro == 3) { $resultado->where('p.id_periodo','=', $parametro1)->where('p.id_asesor','=',$parametro2)->where('p.estado','<>','0')
+        
             ->where(function ($query) {
                 $query->where('p.solicitud_gerencia_estado', '0')
                 ->orWhere('p.solicitud_gerencia_estado', '2');
@@ -177,6 +179,8 @@ trait TraitPedidosGeneral
         }
         //filtro x periodo pero el ca_codigo_agrupado es nulo
         if($filtro == 4) { $resultado->where('p.id_periodo','=',$parametro1)->where('p.estado','<>','0')->whereNull('p.ca_codigo_agrupado')->OrderBy('p.id_pedido','DESC'); }
+        //filtro x periodo root
+        if($filtro == 5) { $resultado->where('p.id_periodo','=',$parametro1)->OrderBy('p.id_pedido','DESC'); }
         $consulta = $resultado->get();
         return $consulta;
     }
@@ -358,7 +362,6 @@ trait TraitPedidosGeneral
         INNER JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
         LEFT JOIN 1_4_estado_venta ev on fv.est_ven_codigo = ev.est_ven_codigo
         WHERE fpr.idPuntoventa = '$ca_codigo_agrupado'
-        AND fv.est_ven_codigo <> 3
         ");
         return $query;
     }

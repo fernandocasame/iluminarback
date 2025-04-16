@@ -513,9 +513,9 @@ class ProformaController extends Controller
     
             if ($request->id_group == 1 || $request->id_group == 22 || $request->id_group == 23) {
                 $id_empresa = $request->emp_id;
-                $cod_usuario = $request->cod_usuario;
+                $iniciales = $request->iniciales;
                 $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                $ven_codigo = "PP-" . $cod_usuario . "-" . $getNumeroDocumento;
+                $ven_codigo = "PP-" . $iniciales . "-" . $getNumeroDocumento;
                 $proforma->prof_id = $ven_codigo;
             }
     
@@ -654,9 +654,9 @@ class ProformaController extends Controller
             if ($request->id_group == 1 || $request->id_group == 22 || $request->id_group == 23) {
                 if($request->prof_tipo_proforma != 0){
                     $id_empresa = $request->emp_id;
-                    $cod_usuario = $request->cod_usuario;
+                    $iniciales = $request->iniciales;
                     $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                    $ven_codigo = "PP-" . $cod_usuario . "-" . $getNumeroDocumento;
+                    $ven_codigo = "PP-" . $iniciales . "-" . $getNumeroDocumento;
                     $proforma->prof_id = $ven_codigo;
                 }
                 
@@ -801,9 +801,9 @@ class ProformaController extends Controller
                         //CODIGO PROF_IF
                         if($oldvalue->prof_id == null || $oldvalue->prof_id ==""){
                             $id_empresa         = $request->emp_id;
-                            $cod_usuario        = $request->cod_usuario;
+                            $iniciales        = $request->iniciales;
                             $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                            $ven_codigo         = "PP-".$cod_usuario."-".$getNumeroDocumento;
+                            $ven_codigo         = "PP-".$iniciales."-".$getNumeroDocumento;
                             $proforma->prof_id  = $ven_codigo;
                         }
                     }
@@ -911,9 +911,9 @@ class ProformaController extends Controller
                 //CODIGO PROF_IF
                     if($oldvalue->prof_id == null || $oldvalue->prof_id ==""){
                         $id_empresa         = $request->emp_id;
-                        $cod_usuario        = $request->cod_usuario;
+                        $iniciales        = $request->iniciales;
                         $getNumeroDocumento = $this->getNumeroDocumento($id_empresa);
-                        $ven_codigo         = "PP-".$cod_usuario."-".$getNumeroDocumento;
+                        $ven_codigo         = "PP-".$iniciales."-".$getNumeroDocumento;
                         $proforma->prof_id  = $ven_codigo;
                     }
                 }

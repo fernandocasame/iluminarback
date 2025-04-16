@@ -2286,7 +2286,7 @@ class VerificacionControllerAnterior extends Controller
                             ]);
     
                         $fecha2 = date('Y-m-d H:i:s');
-                        DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null WHERE contrato_generado = '$contrato'");
+                        DB::UPDATE("UPDATE pedidos SET estado_verificacion = '0' , fecha_solicita_verificacion = null, permitir_editar_despues_contrato = 0 WHERE contrato_generado = '$contrato'");
                         DB::UPDATE("UPDATE temporadas_verificacion_historico SET estado = '2', fecha_realiza_verificacion = '$fecha2' , id_verificacion = '$traeridVerificacion', usuario_verificacion = '$user_created' WHERE contrato = '$contrato' AND estado = '1'");
     
                         //  Para generar una nueva verificación y que quede abierta

@@ -552,16 +552,8 @@ class VentasController extends Controller
         }
     }
     public function Postventa_Registra(Request $request){
-        $letraDocumento     = $request->letra;
         $id_empresa         = $request->id_empresa;
-        $codigo_contrato    = $request->codigo_contrato;
-        $cod_usuario        = $request->cod_usuario;
-        // $getNumeroDocumento = $this->getNumeroDocumento($id_empresa,$letraDocumento);
-        // if($letraDocumento == 'F'){
-        //     $ven_codigo         = $letraDocumento."-".$codigo_contrato."-".$cod_usuario."-".$getNumeroDocumento;
-        // }else{
-        //     $ven_codigo         = "N-".$codigo_contrato."-".$cod_usuario."-".$letraDocumento.$getNumeroDocumento;
-        // }
+       
         try {
             $idProforma = $request->idProforma;
             set_time_limit(6000000);
@@ -952,111 +944,7 @@ class VentasController extends Controller
         }
     }
  
-    // public function GetVentasPendientes(Request $request) {
-    //     // Definir el estado basado en la opción proporcionada
-    //     $estado = null;
-    //     switch ($request->op) {
-    //         case 0:
-    //             $estado = 2; // Pendientes
-    //             break;
-    //         case 1:
-    //             $estado = 11; // Excluir
-    //             break;
-    //         case 2:
-    //             $estado = 12; // Preparado
-    //             break;
-    //         case 3:
-    //             $estado = 10; // Empacado
-    //             break;
-    //         case 4:
-    //             $estado = 1; // Despachadas
-    //             break;
-    //         case 5:
-    //             $estado = [11, 12, 10, 2]; // Todos los estados
-    //             break;
-    //         default:
-    //             $estado = 2; // Por defecto, estado pendiente
-    //             break;
-    //     }
     
-    //     // Consulta principal
-    //     $query = DB::SELECT("SELECT f.*, 
-    //             tv.tip_ven_nombre,
-    //             i.nombreInstitucion,
-    //             us.cedula,
-    //             us.email,
-    //             us.telefono,
-    //             i.telefonoInstitucion,
-    //             i.direccionInstitucion,
-    //             i.asesor_id,
-    //             CONCAT(usa.nombres,' ',usa.apellidos) AS asesor,
-    //             em.nombre,
-    //             pe.periodoescolar,
-    //             CONCAT(u.nombres,' ',u.apellidos) AS responsable,
-    //             CONCAT(us.nombres,' ',us.apellidos) AS cliente,
-    //             pr.pedido_id,
-    //             pr.idPuntoventa,
-    //             pr.prof_observacion,
-    //             pl.id_pedido AS pedido_id,
-    //             SUM(dv.det_ven_cantidad) AS cantidad_despacho,
-    //             pl.porcentaje_descuento,
-    //             camb.ven_codigo as documentoOrigen, camb.idtipodoc as tipoDocumentoOrigen
-    //         FROM f_venta f
-    //         INNER JOIN 1_4_tipo_venta tv ON f.tip_ven_codigo = tv.tip_ven_codigo
-    //         INNER JOIN institucion i ON f.institucion_id = i.idInstitucion
-    //         INNER JOIN empresas em ON f.id_empresa = em.id
-    //         INNER JOIN periodoescolar pe ON f.periodo_id = pe.idperiodoescolar
-    //         INNER JOIN usuario u ON f.user_created = u.idusuario
-    //         LEFT JOIN usuario us ON f.ven_cliente = us.idusuario
-    //         LEFT JOIN pedidos_beneficiarios pb ON f.ven_cliente = pb.id_beneficiario_pedido
-    //         LEFT JOIN usuario user ON pb.id_usuario = user.idusuario
-    //         INNER JOIN f_detalle_venta dv ON f.ven_codigo = dv.ven_codigo AND f.id_empresa = dv.id_empresa
-    //         LEFT JOIN usuario usa ON i.asesor_id = usa.idusuario
-    //         LEFT JOIN f_proforma pr ON pr.prof_id = f.ven_idproforma
-    //         LEFT JOIN p_libros_obsequios pl ON pl.id = f.ven_p_libros_obsequios
-    //         LEFT JOIN f_venta camb ON camb.doc_intercambio = f.ven_codigo  AND camb.id_empresa = f.id_empresa
-    //         WHERE f.est_ven_codigo " . (is_array($estado) ? 'IN (' . implode(',', $estado) . ')' : '= ' . $estado) . "
-    //         AND NOT (f.idtipodoc IN (3, 4) AND f.doc_intercambio IS NOT NULL)
-    //         GROUP BY f.ven_codigo, f.id_empresa, f.tip_ven_codigo, i.nombreInstitucion, us.cedula, us.email,
-    //                 us.telefono, i.telefonoInstitucion, i.direccionInstitucion, i.asesor_id,
-    //                 CONCAT(usa.nombres,' ',usa.apellidos), em.nombre,
-    //                 pe.periodoescolar, CONCAT(u.nombres,' ',u.apellidos),
-    //                 CONCAT(us.nombres,' ',us.apellidos),
-    //                 pr.pedido_id, pr.idPuntoventa, pr.prof_observacion, pl.id_pedido
-    //         ORDER BY COALESCE(f.fecha_proceso_despacho, f.ven_fecha) DESC
-    //     ");
-    
-    //     // Adicionar la lógica para obtener los contratos
-    //     foreach ($query as $key => $item) {
-    //         if ($item->idPuntoventa) {
-    //             $quer1 = DB::SELECT("SELECT pe.contrato_generado FROM pedidos pe WHERE pe.ca_codigo_agrupado = '$item->idPuntoventa'");
-    //             $query[$key]->contratos = $quer1;
-    //         } else {
-    //             if ($item->pedido_id) {
-    //                 $quer1 = DB::SELECT("SELECT pe.contrato_generado FROM pedidos pe WHERE pe.id_pedido = '$item->pedido_id'");
-    //                 $query[$key]->contratos = $quer1;
-    //             }else{
-    //                 $query[$key]->contratos = [];
-    //             }
-    //         }
-    //         //reempacado
-    //         $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
-    //         FROM empacado_remision r
-    //         INNER JOIN empacado_rempacado e ON e.remision_id = r.id
-    //         WHERE r.remi_num_factura = '$item->ven_codigo'
-    //         AND r.remi_estado <> '0'
-    //         ");
-    //         if(count($getReempacado) > 0){
-    //             $query[$key]->empacado = $getReempacado;
-    //         }else{
-    //             $query[$key]->empacado = [];
-    //         }
-    //     }
-    //     if($request->contarArray){
-    //         return count($query);
-    //     }
-    //     return $query;
-    // }
     //api:get/GetVentasPendientes?op=1&anio=2021&mes=12
     public function GetVentasPendientes(Request $request) {
         // Definir el estado basado en la opción proporcionada
@@ -1152,13 +1040,32 @@ class VentasController extends Controller
                 }
             }
             //reempacado
-            $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+            $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, r.remi_codigo, r.remi_idempresa,
+            r.remi_num_factura, r.remi_guia_remision, r.archivo, r.url, r.remi_estado
             FROM empacado_remision r
-            INNER JOIN empacado_rempacado e ON e.remision_id = r.id
             WHERE r.remi_num_factura = '$item->ven_codigo'
             AND r.remi_estado <> '0'
             ");
             if(count($getReempacado) > 0){
+                  // Detalle de empaque
+                $detalleEmpaque = DB::table('empacado_rempacado_detalle')
+                ->where('empacado_rempacado_id', $getReempacado[0]->id_remision)
+                ->where('idempresa', $getReempacado[0]->remi_idempresa)
+                ->sum('cantidad');
+
+                $getReempacado[0]->cantidad = $detalleEmpaque;
+
+                // Detalle de unidades libros de pre-factura
+                $detalleLibros = DB::table('f_detalle_venta')
+                    ->where('ven_codigo', $getReempacado[0]->remi_num_factura)
+                    ->where('id_empresa', $getReempacado[0]->remi_idempresa)
+                    ->select(DB::raw('sum(det_ven_cantidad_despacho) as libros'))
+                    ->get();
+                if(count($detalleLibros) > 0){
+                    $getReempacado[0]->libros = $detalleLibros[0]->libros;
+                }else{
+                    $getReempacado[0]->libros = 0;
+                }
                 $query[$key]->empacado = $getReempacado;
             }else{
                 $query[$key]->empacado = [];
@@ -1232,9 +1139,9 @@ class VentasController extends Controller
                     }
                 }
                   //reempacado
-                $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+                $getReempacado = DB::SELECT("SELECT r.id as id_remision,
+                r.remi_fecha_inicio, r.remi_codigo
                 FROM empacado_remision r
-                INNER JOIN empacado_rempacado e ON e.remision_id = r.id
                 WHERE r.remi_num_factura = '$item->ven_codigo'
                 AND r.remi_estado <> '0'
                 ");
@@ -1301,9 +1208,9 @@ class VentasController extends Controller
                     }
                 }
                 //reempacado
-                $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+                $getReempacado = DB::SELECT("SELECT r.id as id_remision,
+                r.remi_fecha_inicio, r.remi_codigo
                 FROM empacado_remision r
-                INNER JOIN empacado_rempacado e ON e.remision_id = r.id
                 WHERE r.remi_num_factura = '$item->ven_codigo'
                 AND r.remi_estado <> '0'
                 ");
@@ -1369,9 +1276,9 @@ class VentasController extends Controller
                     }
                 }
                 //reempacado
-                $getReempacado = DB::SELECT("SELECT r.id as id_remision,r.remi_fecha_inicio, e.empa_codigo
+                $getReempacado = DB::SELECT("SELECT r.id as id_remision,
+                r.remi_fecha_inicio, r.remi_codigo
                 FROM empacado_remision r
-                INNER JOIN empacado_rempacado e ON e.remision_id = r.id
                 WHERE r.remi_num_factura = '$item->ven_codigo'
                 AND r.remi_estado <> '0'
                 ");

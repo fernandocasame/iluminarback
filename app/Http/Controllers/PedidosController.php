@@ -44,6 +44,8 @@ use App\Models\Abono;
 use App\Models\AbonoHistorico;
 use App\Models\Pedidos_val_area_new;
 use App\Models\PedidoValArea;
+use App\Models\PermisoSuper;
+use App\Models\_14ProductoStockHistorico;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\PedidosPagosRepository;
 use App\Repositories\pedidos\ConvenioRepository;
@@ -165,6 +167,7 @@ class PedidosController extends Controller
                     foreach($miarray as $key => $item){
                         $pedido= pedidos::findOrFail($item->id_pedido);
                         $pedido->ca_codigo_agrupado = $request->ca_codigo_agrupado;
+                        $pedido->permitir_editar_despues_contrato = 0;
                         $pedido->save();
                     }
                 DB::commit();
@@ -186,6 +189,7 @@ class PedidosController extends Controller
                 foreach($miarray as $key => $item){
                     $pedido= pedidos::findOrFail($item->id_pedido);
                     $pedido->ca_codigo_agrupado = $request->ca_codigo_agrupado;
+                    $pedido->permitir_editar_despues_contrato = 0;
                     $pedido->save();
                 }
                 DB::commit();
@@ -196,21 +200,61 @@ class PedidosController extends Controller
             }
         }
     }
-    //api:post/removerContratoAgrupacion
-    public function removerContratoAgrupacion(Request $request){
-        $ca_codigo_agrupado         = $request->ca_codigo_agrupado;
-        //validar que todas las proformas sean anuladas
-        $query = DB::SELECT("SELECT * from f_proforma p
-            WHERE p.idPuntoventa = '$ca_codigo_agrupado'
-            AND p.prof_estado <> '0'
-        ");
-        if(count($query) > 0){
-            return ["status" => "0", "message" => "No se puede anular la agrupación porque existen proformas activas"];
+    //api:post/removerContratoAgrupacion    
+    public function removerContratoAgrupacion(Request $request)
+    {
+        // Definir las reglas de validación para los datos de entrada
+        $rules = [
+            'ca_codigo_agrupado' => 'required',
+            'id_pedido' => 'required',
+            'usuario' => 'nullable',
+        ];
+
+        // Ejecutar la validación
+        $validator = Validator::make($request->all(), $rules);
+
+        // Si la validación falla, retornar los errores
+        if ($validator->fails()) {
+            return response()->json(['status' => '0', 'errors' => $validator->errors()], 422);
         }
-        $id_pedido                  = $request->id_pedido;
-        $pedido                     = pedidos::findOrFail($id_pedido);
-        $pedido->ca_codigo_agrupado = null;
-        $pedido->save();
+
+        $ca_codigo_agrupado = $request->ca_codigo_agrupado;
+        $validacionRoot = false;
+
+        // Verificar si el usuario proporcionado tiene permisos de super usuario
+        if ($request->has('usuario')) {
+            $usuario = PermisoSuper::where('usuario_id', $request->usuario)->first();
+            $validacionRoot = !empty($usuario);
+        }
+        // return response()->json(['validacionRoot' => $validacionRoot, 'usuario' => $usuario]);
+
+        // Validar que todas las proformas asociadas estén anuladas
+        $proformasActivas = DB::table('f_proforma')
+            ->where('idPuntoventa', $ca_codigo_agrupado)
+            ->where('prof_estado', '<>', '0')
+            ->count();
+
+        if ($proformasActivas > 0 && !$validacionRoot) {
+            return response()->json(['status' => '0', 'message' => 'No se puede desvincular la agrupación porque existen proformas activas.']);
+        }
+
+        $id_pedido = $request->id_pedido;
+
+        try {
+            // Buscar el pedido usando Eloquent (findOrFail lanza una excepción si no se encuentra)
+            $pedido = Pedidos::findOrFail($id_pedido);
+
+            // Desvincular el contrato de agrupación
+            $pedido->ca_codigo_agrupado = null;
+            $pedido->save();
+
+            // Retornar una respuesta de éxito
+            return response()->json(['status' => '1', 'message' => 'Contrato de agrupación desvinculado exitosamente.']);
+
+        } catch (\Exception $e) {
+            // Capturar cualquier otra excepción que pueda ocurrir
+            return response()->json(['status' => '0', 'message' => 'Ocurrió un error al desvincular el contrato de agrupación: ' . $e->getMessage()], 500);
+        }
     }
     public function codigoAgrupacion(Request $request){
         $query1 = DB::SELECT("SELECT tdo_letra, tdo_secuencial_calmed as cod from  f_tipo_documento where tdo_letra='$request->letra'");
@@ -466,8 +510,8 @@ class PedidosController extends Controller
             ];
             //guardar en historico
             $this->saveHistoricoAnticipos($request);
-            $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
-            $prueba_get = json_decode($dato, true);
+            // $dato = Http::post("http://186.4.218.168:9095/api/f_Venta/ActualizarVenanticipo?venCodigo=".$contrato,$form_data);
+            // $prueba_get = json_decode($dato, true);
             if($pedido){
                 return ["status" => "1", "message" => "Se guardo correctamente"];
             }else{
@@ -897,13 +941,82 @@ class PedidosController extends Controller
     }
     //api:get>>/getTransabilidad/{id_pedido}
     public function getTransabilidad($id_pedido){
-        $query = DB::SELECT("SELECT p.fecha_creacion_pedido AS pedido_creacion,ph.*,
-        IF(p.ifanticipo = '0',p.fecha_generacion_contrato,ph.fecha_generar_contrato) as f_generateContrato
-        FROM pedidos p
-        LEFT JOIN pedidos_historico ph ON p.id_pedido = ph.id_pedido
-        WHERE p.id_pedido = '$id_pedido'
-        ");
-        return $query;
+        $consulta = "
+            SELECT 
+                p.id_pedido, 
+                p.fecha_creacion_pedido AS pedido_creacion,
+                ph.*,
+                IF(p.ifanticipo = '0', p.fecha_generacion_contrato, ph.fecha_generar_contrato) AS f_generateContrato,
+                
+                -- Agrupar las fechas de evidencia, factura y revisión
+                GROUP_CONCAT(CASE WHEN egt.egft_id = 3 THEN eg.created_at END ORDER BY eg.created_at) AS fecha_subida_evidencia,
+                GROUP_CONCAT(CASE WHEN egt.egft_id = 4 THEN eg.created_at END ORDER BY eg.created_at) AS fecha_subida_factura,
+                GROUP_CONCAT(CASE WHEN egt.egft_id = 2 THEN eg.created_at END ORDER BY eg.created_at) AS fecha_subida_revision
+            FROM 
+                pedidos p
+            LEFT JOIN 
+                pedidos_historico ph ON p.id_pedido = ph.id_pedido
+            LEFT JOIN 
+                verificaciones v ON v.contrato = p.contrato_generado
+            LEFT JOIN 
+                evidencia_global_files eg ON eg.egf_referencia = v.id
+            LEFT JOIN 
+                evidencia_global_files_tipo egt ON egt.egft_id = eg.egft_id
+            WHERE 
+                p.id_pedido = :pedido 
+                AND v.estado = 0
+            GROUP BY 
+                p.id_pedido, ph.id;
+        ";
+
+        $resultado = DB::select($consulta, ['pedido' => $id_pedido]);
+
+        if (empty($resultado)) {
+            return null;  // Si no hay resultados, retornar null
+        }
+
+        // Obtener el primer resultado (en este caso solo debería haber un pedido)
+        $resultado = $resultado[0];
+
+        // Procesar las fechas agrupadas
+        $fechas = [
+            'fecha_subida_evidencia' => array_values(explode(',', $resultado->fecha_subida_evidencia)),
+            'fecha_subida_factura' => array_values(explode(',', $resultado->fecha_subida_factura)),
+            'fecha_subida_revision' => array_values(explode(',', $resultado->fecha_subida_revision)),
+        ];
+
+        // Opcional: Convertir las fechas a un formato más adecuado (si es necesario)
+        $fechas['fecha_subida_evidencia'] = array_map(function ($fecha) {
+            return \Carbon\Carbon::parse($fecha)->format('Y-m-d H:i:s');
+        }, $fechas['fecha_subida_evidencia']);
+
+        $fechas['fecha_subida_factura'] = array_map(function ($fecha) {
+            return \Carbon\Carbon::parse($fecha)->format('Y-m-d H:i:s');
+        }, $fechas['fecha_subida_factura']);
+
+        $fechas['fecha_subida_revision'] = array_map(function ($fecha) {
+            return \Carbon\Carbon::parse($fecha)->format('Y-m-d H:i:s');
+        }, $fechas['fecha_subida_revision']);
+
+        // Ahora se agregan las demás columnas de la consulta en el resultado final
+        $resultadoFinal = [
+            'id_pedido' => $resultado->id_pedido,
+            'pedido_creacion' => $resultado->pedido_creacion,
+            'f_generateContrato' => $resultado->f_generateContrato,
+            'fecha_subida_evidencia' => $fechas['fecha_subida_evidencia'],
+            'fecha_subida_factura' => $fechas['fecha_subida_factura'],
+            'fecha_subida_revision' => $fechas['fecha_subida_revision'],
+        ];
+
+        // Agregar todos los campos de la tabla `pedidos_historico` (ph.*)
+        $camposHistorico = (array) $resultado; // Convertir el objeto a arreglo
+        unset($camposHistorico['fecha_subida_evidencia'], $camposHistorico['fecha_subida_factura'], $camposHistorico['fecha_subida_revision']); // Eliminar las fechas para evitar duplicación
+
+        // Fusionar los resultados
+        $resultadoFinal = array_merge($resultadoFinal, $camposHistorico);
+
+        // Devolver el resultado
+        return $resultadoFinal;
     }
     public function get_datos_pedido($id_pedido)
     {
@@ -1832,8 +1945,9 @@ class PedidosController extends Controller
         // } else {
         $pedidos = [];
         $response = [];
-        if($rol == 1 || $rol == 23) { $pedidos = $this->getPedido(1,$periodo); }
-        if($rol == 11){ $pedidos = $this->getPedido(2,$periodo,$idusuario); }
+        if($rol == 1)   { $pedidos = $this->getPedido(5,$periodo); }
+        if($rol == 23)  { $pedidos = $this->getPedido(1,$periodo); }
+        if($rol == 11)  { $pedidos = $this->getPedido(2,$periodo,$idusuario); }
         if(count($pedidos)==0){
             return $pedidos;
         }
@@ -1896,6 +2010,8 @@ class PedidosController extends Controller
                 'asesor_editComision'            => $item->asesor_editComision,
                 'convenio_origen'                => $item->convenio_origen,
                 'pedidos_convenios_id'           => $item->pedidos_convenios_id,
+                'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
+                'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
             ];
         }
         return $response;
@@ -1986,6 +2102,8 @@ class PedidosController extends Controller
                     'asesor_editComision'            => $item->asesor_editComision,
                     'convenio_origen'                => $item->convenio_origen,
                     'pedidos_convenios_id'           => $item->pedidos_convenios_id,
+                    'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
+                    'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
                 ];
             }
             return $datosMostrar;
@@ -2144,12 +2262,10 @@ class PedidosController extends Controller
                 "region"                => $item->region == 1 ? 'SIERRA':'COSTA',
                 "tregion"               => $item->region,
                 "codigo_contrato"       => $item->codigo_contrato,
-                "cod_usuario"           => $item->cod_usuario,
+                "iniciales_facturador"  => $item->iniciales_facturador,
                 "fecha_generar_contrato" => $item->ifanticipo == 0 ? $item->fecha_generacion_contrato : $item->fecha_generar_contrato,
                 "beneficiario"          => $consulta[0]->beneficiario,
                 "tipo_cuenta"           => $consulta[0]->tipo_cuenta,
-                // "num_cuenta"            => $consulta[0]->num_cuenta,
-                // "banco"                 => $consulta[0]->banco,
                 "email"                 => $consulta[0]->email,
                 "cedula_beneficiario"   => $consulta[0]->cedula_beneficiario,
                 "direccionBenefiario"   => $consulta[0]->direccionBenefiario,
@@ -2602,20 +2718,7 @@ class PedidosController extends Controller
             }
         }
     }
-    public function cargar_codigos_usuarios(){
-        $usuarios = Http::get('http://186.4.218.168:9095/api/usuario');
-        $json_usuarios = json_decode($usuarios, true);
-        // return count($json_usuarios);
-        foreach ($json_usuarios as $key => $value) {
-            try {
-                $query = "UPDATE `usuario` SET `cod_usuario`='".$value['usu_codigo']."' WHERE `cedula` = '".trim($value['usu_ci'])."';";
-                DB::SELECT($query);
-                dump($query);
-            } catch (\Throwable $th) {
-                dump($th);
-            }
-        }
-    }
+
     public function cargar_codigo_institucion1(){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
@@ -2745,120 +2848,7 @@ class PedidosController extends Controller
             return ["status" => "0", "message" => "Error al crear el pedido"];
         }
     }
-    //api:post//guardarContratoBdMilton
-    public function guardarContratoBdMilton(Request $request){
-        //variables
-        $fecha_formato      = date('Y-m-d');
-        $codigo_ven         = $request->contrato_generado;
-        $verificador        = $request->cod_usuario_verif;
-        $iniciales          = $request->iniciales;
-        $tipo_venta         = $request->tipo_venta;
-        $total_venta        = $request->total_venta;
-        $region_idregion    = $request->region_idregion;
-        $descuento          = $request->descuento;
-        $cedulaAsesor       = $request->cedula;
-        $id_responsable     = $request->id_responsable;
-        $institucion        = $request->id_institucion;
-        $asesor_id          = $request->id_asesor;
-        $asesor             = $request->asesor;
-        $temporada          = substr($request->codigo_contrato,0,1);
-        $periodo            = $request->id_periodo;
-        $ciudad             = $request->nombre_ciudad;
-        $nombreInstitucion  = $request->nombreInstitucion;
-        //fin variables
-        $observacion = null;
-        if($request->observacion == null || $request->observacion == "" || $request->observacion == "null"){
-            $observacion        = null;
-        }else{
-            $observacion        = $request->observacion;
-        }
-        $setAnticipo = 0;
-        if($request->anticipo_aprobado == null || $request->anticipo_aprobado == ""){
-            $setAnticipo = 0;
-        }else{
-            $setAnticipo = $request->anticipo_aprobado;
-        }
-        $setNumCuenta = 0;
-        if($request->num_cuenta == null || $request->num_cuenta == "" || $request->num_cuenta == "null"){
-            $setNumCuenta = 0;
-        }else{
-            $setNumCuenta = $request->num_cuenta;
-        }
-        //OBTENER EL DOCENTE
-        $docente = DB::SELECT("SELECT u.cedula,  CONCAT(u.nombres, ' ', u.apellidos) AS docente FROM  usuario u WHERE `idusuario` = ?", [$id_responsable]);
-        $nombreDocente      = $docente[0]->docente;
-        $cedulaDocente      = $docente[0]->cedula;
-        //cli ins codigo
-        $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
-        WHERE `id_asesor` = ? AND `id_institucion` = ?
-        AND `id_docente` = ?", [$iniciales,
-        $request->codigo_institucion_milton, $docente[0]->cedula]);
-        if(empty($cli_ins_cod)){
-            return ["status" => "0","message" => "No existe el ins cliente codigo"];
-        }
-        if (strlen($observacion) > 500) {
-            $cadenaRecortada = substr($observacion, 0, 500); // Recorta la cadena a 500 caracteres
-        } else {
-            $cadenaRecortada = $observacion; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
-        }
-        //GUARDAR VENTA
-        $form_data = [
-            'veN_CODIGO'            => $codigo_ven, //codigo formato milton
-            'usU_CODIGO'            => strval($verificador),
-            'veN_D_CODIGO'          => $iniciales, // codigo del asesor
-            'clI_INS_CODIGO'        => floatval($cli_ins_cod[0]->cli_ins_codigo),
-            'tiP_veN_CODIGO'        => intval($tipo_venta),
-            'esT_veN_CODIGO'        => 2, // por defecto
-            'veN_OBSERVACION'       => $cadenaRecortada,
-            'veN_VALOR'             => floatval($total_venta),
-            'veN_PAGADO'            => 0.00, // por defecto
-            'veN_ANTICIPO'          => floatval($setAnticipo),
-            'veN_DESCUENTO'         => floatval($descuento),
-            'veN_FECHA'             => $fecha_formato,
-            'veN_CONVERTIDO'        => '', // por defecto
-            'veN_TRANSPORTE'        => 0.00, // por defecto
-            'veN_ESTADO_TRANSPORTE' => false, // por defecto
-            'veN_FIRMADO'           => 'DS', // por defecto
-            'veN_TEMPORADA'         => $region_idregion == 1 ? 0 :1 ,
-            'cueN_NUMERO'           => strval($setNumCuenta)
-        ];
-        // return $form_data;
-        //guardar en la tabla de temporadas
-        // $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
-        try {
-            $contrato = Http::post('http://186.4.218.168:9095/api/Contrato', $form_data);
-            $json_contrato = json_decode($contrato, true);
-        } catch (\Exception  $ex) {
-            return ["status" => "0","message" => "Hubo problemas con la conexión al servidor"];
-        }
-
-        //DETALLE DE VENTA
-        $detalleVenta = $this->get_val_pedidoInfo($request->id_pedido);
-        //Si no hay nada en detalle de venta
-        if(empty($detalleVenta)){
-            return ["status" => "0", "message" => "No hay ningun libro para el detalle de venta"];
-        }
-        $iva = 0;
-        $descontar =0;
-        for($i =0; $i< count($detalleVenta);$i++){
-            $form_data_detalleVenta = [
-                "VEN_CODIGO"            => $codigo_ven,
-                "PRO_CODIGO"            => $detalleVenta[$i]["codigo_liquidacion"],
-                "DET_VEN_CANTIDAD"      =>  intval($detalleVenta[$i]["valor"]),
-                "DET_VEN_VALOR_U"       => floatval($detalleVenta[$i]["precio"]),
-                "DET_VEN_IVA"           => floatval($iva),
-                "DET_VEN_DESCONTAR"     => intval($descontar),
-                "DET_VEN_INICIO"        => false,
-                "DET_VEN_CANTIDAD_REAL" => intval($detalleVenta[$i]["valor"]),
-            ];
-            $detalle = Http::post('http://186.4.218.168:9095/api/DetalleVenta', $form_data_detalleVenta);
-        $json_detalle = json_decode($detalle, true);
-        }
-        return $json_contrato;
-        // //actualizar en pedidos que envio a la bd de milton
-        // DB::UPDATE("UPDATE pedidos SET enviarMilton = '1' WHERE id_pedido = '$request->id_pedido' ");
-        // return response()->json(['json_contrato' => $json_contrato, 'form_data' => $form_data]);
-    }
+    
     public function getBeneficiariosXPedido($id_pedido){
         $query              = $this->getAllBeneficiarios($id_pedido);
         return $query;
@@ -2910,7 +2900,6 @@ class PedidosController extends Controller
                 "id_beneficiario_pedido"    => $item->id_beneficiario_pedido,
                 "id_pedido"                 => $item->id_pedido,
                 "id_usuario"                => $item->id_usuario,
-                "cod_usuario"               => $item->cod_usuario,
                 "tipo_identificacion"       => $item->tipo_identificacion,
                 "direccion"                 => $item->direccion,
                 "correo"                    => $item->correo,
@@ -3022,9 +3011,7 @@ class PedidosController extends Controller
         if( !$pedido[0]->codigo_contrato ){
             return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del periodo']);
         }
-        // if( !$usuario_verifica[0]->cod_usuario ){
-        //     return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del usuario facturador']);
-        // }
+        
         $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
         WHERE `id_asesor` = ? AND `id_institucion` = ?
         AND `id_docente` = ?", [$pedido[0]->iniciales,
@@ -3034,26 +3021,7 @@ class PedidosController extends Controller
         } else {
             $cadenaRecortada = $comentario; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
         }
-        // $form_data = [
-        //     'veN_CODIGO' => $codigo_ven, //codigo formato milton
-        //     'usU_CODIGO' => strval($usuario_verifica[0]->cod_usuario),
-        //     'veN_D_CODIGO' => $pedido[0]->iniciales, // codigo del asesor
-        //     'clI_INS_CODIGO' => floatval($cli_ins_cod[0]->cli_ins_codigo),
-        //     'tiP_veN_CODIGO' => $pedido[0]->tipo_venta,
-        //     'esT_veN_CODIGO' => 2, // por defecto
-        //     'veN_OBSERVACION' => $cadenaRecortada,
-        //     'veN_VALOR' => $pedido[0]->total_venta,
-        //     'veN_PAGADO' => 0.00, // por defecto
-        //     'veN_ANTICIPO' => $setAnticipo,
-        //     'veN_DESCUENTO' => $pedido[0]->descuento,
-        //     'veN_FECHA' => $fecha_formato,
-        //     'veN_CONVERTIDO' => '', // por defecto
-        //     'veN_TRANSPORTE' => 0.00, // por defecto
-        //     'veN_ESTADO_TRANSPORTE' => false, // por defecto
-        //     'veN_FIRMADO' => 'DS', // por defecto
-        //     'veN_TEMPORADA' => $pedido[0]->region_idregion == 1 ? 0 :1 ,
-        //     'cueN_NUMERO' => strval($setNumCuenta)
-        // ];
+      
         //guardar en la tabla de temporadas
         $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
         // try {
@@ -3722,41 +3690,7 @@ class PedidosController extends Controller
             return ["status" => "0", "message" => "No se pudo guardar"];
         }
     }
-    //api:get/getContratosPedidos
-    public function getContratosPedidos(Request $request){
-        // $query = DB::SELECT("SELECT p.*,
-        // CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula, u.iniciales,
-        // CONCAT(uv.nombres,' ',uv.apellidos) as verificador, uv.cod_usuario,
-        // i.nombreInstitucion,i.codigo_institucion_milton,
-        // pe.region_idregion, c.nombre AS nombre_ciudad,pe.codigo_contrato
-        // FROM pedidos p
-        // LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        // LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
-        // LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        // LEFT  JOIN usuario uv ON p.id_usuario_verif = uv.idusuario
-        // LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        // WHERE p.contrato_generado IS NOT NULL
-        // AND pe.estado = '1'
-        // AND p.estado = '1'
-        // ORDER BY p.id_pedido DESC
-        // ");
-        $query = DB::SELECT("SELECT p.*,
-        CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula, u.iniciales,
-        CONCAT(uv.nombres,' ',uv.apellidos) as verificador, uv.cod_usuario,
-        i.nombreInstitucion,i.codigo_institucion_milton,
-        pe.region_idregion, c.nombre AS nombre_ciudad,pe.codigo_contrato
-        FROM pedidos p
-        LEFT JOIN periodoescolar pe ON p.id_periodo = pe.idperiodoescolar
-        LEFT  JOIN usuario u ON p.id_asesor = u.idusuario
-        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-        LEFT  JOIN usuario uv ON p.id_usuario_verif = uv.idusuario
-        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-        WHERE p.tipo = '1'
-        AND p.estado = '1'
-        ORDER BY p.id_pedido DESC
-        ");
-        return $query;
-    }
+
     //APIS ===MOSTRAR LO ANTICIPOS ANTERIORES
     public function mostrarAnticiposAnteriores(Request $request){
         try {
@@ -5987,7 +5921,96 @@ class PedidosController extends Controller
         try {
             DB::beginTransaction();
 
+            //Inicio Verificar si hay stock disponible antes de realizar cualquier acción.
+            // Procesamiento de los detalles de la venta
+            $datosDetalle = json_decode($request->datos_detalle_venta, true);
             $empresa = $request->id_empresa;
+            // Verifica si los datos decodificados son un array válido
+            if (!is_array($datosDetalle)) {
+                throw new \Exception('Los datos detalle no son válidos');
+            }
+            $errores = [];
+            if ($request->switch_activar_todo_stock === "true") {
+                //Validará stock disponible de las 4 bodegas
+                foreach ($datosDetalle as $detalle) {
+                    $codigoProducto = $detalle['pro_codigo'];
+                    $cantidadAprobada = $detalle['p_libros_cantidad_aprobada'];
+                    // Consultar el stock actual en la base de datos
+                    $producto = DB::table('1_4_cal_producto')
+                        ->select('pro_stock', 'pro_stockCalmed', 'pro_deposito', 'pro_depositoCalmed', 'pro_reservar')
+                        ->where('pro_codigo', $codigoProducto)
+                        ->first();
+                    if (!$producto) {
+                        $errores[] = "Producto con código $codigoProducto no encontrado.";
+                        continue;
+                    }
+                    // Verificar si hay suficiente stock en pro_reservar
+                    $proReservar = $producto->pro_reservar ?? 0;
+                    if ($cantidadAprobada > $proReservar) {
+                        $errores[] = "Stock general insuficiente (pro_reservar) para el producto $codigoProducto. Disponible: $proReservar, Solicitado: $cantidadAprobada";
+                    }
+                    // Sumar solo los stocks que sean >= 0
+                    $stockTotal = 0;
+                    if (($producto->pro_stock ?? 0) >= 0) {
+                        $stockTotal += $producto->pro_stock;
+                    }
+                    if (($producto->pro_stockCalmed ?? 0) >= 0) {
+                        $stockTotal += $producto->pro_stockCalmed;
+                    }
+                    if (($producto->pro_deposito ?? 0) >= 0) {
+                        $stockTotal += $producto->pro_deposito;
+                    }
+                    if (($producto->pro_depositoCalmed ?? 0) >= 0) {
+                        $stockTotal += $producto->pro_depositoCalmed;
+                    }
+                    // Validar si la cantidad aprobada supera el stock disponible
+                    if ($cantidadAprobada > $stockTotal) {
+                        $errores[] = "Stock total insuficiente para el producto $codigoProducto. Disponible: $stockTotal, Solicitado: $cantidadAprobada";
+                    }
+                }
+            } else if ($request->switch_activar_todo_stock === "false") {
+                // Validará stock disponible solo en la bodega correspondiente a la empresa
+                foreach ($datosDetalle as $detalle) {
+                    $codigoProducto = $detalle['pro_codigo'];
+                    $cantidadAprobada = $detalle['p_libros_cantidad_aprobada'];
+                    // Consultar el stock actual en la base de datos
+                    $producto = DB::table('1_4_cal_producto')
+                        ->select('pro_deposito', 'pro_depositoCalmed', 'pro_reservar')
+                        ->where('pro_codigo', $codigoProducto)
+                        ->first();
+                    if (!$producto) {
+                        $errores[] = "Producto con código $codigoProducto no encontrado.";
+                        continue;
+                    }
+                    // Verificar si pro_reservar tiene suficiente stock
+                    $stockReservado = $producto->pro_reservar ?? 0;
+                    if ($cantidadAprobada > $stockReservado) {
+                        $errores[] = "Stock general insuficiente (pro_reservar) para el producto $codigoProducto. Disponible: $stockReservado, Solicitado: $cantidadAprobada";
+                    }
+                    // Determinar qué stock comparar según la empresa
+                    $stockDisponible = 0;
+                    if ($empresa == 1) {
+                        $stockDisponible = max(0, $producto->pro_deposito ?? 0);
+                    } else if ($empresa == 3) {
+                        $stockDisponible = max(0, $producto->pro_depositoCalmed ?? 0);
+                    }
+                    // Validar si la cantidad aprobada supera el stock disponible
+                    if ($cantidadAprobada > $stockDisponible) {
+                        $errores[] = "Stock total insuficiente para el producto $codigoProducto. Disponible: $stockDisponible, Solicitado: $cantidadAprobada";
+                    }
+                }
+            }
+            
+            // Si hay errores, retornar respuesta sin continuar la lógica
+            if (!empty($errores)) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 3,
+                    'message' => 'Stock insuficiente.',
+                    'errores' => $errores
+                ], 200);
+            }
+            //Fin Verificar si hay stock disponible antes de realizar cualquier acción.
 
             // Crear la venta
             $actaLibrosObsequios = new Ventas;
@@ -6027,14 +6050,6 @@ class PedidosController extends Controller
                 return 'No hay empresa seleccionada';
             }
             $tipo_doc->save();
-
-            // Procesamiento de los detalles de la venta
-            $datosDetalle = json_decode($request->datos_detalle_venta, true);
-
-            // Verifica si los datos decodificados son un array válido
-            if (!is_array($datosDetalle)) {
-                throw new \Exception('Los datos detalle no son válidos');
-            }
 
             // Crear un array con los datos adicionales
             $datosAdicionales = [
@@ -6087,21 +6102,35 @@ class PedidosController extends Controller
                 $actaDetallePedidosObsequios->p_libros_valor_u = $item['p_libros_valor_u'];
                 $actaDetallePedidosObsequios->save();
 
-                // Actualiza los productos relacionados
-                $producto = _14Producto::findOrFail($item['pro_codigo']);
-                if ($empresa == 1) {
-                    $producto->pro_deposito -= (int)$item['p_libros_cantidad_aprobada'];
-                    $producto->pro_reservar -= (int)$item['p_libros_cantidad_aprobada'];
-                } else if ($empresa == 3) {
-                    $producto->pro_depositoCalmed -= (int)$item['p_libros_cantidad_aprobada'];
-                    $producto->pro_reservar -= (int)$item['p_libros_cantidad_aprobada'];
-                } else {
-                    $secuencial = null;
-                    return 'No hay empresa seleccionada';
+                //INICIO SECCION HISTORICO PRODUCTOS Y ACTUALIZACION STOCK
+                $verificar_Tipo_Guardado_Stock = '';
+                if ($request->switch_activar_todo_stock === "true") {
+                    // DB::rollBack();
+                    $verificar_Tipo_Guardado_Stock = 1;
+                    $return_descontarStock_HijosDocentes = $this->descontarStock_HijosDocentes($item,3,$empresa,$verificar_Tipo_Guardado_Stock);
+                    
+                } else if ($request->switch_activar_todo_stock === "false") {
+                    // Actualiza los productos relacionados
+                    // DB::rollBack();
+                    $verificar_Tipo_Guardado_Stock = 2;
+                    $return_descontarStock_HijosDocentes = $this->descontarStock_HijosDocentes($item,3,$empresa,$verificar_Tipo_Guardado_Stock);
                 }
-
-                $producto->save();
+                $HistoricoStock[] = [
+                    'psh_old_values' => json_encode($return_descontarStock_HijosDocentes['old_values']),
+                    'psh_new_values' => json_encode($return_descontarStock_HijosDocentes['new_values']),
+                ];
             }
+            $registroHistorial = [
+                'psh_old_values' => json_encode(array_column($HistoricoStock, 'psh_old_values', 'pro_codigo')),
+                'psh_new_values' => json_encode(array_column($HistoricoStock, 'psh_new_values', 'pro_codigo')),
+                'psh_tipo' => 4, //Tipo generacion documento venta
+                'psh_id_ven_codigo' => $request->ven_codigo,
+                'user_created' => $request->user_created,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ];
+            _14ProductoStockHistorico::insert($registroHistorial);
+            //FIN SECCION HISTORICO PRODUCTOS Y ACTUALIZACION STOCK
 
             // Actualiza el estado del pedido de libros obsequios
             $pedido = PedidosLibroObsequio::findOrFail($request->id_pedidoLibrosObsequios);
@@ -6501,7 +6530,7 @@ class PedidosController extends Controller
     }
 
     public function obtenerDatosDetalleLibros($pedido){
-        $query = DB::SELECT("SELECT plo.*, ls.nombre AS pro_nombre, pl.porcentaje_descuento, pro.pro_deposito, pro.pro_depositoCalmed, l.descripcionlibro, ls.id_serie
+        $query = DB::SELECT("SELECT plo.*, ls.nombre AS pro_nombre, pl.porcentaje_descuento, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_stock, pro.pro_stockCalmed, pro.pro_reservar, l.descripcionlibro, ls.id_serie
         FROM p_detalle_libros_obsequios plo
         INNER JOIN 1_4_cal_producto  pro ON pro.pro_codigo = plo.pro_codigo
         INNER JOIN p_libros_obsequios pl ON pl.id = plo.p_libros_obsequios_id
@@ -6992,9 +7021,7 @@ class PedidosController extends Controller
             if( !$pedido[0]->codigo_contrato ){
                 return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del periodo']);
             }
-            // if( !$usuario_verifica[0]->cod_usuario ){
-            //     return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del usuario facturador']);
-            // }
+           
             $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
             WHERE `id_asesor` = ? AND `id_institucion` = ?
             AND `id_docente` = ?", [$pedido[0]->iniciales,
@@ -7004,26 +7031,7 @@ class PedidosController extends Controller
             } else {
                 $cadenaRecortada = $comentario; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
             }
-            // $form_data = [
-            //     'veN_CODIGO' => $codigo_ven, //codigo formato milton
-            //     'usU_CODIGO' => strval($usuario_verifica[0]->cod_usuario),
-            //     'veN_D_CODIGO' => $pedido[0]->iniciales, // codigo del asesor
-            //     'clI_INS_CODIGO' => floatval($cli_ins_cod[0]->cli_ins_codigo),
-            //     'tiP_veN_CODIGO' => $pedido[0]->tipo_venta,
-            //     'esT_veN_CODIGO' => 2, // por defecto
-            //     'veN_OBSERVACION' => $cadenaRecortada,
-            //     'veN_VALOR' => $pedido[0]->total_venta,
-            //     'veN_PAGADO' => 0.00, // por defecto
-            //     'veN_ANTICIPO' => $setAnticipo,
-            //     'veN_DESCUENTO' => $pedido[0]->descuento,
-            //     'veN_FECHA' => $fecha_formato,
-            //     'veN_CONVERTIDO' => '', // por defecto
-            //     'veN_TRANSPORTE' => 0.00, // por defecto
-            //     'veN_ESTADO_TRANSPORTE' => false, // por defecto
-            //     'veN_FIRMADO' => 'DS', // por defecto
-            //     'veN_TEMPORADA' => $pedido[0]->region_idregion == 1 ? 0 :1 ,
-            //     'cueN_NUMERO' => strval($setNumCuenta)
-            // ];
+           
             //guardar en la tabla de temporadas
             $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
             // try {
@@ -7961,6 +7969,119 @@ class PedidosController extends Controller
                 "status" => 0,
                 'message' => 'Error al realizar las eliminaciones: ' . $e->getMessage()
             ], 500);
+        }
+    }
+
+    public function descontarStock_HijosDocentes($item, $tipo, $id_empresa, $verificar_Tipo_Guardado_Stock)
+    {
+        // return [
+        //     "item"=>$item,
+        //     "tipo"=>$tipo,
+        //     "id_empresa"=>$id_empresa,
+        //     "message"=>"llego al segundo metoodo",
+        // ];
+        if ($verificar_Tipo_Guardado_Stock == 1) {
+            $pro_codigo_recibido = _14Producto::findOrFail($item['pro_codigo']);
+            if (!in_array($id_empresa, [1, 3])) {
+                return 'Empresa no controlada';
+            }
+            // Guardar valores antes de actualizar (old_values)
+            $old_values = [
+                'pro_codigo' => $pro_codigo_recibido->pro_codigo,
+                'pro_reservar' => $pro_codigo_recibido->pro_reservar,
+                'pro_stock' => $pro_codigo_recibido->pro_stock,
+                'pro_stockCalmed' => $pro_codigo_recibido->pro_stockCalmed,
+                'pro_deposito' => $pro_codigo_recibido->pro_deposito,
+                'pro_depositoCalmed' => $pro_codigo_recibido->pro_depositoCalmed,
+            ];
+            // Definir los campos en el orden correcto según empresa y tipo
+            if ($id_empresa == 1) {
+                if ($tipo == 1) {
+                    $campos = ['pro_stock', 'pro_deposito', 'pro_stockCalmed', 'pro_depositoCalmed'];
+                } else if ($tipo == 3 || $tipo == 4) {
+                    $campos = ['pro_deposito', 'pro_stock', 'pro_depositoCalmed', 'pro_stockCalmed'];
+                } else {
+                    return 'Tipo no controlado';
+                }
+            } else { // id_empresa == 3
+                if ($tipo == 1) {
+                    $campos = ['pro_stockCalmed', 'pro_depositoCalmed', 'pro_stock', 'pro_deposito'];
+                } else if ($tipo == 3 || $tipo == 4) {
+                    $campos = ['pro_depositoCalmed', 'pro_stockCalmed', 'pro_deposito', 'pro_stock'];
+                } else {
+                    return 'Tipo no controlado';
+                }
+            }
+            // Inicializar variables
+            $cantidadRestante = $item['p_libros_cantidad_aprobada'];
+            $totalRestado = 0;
+            // Recorrer los campos y descontar stock
+            foreach ($campos as $campo) {
+                if ($cantidadRestante <= 0) {
+                    break;
+                }
+                if ($pro_codigo_recibido->$campo > 0) {
+                    $aRestar = min($cantidadRestante, $pro_codigo_recibido->$campo);
+                    $pro_codigo_recibido->$campo -= $aRestar;
+                    // También restar de pro_reservar si tiene valor
+                    // if ($pro_codigo_recibido->pro_reservar > 0) {
+                    $aRestarReservar = min($aRestar, $pro_codigo_recibido->pro_reservar);
+                    $pro_codigo_recibido->pro_reservar -= $aRestarReservar;
+                    // }
+                    $pro_codigo_recibido->save();
+                    $cantidadRestante -= $aRestar;
+                    $totalRestado += $aRestar;
+                }
+            }
+            // Guardar valores después de actualizar (new_values)
+            $new_values = [
+                'pro_codigo' => $pro_codigo_recibido->pro_codigo,
+                'pro_reservar' => $pro_codigo_recibido->pro_reservar,
+                'pro_stock' => $pro_codigo_recibido->pro_stock,
+                'pro_stockCalmed' => $pro_codigo_recibido->pro_stockCalmed,
+                'pro_deposito' => $pro_codigo_recibido->pro_deposito,
+                'pro_depositoCalmed' => $pro_codigo_recibido->pro_depositoCalmed,
+            ];
+            return [
+                'old_values' => $old_values,
+                'new_values' => $new_values,
+                'totalRestado' => $totalRestado
+            ];
+        }else if ($verificar_Tipo_Guardado_Stock == 2) {
+            $producto = _14Producto::findOrFail($item['pro_codigo']);
+            // Guardar valores antes de actualizar (old_values)
+            $old_values = [
+                'pro_codigo' => $producto->pro_codigo,
+                'pro_reservar' => $producto->pro_reservar,
+                'pro_stock' => $producto->pro_stock,
+                'pro_stockCalmed' => $producto->pro_stockCalmed,
+                'pro_deposito' => $producto->pro_deposito,
+                'pro_depositoCalmed' => $producto->pro_depositoCalmed,
+            ];
+            if ($id_empresa == 1) {
+                $producto->pro_deposito -= (int)$item['p_libros_cantidad_aprobada'];
+                $producto->pro_reservar -= (int)$item['p_libros_cantidad_aprobada'];
+            } else if ($id_empresa == 3) {
+                $producto->pro_depositoCalmed -= (int)$item['p_libros_cantidad_aprobada'];
+                $producto->pro_reservar -= (int)$item['p_libros_cantidad_aprobada'];
+            } else {
+                $secuencial = null;
+                return 'No hay empresa seleccionada';
+            }
+            $producto->save();
+            // Guardar valores después de actualizar (new_values)
+            $new_values = [
+                'pro_codigo' => $producto->pro_codigo,
+                'pro_reservar' => $producto->pro_reservar,
+                'pro_stock' => $producto->pro_stock,
+                'pro_stockCalmed' => $producto->pro_stockCalmed,
+                'pro_deposito' => $producto->pro_deposito,
+                'pro_depositoCalmed' => $producto->pro_depositoCalmed,
+            ];
+            return [
+                'old_values' => $old_values,
+                'new_values' => $new_values,
+            ];
         }
     }
 

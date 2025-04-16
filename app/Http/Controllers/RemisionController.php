@@ -164,11 +164,12 @@ class RemisionController extends Controller
         
 
     }
-
+    //api:get/individual>>>>GetRemisionCALMED_FECHA?op=1&individual=PF-C-C25-FR-0000685
     public function GetRemisionCALMED_FECHA(Request $request) {
         try {
             $fechaFiltro = null;
             $cedulaFiltro = null;
+            $individual   = $request->individual;
     
             switch ($request->op) {
                 case 0:
@@ -187,7 +188,7 @@ class RemisionController extends Controller
             }
     
             // Construir la consulta base
-            $query = "SELECT DISTINCT r.*, e.*, t.trans_nombre, 
+            $query = "SELECT DISTINCT r.*,  t.trans_nombre, 
                     (SELECT CONCAT(i.telefonoInstitucion, ' ', u.telefono) 
                      FROM f_venta f 
                      INNER JOIN institucion i ON i.idInstitucion = f.institucion_id
@@ -206,27 +207,30 @@ class RemisionController extends Controller
                     fv.ruc_cliente,
                     fv.est_ven_codigo
                 FROM empacado_remision r
-                LEFT JOIN empacado_rempacado e ON e.remision_id = r.id
                 LEFT JOIN 1_4_transporte t ON r.trans_codigo = t.trans_codigo
                 LEFT JOIN f_venta fv ON fv.ven_codigo = r.remi_num_factura AND r.remi_idempresa = fv.id_empresa
                 LEFT JOIN usuario u ON fv.ven_cliente = u.idusuario
                 LEFT JOIN institucion i ON fv.institucion_id = i.idInstitucion
                 LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma AND fpr.emp_id = fv.id_empresa
-                LEFT JOIN empresas emp ON emp.id = e.idempresa
+                LEFT JOIN empresas emp ON emp.id = r.remi_idempresa
                 WHERE r.remi_estado = '2'
                 AND ";
-    
-            // Condicionales basadas en el valor de 'op'
-            if ($request->op == 2) {
-                // En caso de 'op' == 2, agregar ambas condiciones (fecha y cédula)
-                $query .= "DATE(r.REMI_FECHA_INICIO) = ? AND r.remi_ci_transportista = ? ";
-                $queryParams = [$fechaFiltro, $cedulaFiltro];
-            } else {
-                // Para 'op' == 0 o 'op' == 1, solo agregar la condición de fecha
-                $query .= "DATE(r.REMI_FECHA_INICIO) = ? ";
-                $queryParams = [$fechaFiltro];
+            if($individual){
+                $query .= "r.remi_num_factura = ? ";
+                $queryParams = [$individual];
+            }else{
+                  // Condicionales basadas en el valor de 'op'
+                if ($request->op == 2) {
+                    // En caso de 'op' == 2, agregar ambas condiciones (fecha y cédula)
+                    $query .= "DATE(r.REMI_FECHA_INICIO) = ? AND r.remi_ci_transportista = ? ";
+                    $queryParams = [$fechaFiltro, $cedulaFiltro];
+                } else {
+                    // Para 'op' == 0 o 'op' == 1, solo agregar la condición de fecha
+                    $query .= "DATE(r.REMI_FECHA_INICIO) = ? ";
+                    $queryParams = [$fechaFiltro];
+                }
             }
-    
+
             // Ordenar por fecha
             $query .= "ORDER BY r.remi_fecha_inicio ASC";
     
@@ -235,7 +239,7 @@ class RemisionController extends Controller
     
             return response()->json($result);
         } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 200);
+            return ["status" => "0", "message" => "Error al obtener el listado de empacados", "error" => $e->getMessage()];
         }
     }
     

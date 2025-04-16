@@ -492,6 +492,14 @@ class EvaluacionController extends Controller
             $nombrePeriodo = DB::table('periodoescolar')
                 ->where('idperiodoescolar', $periodoId)
                 ->value('periodoescolar');
+
+                // Obtener el estado ifcodigoEvaluacion de la institución
+            $institucion = DB::table('institucion')
+            ->where('idInstitucion', $institucionId)
+            ->select('ifcodigoEvaluacion')
+            ->first();
+
+            $mostrarCodigoEvaluacion = $institucion->ifcodigoEvaluacion == 1;
     
             // Obtener todas las asignaturas del docente en el período
             $asignaturas = DB::table('asignaturausuario as au')
@@ -557,7 +565,8 @@ class EvaluacionController extends Controller
             return response()->json([
                 'success' => true,
                 'periodo_escolar' => $nombrePeriodo,
-                'data' => $resultado
+                'data' => $resultado,
+                'mostrar_codigo_evaluacion' => $mostrarCodigoEvaluacion, // Opcional: informar al frontend
             ]);
     
         } catch (\Exception $e) {
