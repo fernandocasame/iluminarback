@@ -127,6 +127,10 @@ class PaqueteController extends Controller
                             $ifcodigo_paqueteD = $validarD[0]->codigo_paquete;
                             $codigo_unionD = strtoupper($validarD[0]->codigo_union);
 
+                            $ifcodigo_combo = $validarA[0]->codigo_combo;
+                            if($ifcodigo_combo){
+                                return ["status" => "0", "message" => "El paquete $codigoPaquete ya tiene un combo asociado"];
+                            }
                             //===VALIDACION====
                             if ($ifcodigo_paqueteA == null && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) {
                                 $errorA = 0;
@@ -293,11 +297,16 @@ class PaqueteController extends Controller
 
                             if (count($validarB) > 0) {
                                 //VARIABLES PARA EL PROCESO
+                                $ifcodigo_combo     = $validarA[0]->codigo_combo;
                                 $ifcodigo_paqueteA  = strtoupper($validarA[0]->codigo_paquete);
                                 $codigo_unionA      = strtoupper($validarA[0]->codigo_union);
                                 $ifcodigo_paqueteB  = strtoupper($validarB[0]->codigo_paquete);
                                 $codigo_unionB      = strtoupper($validarB[0]->codigo_union);
 
+                                ///VALIDAR SI UN CODIGO TIENE COMBO NO DEJAR PASAR
+                                if($ifcodigo_combo){
+                                    return ["status" => "0", "message" => "El paquete $codigoPaquete ya tiene un combo asociado"];
+                                }
                                 //===VALIDACION====
                                 if ($ifcodigo_paqueteA == null && (($codigo_unionA == $codigoB) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) $errorA = 0;
                                 if ($ifcodigo_paqueteB == null && (($codigo_unionB == $codigoA) || ($codigo_unionB == null || $codigo_unionB == "" || $codigo_unionB == "0"))) $errorB = 0;
