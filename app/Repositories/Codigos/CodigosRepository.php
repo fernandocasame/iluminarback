@@ -49,7 +49,7 @@ class  CodigosRepository extends BaseRepository
         if($ifSetCombo == 1)            { $arrayCombo  = [ 'combo' => $combo]; }
         if($tipoComboImportacion == 1)  { $arrayCombo  = [ 'combo' => $comboIndividual, ]; }
         //paquete
-        if($paquete == null)            { $arrayPaquete = []; }else{ $arrayPaquete  = [ 'codigo_paquete' => $paquete, 'fecha_registro_paquete'    => $fecha]; }
+        // if($paquete == null)            { $arrayPaquete = []; }else{ $arrayPaquete  = [ 'codigo_paquete' => $paquete, 'fecha_registro_paquete'    => $fecha]; }
         //codigo de union
         if($union == null)              { $arrayUnion  = [];  } else{ $arrayUnion  = [ 'codigo_union' => $union ]; }
         //si proforma es true
