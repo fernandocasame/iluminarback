@@ -1425,6 +1425,7 @@ class AbonoController extends Controller
         ->where('ab.abono_tipo', '<>', 4) // Excluir tipo 4
         ->where('ab.abono_notas', '=', 0.00) // Solo abonos con facturas
         ->where('ab.abono_facturas', '>', 0) // Solo abonos con notas
+        ->where('ab.abono_periodo', '=', $request->periodo)
         ->where(function ($query) {
             // Filtra solo los abonos que no tienen documentos asociados de tipo 3 o 4
             $query->whereNull('fv.ven_codigo')
@@ -1457,6 +1458,7 @@ class AbonoController extends Controller
             ->where('ab.abono_tipo', '<>', 4) // Excluir tipo 4
             ->where('ab.abono_facturas', '=', 0.00) // Solo abonos con facturas
             ->where('ab.abono_notas', '>', 0) // Solo abonos con notas
+            ->where('ab.abono_periodo', '=', $request->periodo)
             ->where(function ($query) {
                 // Filtra solo los abonos que no tienen documentos asociados de tipo 3 o 4
                 $query->whereNull('fv.ven_codigo')
