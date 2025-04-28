@@ -362,6 +362,16 @@ trait TraitPedidosGeneral
         INNER JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
         LEFT JOIN 1_4_estado_venta ev on fv.est_ven_codigo = ev.est_ven_codigo
         WHERE fpr.idPuntoventa = '$ca_codigo_agrupado'
+        -- AND fv.est_ven_codigo <> 3
+        ");
+        return $query;
+    }
+    public function tr_getDocumentosRuc($ca_codigo_agrupado){
+        $query = DB::SELECT("SELECT DISTINCT fv.ruc_cliente FROM f_venta fv
+        INNER JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
+        LEFT JOIN 1_4_estado_venta ev on fv.est_ven_codigo = ev.est_ven_codigo
+        WHERE fpr.idPuntoventa = '$ca_codigo_agrupado'
+        AND fv.est_ven_codigo <> 3
         ");
         return $query;
     }

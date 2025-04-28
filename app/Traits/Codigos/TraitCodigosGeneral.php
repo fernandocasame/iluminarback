@@ -30,12 +30,12 @@ trait TraitCodigosGeneral{
     public function getCodigosVerificaciones($codigo){
         $consulta = DB::SELECT("SELECT
         c.venta_lista_institucion,
-        c.codigos_barras,c.anio,c.serie, c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.serie,
+        c.anio,c.serie, c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.serie,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro as book,c.libro_idlibro,
         CONCAT(u.nombres, ' ', u.apellidos) as estudiante, CONCAT(ucr.nombres, ' ', ucr.apellidos) as creador,
          u.email,u.cedula, ib.nombreInstitucion as institucion_barras,c.created_at,
         i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,c.bc_fecha_ingreso,
-        c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
+        c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
         (case when (c.estado_liquidacion = '0') then 'liquidado'
             when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -46,9 +46,6 @@ trait TraitCodigosGeneral{
         (case when (c.bc_estado = '2') then 'codigo leido'
         when (c.bc_estado = '1') then 'codigo sin leer'
         end) as barrasEstado,
-        (case when (c.codigos_barras = '1') then 'con código de barras'
-            when (c.codigos_barras = '0')  then 'sin código de barras'
-        end) as status,
         (case when (c.venta_estado = '0') then ''
             when (c.venta_estado = '1') then 'Venta directa'
             when (c.venta_estado = '2') then 'Venta por lista'
@@ -107,11 +104,6 @@ trait TraitCodigosGeneral{
                 when (ci.verif3 > 0) then "verif3"
                 when (ci.verif4 > 0) then "verif4"
                 when (ci.verif5 > 0) then "verif5"
-                when (ci.verif6 > 0) then "verif6"
-                when (ci.verif7 > 0) then "verif7"
-                when (ci.verif8 > 0) then "verif8"
-                when (ci.verif9 > 0) then "verif9"
-                when (ci.verif10 > 0) then "verif10"
                 end) as verificacion
             FROM codigoslibros ci
             WHERE ci.codigo = c.codigo
@@ -259,11 +251,6 @@ trait TraitCodigosGeneral{
                     when (ci.verif3 > 0) then 'verif3'
                     when (ci.verif4 > 0) then 'verif4'
                     when (ci.verif5 > 0) then 'verif5'
-                    when (ci.verif6 > 0) then 'verif6'
-                    when (ci.verif7 > 0) then 'verif7'
-                    when (ci.verif8 > 0) then 'verif8'
-                    when (ci.verif9 > 0) then 'verif9'
-                    when (ci.verif10 > 0) then 'verif10'
                     end) as verificacion
                 FROM codigoslibros ci
                 WHERE ci.codigo = c.codigo
@@ -387,7 +374,6 @@ trait TraitCodigosGeneral{
             $devolucionH->codigo                        = $codigo;
             $devolucionH->pro_codigo                    = $pro_codigo;
             $devolucionH->id_cliente                    = $id_cliente;
-            $devolucionH->combo                         = $combo;
             $devolucionH->factura                       = $factura;
             $devolucionH->documento                     = $documento;
             $devolucionH->id_empresa                    = $id_empresa;
@@ -402,7 +388,10 @@ trait TraitCodigosGeneral{
             $devolucionH->precio                        = $precio;
             $devolucionH->tipo_importacion              = $tipo_importacion;
             $devolucionH->estado_codigo                 = $estado_codigo;
-            $devolucionH->codigo_combo                  = $codigo_combo;
+            if($tipo_importacion == 3){
+                $devolucionH->codigo_combo              = $codigo_combo;
+                $devolucionH->combo                     = $combo;
+            }
             $devolucionH->save();
             return "Guardado en devolucion hijo";
         }

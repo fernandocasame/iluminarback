@@ -242,5 +242,30 @@ class RemisionController extends Controller
             return ["status" => "0", "message" => "Error al obtener el listado de empacados", "error" => $e->getMessage()];
         }
     }
+
+    public function guias_remision_list(Request $request)
+    {
+        $rucsRaw = json_decode($request->input('ruc'));
+    
+        if (!is_array($rucsRaw)) {
+            $rucsRaw = [$rucsRaw];
+        }
+    
+        $rucs = collect($rucsRaw)
+            ->filter(fn($item) => isset($item->ruc_cliente))
+            ->pluck('ruc_cliente')
+            ->toArray();
+    
+        $periodo = $request->input('periodo');
+    
+        $guias = DB::table('f_venta as f')
+            ->join('empacado_remision as r', 'r.remi_num_factura', '=', 'f.ven_codigo')
+            ->select('f.ven_codigo', 'f.id_empresa', 'r.remi_num_factura', 'r.archivo', 'r.url', 'r.remi_guia_remision')
+            ->whereIn('f.ruc_cliente', $rucs)
+            ->where('f.periodo_id', $periodo)
+            ->get();
+    
+        return response()->json($guias);
+    }
     
 }

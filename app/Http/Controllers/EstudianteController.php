@@ -563,7 +563,7 @@ class EstudianteController extends Controller
             (case when (c.estado_liquidacion = '0') then 'liquidado'
                 when (c.estado_liquidacion = '1') then 'sin liquidar'
                 when (c.estado_liquidacion = '2') then 'codigo regalado'
-            end) as liquidacion,c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
+            end) as liquidacion,c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,
             l.nombrelibro
             FROM codigoslibros c
             LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo

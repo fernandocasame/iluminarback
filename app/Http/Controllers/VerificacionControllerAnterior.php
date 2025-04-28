@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\CodigosLibros;
+use App\Models\CodigosLibrosDevolucionHeader;
 use App\Models\HistoricoCodigos;
 use App\Models\Pedidos;
 use App\Models\Temporada;
@@ -447,16 +448,11 @@ class VerificacionControllerAnterior extends Controller
                         when (ci.verif3 > 0) then "verif3"
                         when (ci.verif4 > 0) then "verif4"
                         when (ci.verif5 > 0) then "verif5"
-                        when (ci.verif6 > 0) then "verif6"
-                        when (ci.verif7 > 0) then "verif7"
-                        when (ci.verif8 > 0) then "verif8"
-                        when (ci.verif9 > 0) then "verif9"
-                        when (ci.verif10 > 0) then "verif10"
                         end) as verificacion
                     FROM codigoslibros ci
                     WHERE ci.codigo = c.codigo
                 ) AS verificacion,
-                c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
+                c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,
                 c.quitar_de_reporte
             '))
              ->where($columnaVerificacion, $verificacion_id)
@@ -706,13 +702,7 @@ class VerificacionControllerAnterior extends Controller
        c.verif2,
        c.verif3,
        c.verif4,
-       c.verif5,
-       c.verif6,
-       c.verif7,
-       c.verif8,
-       c.verif7,
-       c.verif9,
-       c.verif10
+       c.verif5
        FROM codigoslibros c
        LEFT JOIN libro l ON c.libro_idlibro = l.idlibro
        WHERE c.bc_institucion   = '$request->institucion_id'
@@ -1128,38 +1118,6 @@ class VerificacionControllerAnterior extends Controller
     public function notificacionesVerificaciones(Request $request)
     {
         $idFacturador = $request->input("idFacturador", 0);
-
-        // Consulta principal
-        // $query = DB::table('pedidos as p')
-        //     ->select(
-        //         DB::raw("CONCAT(u.nombres, ' ', u.apellidos) AS asesor"),
-        //         'p.id_asesor',
-        //         'i.nombreInstitucion',
-        //         'pe.region_idregion',
-        //         'c.nombre AS ciudad',
-        //         'p.contrato_generado',
-        //         'p.fecha_solicita_verificacion as fecha_solicita',
-        //         'p.tipo_venta',
-        //         DB::raw('CAST(100 AS UNSIGNED) AS tipo')
-        //     )
-        //     ->leftJoin('periodoescolar as pe', 'p.id_periodo', '=', 'pe.idperiodoescolar')
-        //     ->leftJoin('usuario as u', 'p.id_asesor', '=', 'u.idusuario')
-        //     ->leftJoin('institucion as i', 'p.id_institucion', '=', 'i.idInstitucion')
-        //     ->leftJoin('ciudad as c', 'i.ciudad_id', '=', 'c.idciudad')
-        //     ->where('p.estado', '1')
-        //     ->where('p.estado_verificacion', '1')
-        //     ->when($idFacturador, function ($query) use ($idFacturador) {
-        //         $query->whereExists(function ($subquery) use ($idFacturador) {
-        //             $subquery->select(DB::raw(1))
-        //                 ->from('pedidos_asesores_facturador')
-        //                 ->whereColumn('pedidos_asesores_facturador.id_asesor', 'p.id_asesor')
-        //                 ->where('pedidos_asesores_facturador.id_facturador', $idFacturador);
-        //         });
-        //     })
-        //     ->orderBy('p.fecha_solicita_verificacion', 'desc')
-        //     ->get()
-        //     ->toArray(); // Convertimos el resultado a array
-
         // Consulta secundaria
         $notificacionFactura = DB::table('notificaciones_general')
             // ->where('tipo', '=', '0')
@@ -1307,7 +1265,32 @@ class VerificacionControllerAnterior extends Controller
                     $item->agrupado             = $padre ? $padre->idPuntoventa : null;
                     $item->periodo              = $padre ? $padre->periodoescolar : null;
                 }
-                // $this->notificacionRepository->notificacionVerificaciones('asesor.notificacionVerificacion', 'NewNotification', ['data' => $item]);
+                if($item->tipo == '5'){
+                    $padre = CodigosLibrosDevolucionHeader::from('codigoslibros_devolucion_header as v')
+                    ->where('v.id', $item->id_padre)
+                    ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'v.id_cliente')
+                    ->leftJoin('usuario as u', 'u.idusuario', '=', 'i.asesor_id')
+                    ->leftJoin('periodoescolar as pe', 'pe.idperiodoescolar', '=', 'v.periodo_id')
+                    ->leftJoin('ciudad as c', 'c.idciudad', '=', 'i.ciudad_id')
+                    ->select(
+                        'v.*',
+                        'i.idInstitucion',
+                        'i.nombreInstitucion',
+                        DB::raw('CONCAT(u.nombres, " ", u.apellidos) as asesor'),
+                        'c.nombre as ciudad',
+                        'pe.region_idregion'
+                    )
+                    ->first();
+
+                    // Asignamos los valores al item
+                    $item->contrato_generado    = $padre ? $padre->contrato : null;
+                    $item->asesor               = $padre ? $padre->asesor : null;
+                    $item->ciudad               = $padre ? $padre->ciudad : null;
+                    $item->region_idregion      = $padre ? $padre->region_idregion : null;
+                    $item->id_asesor            = 0;
+                    $item->id_institucion       = $padre ? $padre->idInstitucion : null;
+                    $item->nombreInstitucion    = $padre ? $padre->nombreInstitucion : null;
+                }
                 return $item;
             })
             ->toArray(); // Convertimos el resultado a array
@@ -2220,7 +2203,7 @@ class VerificacionControllerAnterior extends Controller
         }
         catch(\Exception $e){
             DB::rollBack(); // Deshacer los cambios si ocurre un error
-            return ["status"=>"0","message"=>$e->getMessage()];
+            return ["status"=>"0","message"=>$e->getMessage(), "line" => $e->getLine()];
         }
     }
   
@@ -2311,6 +2294,7 @@ class VerificacionControllerAnterior extends Controller
                 }
             } else {
                 DB::rollBack(); // Revertir transacción si no hay datos
+                return ["status" => "2", "message" => "No hay datos para liquidar"];
                 // return ["status" => "2", "message" => "Se guardó correctamente ya no más libros por liquidar"];
             }
         } catch (\Exception $e) {

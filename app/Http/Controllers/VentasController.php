@@ -356,6 +356,65 @@ class VentasController extends Controller
               }
     return $query;
     }
+    
+    public function GetFacturasxAgrupaXPeriodo(Request $request){
+            $periodo = $request->periodo;
+            $query = DB::SELECT("SELECT
+            fv.id_factura,
+            fv.ven_cliente,
+            fv.ven_fecha,
+            fv.ven_valor,
+            fv.id_empresa,
+            fv.estadoPerseo,
+            fv.*,
+            ins.nombreInstitucion,
+            ins.direccionInstitucion,
+            ins.telefonoInstitucion,
+            usa.nombres,
+            usa.apellidos,
+            usa.cedula,
+            usa.email,
+            usa.telefono,
+            em.descripcion_corta as nombre,
+            CONCAT(us.nombres,' ',us.apellidos) AS responsable,
+            COUNT(DISTINCT dfv.pro_codigo) AS item,
+            SUM(dfv.det_ven_cantidad) AS libros
+        FROM
+            f_venta_agrupado fv
+            INNER JOIN institucion ins ON fv.institucion_id = ins.idInstitucion
+            INNER JOIN usuario usa ON fv.ven_cliente = usa.idusuario
+            INNER JOIN f_detalle_venta_agrupado dfv ON fv.id_factura = dfv.id_factura
+            INNER JOIN empresas em ON em.id = fv.id_empresa
+            INNER JOIN usuario us ON us.idusuario=fv.user_created
+        WHERE dfv.id_empresa = fv.id_empresa
+            AND fv.idtipodoc = 11
+            AND fv.periodo_id = $periodo
+        GROUP BY
+            fv.id_factura,
+            fv.ven_cliente,
+            fv.ven_fecha,
+            fv.ven_valor,
+            fv.ven_valor,
+            fv.id_empresa,
+            fv.estadoPerseo,
+            ins.nombreInstitucion,
+            ins.direccionInstitucion,
+            ins.telefonoInstitucion,
+            usa.nombres,
+            usa.apellidos,
+            usa.cedula,
+            usa.email,
+            usa.telefono
+        ORDER BY
+            fv.ven_fecha DESC");
+            foreach($query as $key => $item){
+                if($item->id_factura){
+                    $quer1=DB::SELECT("select ven_codigo from f_venta where id_factura= '$item->id_factura' AND id_empresa=$item->id_empresa");
+                    $query[$key]->prefacturas =$quer1;
+                }
+            }
+        return $query;
+    }
 
 
     public function Get_DFactura(Request $request){

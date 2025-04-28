@@ -321,6 +321,7 @@ class Pedidos2Controller extends Controller
                 'datoAgrupado'      => $this->tr_getAgrupado($item->ca_codigo_agrupado),
                 'Instituciones'     => $this->tr_getPreproformasInstitucion($item->ca_codigo_agrupado),
                 'documentos'        => $this->tr_getDocumentos($item->ca_codigo_agrupado),
+                'ruc_ci'            => $this->tr_getDocumentosRuc($item->ca_codigo_agrupado),
                 'ca_descripcion'    => $item->ca_descripcion,
                 'ca_tipo_pedido'    => $item->ca_tipo_pedido,
                 'ca_id'             => $item->ca_id,

@@ -55,6 +55,7 @@ use App\Traits\Pedidos\TraitGuiasGeneral;
 use App\Traits\Pedidos\TraitPagosGeneral;
 use App\Traits\Pedidos\TraitPedidosGeneral;
 use App\Traits\Verificacion\TraitVerificacionGeneral;
+use App\Repositories\pedidos\NotificacionRepository;
 use Carbon\Carbon;
 use DB;
 use DateTime;
@@ -73,14 +74,16 @@ class PedidosController extends Controller
     private $convenioRepository;
     private $pedidosRepository;
     private $codigosRepository;
+    public $NotificacionRepository;
     private $guiaRepository;
-    public function __construct(PedidosPagosRepository $pagoRepository, ConvenioRepository $convenioRepository,PedidosRepository $pedidosRepository,CodigosRepository $codigosRepository, GuiaRepository $guiaRepository)
+    public function __construct(PedidosPagosRepository $pagoRepository, ConvenioRepository $convenioRepository,PedidosRepository $pedidosRepository,CodigosRepository $codigosRepository, GuiaRepository $guiaRepository,NotificacionRepository $NotificacionRepository)
     {
      $this->pagoRepository          = $pagoRepository;
      $this->convenioRepository      = $convenioRepository;
      $this->pedidosRepository       = $pedidosRepository;
      $this->codigosRepository       = $codigosRepository;
      $this->guiaRepository          = $guiaRepository;
+     $this->NotificacionRepository  = $NotificacionRepository;
     }
     //api:get/pedidos
     public function index(Request $request)
@@ -2351,10 +2354,51 @@ class PedidosController extends Controller
 
     public function guardar_comentario(Request $request)
     {
-       //para dejar en visto los mensajes
-       $this->VistosMensajesPedidos($request->id_pedido,$request->id_group);
-       DB::INSERT("INSERT INTO `pedidos_comentarios`(`id_pedido`, `comentario`, `id_usuario`, `id_group`) VALUES (?,?,?,?)", [$request->id_pedido,$request->comentario,$request->id_usuario,$request->id_group]);
+        try {
+            // Verificar que los datos necesarios estén presentes
+            if (empty($request->id_pedido) || empty($request->comentario) || empty($request->id_usuario) || empty($request->id_group)) {
+                return response()->json(['success' => false, 'message' => 'Faltan datos necesarios.']);
+            }
+
+            // Para dejar en visto los mensajes
+            $this->VistosMensajesPedidos($request->id_pedido, $request->id_group);
+
+            // Insertar el comentario en la base de datos
+            $success = DB::table('pedidos_comentarios')->insert([
+                'id_pedido' => $request->id_pedido,
+                'comentario' => $request->comentario,
+                'id_usuario' => $request->id_usuario,
+                'id_group' => $request->id_group,
+            ]);
+
+            if ($success) {
+                // Enviar notificación
+                $channel = 'admin.notifications_verificaciones';
+                $event = 'NewNotification';
+                $data = [
+                    'message' => 'Nueva notificación',
+                ];
+
+                $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
+
+                $channel = 'asesor.notificacionVerificacion';
+                $event = 'NewNotification';
+                $data = [
+                    'message' => 'Nueva notificación',
+                ];
+                $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
+
+                return response()->json(['success' => true, 'message' => 'Comentario guardado y notificación enviada.']);
+            } else {
+                return response()->json(['success' => false, 'message' => 'Error al guardar el comentario.']);
+            }
+
+        } catch (\Exception $e) {
+            // Manejo de errores en caso de fallo
+            return response()->json(['success' => false, 'message' => 'Error al procesar la solicitud: ' . $e->getMessage()]);
+        }
     }
+
     public function VistosMensajesPedidos($id_pedido,$id_group){
         if($id_group == 11){
             //actualizar los mensajes como leidos para los facturadores
@@ -2430,7 +2474,7 @@ class PedidosController extends Controller
           FROM usuario u
           LEFT JOIN sys_group_users g ON g.id = id_group
           WHERE u.estado_idEstado = 1
-          AND (u.id_group = 6 OR u.id_group = 10 OR u.id_group = 11 OR u.id_group = '33')
+          AND (u.id_group = 6 OR u.id_group = 10 OR u.id_group = 11 OR u.id_group = '33' OR u.id_group = '11')
           AND u.cedula like '%$request->cedula%'
           ");
         return $responsables;
@@ -4213,7 +4257,10 @@ class PedidosController extends Controller
             //guardar valores el asesor
             $alcance = PedidoAlcance::findOrFail($request->id);
             if($request->only_observacion){
-                $alcance->observacion_asesor    = $request->observacion_asesor;
+                $obs = $request->observacion_asesor;
+                $alcance->observacion_asesor = (!is_null($obs) && trim($obs) !== '' && strtolower(trim($obs)) !== 'null') 
+                    ? $obs 
+                    : null;
             }else{
                 $alcance->venta_bruta           = $request->venta_bruta;
                 $alcance->total_unidades        = $request->total_unidades;

@@ -6,8 +6,9 @@ use App\Models\CodigoLibros;
 use App\Models\Periodo;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use DB;
+use Illuminate\Support\Facades\DB;
 use App\Imports\CodigosImport;
+use App\Models\_14ProductoStockHistorico;
 use App\Models\CodigosDevolucion;
 use App\Models\CodigosLibros;
 use App\Models\CodigosLibrosDevolucionHeader;
@@ -23,7 +24,9 @@ use App\Models\Ventas;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Facturacion\DevolucionRepository;
 use App\Repositories\Facturacion\ProformaRepository;
+use App\Repositories\pedidos\NotificacionRepository;
 use App\Repositories\pedidos\PedidosRepository;
+use App\Repositories\pedidos\VerificacionRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use App\Traits\Pedidos\TraitGuiasGeneral;
 use App\Traits\Pedidos\TraitPedidosGeneral;
@@ -40,11 +43,16 @@ class CodigoLibrosController extends Controller
     protected $proformaRepository;
     protected $pedidosRepository;
     protected $devolucionRepository;
-    public function __construct(CodigosRepository $codigosRepository,ProformaRepository $proformaRepository, PedidosRepository $pedidosRepository, DevolucionRepository $devolucionRepository) {
+    protected $verificacionRepository;
+    protected $NotificacionRepository;
+    
+    public function __construct(CodigosRepository $codigosRepository,ProformaRepository $proformaRepository, PedidosRepository $pedidosRepository, DevolucionRepository $devolucionRepository, VerificacionRepository $verificacionRepository, NotificacionRepository $NotificacionRepository) {
         $this->codigosRepository    = $codigosRepository;
         $this->proformaRepository   = $proformaRepository;
         $this->pedidosRepository    = $pedidosRepository;
         $this->devolucionRepository = $devolucionRepository;
+        $this->verificacionRepository = $verificacionRepository;
+        $this->NotificacionRepository = $NotificacionRepository;
     }
     //api:post//codigos/importar
     public function importar(Request $request){
@@ -1107,7 +1115,7 @@ class CodigoLibrosController extends Controller
 
         // Obtener los detalles de tipoVenta
         $tipoVenta = DB::SELECT("SELECT
-            c.libro as book, c.serie, c.prueba_diagnostica, c.factura, c.codigo_union,
+            c.libro as book, c.serie, c.prueba_diagnostica, c.factura, c.codigo_union,codigo_paquete,
             IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
             c.contrato, c.porcentaje_descuento, c.codigo, c.bc_estado, c.estado, c.estado_liquidacion, contador,
             c.venta_estado, c.bc_periodo, c.bc_institucion, c.idusuario, c.id_periodo, c.contrato, l.nombrelibro as libro,
@@ -1868,20 +1876,21 @@ class CodigoLibrosController extends Controller
     public function devolucionBodega2(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $codigos = json_decode($request->data_codigos);
+        $codigos                = json_decode($request->data_codigos);
         $codigosNoCambiados     = [];
         $codigosConLiquidacion  = [];
         $codigoNoExiste         = [];
         $codigosSinCodigoUnion  = [];
+        $arrayOldValues         = [];
+        $arrayNewValues         = [];
         $porcentaje             = 0;
-        $contador               = 0;
         $contadorNoCambiado     = 0;
         $contadorNoexiste       = 0;
         $mensaje                = $request->observacion;
         $id_devolucion          = $request->id_devolucion;
+        $id_usuario             = $request->id_usuario;
         $setContrato            = null;
         $verificacion_liquidada = null;
-        // $tipo_importacion       = $request->tipo_importacion;
         try{
             //si el estado de devolucion es 2
             $devolucion = CodigosLibrosDevolucionHeader::find($id_devolucion);
@@ -1891,6 +1900,7 @@ class CodigoLibrosController extends Controller
                     "message" => "La devolucion ya se encuentra finalizada"
                 ];
             }
+            $periodo_id             = $devolucion->periodo_id;
             DB::beginTransaction();
                 ///===PROCESO===
                 foreach($codigos as $key => $item){
@@ -1908,6 +1918,8 @@ class CodigoLibrosController extends Controller
                     if(count($validar)>0){
 
                         $codigo_union               = $validar[0]->codigo_union;
+                        //if_codigo_combo
+                        $if_codigo_combo            = $validar[0]->codigo_combo;
                         //validar si el codigo se encuentra liquidado
                         $ifLiquidado                = $validar[0]->estado_liquidacion;
                         //contrato
@@ -1915,7 +1927,7 @@ class CodigoLibrosController extends Controller
                         //numero de verificacion
                         $ifVerificacion             = $validar[0]->verificacion;
                         //codigo de combo
-                        $ifCombo                    = $validar[0]->combo;
+                        $ifCombo                    = $item->combo;
                         //codigo de factura
                         $ifFactura                  = $validar[0]->factura;
                         //tipo_venta
@@ -1945,13 +1957,14 @@ class CodigoLibrosController extends Controller
                         }
                      
                         //====PROFORMA============================================
+                        //tipo_importacion => 1 => importacion codigos; 2 => importacion paquetes, 3 => importacion combos
                         //ifdevuelto_proforma => 0 => nada; 1 => devuelta antes del enviar el pedido; 2 => enviada despues de enviar al pedido
-                        if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1 && ($ifCombo == null || $ifCombo == "")){
+                        if($ifproforma_empresa > 0 && $ifdevuelto_proforma != 1 && ($tipo_importacion == 1 || $tipo_importacion == 2)){
                             //validacion de documento 
                             $datos = (object) [
                                 "pro_codigo"        => $ifcodigo_liquidacion,
                                 "id_institucion"    => $id_cliente,
-                                "id_periodo"        => $bc_periodo,
+                                "id_periodo"        => $periodo_id,
                                 "id_empresa"        => $ifproforma_empresa
                             ];  
                             //VALIDAR QUE EL DOCUMENTO ACTUAL ESTE DISPONIBLE 
@@ -1965,13 +1978,6 @@ class CodigoLibrosController extends Controller
                                 $ifsetProforma     = 0;
                                 $EstatusProceso    = false;
                             }
-                            // $datosProforma     = $this->codigosRepository->validateProforma($ifcodigo_proforma,$ifproforma_empresa,$ifcodigo_liquidacion);
-                            // $ifErrorProforma   = $datosProforma["ifErrorProforma"];
-                            // $messageIngreso    = $datosProforma["messageProforma"];
-                            // $ifsetProforma     = $datosProforma["ifsetProforma"];
-                            // $mensaje           = $request->observacion." - Se devolvio a $ifcodigo_proforma";
-                            // if($ifsetProforma  == 1 && $ifErrorProforma == 0)   { $EstatusProceso = true; }
-                            // else                                                { $EstatusProceso = false; }
                         }
                         //jorge dice que se quita esta validacion
                         // if(($ifLiquidado == '1' || $ifLiquidado == '2') && ($ifBc_Institucion == $institucion_id || $ifventa_lista_institucion == $institucion_id )) $EstatusProceso = true;
@@ -1994,22 +2000,31 @@ class CodigoLibrosController extends Controller
                                 $getIngreso         =  $this->codigosRepository->updateDevolucionDocumento($datos);
                                 $ingreso            = $getIngreso["ingreso"];
                                 $messageIngreso     = $getIngreso["message"];
+                                /// Guardar en historico de STOCK en el array
+                                if(count($getIngreso["oldValues"]) > 0){
+                                    $arrayOldValues[]   = $getIngreso["oldValues"];
+                                    $arrayNewValues[]   = $getIngreso["newValues"];
+                                }
                                 //si ingresa correctamente
                                 if($ingreso == 1){
                                     //newValues
                                     $newValuesPrimero    = CodigosLibros::where('codigo',$item->codigo)->get();
                                     $newValuesUnion      = CodigosLibros::where('codigo',$codigo_union)->get();
                                     if($tipo_importacion == 1){
-                                        //agregar al mensaje que se quito el paquete
-                                        $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                        if($if_codigo_combo){
+                                            $mensaje = $mensaje." - Se quito el combo $if_codigo_combo";
+                                        }
+                                        if($ifcodigo_paquete){
+                                            $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                        }
                                     }
                                     $porcentaje++;
                                     //====CODIGO====
                                     //ingresar en el historico codigo
-                                    $this->GuardarEnHistorico(0,$id_cliente,$bc_periodo,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,$newValuesPrimero,$setContrato,$verificacion_liquidada);
+                                    $this->GuardarEnHistorico(0,$id_cliente,$periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,$newValuesPrimero,$setContrato,$verificacion_liquidada);
                                     //ingresar a la tabla de devolucion
                                     //====CODIGO UNION=====
-                                    $this->GuardarEnHistorico(0,$id_cliente,$bc_periodo,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,$newValuesUnion,$setContrato,$verificacion_liquidada);
+                                    $this->GuardarEnHistorico(0,$id_cliente,$periodo_id,$codigo_union,$request->id_usuario,$mensaje,$getcodigoUnion,$newValuesUnion,$setContrato,$verificacion_liquidada);
                                     //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO LIBRO
                                     $this->tr_updateDevolucionHijos($item->codigo,1,$id_devolucion);
                                     // //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO UNION
@@ -2035,18 +2050,26 @@ class CodigoLibrosController extends Controller
                                     "tipo_importacion"   => $tipo_importacion
                                 ];
                                 $getIngreso         =  $this->codigosRepository->updateDevolucionDocumento($datos);
-                                // $getIngreso         = $this->codigosRepository->updateDevolucion($item->codigo,0,null,$request,$ifsetProforma,$ifcodigo_liquidacion,$ifproforma_empresa,$ifcodigo_proforma,$tipo_importacion);
                                 $ingreso            = $getIngreso["ingreso"];
                                 $messageIngreso     = $getIngreso["message"];
+                                /// Guardar en historico de STOCK en el array
+                                if(count($getIngreso["oldValues"]) > 0){
+                                    $arrayOldValues[]   = $getIngreso["oldValues"];
+                                    $arrayNewValues[]   = $getIngreso["newValues"];
+                                }
                                 if($ingreso == 1){
                                     $newValuesPrimero    = CodigosLibros::where('codigo',$item->codigo)->get();
                                     if($tipo_importacion == 1){
-                                        //agregar al mensaje que se quito el paquete
-                                        $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                        if($if_codigo_combo){
+                                            $mensaje = $mensaje." - Se quito el combo $if_codigo_combo";
+                                        }
+                                        if($ifcodigo_paquete){
+                                            $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                        }
                                     }
                                     $porcentaje++;
                                     //ingresar en el historico
-                                    $this->GuardarEnHistorico(0,$id_cliente,$bc_periodo,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,$newValuesPrimero,$setContrato,$verificacion_liquidada);
+                                    $this->GuardarEnHistorico(0,$id_cliente,$periodo_id,$item->codigo,$request->id_usuario,$mensaje,$getcodigoPrimero,$newValuesPrimero,$setContrato,$verificacion_liquidada);
                                     //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO LIBRO
                                     $this->tr_updateDevolucionHijos($item->codigo,1,$id_devolucion);                                    $codigosSinCodigoUnion[] = $validar[0];
                                 }
@@ -2061,10 +2084,6 @@ class CodigoLibrosController extends Controller
                         }
                         //SI NO CUMPLE LA VALIDACION
                         else{
-                            //admin
-                            // if($ifErrorProforma == 1)               { $validar[0]->errorProforma = 1; $validar[0]->mensajeErrorProforma   = $messageProforma; }
-                            // $codigosConLiquidacion[]                = $validar[0];
-                            // $contador++;
                             $codigosNoCambiados[$contadorNoCambiado] = [
                                 "codigo"        => $item->codigo,
                                 "mensaje"       => $messageIngreso
@@ -2102,7 +2121,38 @@ class CodigoLibrosController extends Controller
                     $devolucion->ven_total              = $totalValor;
                     $devolucion->total_items            = $totalCantidad;
                     $devolucion->save();
-                    //actualizar venta
+                    //actualizar historico stock
+                    // Historico
+                    if(count($arrayOldValues) > 0){
+                        _14ProductoStockHistorico::insert([
+                            'psh_old_values'                        => json_encode($arrayOldValues),
+                            'psh_new_values'                        => json_encode($arrayNewValues),
+                            'psh_tipo'                              => 9,
+                            'id_codigoslibros_devolucion_header'    => $id_devolucion,
+                            'user_created'                          => $id_usuario,
+                            'created_at'                            => now(),
+                            'updated_at'                            => now(),
+                        ]);
+                    }
+                    //enviar notificacion push
+                    // Registrar notificación
+                    $formData = (Object)[
+                        'nombre'        => 'Devolución Bodega',
+                        'descripcion'   => null,
+                        'tipo'          => '5',
+                        'user_created'  => $id_usuario,
+                        'id_periodo'    => $periodo_id,
+                        'id_padre'      => $id_devolucion,
+                    ];
+                    $color = '#7a4af1';
+                    $notificacion = $this->verificacionRepository->save_notificacion($formData,$color);
+                    $channel = 'admin.notifications_verificaciones';
+                    $event = 'NewNotification';
+                    $data = [
+                        'message' => 'Nueva notificación',
+                    ];
+                    // notificacion en pusher
+                    $this->NotificacionRepository->notificacionVerificaciones($channel, $event, $data);
                 }
                 DB::commit();
                 return [
@@ -2179,7 +2229,6 @@ class CodigoLibrosController extends Controller
                     $devolucion->cantidadPaquetes       = $cantidadPaquetes;
                     //0 porque la empresa se guarda en cada codigo individual
                     $devolucion->id_empresa             = 0;
-                    // $devolucion->tipo_importacion       = $tipo_importacion;
                     $devolucion->save();
                     $id_devolucion                      = $devolucion->id;
                 }else {
@@ -2330,6 +2379,7 @@ class CodigoLibrosController extends Controller
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO LIBRO
                                 $this->tr_GuardarDevolucionHijos($id_devolucion,$item->codigo,$item->codigo_liquidacion,$id_cliente,$ifCombo,$ifFactura,$ifcodigo_proforma,$ifproforma_empresa,$ifTipoVenta,$bc_periodo,0,$codigo_union,$libro_idlibro,$ifcodigo_paquete,$ifLiquidado,$ifliquidado_regalado,$precio,$tipo_importacion,$estado_codigo,$ifCodigoCombo);
                                 //GUARDAR EN LA TABLA DE DEVOLUCION CODIGO UNION
+                              
                             }
                             else{
                                 $codigosNoCambiados[] = [
@@ -2371,6 +2421,18 @@ class CodigoLibrosController extends Controller
                 }else{
                     $codigoNoExiste[$contadorNoexiste] = [ "codigo" => $item->codigo ];
                     $contadorNoexiste++;
+                }
+            }
+            //validar si es combo actualizar a importacion_con_combos a 1
+            $getHijos = CodigosLibrosDevolucionSon::whereNotNull('codigo_combo')
+            ->whereNotNull('combo') 
+            ->where('codigoslibros_devolucion_id',$id_devolucion)
+            ->get(); 
+            if(count($getHijos) > 0){ 
+                $padre = CodigosLibrosDevolucionHeader::find($id_devolucion);
+                if($padre){
+                    $padre->importacion_con_combos = 1;
+                    $padre->save();
                 }
             }
             if($contadorNoCambiado > 0 || $contadorNoexiste > 0){
@@ -2421,6 +2483,8 @@ class CodigoLibrosController extends Controller
             if(count($validar)>0){
                 //trae codigo union
                 $codigo_union                   = $validar[0]->codigo_union;
+                // combo generado
+                $if_codigo_combo                = $validar[0]->codigo_combo;
                 //validar si el codigo no se encuentra liquidado
                 $ifLiquidado                    = $validar[0]->estado_liquidacion;
                 $ifliquidado_regalado           = $validar[0]->liquidado_regalado;
@@ -2446,8 +2510,12 @@ class CodigoLibrosController extends Controller
                         $messageIngreso     = $getIngreso["messageIngreso"];
                         if($ingreso == 1){
                             if($tipo_importacion == 1){
-                                //agregar al mensaje que se quito el paquete
-                                $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                if($if_codigo_combo){
+                                    $mensaje = $mensaje." - Se quito el combo $if_codigo_combo";
+                                }
+                                if($ifcodigo_paquete){
+                                    $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                }
                             }
                             $porcentaje++;
                             $newValusPrimero = CodigosLibros::where('codigo',$getCodigo)->get();
@@ -2474,9 +2542,14 @@ class CodigoLibrosController extends Controller
                         $messageIngreso     = $getIngreso["messageIngreso"];
                         if($ingreso == 1){
                             if($tipo_importacion == 1){
-                                //agregar al mensaje que se quito el paquete
-                                $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                if($if_codigo_combo){
+                                    $mensaje = $mensaje." - Se quito el combo $if_codigo_combo";
+                                }
+                                if($ifcodigo_paquete){
+                                    $mensaje = $mensaje." - Se quito el paquete $ifcodigo_paquete";
+                                }
                             }
+
                             $porcentaje++;
                             $newValusPrimero = CodigosLibros::where('codigo',$getCodigo)->get();
                             //ingresar en el historico

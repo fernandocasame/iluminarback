@@ -1835,6 +1835,9 @@ Route::get('GetRemisionCALMED_FECHA', 'RemisionController@GetRemisionCALMED_FECH
 Route::get('genCodigoE', 'RemisionController@genCodigoE');
 Route::post('PostRemision_Registrar_modificar','RemisionController@PostRemision_Registrar_modificar');
 Route::post('Eliminar_Remision','RemisionController@Eliminar_Remision');
+
+Route::get('guias_remision_list', 'RemisionController@guias_remision_list');
+
 //fin remision
 //INICIO transporte
 Route::get('Get_Transporte', 'TransporteController@Get_Transporte');
@@ -1943,6 +1946,7 @@ Route::get('GetVentasP','VentasController@GetVentasP');
 Route::post('imprimirDVenta','VentasController@imprimirDVenta');
 Route::get('GetPreFacturasxAgrupa','VentasController@GetPreFacturasxAgrupa');
 Route::get('GetFacturasxAgrupa','VentasController@GetFacturasxAgrupa');
+Route::get('GetFacturasxAgrupaXPeriodo','VentasController@GetFacturasxAgrupaXPeriodo');
 Route::get('getDventas','VentasController@getDventas');
 Route::get('Get_DatoFactura','VentasController@Get_DatoFactura');
 Route::post('Postventa_Registra','VentasController@Postventa_Registra');
@@ -1957,7 +1961,7 @@ Route::post('PostFacturarReal', 'VentasController@PostFacturarReal');
 Route::post('updateDocument', 'VentasController@updateDocument');
 Route::post('notasMoverToPrefactura', 'PrefacturaController@notasMoverToPrefactura');
 Route::get('metodosGetVentas','VentasController@metodosGetVentas');
-Route::get('metodosPostVentas','VentasController@metodosPostVentas');
+Route::post('metodosPostVentas','VentasController@metodosPostVentas');
 //venta
 //inicio ventas apis externas
 Route::get('Pruebacliapi', 'FacturacionApiController@Pruebacliapi');
@@ -2089,3 +2093,4 @@ Route::post('getEvaluacionesAdminPeriodo', 'EvaluacionController@getEvaluaciones
 
 Route::get('cod_evaluacion_institucion/{id}','InstitucionController@cod_evaluacion_institucion');
 Route::post('contarLibrosPorPeriodo','PedidosController@contarLibrosPorPeriodo');
+Route::post('edit_fecha_evaluacion_admin','EvaluacionController@edit_fecha_evaluacion_admin');

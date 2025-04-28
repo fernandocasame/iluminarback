@@ -576,100 +576,13 @@ class EvaluacionController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
-
-
-
-        //segunda version, nviada a optimizar al chat
-        // // Obtener el último período escolar registrado para la institución
-        // $ultimoPeriodo = DB::table('periodoescolar_has_institucion')
-        //     ->where('institucion_idInstitucion', $institucionId)
-        //     ->orderBy('periodoescolar_idperiodoescolar', 'desc')
-        //     ->first();
-
-        // if (!$ultimoPeriodo) {
-        //     return response()->json(['error' => 'No se encontró un período escolar para la institución.'], 404);
-        // }
-
-        // // Obtener el nombre del período escolar
-        // $nombrePeriodo = DB::table('periodoescolar')
-        //     ->where('idperiodoescolar', $ultimoPeriodo->periodoescolar_idperiodoescolar)
-        //     ->value('periodoescolar');
-
-        // $asignaturas = DB::table('asignaturausuario as asu')
-        //     ->leftjoin('asignatura as asig','asu.asignatura_idasignatura','asig.idasignatura')
-        //     ->where('asu.periodo_id', $ultimoPeriodo->periodoescolar_idperiodoescolar)
-        //     ->where('asu.usuario_idusuario', $docenteId)
-        //     ->select('asig.nombreasignatura','asu.periodo_id','asig.idasignatura')
-        //     ->get();
-
-        // $cursos = DB::table('curso as cu')
-        //     ->where('cu.estado',"1")
-        //     ->where('cu.idusuario',$docenteId)
-        //     ->where('cu.id_periodo',$ultimoPeriodo->periodoescolar_idperiodoescolar)
-        //     ->select('cu.nombre','cu.seccion','cu.materia','cu.codigo')
-        //     ->get();
-        
-        // $evaluaciones = DB::table('evaluaciones as eval')
-        //     ->where('eval.estado',"1")
-        //     ->where('eval.id_docente',$docenteId)
-        //     ->get(['eval.nombre_evaluacion','eval.id_asignatura','eval.id_docente','eval.codigo_curso','eval.descripcion','eval.puntos','eval.duracion','eval.fecha_inicio','eval.fecha_fin','eval.codigo_curso]);
-
-        // return compact('asignaturas','cursos','evaluaciones');
-        //fin segunda version
-
-        
-
-        // // Obtener los cursos activos asignados al docente
-        // $cursos = DB::table('curso')
-        //     ->join('asignatura', 'curso.id_asignatura', '=', 'asignatura.idasignatura')
-        //     ->where('curso.idusuario', $docenteId)
-        //     ->where('curso.estado', "1") // Filtrar solo los cursos activos
-        //     ->select(
-        //         'curso.codigo',
-        //         'curso.nombre as nombre_curso',
-        //         'curso.seccion',
-        //         'curso.aula',
-        //         'curso.estado as estado_curso', // Se añade el estado del curso
-        //         'asignatura.idasignatura',
-        //         'asignatura.nombreasignatura',
-        //         'asignatura.estado as estado_asignatura'
-        //     )
-        //     ->get();
-
-        // // Obtener las evaluaciones asociadas a los cursos activos
-        // $evaluaciones = DB::table('evaluaciones')
-        //     ->join('eval_tipos', 'evaluaciones.id_tipoeval', '=', 'eval_tipos.id')
-        //     ->whereIn('evaluaciones.codigo_curso', $cursos->pluck('codigo')) // Filtrar por cursos activos
-        //     ->select(
-        //         'evaluaciones.id',
-        //         'evaluaciones.nombre_evaluacion',
-        //         'evaluaciones.id_docente',
-        //         'evaluaciones.codigo_curso',
-        //         'evaluaciones.puntos',
-        //         'evaluaciones.duracion',
-        //         'evaluaciones.descripcion',
-        //         'evaluaciones.fecha_inicio',
-        //         'evaluaciones.fecha_fin',
-        //         'evaluaciones.estado',
-        //         'evaluaciones.grupos_evaluacion',
-        //         'evaluaciones.cant_unidades',
-        //         'evaluaciones.codigo_evaluacion',
-        //         'evaluaciones.ver_calificaciones',
-        //         'evaluaciones.id_tipoeval',
-        //         'eval_tipos.tipo_nombre'
-        //     )
-        //     ->get();
-
-        // // Anidar evaluaciones dentro de cada curso
-        // $cursos->each(function ($curso) use ($evaluaciones) {
-        //     $curso->evaluaciones = $evaluaciones->where('codigo_curso', $curso->codigo)->values();
-        // });
-
-        // return response()->json([
-        //     'institucion_id' => $institucionId,
-        //     'nombre_periodo' => $nombrePeriodo,
-        //     'cursos' => $cursos
-        // ]);
+    }
+    public function edit_fecha_evaluacion_admin(Request $request){
+        $evaluacion = Evaluaciones::find($request->id);
+        $evaluacion->fecha_inicio       = $request->fecha_inicio;
+        $evaluacion->fecha_fin          = $request->fecha_fin;
+        $evaluacion->save();
+        return response()->json($evaluacion); // Retorna toda la evaluación actualizada
     }
 
 

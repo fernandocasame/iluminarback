@@ -51,7 +51,7 @@ class  VerificacionRepository extends BaseRepository
         ");
         return $query;
     }
-    public function save_notificacion($request){
+    public function save_notificacion($request,$color='primary'){
         try{
             //validar si existe la notificacion
             $validar = DB::SELECT("SELECT * FROM notificaciones_general n
@@ -68,6 +68,7 @@ class  VerificacionRepository extends BaseRepository
             $notificacion->user_created = $request->user_created;
             $notificacion->id_periodo   = $request->id_periodo;
             $notificacion->id_padre     = $request->id_padre;
+            $notificacion->color        = $color;
             $notificacion->save();
             if($notificacion){
                 return ["status"=>"1","message"=>"Se guardo correctamente"];

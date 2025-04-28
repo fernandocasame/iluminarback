@@ -661,7 +661,12 @@ class AbonoController extends Controller
     {
         $busqueda   = $request->busqueda;
         $id_periodo = $request->id_periodo;
-        $query = $this->tr_getPuntosVenta($busqueda);
+        $getPeriodo = DB::table("periodoescolar")
+        ->where('idperiodoescolar',$id_periodo)
+        ->get();
+        $region = $getPeriodo[0]->region_idregion;
+        $query = $this->tr_getPuntosVentaXPeriodo($busqueda,$region,$id_periodo);
+        // $query = $this->tr_getPuntosVenta($busqueda);
         //traer datos de la tabla f_formulario_proforma por id_periodo
         foreach($query as $key => $item){
             $query[$key]->datosClienteInstitucion = DB::SELECT("SELECT DISTINCT usu.cedula, CONCAT(usu.nombres,' ', usu.apellidos) nombres
@@ -697,6 +702,31 @@ class AbonoController extends Controller
         FROM institucion i
         LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
         WHERE i.nombreInstitucion LIKE '%$busqueda%'");
+        return $query;
+    }
+    public function tr_getPuntosVentaXPeriodo($busqueda,$region,$id_periodo){
+        $query = DB::SELECT("SELECT i.idInstitucion,
+            i.nombreInstitucion,
+            i.ruc,
+            i.email,
+            i.telefonoInstitucion,
+            i.direccionInstitucion,
+            c.nombre AS ciudad,
+            MAX(CASE
+                WHEN p.id_institucion IS NOT NULL THEN 1
+                ELSE 0
+            END) AS validate_pedidos,
+        CONCAT(u.nombres,' ',u.apellidos) as representante
+        FROM institucion i
+        LEFT JOIN usuario u ON i.asesor_id=u.idusuario
+        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        LEFT JOIN pedidos p ON p.id_institucion = i.idInstitucion and p.id_periodo = $id_periodo
+        WHERE i.nombreInstitucion LIKE '%$busqueda%'
+        AND i.region_idregion = '$region'
+        AND i.estado_idEstado = '1'
+        GROUP BY
+            i.idInstitucion, i.nombreInstitucion, i.ruc, i.email, i.telefonoInstitucion, i.direccionInstitucion, c.nombre
+        ");
         return $query;
     }
     public function traerCobros(Request $request){
@@ -1856,6 +1886,8 @@ class AbonoController extends Controller
             $valorAbono = DB::table('abono as ab')
                 ->where('ab.abono_ruc_cliente', $ruc)
                 ->where('ab.abono_estado', 0)
+                ->where('ab.abono_periodo', $request->periodo)
+                // ->where('ab.abono_tipo', '<>', '3')
                 // ->where('ab.abono_cuenta','<>','6')
                 // ->where('ab.abono_tipo', '<>', '4')
                 ->sum(DB::raw('ab.abono_facturas + ab.abono_notas'));
@@ -2258,6 +2290,7 @@ class AbonoController extends Controller
 
     public function getClienteDocumentos(Request $request){
         $cliente = $request->input('cliente');
+        $periodo = $request->input('periodo');
 
         // Consulta los IDs de la institución para el cliente
         $clientesBase = DB::select("SELECT DISTINCT fv.institucion_id FROM f_venta fv
@@ -2271,6 +2304,7 @@ class AbonoController extends Controller
                 ->join('codigoslibros_devolucion_son as cls', 'cdh.id', '=', 'cls.codigoslibros_devolucion_id')
                 ->leftJoin('institucion as i', 'i.idInstitucion', '=', 'cdh.id_cliente')
                 ->where('cls.id_cliente', '=', $item->institucion_id)
+                ->where('cdh.periodo_id', $periodo)
                 // Validación de documento: null, vacío o 0
                 ->where(function ($query) {
                     $query->whereNull('cls.documento')
