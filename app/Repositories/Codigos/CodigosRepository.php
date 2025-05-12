@@ -373,23 +373,28 @@ class  CodigosRepository extends BaseRepository
                     $getStock                   = _14Producto::obtenerProducto($codigo_liquidacion);
                     $stockAnteriorReserva       = $getStock->pro_reservar;
                     //prolipa
-                    if($proforma_empresa == 1)  {
-                        //si es documento de prefactura
-                        if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stock; }
-                        //si es documento de notas
-                        if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_deposito; }
-                    }
-                    //calmed
-                    if($proforma_empresa == 3)  {
-                        //si es documento de prefactura
-                        if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stockCalmed; }
-                        //si es documento de notas
-                        if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_depositoCalmed; }
-                    }
+                    // if($proforma_empresa == 1)  {
+                    //     //si es documento de prefactura
+                    //     if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stock; }
+                    //     //si es documento de notas
+                    //     if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_deposito; }
+                    // }
+                    // //calmed
+                    // if($proforma_empresa == 3)  {
+                    //     //si es documento de prefactura
+                    //     if($documentoPrefactura == 0)  { $stockEmpresa  = $getStock->pro_stockCalmed; }
+                    //     //si es documento de notas
+                    //     if($documentoPrefactura == 1)  { $stockEmpresa  = $getStock->pro_depositoCalmed; }
+                    // }
+                    // SOLO SE VA DEVOLVER A CALMED STOCK NOTAS
+                    $empresaNuevo               = 3;
+                    // tipoDocumento = 0; => prefactura; tipoDocumento = 1 => notas
+                    $tipoDocumento              = 1;
+                    $stockEmpresa               = $getStock->pro_depositoCalmed;
                     $nuevoStockReserva          = $stockAnteriorReserva + $valorNew;
                     $nuevoStockEmpresa          = $stockEmpresa + $valorNew;
                     //actualizar stock en la tabla de productos
-                    _14Producto::updateStock($codigo_liquidacion,$proforma_empresa,$nuevoStockReserva,$nuevoStockEmpresa,$documentoPrefactura);
+                    _14Producto::updateStock($codigo_liquidacion,$empresaNuevo,$nuevoStockReserva,$nuevoStockEmpresa,$tipoDocumento);
                     // new values STOCK
                     $newValues              = $this->save_historicoStockNew($codigo_liquidacion);
                     $estadoIngreso = 1;
@@ -500,7 +505,7 @@ class  CodigosRepository extends BaseRepository
                         if($unionCorrecto){
                             $estadoIngreso = 1;
                         }
-                       
+
                         if($estadoIngreso == 1 || $ifGuardarProforma == 2){
                             //PROFORMA
                             $codigoU = DB::table('codigoslibros')
@@ -525,8 +530,8 @@ class  CodigosRepository extends BaseRepository
                     }
                 }
             }else{
-                
-                $estadoIngreso    = 1; 
+
+                $estadoIngreso    = 1;
                 ///CODIGO UNICO===
                 //actualizar el primer codigo CODIGO SIN UNION
                 if($estadoIngreso == 1 || $ifGuardarProforma == 2){
@@ -1163,12 +1168,12 @@ class  CodigosRepository extends BaseRepository
         try {
             // Convertir $getCombos a una colección de Laravel si es un array normal
             $getCombos = collect($getCombos);
-        
+
             // Agrupar por código de combo
             $result = $codigos->groupBy(function ($item) {
                 return $item->combo;
             });
-        
+
             // Mapear los resultados para incluir la información adicional de cada combo
             $result = $result->map(function ($group) use ($getCombos) {
                 // Agrupar por 'codigo_combo' y contar las ocurrencias
@@ -1179,10 +1184,10 @@ class  CodigosRepository extends BaseRepository
                         'cantidad' => $subGroup->count()  // Cantidad de ocurrencias de este código de combo
                     ];
                 });
-        
+
                 // Buscar la información del combo dentro de $getCombos usando el código del combo
                 $comboInfo = $getCombos->firstWhere('codigo_liquidacion', $group->first()->combo);
-        
+
                 // Retornar el formato solicitado con la información adicional del combo
                 return(object)[
                     'codigo_libro'              => $group->first()->combo,
@@ -1202,10 +1207,10 @@ class  CodigosRepository extends BaseRepository
                     'tipo_codigo'               => 1 // 0 = codigo individual; 1 = combo general
                 ];
             });
-        
+
             // Convertir el resultado en un array simple
             return $result->values()->toArray();
-    
+
         } catch (\Exception $e) {
             // Lanza una excepción personalizada
             throw new \Exception('Error al procesar los combos: ' . $e->getMessage());
@@ -1247,9 +1252,9 @@ class  CodigosRepository extends BaseRepository
                 'pro_depositoCalmed' => $producto->pro_depositoCalmed ?? 0,
             ];
             return $newValues;
-        }   
+        }
         catch(\Exception $e){
             throw new \Exception("Error al guardar el historico stock new producto $pro_codigo");
         }
-    }   
+    }
 }

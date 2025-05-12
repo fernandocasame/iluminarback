@@ -53,7 +53,7 @@ class Pedidos2Controller extends Controller
         if($request->getLibrosXInstitucionesAsesor) { return $this->getLibrosXInstitucionesAsesor($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
         if($request->getLibrosXInstitucionesAsesor_new) { return $this->getLibrosXInstitucionesAsesor_new($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
         if($request->getLibrosXPerido) { return $this->getLibrosXPerido($request->id_periodo); }
-
+        if($request->formatoPrecioXPeriodo)         { return $this->formatoPrecioXPeriodo($request); }
 
         if($request->getproStockReserva)            { return $this->getproStockReserva($request); }
         if($request->getPuntosVentaDespachadosComparativo) { return $this->getPuntosVentaDespachadosComparativo($request); }
@@ -87,7 +87,6 @@ class Pedidos2Controller extends Controller
         if(!$periodo_id){
             return ["status" => "0", "message" => "Falta el periodo_id"];
         }
-        
         // 2. Obtener los pedidos
         // con contratos
         if($ifContratos == 1){
@@ -96,7 +95,7 @@ class Pedidos2Controller extends Controller
                 WHERE p.id_periodo = ?
                 AND p.estado = '1'
                 AND p.tipo = '0'
-                AND p.contrato_generado IS NOT NULL 
+                AND p.contrato_generado IS NOT NULL
             ",[$periodo_id]);
         }
         // sin contratos
@@ -106,187 +105,42 @@ class Pedidos2Controller extends Controller
                 WHERE p.id_periodo = ?
                 AND p.estado = '1'
                 AND p.tipo = '0'
-                AND p.contrato_generado IS NULL 
+                AND p.contrato_generado IS NULL
             ",[$periodo_id]);
         }
-      
-    
         $arrayDetalles = [];
-        
         // 3. Recorrer los pedidos y obtener los detalles de cada uno
         foreach($getPedidos as $key => $item10){
             $pedido = $item10->id_pedido;
-    
-            // Obtener detalles del pedido
-            $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
-                p.id_periodo,
-                CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
-                se.nombre_serie
-                FROM pedidos_val_area pv
-                left join area ar ON pv.id_area = ar.idarea
-                left join series se ON pv.id_serie = se.id_serie
-                INNER JOIN pedidos p ON pv.id_pedido = p.id_pedido
-                WHERE pv.id_pedido = '$pedido'
-                GROUP BY pv.id;
-            ");
- 
-            
-            if(empty($val_pedido)){
-                continue;
-            }
-    
-            $arreglo = [];
-            $cont    = 0;
-    
-            // 4. Obtener solo los alcances activos
-            foreach($val_pedido as $k => $tr){
-                $alcance_id = 0;
-                $alcance_id = $tr->alcance;
-                
-                if($alcance_id == 0){
-                    $arreglo[$cont] = (object)[
-                        "id"                => $tr->id,
-                        "id_pedido"         => $tr->id_pedido,
-                        "valor"             => $tr->valor,
-                        "id_area"           => $tr->id_area,
-                        "id_serie"          => $tr->id_serie,
-                        "year"              => $tr->year,
-                        "plan_lector"       => $tr->plan_lector,
-                        "alcance"           => $tr->alcance,
-                        "id_periodo"        => $tr->id_periodo,
-                        "serieArea"         => $tr->serieArea,
-                        "nombre_serie"      => $tr->nombre_serie,
-                        "alcance"           => $alcance_id,
-                    ];
-                } else {
-                    // Validar que el alcance esté cerrado o aprobado
-                    $query = $this->getAlcanceAbiertoXId($alcance_id);
-                    if(count($query) > 0){
-                        $arreglo[$cont] = (object)[
-                            "id"                => $tr->id,
-                            "id_pedido"         => $tr->id_pedido,
-                            "valor"             => $tr->valor,
-                            "id_area"           => $tr->id_area,
-                            "id_serie"          => $tr->id_serie,
-                            "year"              => $tr->year,
-                            "plan_lector"       => $tr->plan_lector,
-                            "alcance"           => $tr->alcance,
-                            "id_periodo"        => $tr->id_periodo,
-                            "serieArea"         => $tr->serieArea,
-                            "nombre_serie"      => $tr->nombre_serie,
-                            "alcance"           => $alcance_id,
-                        ];
-                    }
-                }
-                $cont++;
-            }
-    
-            $renderSet = array_values($arreglo);
-    
-            if(count($renderSet) == 0){
-                continue;
-            }
-    
-            // 5. Obtener más detalles sobre el plan lector o los libros
-            $datos = [];
-            $contador = 0;
-    
-            foreach($renderSet as $key => $item){
-                $valores = [];
-    
-                // Lógica para obtener valores del plan lector o libros
-                if($item->plan_lector > 0 ){
-                    $getPlanlector = DB::SELECT("SELECT l.nombrelibro, l.idlibro, pro.pro_reservar, pro.pro_stock, pro.pro_deposito,
-                    (
-                        SELECT f.pvp AS precio
-                        FROM pedidos_formato f
-                        WHERE f.id_serie = '6'
-                        AND f.id_area = '69'
-                        AND f.id_libro = '$item->plan_lector'
-                        AND f.id_periodo = '$item->id_periodo'
-                    )as precio, ls.codigo_liquidacion, ls.version, ls.year
-                    FROM libro l
-                    left join libros_series ls on ls.idLibro = l.idlibro
-                    inner join 1_4_cal_producto pro on ls.codigo_liquidacion = pro.pro_codigo
-                    WHERE l.idlibro = '$item->plan_lector'
-                    ");
-                    $valores = $getPlanlector;
-                } else {
-                    $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro, pro.pro_reservar, pro.pro_stock, pro.pro_deposito,
-                    (
-                        SELECT f.pvp AS precio
-                        FROM pedidos_formato f
-                        WHERE f.id_serie = ls.id_serie
-                        AND f.id_area = a.area_idarea
-                        AND f.id_periodo = '$item->id_periodo'
-                    )as precio
-                    FROM libros_series ls
-                    LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                    inner join 1_4_cal_producto pro on ls.codigo_liquidacion = pro.pro_codigo
-                    LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-                    WHERE ls.id_serie = '$item->id_serie'
-                    AND a.area_idarea = '$item->id_area'
-                    AND l.Estado_idEstado = '1'
-                    AND a.estado = '1'
-                    AND ls.year = '$item->year'
-                    LIMIT 1
-                    ");
-                    $valores = $getLibros;
-                }
-    
-                // Añadir el detalle de la respuesta
-                $datos[$contador] = [
-                    "id"                => $item->id,
-                    "id_pedido"         => $item->id_pedido,
-                    "valor"             => $item->valor,
-                    "id_area"           => $item->id_area,
-                    "id_serie"          => $item->id_serie,
-                    "year"              => $item->year,
-                    "anio"              => $valores[0]->year,
-                    "plan_lector"       => $item->plan_lector,
-                    "serieArea"         => $item->id_serie == 6 ? $item->nombre_serie . " " . $valores[0]->nombrelibro : $item->serieArea,
-                    "idlibro"           => $valores[0]->idlibro,
-                    "nombrelibro"       => $valores[0]->nombrelibro,  // Añadir nombrelibro aquí
-                    "precio"            => $valores[0]->precio,
-                    "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
-                    "alcance"           => $item->alcance,
-                ];
-                $contador++;
-            }
-    
-            $arrayDetalles[$key] = $datos;
+            $libroSolicitados    = $this->pedidosRepository->obtenerLibroxPedidoTodo($pedido);
+            $arrayDetalles[$key] = $libroSolicitados;
         }
-    
-        // 6. Agrupar por codigo_liquidacion y sumar el valor 
         $agrupado = [];
-    
-        foreach($arrayDetalles as $key => $detalles) {
-            foreach($detalles as $detalle) {
-                $codigo_liquidacion = $detalle['codigo_liquidacion'];
-    
-                // Si el grupo ya existe, suma el valor y mantiene el nombrelibro
-                if (isset($agrupado[$codigo_liquidacion])) {
-                    $agrupado[$codigo_liquidacion]['valor'] += $detalle['valor'];
-                    // Para el nombrelibro, si es necesario, mantener el primero que aparece
-                    if (empty($agrupado[$codigo_liquidacion]['nombrelibro'])) {
-                        $agrupado[$codigo_liquidacion]['nombrelibro'] = $detalle['nombrelibro'];
-                    }
-                } else {
-                    // Si no existe, crear el grupo
-                    $agrupado[$codigo_liquidacion] = [
-                        'codigo_liquidacion' => $codigo_liquidacion,
-                        'valor' => $detalle['valor'],
-                        'nombrelibro' => $detalle['nombrelibro'], // Guardar el nombrelibro
-                    ];
+
+        $arrayDetalles = collect($arrayDetalles)->flatten(10);
+
+        foreach ($arrayDetalles as $key => $detalle) {
+            $codigo_liquidacion = $detalle->codigo_liquidacion;
+
+            if (isset($agrupado[$codigo_liquidacion])) {
+                $agrupado[$codigo_liquidacion]['valor'] += $detalle->valor;
+
+                if (empty($agrupado[$codigo_liquidacion]['nombrelibro'])) {
+                    $agrupado[$codigo_liquidacion]['nombrelibro'] = $detalle->nombrelibro;
                 }
+            } else {
+                $agrupado[$codigo_liquidacion] = [
+                    'codigo_liquidacion' => $codigo_liquidacion,
+                    'valor' => $detalle->valor,
+                    'nombrelibro' => $detalle->nombrelibro,
+                ];
             }
         }
-    
         // 7. Retornar los datos agrupados
         return array_values($agrupado);
     }
-    
-    
+
+
     //API:GET/pedidos2/pedidos?getLibrosFormato=yes&periodo_id=22
     /**
      * Get the libros formato for a given periodo.
@@ -407,6 +261,22 @@ class Pedidos2Controller extends Controller
         $id_pedidos = implode(",",$id_pedidos->toArray());
         $query2 = $this->geAllLibrosxAsesor(0,$id_periodo,1,$id_pedidos);
         return $query2;
+    }
+    //api:get/pedidos2/pedidos?formatoPrecioXPeriodo=1&periodo_id=28&nuevo=1
+    public function formatoPrecioXPeriodo(Request $request){
+        $periodo_id = $request->periodo_id;
+        $nuevo      = $request->nuevo;
+        if($nuevo == 1){
+            $query = DB::SELECT("SELECT * FROM pedidos_formato_new p
+            WHERE p.idperiodoescolar = '$periodo_id'
+            AND p.pfn_estado = 1
+            ");
+        }else{
+            $query = DB::SELECT("SELECT * FROM pedidos_formato p
+            WHERE p.id_periodo = '25';
+            ");
+        }
+        return $query;
     }
     //API:GET/pedidos2/pedidos?getproStockReserva=yes
     public function getproStockReserva($pro_codigo){
@@ -1219,7 +1089,7 @@ class Pedidos2Controller extends Controller
         // $coleccion  = collect($resultado);
         // return $coleccion->values();
     }
-    
+
     public function getAlcanceAbiertoXId($id){
         $query = DB::SELECT("SELECT * FROM pedidos_alcance a
         WHERE a.id = '$id'
@@ -2023,7 +1893,7 @@ class Pedidos2Controller extends Controller
         if (!$datosVerificacion) {
             return ["status" => "0", "message" => "No existe la verificación con ese id"];
         }
-              
+
         // si no hago el proceso normal
         if(!$mostrarSolo100){
             // documentos 100%

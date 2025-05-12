@@ -1839,6 +1839,12 @@ Route::post('Eliminar_Remision','RemisionController@Eliminar_Remision');
 Route::get('guias_remision_list', 'RemisionController@guias_remision_list');
 
 //fin remision
+
+//Finalizar pendientes de venta 
+Route::post('ActualizarVenta','VentasController@ActualizarVenta');
+Route::get('ObtenerDetallesProformaVenta','VentasController@ObtenerDetallesProformaVenta');
+Route::get('GetVentaOfProforma','VentasController@GetVentaOfProforma');
+
 //INICIO transporte
 Route::get('Get_Transporte', 'TransporteController@Get_Transporte');
 Route::get('GetTransporte_xfiltro', 'TransporteController@GetTransporte_xfiltro');
@@ -2094,3 +2100,4 @@ Route::post('getEvaluacionesAdminPeriodo', 'EvaluacionController@getEvaluaciones
 Route::get('cod_evaluacion_institucion/{id}','InstitucionController@cod_evaluacion_institucion');
 Route::post('contarLibrosPorPeriodo','PedidosController@contarLibrosPorPeriodo');
 Route::post('edit_fecha_evaluacion_admin','EvaluacionController@edit_fecha_evaluacion_admin');
+require_once "others/codigos/RouterCodigos.php";

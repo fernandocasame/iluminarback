@@ -203,7 +203,7 @@ class PedidosController extends Controller
             }
         }
     }
-    //api:post/removerContratoAgrupacion    
+    //api:post/removerContratoAgrupacion
     public function removerContratoAgrupacion(Request $request)
     {
         // Definir las reglas de validación para los datos de entrada
@@ -945,30 +945,30 @@ class PedidosController extends Controller
     //api:get>>/getTransabilidad/{id_pedido}
     public function getTransabilidad($id_pedido){
         $consulta = "
-            SELECT 
-                p.id_pedido, 
+            SELECT
+                p.id_pedido,
                 p.fecha_creacion_pedido AS pedido_creacion,
                 ph.*,
                 IF(p.ifanticipo = '0', p.fecha_generacion_contrato, ph.fecha_generar_contrato) AS f_generateContrato,
-                
+
                 -- Agrupar las fechas de evidencia, factura y revisión
                 GROUP_CONCAT(CASE WHEN egt.egft_id = 3 THEN eg.created_at END ORDER BY eg.created_at) AS fecha_subida_evidencia,
                 GROUP_CONCAT(CASE WHEN egt.egft_id = 4 THEN eg.created_at END ORDER BY eg.created_at) AS fecha_subida_factura,
                 GROUP_CONCAT(CASE WHEN egt.egft_id = 2 THEN eg.created_at END ORDER BY eg.created_at) AS fecha_subida_revision
-            FROM 
+            FROM
                 pedidos p
-            LEFT JOIN 
+            LEFT JOIN
                 pedidos_historico ph ON p.id_pedido = ph.id_pedido
-            LEFT JOIN 
+            LEFT JOIN
                 verificaciones v ON v.contrato = p.contrato_generado
-            LEFT JOIN 
+            LEFT JOIN
                 evidencia_global_files eg ON eg.egf_referencia = v.id
-            LEFT JOIN 
+            LEFT JOIN
                 evidencia_global_files_tipo egt ON egt.egft_id = eg.egft_id
-            WHERE 
-                p.id_pedido = :pedido 
+            WHERE
+                p.id_pedido = :pedido
                 AND v.estado = 0
-            GROUP BY 
+            GROUP BY
                 p.id_pedido, ph.id;
         ";
 
@@ -1211,7 +1211,7 @@ class PedidosController extends Controller
         // Consulta los libros obsequios
         $DatosLibrosObsequios = DB::select("
         SELECT ls.idLibro, CONCAT(ls.nombre,' ',f.ven_desc_por,'%') AS nombrelibro, ls.codigo_liquidacion, fd.det_ven_valor_u AS precio, fd.det_ven_cantidad AS valor
-        FROM  f_detalle_venta fd 
+        FROM  f_detalle_venta fd
         JOIN f_venta f ON fd.ven_codigo = f.ven_codigo AND fd.id_empresa = f.id_empresa
         JOIN p_libros_obsequios o ON o.id = f.ven_p_libros_obsequios
         JOIN pedidos p ON p.id_pedido = o.id_pedido
@@ -1386,7 +1386,7 @@ class PedidosController extends Controller
         // Consulta los libros obsequios
         $DatosLibrosObsequios = DB::select("
         SELECT ls.idLibro, CONCAT(ls.nombre,' ',f.ven_desc_por,'%') AS nombrelibro, ls.codigo_liquidacion, fd.det_ven_valor_u AS precio, fd.det_ven_cantidad AS valor
-        FROM  f_detalle_venta fd 
+        FROM  f_detalle_venta fd
         JOIN f_venta f ON fd.ven_codigo = f.ven_codigo AND fd.id_empresa = f.id_empresa
         JOIN p_libros_obsequios o ON o.id = f.ven_p_libros_obsequios
         JOIN pedidos p ON p.id_pedido = o.id_pedido
@@ -1413,7 +1413,7 @@ class PedidosController extends Controller
         // Retorna los datos finales
         return $datos;
     }
-    
+
     //Libros de pedido y alcance
     public function get_val_pedidoInfoTodo($pedido){
         $val_pedido = DB::SELECT("SELECT DISTINCT pv.*,
@@ -2015,6 +2015,7 @@ class PedidosController extends Controller
                 'pedidos_convenios_id'           => $item->pedidos_convenios_id,
                 'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
                 'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
+                'anticipo_global'                => $item->anticipo_global,
             ];
         }
         return $response;
@@ -2107,6 +2108,7 @@ class PedidosController extends Controller
                     'pedidos_convenios_id'           => $item->pedidos_convenios_id,
                     'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
                     'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
+                    'anticipo_global'                => $item->anticipo_global,
                 ];
             }
             return $datosMostrar;
@@ -2892,7 +2894,7 @@ class PedidosController extends Controller
             return ["status" => "0", "message" => "Error al crear el pedido"];
         }
     }
-    
+
     public function getBeneficiariosXPedido($id_pedido){
         $query              = $this->getAllBeneficiarios($id_pedido);
         return $query;
@@ -3055,7 +3057,7 @@ class PedidosController extends Controller
         if( !$pedido[0]->codigo_contrato ){
             return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del periodo']);
         }
-        
+
         $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
         WHERE `id_asesor` = ? AND `id_institucion` = ?
         AND `id_docente` = ?", [$pedido[0]->iniciales,
@@ -3065,7 +3067,7 @@ class PedidosController extends Controller
         } else {
             $cadenaRecortada = $comentario; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
         }
-      
+
         //guardar en la tabla de temporadas
         $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
         // try {
@@ -4258,8 +4260,8 @@ class PedidosController extends Controller
             $alcance = PedidoAlcance::findOrFail($request->id);
             if($request->only_observacion){
                 $obs = $request->observacion_asesor;
-                $alcance->observacion_asesor = (!is_null($obs) && trim($obs) !== '' && strtolower(trim($obs)) !== 'null') 
-                    ? $obs 
+                $alcance->observacion_asesor = (!is_null($obs) && trim($obs) !== '' && strtolower(trim($obs)) !== 'null')
+                    ? $obs
                     : null;
             }else{
                 $alcance->venta_bruta           = $request->venta_bruta;
@@ -5728,25 +5730,25 @@ class PedidosController extends Controller
     public function AnularLibrosObsequios(Request $request) {
         // Iniciar transacción
         DB::beginTransaction();
-    
+
         try {
             // Encontrar el pedido de libro obsequio
             $pedidoLibroObsequio = PedidosLibroObsequio::findOrFail($request->id);
-    
+
             // Actualizar el estado del pedido de libro obsequio
             $pedidoLibroObsequio->estado_libros_obsequios = $request->estado_libros_obsequios;
             $pedidoLibroObsequio->save();
-    
+
             // Buscar todas las ventas asociadas en la tabla F_venta
             $ventas = DB::table('f_venta')
                         ->where('ven_p_libros_obsequios', $request->id)
                         ->get();
-    
+
             // Validar que se encontraron ventas
             if ($ventas->isEmpty()) {
                 throw new \Exception('No se encontraron ventas asociadas');
             }
-    
+
             // Iterar sobre todas las ventas encontradas
             foreach ($ventas as $venta) {
                 // Validar que el estado de la venta sea 2 o diferente de 3
@@ -5755,36 +5757,36 @@ class PedidosController extends Controller
                     DB::rollBack();
                     return ["status" => "0", "message" => "El documento " . $venta->ven_codigo . " ya no se encuentra pendiente de despacho. No se puede anular."];
                 }
-    
+
                 // Actualizar el estado de la venta
                 DB::table('f_venta')
                     ->where('ven_codigo', $venta->ven_codigo)
                     ->where('id_empresa', $venta->id_empresa)
                     ->update([
-                        'est_ven_codigo' => 3, 
-                        'user_anulado' => $request->usuario, 
-                        'observacionAnulacion' => $request->observacion, 
+                        'est_ven_codigo' => 3,
+                        'user_anulado' => $request->usuario,
+                        'observacionAnulacion' => $request->observacion,
                         'fecha_anulacion' => now()]
                     );
-    
+
                 // Obtener detalles de la venta
                 $detalles = DB::table('f_detalle_venta')
                               ->where('ven_codigo', $venta->ven_codigo)
                               ->where('id_empresa', $venta->id_empresa)
                               ->get();
-    
+
                 // Iterar sobre los detalles y actualizar los productos
                 foreach ($detalles as $detalle) {
                     $producto = DB::table('1_4_cal_producto')
                                   ->where('pro_codigo', $detalle->pro_codigo)
                                   ->first();
-    
+
                     if (!$producto) {
                         // Deshacer la transacción en caso de error con un producto
                         DB::rollBack();
                         return ["status" => "0", "message" => "Producto no encontrado"];
                     }
-    
+
                     // Ajustar el stock según la empresa
                     if ($venta->id_empresa == 1) {
                         DB::table('1_4_cal_producto')
@@ -5803,22 +5805,22 @@ class PedidosController extends Controller
                     }
                 }
             }
-    
+
             // Confirmar la transacción
             DB::commit();
-    
+
             return ["status" => "1", "message" => "Se anuló correctamente"];
         } catch (\Exception $e) {
             // Deshacer la transacción en caso de error
             DB::rollBack();
-    
+
             // Opcional: Loguear el error
             // Log::error('Error al anular libros obsequios: ' . $e->getMessage());
 
             return ["status" => "0", "message" => "No se pudo anular"];
         }
     }
-    
+
     public function eliminarPedidoLibrosObsequios(Request $request){
         $detallePedidosObsequios = DetallePedidoLibroObsequio::where('p_libros_obsequios_id', $request->id)->delete();
         $pedido = PedidosLibroObsequio::findOrFail($request->id)->delete();
@@ -6047,7 +6049,7 @@ class PedidosController extends Controller
                     }
                 }
             }
-            
+
             // Si hay errores, retornar respuesta sin continuar la lógica
             if (!empty($errores)) {
                 DB::rollBack();
@@ -6155,7 +6157,7 @@ class PedidosController extends Controller
                     // DB::rollBack();
                     $verificar_Tipo_Guardado_Stock = 1;
                     $return_descontarStock_HijosDocentes = $this->descontarStock_HijosDocentes($item,3,$empresa,$verificar_Tipo_Guardado_Stock);
-                    
+
                 } else if ($request->switch_activar_todo_stock === "false") {
                     // Actualiza los productos relacionados
                     // DB::rollBack();
@@ -7068,7 +7070,7 @@ class PedidosController extends Controller
             if( !$pedido[0]->codigo_contrato ){
                 return response()->json(['json_contrato' => '', 'form_data' => '', 'error' => 'Falta el código del periodo']);
             }
-           
+
             $cli_ins_cod = DB::SELECT("SELECT * FROM `pedidos_asesor_institucion_docente`
             WHERE `id_asesor` = ? AND `id_institucion` = ?
             AND `id_docente` = ?", [$pedido[0]->iniciales,
@@ -7078,7 +7080,7 @@ class PedidosController extends Controller
             } else {
                 $cadenaRecortada = $comentario; // Si la cadena original tiene 500 caracteres o menos, se asigna tal cual
             }
-           
+
             //guardar en la tabla de temporadas
             $this->guardarContratoTemporada($codigo_ven,$institucion,$asesor_id,$temporada,$periodo,$ciudad,$asesor,$cedulaAsesor,$nombreDocente,$cedulaDocente,$nombreInstitucion);
             // try {
@@ -7756,7 +7758,7 @@ class PedidosController extends Controller
         $id_pedido = $request->input('id_pedido');
         $id_periodo = $request->input('id_periodo');
         $validacionperiodo = $request->input('validacionperiodo');
-    
+
         // Validar si se envió el ID del pedido
         if (!$id_pedido) {
             return response()->json(['error' => 'ID de pedido no proporcionado'], 400);
@@ -7788,7 +7790,7 @@ class PedidosController extends Controller
         }else{
             $mensajeLibrosDelPedido = "No se a definido un periodo para consultar los libros.";
         }
-    
+
         // Consultar convenios
         $convenios = DB::SELECT("SELECT * FROM pedidos_convenios WHERE id_pedido = ?", [$id_pedido]);
         if (!empty($convenios)) {
@@ -7796,7 +7798,7 @@ class PedidosController extends Controller
         }else{
             $mensajeConvenios = "No contiene";
         }
-    
+
         // Consultar pagos
         $pagos = DB::SELECT("SELECT * FROM 1_4_documento_liq dl WHERE dl.id_pedido = ?", [$id_pedido]);
         if (!empty($pagos)) {
@@ -7812,7 +7814,7 @@ class PedidosController extends Controller
         }else{
             $mensajebeneficiarios = "No contiene";
         }
-    
+
         // Consultar libroshijosdocentes
         // 1. Obtener todos los ID de p_libros_obsequios relacionados con id_pedido
         $libroshijosdocentes = DB::table('p_libros_obsequios')
@@ -7839,7 +7841,7 @@ class PedidosController extends Controller
                 $mensajeActasHijosDocentes = "Sí contiene";
             }
         }
-    
+
         // Retornar la respuesta final con todos los resultados
         return response()->json([
             'mensajeConvenios'             => $mensajeConvenios,
@@ -7874,7 +7876,7 @@ class PedidosController extends Controller
                     $resultados[] = 'No se encontraron registros en pedidos_val_area con el id_pedido ' . $request->id_pedido;
                 } else {
                     $resultados[] = 'Registros eliminados en pedidos_val_area: ' . $deleted_pedidos_val_area;
-                }   
+                }
             }else if ($request->validacionperiodo == 'formato_new') {
                 // Eliminar registros de pedidos_val_area_new
                 $deleted_pedidos_val_area_new = DB::table('pedidos_val_area_new')
@@ -7884,7 +7886,7 @@ class PedidosController extends Controller
                     $resultados[] = 'No se encontraron registros en pedidos_val_area_new con el id_pedido ' . $request->id_pedido;
                 } else {
                     $resultados[] = 'Registros eliminados en pedidos_val_area_new: ' . $deleted_pedidos_val_area_new;
-                }   
+                }
             }else{
                 $resultados[] = 'No se proporciono un valor para validacionperiodo, para eliminar los registros de pedidos_val_area_new: ';
             }
@@ -8263,7 +8265,7 @@ class PedidosController extends Controller
         if($request->ifContratos == 1){
             foreach ($resultado as $key => $value) {
                 // Obtener cantidad de alcances con parámetros enlazados
-                $query = DB::select("SELECT COALESCE(SUM(pv.pvn_cantidad), 0) AS cantidad 
+                $query = DB::select("SELECT COALESCE(SUM(pv.pvn_cantidad), 0) AS cantidad
                     FROM pedidos_val_area_new pv
                     LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
                     LEFT JOIN pedidos_alcance ac ON ac.id = pv.pvn_tipo
@@ -8274,10 +8276,10 @@ class PedidosController extends Controller
                     AND ac.estado_alcance = '1'
                     AND pv.idlibro = ?
                 ", [$request->id_periodo, $value->idlibro]);
-            
+
                 // Asegurar que haya resultados y convertir a float
                 $alcances = !empty($query) ? (float) $query[0]->cantidad : 0.0;
-            
+
                 // Asignar valores al resultado
                 $resultado[$key]->alcances = $alcances;
                 $resultado[$key]->cantidad = (float) $resultado[$key]->cantidad + $alcances;

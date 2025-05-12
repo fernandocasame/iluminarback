@@ -1335,6 +1335,8 @@ class AbonoController extends Controller
                         'todos_los_documentos' => '',
                         'abono_total' => 0,
                         'retencion_total' => 0,
+                        'abono_liquidacion' => 0,
+                        'abono_cruce' => 0,
                         'devolucion' => $devolucionConDescuento,
                         'devolucion_todas' => [], // Puedes dejarlo vacío o añadir detalles si es necesario
                     ];
@@ -1510,6 +1512,8 @@ class AbonoController extends Controller
                     'retencion_total' => 0, // Si hay retenciones, asegúrate de calcularlo
                     'devolucion' => 0, // En este caso, parece no haber devolución
                     'devolucion_todas' => [], // Puedes dejarlo vacío o añadir detalles si es necesario
+                    'abono_liquidacion' => 0, 
+                    'abono_cruce' => 0,       
                 ];
             }
         }
@@ -1555,6 +1559,8 @@ class AbonoController extends Controller
                     'retencion_total' => 0, // Si hay retenciones, asegúrate de calcularlo
                     'devolucion' => 0, // En este caso, parece no haber devolución
                     'devolucion_todas' => [], // Puedes dejarlo vacío o añadir detalles si es necesario
+                    'abono_liquidacion' => 0, 
+                    'abono_cruce' => 0,       
                 ];
             }
         }
@@ -1604,10 +1610,53 @@ class AbonoController extends Controller
                     'retencion_total' => 0,
                     'devolucion' => 0,
                     'devolucion_todas' => [], // Puedes dejarlo vacío o agregar detalles si es necesario
+                    'abono_liquidacion' => 0, 
+                    'abono_cruce' => 0,       
                 ];
             }
         }
-        return $reporte;
+
+        // return $reporte;
+        
+        $reporteAgrupado = collect($reporte)->groupBy(function($item) {
+            return $item->ruc_cliente . '|' . $item->idtipodoc . '|' . $item->id_empresa;
+        })->map(function($grupo) {
+            $base = $grupo->first();
+        
+            return (object) [
+                'idtipodoc' => $base->idtipodoc,
+                'tdo_id' => $base->tdo_id,
+                'tdo_nombre' => $base->tdo_nombre,
+                'empresa' => $base->empresa,
+                'id_empresa' => $base->id_empresa,
+                'ruc_cliente' => $base->ruc_cliente,
+        
+                'nombreInstitucion' => $grupo->pluck('nombreInstitucion')->unique()->implode(' / '),
+                'asesor' => $grupo->pluck('asesor')->unique()->implode(' / '),
+                'cliente_facturado' => $grupo->pluck('cliente_facturado')->unique()->implode(' / '),
+        
+                'idInstitucion' => null,
+                'institucion_id' => null,
+                'punto_venta' => null,
+        
+                'subtotal_total' => $grupo->sum('subtotal_total'),
+                'descuento_total' => $grupo->sum('descuento_total'),
+                'valor_total' => $grupo->sum('valor_total'),
+                'abono_total' => $base->abono_total,
+                'retencion_total' => $base->retencion_total,
+                'abono_liquidacion' => $base->abono_liquidacion,
+                'abono_cruce' => $base->abono_cruce,
+                'devolucion' => $grupo->sum('devolucion'),
+        
+                'todos_los_documentos' => collect($grupo)->pluck('todos_los_documentos')->flatMap(function($docs) {
+                    return explode(',', $docs);
+                })->filter()->unique()->implode(','),
+        
+                'devolucion_todas' => collect($grupo)->pluck('devolucion_todas')->flatten(1)->all(),
+            ];
+        })->values();
+        
+        return $reporteAgrupado;
 
     }
     

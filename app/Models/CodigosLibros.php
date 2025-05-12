@@ -24,6 +24,7 @@ class CodigosLibros extends Model implements Auditable
         'bc_periodo',
         'bc_institucion'
     ];
+    const CODIGO_NO_EXISTE          = 'El código no existe';
     const CODIGO_LIQUIDADO          = 'El código se encuentra liquidado';
     const CODIGO_REGALADO           = 'El código se encuentra regalado';
     const CODIGO_GUIA               = 'El código se encuentra como GUIA';
