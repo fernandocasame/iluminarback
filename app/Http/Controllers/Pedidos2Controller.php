@@ -273,7 +273,7 @@ class Pedidos2Controller extends Controller
             ");
         }else{
             $query = DB::SELECT("SELECT * FROM pedidos_formato p
-            WHERE p.id_periodo = '25';
+            WHERE p.id_periodo = '$periodo_id';
             ");
         }
         return $query;
