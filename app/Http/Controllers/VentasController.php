@@ -2903,12 +2903,14 @@ class VentasController extends Controller
         if($request->XlibroTodos){
             // Obtener parámetros del request
             $periodo_id     = $request->periodo;
+            //tipoVenta = 1 ; directa; 2 = lista; 3 todo
             $tipoVenta      = $request->tipoVenta;
             $nuevo          = $request->nuevo;
             $arrayPedidos   = [];
             $arrayDespachoBodega = [];
             // tipoInstitucion: 0 => institución venta directa; 1 => venta lista
             $tipoInstitucion = $request->tipoVenta == 1 ? 0 : 1;
+
 
             // Consulta despachados bodega directa
             if($tipoVenta == 1){
@@ -2917,6 +2919,10 @@ class VentasController extends Controller
             // Consulta despachados bodega lista
             if($tipoVenta == 2){
                 $arrayDespachoBodega = $this->ventasRepository->getDespachoBodegaLista($request->periodo);
+            }
+            // Consulta despachos Todos
+            if($tipoVenta == 3){
+                $arrayDespachoBodega = $this->ventasRepository->getDespachoBodegaTodo($request->periodo);
             }
             // Formato para colección
             $arrayDespachoBodega = collect($arrayDespachoBodega)->map(function ($item) {

@@ -229,5 +229,22 @@ class  VentaRepository extends BaseRepository
         ");
         return $query;
     }
+    public function getDespachoBodegaTodo($periodo){
+        $query = DB::SELECT("SELECT
+                ls.codigo_liquidacion,
+                l.nombrelibro,
+                COUNT(*) AS valor
+            FROM codigoslibros c
+            LEFT JOIN libros_series ls ON ls.idLibro = c.libro_idlibro
+            LEFT JOIN libro l ON l.idlibro = ls.idLibro
+            WHERE
+                c.prueba_diagnostica = '0'
+                AND c.estado_liquidacion IN ('0', '1', '2')
+                AND c.bc_periodo = '$periodo'
+            GROUP BY ls.codigo_liquidacion, l.nombrelibro
+            ORDER BY ls.codigo_liquidacion;
+        ");
+        return $query;
+    }
 }
 ?>
