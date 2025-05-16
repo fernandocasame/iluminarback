@@ -3587,6 +3587,8 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
     public function metodosGetCodigos(Request $request){
         if($request->reporteBodega)                             { return $this->reporteBodega($request); }
         if($request->reporteBodega_new)                         { return $this->reporteBodega_new($request); }
+        if($request->reporteBodega_newGuias_FormatoAnterior)    { return $this->reporteBodega_newGuias_FormatoAnterior($request); }
+        if($request->reporteBodega_newGuias_FormatoNuevo)       { return $this->reporteBodega_newGuias_FormatoNuevo($request); }
         if($request->reporteVentaCodigos)                      { return $this->reporteVentaCodigos($request); }
         if($request->reporteBodegaCombos)                       { return $this->reporteBodegaCombos($request); }
         if($request->reporteBodegaCombos_new)                   { return $this->reporteBodegaCombos_new($request); }
@@ -4194,12 +4196,13 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
     }
     //api:post/metodosPostCodigos=1
     public function metodosPostCodigos(Request $request){
-        if($request->getPrevisualizarCodigos)               { return $this->getPrevisualizarCodigos($request); }
-        if($request->getPrevisualizarPaquetes)              { return $this->getPrevisualizarPaquetes($request); }
-        if($request->getPrevisualizarCodigosTablaSon)       { return $this->getPrevisualizarCodigosTablaSon($request); }
-        if($request->getPrevisualizarPaquetesTablaSon)      { return $this->getPrevisualizarPaquetesTablaSon($request); }
-        if($request->saveImportPlus)                        { return $this->saveImportPlus($request); }
-        if($request->saveImportGuias)                       { return $this->saveImportGuias($request); }
+        if($request->getPrevisualizarCodigos)                   { return $this->getPrevisualizarCodigos($request); }
+        if($request->getPrevisualizarPaquetes)                  { return $this->getPrevisualizarPaquetes($request); }
+        if($request->getPrevisualizarCodigosTablaSon)           { return $this->getPrevisualizarCodigosTablaSon($request); }
+        if($request->getPrevisualizarPaquetesTablaSon)          { return $this->getPrevisualizarPaquetesTablaSon($request); }
+        if($request->saveImportPlus)                            { return $this->saveImportPlus($request); }
+        if($request->saveImportGuias)                           { return $this->saveImportGuias($request); }
+        if($request->reporteBodega_newGuias_OrganizarCodigos)   { return $this->reporteBodega_newGuias_OrganizarCodigos($request); }
     }
     //api:post/metodosPostCodigos?getPrevisualizarCodigos=1
     public function getPrevisualizarCodigos($request){
@@ -5329,6 +5332,287 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
         }
         // return $resultadoFinal;
         return $val_pedido2;
+    }
+    public function reporteBodega_newGuias_FormatoAnterior($request){
+        $periodo = $request->input('periodo');
+        $serie = $request->input('serie');
+        // Obtener las guías registradas
+        $guias_codigos_libros = DB::SELECT("SELECT
+                ls.nombre AS nombrelibro,
+                c.serie,
+                ls.codigo_liquidacion,
+                ls.id_serie,
+                COUNT(*) AS cantidad_guias
+            FROM codigoslibros c
+            LEFT JOIN libros_series ls ON ls.idLibro = c.libro_idlibro
+            WHERE c.estado_liquidacion = 4
+            AND c.prueba_diagnostica = '0'
+            AND c.bc_periodo = ?
+            AND ls.id_serie = ?
+            GROUP BY ls.nombre, c.serie, ls.codigo_liquidacion, ls.id_serie
+            ORDER BY cantidad_guias DESC
+        ", [$periodo, $serie]);
+        // Obtener los asesores y sus pedidos
+        $asesores = DB::SELECT("SELECT DISTINCT p.id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor
+            FROM pedidos_val_area pv
+            LEFT JOIN area ar ON pv.id_area = ar.idarea
+            LEFT JOIN series se ON pv.id_serie = se.id_serie
+            LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+            WHERE p.tipo = '1'
+            AND p.id_periodo = ?
+            AND p.estado = '1'
+            GROUP BY u.nombres, p.id_asesor
+            ORDER BY u.nombres
+        ", [$periodo]);
+        $pedidoAsesores = [];
+        foreach ($asesores as $asesor) {
+            $guias = $this->codigosRepository->getLibrosAsesores($periodo, $asesor->id_asesor);
+            foreach ($guias as $guia) {
+                $key = $guia->codigo . '|' . $guia->nombre_serie;
+                if (!isset($pedidoAsesores[$key])) {
+                    $pedidoAsesores[$key] = (array)$guia;
+                } else {
+                    $pedidoAsesores[$key]['valor'] += $guia->valor;
+                }
+            }
+        }
+        // Filtrar por serie si se especifica
+        if (!empty($serie)) {
+            $pedidoAsesores = array_filter($pedidoAsesores, fn($item) => $item['id_serie'] == $serie);
+        }
+        // Re-indexar array
+        $pedidoAsesores = array_values($pedidoAsesores);
+        // Preparar resultado de sumas
+        $resultado_sumas = [];
+        foreach ($guias_codigos_libros as $item) {
+            $codigo = $item->codigo_liquidacion;
+            $resultado_sumas[$codigo] = [
+                'codigo_liquidacion' => $codigo,
+                'id_serie' => $item->id_serie,
+                'serie' => $item->serie,
+                'nombrelibro' => $item->nombrelibro,
+                'guias_x_codigoslibros' => (int)$item->cantidad_guias,
+                'guias_x_pedidos' => 0,
+                'sumatotal' => (int)$item->cantidad_guias
+            ];
+        }
+        foreach ($pedidoAsesores as $item) {
+            $codigo = $item['codigo'];
+            if (isset($resultado_sumas[$codigo])) {
+                $resultado_sumas[$codigo]['guias_x_pedidos'] += $item['valor'];
+                $resultado_sumas[$codigo]['sumatotal'] += $item['valor'];
+            } else {
+                $resultado_sumas[$codigo] = [
+                    'codigo_liquidacion' => $codigo,
+                    'id_serie' => $item['id_serie'],
+                    'serie' => $item['nombre_serie'],
+                    'nombrelibro' => $item['nombrelibro'],
+                    'guias_x_codigoslibros' => 0,
+                    'guias_x_pedidos' => $item['valor'],
+                    'sumatotal' => $item['valor']
+                ];
+            }
+        }
+        return [
+            'guias_codigos_libros' => $guias_codigos_libros,
+            'pedidoAsesores' => $pedidoAsesores,
+            'resultado_final' => array_values($resultado_sumas)
+        ];
+    }
+    public function reporteBodega_newGuias_FormatoNuevo($request){
+        $periodo = $request->input('periodo');
+        $serie = $request->input('serie');
+        // Obtener las guías registradas
+        $guias_codigos_libros = DB::SELECT("SELECT
+                ls.nombre AS nombrelibro,
+                c.serie,
+                ls.codigo_liquidacion,
+                ls.id_serie,
+                COUNT(*) AS cantidad_guias
+            FROM codigoslibros c
+            LEFT JOIN libros_series ls ON ls.idLibro = c.libro_idlibro
+            WHERE c.estado_liquidacion = 4
+            AND c.prueba_diagnostica = '0'
+            AND c.bc_periodo = $periodo
+            AND ls.id_serie = $serie
+            GROUP BY ls.nombre, c.serie, ls.codigo_liquidacion, ls.id_serie
+            ORDER BY cantidad_guias DESC
+        ");
+        // return $guias_codigos_libros;
+        // Obtener los asesores y sus pedidos
+        $asesores = DB::SELECT("SELECT DISTINCT p.id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor
+        FROM pedidos_val_area_new pv
+        LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        where p.tipo        = '1'
+        and p.id_periodo  = '$periodo'
+        AND p.estado        = '1'
+        AND p.estado_entrega = '2'
+        GROUP BY u.nombres ORDER BY u.nombres
+        ");
+        $pedidoAsesores = [];
+        // $datos = [];
+        // Agrupar libros de todos los asesores
+        foreach($asesores as $item){
+            $id_asesor = $item->id_asesor;
+            $guias = $this->codigosRepository->getLibrosAsesores_new($periodo, $id_asesor);
+            // $datos[$key] = $guias;
+            foreach ($guias as $guia) {
+                $key = $guia->codigo . '|' . $guia->nombre_serie;
+                if (!isset($pedidoAsesores[$key])) {
+                    $pedidoAsesores[$key] = (array) $guia;
+                } else {
+                    $pedidoAsesores[$key]['valor'] += $guia->valor;
+                    // $pedidoAsesores[$key]['subtotal'] += $guia->subtotal;
+                }
+            }
+        }
+        // return $datos;
+        // Re-indexar
+        $pedidoAsesores = array_values($pedidoAsesores);
+        // Filtrar por serie si se especifica
+        if (!empty($serie)) {
+            $pedidoAsesores = array_filter($pedidoAsesores, function ($item) use ($serie) {
+                return $item['id_serie'] == $serie;
+            });
+            $pedidoAsesores = array_values($pedidoAsesores);
+        }
+        // return [
+        //     'guias_codigos_libros' => $guias_codigos_libros,
+        //     'pedidoAsesores' => $pedidoAsesores
+        // ];
+        // Mapear datos para suma final por código
+        $resultado_sumas = [];
+        // Indexar cantidad_guias por código
+        foreach ($guias_codigos_libros as $item) {
+            $codigo = $item->codigo_liquidacion;
+            $resultado_sumas[$codigo] = [
+                'codigo_liquidacion' => $codigo,
+                'id_serie' => $item->id_serie,
+                'serie' => $item->serie,
+                'nombrelibro' => $item->nombrelibro,
+                'guias_x_codigoslibros' => (int) $item->cantidad_guias,
+                'guias_x_pedidos' => 0, // se actualizará después
+                'sumatotal' => (int) $item->cantidad_guias // base inicial
+            ];
+        }
+        // Sumar valores desde pedidos
+        foreach ($pedidoAsesores as $item) {
+            $codigo = $item['codigo'];
+            if (isset($resultado_sumas[$codigo])) {
+                $resultado_sumas[$codigo]['guias_x_pedidos'] += $item['valor'];
+                $resultado_sumas[$codigo]['sumatotal'] += $item['valor'];
+            } else {
+                // Código que solo está en pedidos, no en guías
+                $resultado_sumas[$codigo] = [
+                    'codigo_liquidacion' => $codigo,
+                    'id_serie' => $item['id_serie'],
+                    'serie' => $item['nombre_serie'],
+                    'nombrelibro' => $item['nombrelibro'],
+                    'guias_x_codigoslibros' => 0,
+                    'guias_x_pedidos' => $item['valor'],
+                    'sumatotal' => $item['valor'],
+                ];
+            }
+        }
+        // Re-indexar como array simple
+        $resultado_final = array_values($resultado_sumas);
+
+        return [
+            'guias_codigos_libros' => $guias_codigos_libros,
+            'pedidoAsesores' => $pedidoAsesores,
+            'resultado_final' => $resultado_final
+        ];
+    }
+    public function reporteBodega_newGuias_OrganizarCodigos($request)
+    {
+        $Guias_Despachadas = $request->input('Guias_Array') ?? [];
+        $Textos_Despachados = $request->input('Textos_Array') ?? [];
+        $periodo = $request->input('periodo');
+        $serie = $request->input('serie');
+        $Guias_Resumen = [];
+        $Textos_Resumen = [];
+        // Extraer de Guias_Despachadas
+        foreach ($Guias_Despachadas as $guia) {
+            if (!empty($guia['codigo_liquidacion'])) {
+                $Guias_Resumen[] = [
+                    'codigo_texto_o_guia' => 'G' . $guia['codigo_liquidacion'],
+                    'cantidad_despachada' => $guia['sumatotal'] ?? 0
+                ];
+            }
+        }
+        // Extraer de Textos_Despachados
+        foreach ($Textos_Despachados as $texto) {
+            if (!empty($texto['codigo'])) {
+                $Textos_Resumen[] = [
+                    'codigo_texto_o_guia' => $texto['codigo'],
+                    'cantidad_despachada' => $texto['cantidad'] ?? 0
+                ];
+            }
+        }
+        // Crear mapa de guías: quitar la G inicial para emparejar
+        $Guias_Map = [];
+        foreach ($Guias_Resumen as $guia) {
+            $codigo_base = ltrim($guia['codigo_texto_o_guia'], 'G');
+            $Guias_Map[$codigo_base] = $guia;
+        }
+        // Crear el nuevo array ordenado
+        $ResumenGeneral = [];
+        $usados_en_guia = [];
+        // Recorrer textos y añadir su guía correspondiente si existe
+        foreach ($Textos_Resumen as $texto) {
+            $ResumenGeneral[] = $texto;
+            $codigo = $texto['codigo_texto_o_guia'];
+            if (isset($Guias_Map[$codigo])) {
+                $ResumenGeneral[] = $Guias_Map[$codigo];
+                $usados_en_guia[] = $Guias_Map[$codigo]['codigo_texto_o_guia'];
+            }
+        }
+        // Agregar guías que no se usaron aún (sin texto correspondiente)
+        foreach ($Guias_Resumen as $guia) {
+            if (!in_array($guia['codigo_texto_o_guia'], $usados_en_guia)) {
+                $ResumenGeneral[] = $guia;
+            }
+        }
+        // Extraer todos los códigos
+        $codigos = array_column($ResumenGeneral, 'codigo_texto_o_guia');
+        // Consultar los datos desde la tabla 1_4_cal_producto
+        $productos = DB::table('1_4_cal_producto')
+            ->select('pro_codigo', 'pro_reservar', 'pro_stock', 'pro_stockCalmed', 'pro_deposito', 'pro_depositoCalmed','gru_pro_codigo','pro_nombre')
+            ->whereIn('pro_codigo', $codigos)
+            ->get()
+            ->keyBy('pro_codigo');
+        // Enriquecer los datos en ResumenGeneral
+        foreach ($ResumenGeneral as &$item) {
+            $codigo = $item['codigo_texto_o_guia'];
+            if ($productos->has($codigo)) {
+                $producto = $productos[$codigo];
+                $item['pro_reservar'] = $producto->pro_reservar;
+                $item['pro_stock'] = $producto->pro_stock;
+                $item['pro_stockCalmed'] = $producto->pro_stockCalmed;
+                $item['pro_deposito'] = $producto->pro_deposito;
+                $item['pro_depositoCalmed'] = $producto->pro_depositoCalmed;
+                $item['gru_pro_codigo'] = $producto->gru_pro_codigo;
+                $item['pro_nombre'] = $producto->pro_nombre;
+            } else {
+                // En caso de que no se encuentre el producto, asignar null o 0
+                $item['pro_reservar'] = null;
+                $item['pro_stock'] = null;
+                $item['pro_stockCalmed'] = null;
+                $item['pro_deposito'] = null;
+                $item['pro_depositoCalmed'] = null;
+                $item['gru_pro_codigo'] = null;
+                $item['pro_nombre'] = null;
+            }
+        }
+        return [
+            'ResumenGeneral' => $ResumenGeneral,
+            'Guias_Array' => $Guias_Despachadas,
+            'Textos_Array' => $Textos_Despachados,
+            'periodo' => $periodo,
+            'serie' => $serie
+        ];
     }
     //FIN METODOS JEYSON
     //api:post/restaurarALiquidado_devueltos
