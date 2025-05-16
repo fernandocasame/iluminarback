@@ -3609,6 +3609,10 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
         $puntoVenta         = $request->input('puntoVenta');
         $puntoVentaActivos  = $request->input('puntoVentaActivos');
         $ventaDirecta       = $request->input('ventaDirecta');
+        $onlyCombos         = $request->input('onlyCombos');
+        if($onlyCombos == 1){
+            return $this->codigosRepository->reporteCombos($periodo);
+        }
         // Realizar la consulta
         $arrayCodigosActivos = CodigosLibros::select(
             'libros_series.codigo_liquidacion AS codigo',

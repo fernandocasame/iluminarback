@@ -1257,4 +1257,46 @@ class  CodigosRepository extends BaseRepository
             throw new \Exception("Error al guardar el historico stock new producto $pro_codigo");
         }
     }
+    public function reporteCombos($periodo){
+            // SELECT c.codigo_combo, c.combo, COUNT(*) AS cantidad_codigos
+        // FROM codigoslibros c
+        // WHERE c.prueba_diagnostica = '0'
+        // AND c.codigo_combo IS NOT NULL
+        // AND c.bc_periodo = '26'
+        // GROUP BY c.codigo_combo, c.combo;
+         $query = DB::select("SELECT 
+            sub.combo AS codigo, 
+            COUNT(DISTINCT sub.codigo_combo) AS cantidad,
+            SUM(sub.cantidad) AS total_codigos,
+            pr.codigos_combos,
+            pr.pro_nombre AS nombrelibro,
+            ls.idLibro,
+            v.det_ven_valor_u AS precio
+        FROM (
+            SELECT c.codigo_combo, c.combo, COUNT(*) AS cantidad
+            FROM codigoslibros c
+            WHERE c.prueba_diagnostica = '0'
+            AND c.codigo_combo IS NOT NULL
+            AND c.bc_periodo = '$periodo'
+            AND c.estado_liquidacion IN ('0', '1', '2')
+            GROUP BY c.codigo_combo, c.combo
+        ) AS sub
+        LEFT JOIN `1_4_cal_producto` pr ON pr.pro_codigo = sub.combo
+        LEFT JOIN libros_series ls ON ls.codigo_liquidacion = pr.pro_codigo
+        LEFT JOIN f_detalle_venta v ON v.pro_codigo = pr.pro_codigo
+        LEFT JOIN f_venta v2 ON v2.ven_codigo = v.ven_codigo 
+            AND v.id_empresa = v2.id_empresa 
+            AND v2.periodo_id = '$periodo'  -- Aseguramos que solo se tomen los precios del periodo específico
+        WHERE v2.periodo_id = '$periodo'  -- Filtro adicional para asegurar que se obtienen solo los datos del periodo correcto
+        GROUP BY sub.combo, pr.codigos_combos, pr.pro_nombre, ls.idLibro, v.det_ven_valor_u;
+
+        ");
+
+        foreach ($query as $key => $item) {
+            // Asegurarse de que cantidad y precio no sean nulos y luego realizar el cálculo y redondear a 2 decimales
+            $item->precio_total = round(($item->cantidad ?? 0) * ($item->precio ?? 0), 2);
+        }
+
+        return $query;
+    }
 }
