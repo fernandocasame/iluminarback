@@ -649,6 +649,53 @@ class AbonoController extends Controller
         AND fv.idtipodoc <> 17");
         return $query;
     }
+
+    public function getVentasXperioso(Request $request) {
+        $query = DB::select("
+            SELECT  
+                fv.ven_codigo,
+                ROUND(SUM(fdv.det_ven_valor_u * fdv.det_ven_cantidad), 2) AS total_venta,
+                ROUND(SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS total_no_devuelto,
+                ROUND(SUM(fdv.det_ven_valor_u * (fdv.det_ven_cantidad - fdv.det_ven_dev)), 2) AS total_venta_neta
+            FROM f_venta fv
+            JOIN f_detalle_venta fdv 
+                ON fdv.ven_codigo = fv.ven_codigo 
+                AND fv.id_empresa = fdv.id_empresa
+            WHERE fv.periodo_id = $request->periodo_id
+            AND fv.idtipodoc = 1
+            AND fv.est_ven_codigo <> 3
+            and fv.tip_ven_codigo <> 17
+            and fv.tip_ven_codigo <> 16
+            and fv.ven_desc_por < 100
+            GROUP BY fv.ven_codigo
+        ");
+
+        $query2 = DB::select("
+            SELECT  
+                fv.ven_codigo,
+                ROUND(SUM(fdv.det_ven_valor_u * fdv.det_ven_cantidad), 2) AS total_venta,
+                ROUND(SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS total_no_devuelto,
+                ROUND(SUM(fdv.det_ven_valor_u * (fdv.det_ven_cantidad - fdv.det_ven_dev)), 2) AS total_venta_neta
+            FROM f_venta fv
+            JOIN f_detalle_venta fdv 
+                ON fdv.ven_codigo = fv.ven_codigo 
+                AND fv.id_empresa = fdv.id_empresa
+            WHERE fv.periodo_id = $request->periodo_id
+            AND fv.idtipodoc IN (3, 4)
+            AND fv.est_ven_codigo <> 3
+            and fv.tip_ven_codigo <> 17
+            and fv.tip_ven_codigo <> 16
+            and fv.ven_desc_por < 100
+            GROUP BY fv.ven_codigo
+        ");
+
+        return [
+            'facturas' => $query,
+            'notas' => $query2
+        ];
+    }
+
+
     public function getClienteCobranzaxInstitucion(Request $request){
 
         $query = DB::SELECT("SELECT DISTINCT usu.* FROM f_venta fv
@@ -1637,7 +1684,7 @@ class AbonoController extends Controller
         
                 'idInstitucion' => null,
                 'institucion_id' => null,
-                'punto_venta' => null,
+                'punto_venta' => $base->punto_venta,
         
                 'subtotal_total' => $grupo->sum('subtotal_total'),
                 'descuento_total' => $grupo->sum('descuento_total'),

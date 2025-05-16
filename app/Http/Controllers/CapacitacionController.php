@@ -275,14 +275,11 @@ class CapacitacionController extends Controller
     public function getCapacitadores()
     {
         $query = DB::SELECT("SELECT u.idusuario,
-        CONCAT(u.nombres, ' ',u.apellidos) AS capacitador
-        FROM
-       usuario u
+        CONCAT(u.nombres, ' ',u.apellidos, ' - ', u.cedula) AS capacitador
+        FROM usuario u
        WHERE u.capacitador = '1'
        AND u.estado_idEstado = '1'
-       AND u.idusuario <> '70102'
-       AND u.idusuario <> '70102'
-       ");
+       AND u.idusuario <> '70102'");
         return $query;
     }
     //api:get/reporteCapacitacionesGrupal/datos

@@ -3587,6 +3587,7 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
     public function metodosGetCodigos(Request $request){
         if($request->reporteBodega)                             { return $this->reporteBodega($request); }
         if($request->reporteBodega_new)                         { return $this->reporteBodega_new($request); }
+        if($request->reporteVentaCodigos)                      { return $this->reporteVentaCodigos($request); }
         if($request->reporteBodegaCombos)                       { return $this->reporteBodegaCombos($request); }
         if($request->reporteBodegaCombos_new)                   { return $this->reporteBodegaCombos_new($request); }
         if($request->getCombos)                                 { return $this->codigosRepository->getCombos(); }
@@ -3600,6 +3601,7 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
     public function reporteBodega($request){
         $periodo            = $request->input('periodo');
         $activos            = $request->input('activos');
+        $activosNoCombos    = $request->input('activosNoCombos');
         $regalados          = $request->input('regalados');
         $bloqueados         = $request->input('bloqueados');
         $puntoVenta         = $request->input('puntoVenta');
@@ -3627,7 +3629,16 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
                       ->orWhere('codigoslibros.estado_liquidacion', '0')
                       ->orWhere('codigoslibros.estado_liquidacion', '2');
             });
-            // ->where('codigoslibros.estado', '<>', '2'); // Comparar como string si la columna es de tipo string
+            // ->whereNotNull('codigoslibros.codigo_combo'); // Comparar como string si la columna es de tipo string
+            // ->whereNull('codigoslibros.codigo_combo'); // Comparar como string si la columna es de tipo string
+        })
+        ->when($activosNoCombos, function ($query) {
+            $query->where(function ($query) {
+                $query->where('codigoslibros.estado_liquidacion', '1')
+                      ->orWhere('codigoslibros.estado_liquidacion', '0')
+                      ->orWhere('codigoslibros.estado_liquidacion', '2');
+            })
+            ->whereNull('codigoslibros.codigo_combo'); // Comparar como string si la columna es de tipo string
         })
         ->when($regalados, function ($query) {
             $query->where('codigoslibros.estado_liquidacion', '2')
@@ -3672,10 +3683,50 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
             $precio = $this->pedidosRepository->getPrecioXLibro($item->id_serie, $item->libro_idlibro, $item->area_idarea, $periodo, $item->year);
             $item->precio       = $precio;
             // Multiplicar el precio por la cantidad
-            $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
+            $item->precio_total = round($precio * $item->cantidad, 2);
+            // $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
         }
 
         return $arrayCodigosActivos;
+    }
+    //api:get/metodosGetCodigos?reporteVentaCodigos=1&periodo=26
+    public function reporteVentaCodigos($request){
+        $periodo            = $request->input('periodo');
+        $tipoReporte        = $request->input('tipoReporte');
+        $resultados = DB::table('f_venta as fv')
+            ->leftJoin('empresas as ep', 'ep.id', '=', 'fv.id_empresa')
+            ->leftJoin('f_detalle_venta as fdv', function ($join) {
+                $join->on('fdv.ven_codigo', '=', 'fv.ven_codigo')
+                    ->on('fdv.id_empresa', '=', 'fv.id_empresa');
+            })
+            ->leftJoin('1_4_cal_producto as pp', 'pp.pro_codigo', '=', 'fdv.pro_codigo')
+            ->select([
+                'fdv.pro_codigo as codigo',
+                'pp.pro_nombre as nombrelibro',
+                DB::raw('COALESCE(SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 0) as cantidad'),
+                DB::raw('MAX(fdv.det_ven_valor_u) as precio'),
+                DB::raw('COALESCE(SUM((fdv.det_ven_cantidad - fdv.det_ven_dev) * fdv.det_ven_valor_u), 0) as precio_total'),
+                'pp.ifcombo',
+                'pp.codigos_combos'
+            ])
+            ->when($tipoReporte == 0, function ($query) {
+              //todos
+            })
+            ->when($tipoReporte == 1, function ($query) {
+              //solo libros
+              $query->where('pp.ifcombo', '0');
+            })
+            ->when($tipoReporte == 2, function ($query) {
+              //solo combos
+              $query->where('pp.ifcombo', '1');
+            })
+            ->where('fv.periodo_id', '=', $periodo)
+            ->where('fv.est_ven_codigo', '<>', 3)
+            ->whereNotIn('fv.idtipodoc', [2, 16, 17])
+            ->groupBy('fdv.pro_codigo', 'pp.pro_nombre', 'pp.ifcombo', 'pp.codigos_combos')
+            ->get();
+        return $resultados;
+
     }
     //api:get/metodosGetCodigos?reporteBodegaCombos=1&periodo=25&combos=1
     public function reporteBodegaCombos($request){
@@ -3701,7 +3752,7 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
             'a.area_idarea',
             'p.codigos_combos',
             'p.ifcombo',
-            DB::raw('SUM(v.det_ven_cantidad) as cantidad'),
+            // DB::raw('SUM(v.det_ven_cantidad) as cantidad'),
             DB::raw('SUM(v.det_ven_dev) as cantidad_devuelta'),
             DB::raw('SUM(v.det_ven_cantidad) - SUM(v.det_ven_dev) as cantidad')
         )
@@ -3737,23 +3788,26 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
         $codigoBusqueda = $request->codigo;
         // $GuiasBodega   = $this->codigosRepository->getCodigosBodega(1,$periodo,0,4179);
         // return $GuiasBodega;
-        $val_pedido2 = DB::SELECT("SELECT DISTINCT p.id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor
-        FROM pedidos_val_area pv
-        LEFT JOIN area ar ON  pv.id_area = ar.idarea
-        LEFT JOIN series se ON pv.id_serie = se.id_serie
-        LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
-        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-        where p.tipo        = '1'
-        and p.id_periodo  = '$periodo'
-        AND p.estado        = '1'
-        AND p.estado_entrega = '2'
-        GROUP BY u.nombres ORDER BY u.nombres
-        ");
+        // $val_pedido2 = DB::SELECT("SELECT DISTINCT p.id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor
+        // FROM pedidos_val_area pv
+        // LEFT JOIN area ar ON  pv.id_area = ar.idarea
+        // LEFT JOIN series se ON pv.id_serie = se.id_serie
+        // LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        // LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        // where p.tipo        = '1'
+        // and p.id_periodo  = '$periodo'
+        // AND p.estado        = '1'
+        // AND p.estado_entrega = '2'
+        // GROUP BY u.nombres ORDER BY u.nombres
+        // ");
+        $val_pedido2 = DB::SELECT("SELECT u.idusuario as id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor from usuario u where id_group = '11'");
+
         foreach($val_pedido2 as $key11 => $itemAsesor){
             $guias = $this->codigosRepository->getLibrosAsesores($periodo,$itemAsesor->id_asesor);
             $resultado = [];
             //filtrar por el libro_id = 652 los libros
             $guiasPedidos = collect($guias)->where('codigo',$codigoBusqueda)->values();
+            //    $resultado = $guiasPedidos;
             if(count($guiasPedidos) == 0){
                 $GuiasBodega   = $this->codigosRepository->getCodigosBodega(1,$periodo,0,$itemAsesor->id_asesor);
                 //filtrar por codigo
@@ -3776,7 +3830,7 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
             }else{
                 $itemAsesor->totalguias = $resultado[0]->valor;
             }
-            ////ESCUELAS
+            //ESCUELAS
             $pedidos = $this->tr_institucionesAsesorPedidos($periodo,$itemAsesor->id_asesor);
             foreach($pedidos as $key8 => $itempedido){
                 $val_pedido = DB::table('pedidos_val_area as pv')
@@ -4985,7 +5039,8 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
             $precio = $this->pedidosRepository->getPrecioXLibro_new($item->id_serie, $item->libro_idlibro, $item->area_idarea, $periodo, $item->year);
             $item->precio       = $precio;
             // Multiplicar el precio por la cantidad
-            $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
+            $item->precio_total = round($precio * $item->cantidad, 2);
+            // $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
         }
 
         return $arrayCodigosActivos;
@@ -5051,16 +5106,17 @@ private function agruparPorCodigoPrimerValor($arrayOldValues) {
         $codigoBusqueda = $request->codigo;
         // $GuiasBodega   = $this->codigosRepository->getCodigosBodega(1,$periodo,0,4179);
         // return $GuiasBodega;
-        $val_pedido2 = DB::SELECT("SELECT DISTINCT p.id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor
-        FROM pedidos_val_area_new pv
-        LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
-        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-        where p.tipo        = '1'
-        and p.id_periodo  = '$periodo'
-        AND p.estado        = '1'
-        AND p.estado_entrega = '2'
-        GROUP BY u.nombres ORDER BY u.nombres
-        ");
+        // $val_pedido2 = DB::SELECT("SELECT DISTINCT p.id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor
+        // FROM pedidos_val_area_new pv
+        // LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        // LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        // where p.tipo        = '1'
+        // and p.id_periodo  = '$periodo'
+        // AND p.estado        = '1'
+        // AND p.estado_entrega = '2'
+        // GROUP BY u.nombres ORDER BY u.nombres
+        // ");
+        $val_pedido2 = DB::SELECT("SELECT u.idusuario as id_asesor, CONCAT(u.nombres,' ',u.apellidos) as asesor from usuario u where id_group = '11'");
         foreach($val_pedido2 as $key11 => $itemAsesor){
             $guias = $this->codigosRepository->getLibrosAsesores_new($periodo,$itemAsesor->id_asesor);
             $resultado = [];

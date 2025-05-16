@@ -26,6 +26,7 @@ use App\Repositories\Facturacion\DevolucionRepository;
 use App\Repositories\Facturacion\VentaRepository;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use App\Http\Controllers\_14ProductoController;
 
 class VentasController extends Controller
 {
@@ -93,7 +94,7 @@ class VentasController extends Controller
         FROM f_venta fv
         LEFT JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
         LEFT JOIN empresas em ON fpr.emp_id = em.id
-        LEFT JOIN pedidos pe ON fpr.idPuntoventa = pe.ca_codigo_agrupado
+        -- LEFT JOIN pedidos pe ON fpr.idPuntoventa = pe.ca_codigo_agrupado
         LEFT JOIN institucion ins ON fpr.id_ins_depacho = ins.idInstitucion
         LEFT JOIN usuario usa ON fpr.ven_cliente = usa.idusuario
         INNER JOIN usuario us ON fv.user_created = us.idusuario
@@ -957,6 +958,10 @@ class VentasController extends Controller
                     $this->finalizarDocumento($proform->id);
                     // $proform->prof_estado = 3;
                     // $proform->save();
+                    // SECCION PARA ACTUALIZAR STOCK
+                    $productoController = new _14ProductoController();
+                    // Llamar al método Mover_Stock_SoloTxt_Todo_A_DepositoCALMED
+                    $productoController->Mover_Stock_SoloTxt_Todo_A_DepositoCALMED();
                 DB::commit();
                 return response()->json(['message' => 'Anulación exitosa de la venta.'], 200);
             }catch(\Exception $e){
@@ -978,6 +983,10 @@ class VentasController extends Controller
                 'fecha_proceso_despacho'       => now(),
                 'observacionRegresarAPendiente' => null
             ]);
+            // SECCION PARA ACTUALIZAR STOCK
+            $productoController = new _14ProductoController();
+            // Llamar al método Mover_Stock_SoloTxt_Todo_A_DepositoCALMED
+            $productoController->Mover_Stock_SoloTxt_Todo_A_DepositoCALMED();
             return $venta;
         }
     }
@@ -2886,6 +2895,7 @@ class VentasController extends Controller
                     fdv.pro_codigo,
                     p.pro_nombre,
                     SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal,
+                     SUM( fdv.det_ven_dev) AS cantidadDevuelta,
                     fdv.det_ven_valor_u,
                     fdv.id_empresa
                 FROM f_detalle_venta fdv
@@ -2910,7 +2920,16 @@ class VentasController extends Controller
             $arrayDespachoBodega = [];
             // tipoInstitucion: 0 => institución venta directa; 1 => venta lista
             $tipoInstitucion = $request->tipoVenta == 1 ? 0 : 1;
-
+            $setTipoVenta = [];
+            if($tipoVenta == 1){
+                $setTipoVenta = [1];
+            }
+            if($tipoVenta == 2){
+                $setTipoVenta = [2];
+            }
+            if($tipoVenta == 3){
+                $setTipoVenta = [1,2];
+            }
 
             // Consulta despachados bodega directa
             if($tipoVenta == 1){
@@ -2932,8 +2951,7 @@ class VentasController extends Controller
             });
 
             // Consulta de Documentos Venta
-            $arrayDocumentosVenta = $this->ventasRepository->getVentasTipoVenta($request->periodo, $request->tipoVenta);
-
+            $arrayDocumentosVenta = $this->ventasRepository->getVentasTipoVenta($request->periodo, $setTipoVenta);
             // Convertir a colección y asegurar formato
             $arrayDocumentosVenta = collect($arrayDocumentosVenta)->map(function ($item) {
                 // Convertir a array asociativo si es objeto
@@ -2944,10 +2962,10 @@ class VentasController extends Controller
             });
             if($nuevo == 0){
                 // Obtener pedidos con contratos
-                $arrayPedidos = $this->ventasRepository->getProductosPedidos($periodo_id, $tipoVenta);
+                $arrayPedidos = $this->ventasRepository->getProductosPedidos($periodo_id, $setTipoVenta);
             }
             if($nuevo == 1){
-                $arrayPedidos = $this->ventasRepository->getProdutosPedidosNuevo($periodo_id, $tipoVenta);
+                $arrayPedidos = $this->ventasRepository->getProdutosPedidosNuevo($periodo_id, $setTipoVenta);
             }
             // Convertir a colección y asegurar formato
             $arrayPedidos = collect($arrayPedidos)->map(function ($item) {
@@ -2997,44 +3015,111 @@ class VentasController extends Controller
             return $result;
 
         }
-        if($request->Xasesor){
-            $query = DB::select("SELECT fv.institucion_id, fdv.*, p.pro_nombre, SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal
+
+
+    // Buscar asesores por periodo y empresa
+    if ($request->busquedaAsesorPeriodo) {
+        $query = DB::select("SELECT DISTINCT u.idusuario AS id_asesor,
+            CONCAT(u.nombres, ' ', u.apellidos) AS asesor
+            FROM f_venta fv
+            INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+            INNER JOIN usuario u ON i.asesor_id = u.idusuario
+            WHERE fv.periodo_id = ?
+            AND fv.id_empresa = ?
+            AND fv.est_ven_codigo <> 3
+            AND fv.institucion_id IS NOT NULL
+            AND fv.idtipodoc IN (1, 3, 4)",
+            [$request->periodo, $request->empresa]);
+    }
+
+    // Buscar ventas por asesor
+    if($request->Xasesor){
+        $query = DB::select("SELECT fv.institucion_id, fdv.*, p.pro_nombre, 
+            SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal, fv.tip_ven_codigo,
+            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
+            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
+            SUM( fdv.det_ven_dev) AS cantidadDevuelta,
+            i.asesor_id
+            FROM f_detalle_venta fdv
+            INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo
+            AND fv.id_empresa = fdv.id_empresa
+            INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
+            LEFT JOIN institucion i ON i.idInstitucion = fv.institucion_id
+            WHERE fv.periodo_id = ?
+            AND i.asesor_id = ?
+            AND fv.idtipodoc IN (1, 3, 4)
+            AND fv.est_ven_codigo <> 3
+            GROUP BY fdv.det_ven_codigo, p.pro_nombre",
+            [$request->periodo, $request->asesor]);
+    }
+
+
+        // Consulta para buscar instituciones y periodo
+        if ($request->busquedaInstitucionPeriodo) {
+            $query = DB::select("SELECT DISTINCT i.idInstitucion, i.nombreInstitucion
+                FROM f_venta fv
+                INNER JOIN institucion i ON fv.institucion_id = i.idInstitucion
+                WHERE fv.est_ven_codigo <> 3
+                AND fv.idtipodoc IN (1, 3, 4)
+                AND fv.periodo_id = ?
+                AND fv.id_empresa = ?",
+                [$request->periodo, $request->empresa]);
+        }
+
+        if ($request->Xinstitucion) {
+            $instituciones = explode(',', $request->institucion); // Soporte para múltiples instituciones
+            $placeholders = implode(',', array_fill(0, count($instituciones), '?'));
+            $query = DB::select("SELECT fdv.*, p.pro_nombre, SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal, fv.tip_ven_codigo,
+                ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
+                ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
+                SUM( fdv.det_ven_dev) AS cantidadDevuelta
                 FROM f_detalle_venta fdv
                 INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo
-                AND fv.id_empresa = fdv.id_empresa
+                    AND fv.id_empresa = fdv.id_empresa
                 INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
-                LEFT JOIN f_proforma fp ON fp.prof_id = fv.ven_idproforma
-                LEFT JOIN f_contratos_agrupados fca ON fca.ca_codigo_agrupado = fp.idPuntoventa
-                LEFT JOIN pedidos pdd ON pdd.ca_codigo_agrupado = fca.ca_codigo_agrupado
-                LEFT JOIN institucion i ON i.idInstitucion = pdd.id_institucion
-                WHERE fv.periodo_id = $request->periodo
-                AND fv.tip_ven_codigo = $request->tipoVenta
-                AND i.asesor_id= '$request->asesor'
-                AND fv.idtipodoc IN (1, 3, 4)
+                WHERE fv.periodo_id = ?
+                AND fv.id_empresa = ?
+                AND fv.institucion_id IN ($placeholders)
                 AND fv.est_ven_codigo <> 3
-                GROUP BY fdv.det_ven_codigo, p.pro_nombre;
-
-            ");
+                and fv.tip_ven_codigo <> 17
+                and fv.tip_ven_codigo <> 16
+                and fv.ven_desc_por < 100
+                GROUP BY fdv.det_ven_codigo, p.pro_nombre, fv.tip_ven_codigo, fv.id_empresa",
+                array_merge([$request->periodo, $request->empresa], $instituciones));
         }
-        if($request->busquedaInstitucionPeriodo){
-            $query = $this->tr_institucionesVentasPeriodo($request->periodo);
-        }
 
-        if($request->Xinstitucion){
-            $query = DB::select("SELECT fdv.*, p.pro_nombre, SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal
+        //buscar cliente y periodo
+        if($request->busquedaClientePeriodo){
+            $query = DB::select("SELECT DISTINCT v.ruc_cliente, CONCAT(u.nombres, '', u.apellidos) AS cliente FROM f_venta v
+                JOIN usuario u ON u.cedula = v.ruc_cliente
+                WHERE v.est_ven_codigo <> 3
+                AND v.idtipodoc IN (1, 3, 4)
+                AND v.periodo_id = ?
+                AND v.id_empresa = ?",
+                [$request->periodo, $request->empresa]);
+        }
+         if($request->XCliente){
+            $query = DB::select("SELECT fdv.*, p.pro_nombre, SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal, fv.tip_ven_codigo,
+            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad ), 2) AS precio,
+            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
+            SUM( fdv.det_ven_dev) AS cantidadDevuelta
             FROM f_detalle_venta fdv
             INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo
                 AND fv.id_empresa = fdv.id_empresa
             INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
             WHERE fv.periodo_id = $request->periodo
-            AND fv.tip_ven_codigo = $request->tipoVenta
-            AND fv.institucion_id = $request->institucion
-            AND fv.idtipodoc IN (1, 3, 4)
+            and fv.id_empresa = $request->empresa
+            AND fv.ruc_cliente = $request->cliente
+            -- AND fv.idtipodoc IN (1, 3, 4)
             AND fv.est_ven_codigo <> 3
+            and fv.tip_ven_codigo <> 17
+            and fv.tip_ven_codigo <> 16
+            and fv.ven_desc_por < 100
             GROUP BY fdv.det_ven_codigo, p.pro_nombre;
 
         ");
         }
+
 
         return $query;
     }

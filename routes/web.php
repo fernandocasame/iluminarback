@@ -1044,6 +1044,7 @@ Route::post('cobro_cheque_registro', 'AbonoController@cobro_cheque_registro');
 Route::get('get_facturasNotasxParametro', 'AbonoController@get_facturasNotasxParametro');
 Route::get('get_notasCreditoxParametro', 'AbonoController@get_notasCreditoxParametro');
 Route::get('get_facturasNotasAll', 'AbonoController@get_facturasNotasAll');
+Route::get('getVentasXperioso', 'AbonoController@getVentasXperioso');
 Route::get('getClienteCobranzaxInstitucion', 'AbonoController@getClienteCobranzaxInstitucion');
 Route::get('traerCobros', 'AbonoController@traerCobros');
 Route::get('getClienteLocalDocumentos', 'AbonoController@getClienteLocalDocumentos');
