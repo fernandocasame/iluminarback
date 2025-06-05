@@ -88,9 +88,9 @@ class DevolucionController extends Controller
 
         foreach ($proformas as $key => $proforma) {
             $detalleCombos = $this->devolucionRepository->detallePrefactura(
-                $proforma->ven_codigo, 
-                $proforma->id_empresa, 
-                $proforma->institucion_id, 
+                $proforma->ven_codigo,
+                $proforma->id_empresa,
+                $proforma->institucion_id,
                 1
             );
             $proformas[$key]->combos = count($detalleCombos);
@@ -1660,7 +1660,7 @@ class DevolucionController extends Controller
 
                 // Actualizar tabla f_detalle_venta
                 $modificados['f_detalle_venta'] = array_merge($modificados['f_detalle_venta'], $this->actualizarDetalleVenta($libro, $empresaId));
-                
+
                 // Actualizar tabla codigoslibros_devolucion_son
                 $modificados['codigoslibros_devolucion_son'] = array_merge($modificados['codigoslibros_devolucion_son'], $this->actualizarCodigosLibrosDevolucionSon($libro, $empresaId, $iDdocumentoDev, $documentoDev));
 
@@ -2010,12 +2010,12 @@ class DevolucionController extends Controller
             'nuevo_id_cliente' => 'required|integer',
             'usuario' => 'required|integer'
         ]);
-    
+
         $codigoDevolucion = $request->codigo_devolucion;
         $nuevoIdCliente = $request->nuevo_id_cliente;
         $usuario = $request->usuario;
         $observacion = $request->observacion;
-    
+
         try {
             DB::transaction(function () use ($codigoDevolucion, $nuevoIdCliente, $usuario, $observacion) {
 
@@ -2032,11 +2032,11 @@ class DevolucionController extends Controller
                 $header = CodigosLibrosDevolucionHeader::where('codigo_devolucion', $codigoDevolucion)
                     ->where('estado', 1)
                     ->first();
-    
+
                 if (!$header) {
                     throw new \Exception('No se encontró el código de devolución.');
                 }
-    
+
                 $header->id_cliente = $nuevoIdCliente;
                 $header->intercambio_cliente = 1;
                 $header->fecha_intercambio_cliente = now();
@@ -2045,28 +2045,28 @@ class DevolucionController extends Controller
                 if (!$header->save()) {
                     throw new \Exception('Error al actualizar la cabecera de devolución.');
                 }
-    
+
                 // Actualizar en codigoslibros_devolucion_son
                 $updatedSon = CodigosLibrosDevolucionSon::where('codigoslibros_devolucion_id', $header->id)
                     ->update(['id_cliente' => $nuevoIdCliente]);
-    
+
                 // Actualizar en codigoslibros_devolucion_header_facturador solo si existen registros
                 if (CodigosLibrosDevolucionHeaderFacturador::where('codigoslibros_devolucion_header_id', $header->id)->exists()) {
                     CodigosLibrosDevolucionHeaderFacturador::where('codigoslibros_devolucion_header_id', $header->id)
                         ->update(['id_cliente' => $nuevoIdCliente]);
                 }
-    
+
                 // Validar que la actualización en `codigoslibros_devolucion_son` se realizó correctamente
                 if ($updatedSon === false) {
                     throw new \Exception('No se pudo actualizar todos los registros correctamente.');
                 }
             });
-    
+
             return response()->json([
                 'message' => 'Cliente actualizado correctamente.',
                 'status' => 1
             ]);
-    
+
         } catch (\Exception $e) {
             return response()->json([
                 'message' => $e->getMessage(),
@@ -2075,9 +2075,9 @@ class DevolucionController extends Controller
             ]);
         }
     }
-    
-    
-    
+
+
+
     public function InstitucionesCambio(Request $request)
     {
         $request->validate([
@@ -2088,7 +2088,7 @@ class DevolucionController extends Controller
 
         $query = DB::table('institucion as i')
             ->leftJoin('ciudad as c', 'i.ciudad_id', '=', 'c.idciudad')
-            ->select('i.idInstitucion', 'i.nombreInstitucion', 'i.ruc', 'i.email', 
+            ->select('i.idInstitucion', 'i.nombreInstitucion', 'i.ruc', 'i.email',
                     'i.telefonoInstitucion', 'i.direccionInstitucion', 'c.nombre as ciudad')
             ->when($busqueda, function ($query, $busqueda) {
                 return $query->where('i.nombreInstitucion', 'LIKE', "%$busqueda%");

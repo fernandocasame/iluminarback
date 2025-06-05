@@ -12,7 +12,7 @@ class User extends Authenticatable implements Auditable
 {
     use HasFactory, Notifiable;
     use \OwenIt\Auditing\Auditable;
-
+    
     /**
      * The attributes that are mass assignable.
      *
@@ -21,8 +21,8 @@ class User extends Authenticatable implements Auditable
     protected $table = 'usuario';
     protected $primaryKey = 'idusuario';
     protected $fillable = [
-        'nombres', 'apellidos', 'name_usuario', 'email', 'password','cedula','id_group','remember_token','session_id','estado_idEstado'
-
+        'nombres', 'apellidos', 'name_usuario', 'email', 'password','cedula','id_group','remember_token','session_id','estado_idEstado','capacitador'
+     
 
     ];
     protected $rememberTokenName = false;
@@ -35,7 +35,6 @@ class User extends Authenticatable implements Auditable
      */
     protected $hidden = [
         'password',
-        'password2',
         'remember_token',
     ];
 

@@ -14,22 +14,22 @@ use App\Models\SeguimientoMuestra;
 
 class SeguimientoInstitucionController extends Controller
 {
-      
+
     public function makeid(){
         $characters = '123456789abcdefghjkmnpqrstuvwxyz';
         $charactersLength = strlen($characters);
-   
+
         $randomString = '';
         for ($i = 0; $i < 5; $i++) {
             for ($i = 0; $i < 16; $i++) {
                 $randomString .= $characters[rand(0, $charactersLength - 1)];
             }
             return $randomString;
-      
-        
-         }   
+
+
+         }
     }
-   
+
     //para traer el detalle de las muestras
     //api::get/muestraDetalle
     public function muestraDetalle(Request $request){
@@ -41,9 +41,9 @@ class SeguimientoInstitucionController extends Controller
     }
 
     public function traerPeriodo($institucion_id){
-        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = ( 
+        $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo , periodoescolar AS descripcion FROM periodoescolar WHERE idperiodoescolar = (
             SELECT  pir.periodoescolar_idperiodoescolar as id_periodo
-            from institucion i,  periodoescolar_has_institucion pir         
+            from institucion i,  periodoescolar_has_institucion pir
             WHERE i.idInstitucion = pir.institucion_idInstitucion
             AND pir.id = (SELECT MAX(phi.id) AS periodo_maximo FROM periodoescolar_has_institucion phi
             WHERE phi.institucion_idInstitucion = i.idInstitucion
@@ -76,14 +76,21 @@ class SeguimientoInstitucionController extends Controller
             }
         }
         else{
-            $asesores = DB::SELECT("SELECT DISTINCT u.idusuario,u.cedula, CONCAT(u.nombres, ' ', u.apellidos) as vendedor
-            
-            FROM usuario u, institucion i
+            $asesores = DB::SELECT("SELECT  u.idusuario,u.cedula, CONCAT(u.nombres, ' ', u.apellidos) as vendedor
+
+            FROM usuario u
             WHERE u.id_group = '11'
-            AND i.vendedorInstitucion = u.cedula
             AND u.estado_idEstado  ='1'
             ORDER BY u.apellidos ASC
             ");
+            // $asesores = DB::SELECT("SELECT DISTINCT u.idusuario,u.cedula, CONCAT(u.nombres, ' ', u.apellidos) as vendedor
+
+            // FROM usuario u, institucion i
+            // WHERE u.id_group = '11'
+            // AND i.vendedorInstitucion = u.cedula
+            // AND u.estado_idEstado  ='1'
+            // ORDER BY u.apellidos ASC
+            // ");
             return $asesores;
         }
     }
@@ -95,7 +102,7 @@ class SeguimientoInstitucionController extends Controller
         $seguimiento = Agenda::findOrFail($request->id);
         $seguimiento->estado = "1";
         $seguimiento->save();
-        
+
      }
 
      //para traer los registros pendientes de la agenda
@@ -110,7 +117,7 @@ class SeguimientoInstitucionController extends Controller
         AND u.id_group = '11'
         AND a.id_usuario = '$asesor'
         AND a.estado = '0'
-        AND a.estado_institucion_temporal = '0' 
+        AND a.estado_institucion_temporal = '0'
         ORDER BY a.id DESC");
         return $registros;
     }
@@ -124,7 +131,7 @@ class SeguimientoInstitucionController extends Controller
         AND u.id_group = '11'
         AND a.id_usuario = '$asesor'
         AND a.estado = '0'
-        AND a.estado_institucion_temporal = '1' 
+        AND a.estado_institucion_temporal = '1'
         ORDER BY a.id DESC");
         return $registros;
     }
@@ -132,28 +139,28 @@ class SeguimientoInstitucionController extends Controller
     //api::get>>/asesor/seguimiento
     public function visitas(Request $request){
 
-  
-        if($request->muestra){    
+
+        if($request->muestra){
             $muestras = $this->listadoMuestras($request->institucion_id,$request->asesor_id,$request->periodo_id,$request->nombreInstitucion);
             return $muestras;
         }
-       
+
         else{
             $seguimiento = $this->listadoSeguimiento($request->institucion_id,$request->asesor_id,$request->periodo_id,$request->nombreInstitucion);
             return $seguimiento;
         }
-   
+
     }
     //para eliminar la visita / capacitacion/presentacion
      public function eliminar(Request $request){
         $seguimiento = SeguimientoInstitucion::findOrFail($request->id);
         $seguimiento->estado = "2";
         $seguimiento->save();
-        
+
      }
     //para guardar la institucion
     public function GuardarInstitucionTemporal(Request $request){
-  
+
         //obtener el periodo de la region
         // $buscarPeriodo = $this->periodosActivosIndividual($request->region);
         // $periodo = $buscarPeriodo[0]->idperiodoescolar;
@@ -226,20 +233,20 @@ class SeguimientoInstitucionController extends Controller
                 $agenda->fecha_que_visita  = $request->fecha_que_visita;
                 $agenda->usuario_editor = $request->usuario_editor;
             }
-            
+
         }else{
             $agenda = new Agenda();
             $agenda->usuario_creador = $request->usuario_editor;
         }
         //si hace los cambios el administrador
-        
+
         //si crean una insitucion temporal
         if($request->estado_institucion_temporal == 1){
             $agenda->periodo_id = $request->periodo_id_temporal;
             $agenda->institucion_id_temporal = $request->institucion_id_temporal;
             $agenda->nombre_institucion_temporal = $request->nombreInstitucion;
             $agenda->institucion_id = "";
-        } 
+        }
         if($request->estado_institucion_temporal == 0){
             $agenda->institucion_id = $request->institucion_id;
             $agenda->institucion_id_temporal = "";
@@ -249,7 +256,7 @@ class SeguimientoInstitucionController extends Controller
             if($buscarPeriodo["status"] == "1"){
                 $obtenerPeriodo = $buscarPeriodo["periodo"][0]->periodo;
                 $agenda->periodo_id = $obtenerPeriodo;
-                
+
             }
         }
         $agenda->id_usuario = $request->idusuario;
@@ -270,10 +277,10 @@ class SeguimientoInstitucionController extends Controller
         $agenda->save();
         //guardar en caso que sea otra editorial
         if($request->otraEditorial == "true"){
-        
+
             //para editar
             if( $request->id != 0 ){
-               
+
                $validar = DB::SELECT("SELECT * FROM  institucion_fuera_prolipa where  asesor_planificacion_id = '$agenda->id'");
                if(count($validar) == 0){
                 $this->guardarInstitucionFueraProlipa($request->nombre_editorial,$request->idusuario,$agenda->id,$request->estado_institucion_temporal,$agenda->periodo_id,$request->institucion_id_temporal,$request->nombreInstitucion,$request->institucion_id);
@@ -290,7 +297,7 @@ class SeguimientoInstitucionController extends Controller
                             'institucion_id' =>  "",
                         ]);
                     }
-        
+
                     if($request->estado_institucion_temporal == 0){
                         DB::table('institucion_fuera_prolipa')
                         ->where('asesor_planificacion_id', $agenda->id)
@@ -305,11 +312,11 @@ class SeguimientoInstitucionController extends Controller
                     }
                }
             }else{
-          
+
                 $this->guardarInstitucionFueraProlipa($request->nombre_editorial,$request->idusuario,$agenda->id,$request->estado_institucion_temporal,$agenda->periodo_id,$request->institucion_id_temporal,$request->nombreInstitucion,$request->institucion_id);
             }
-        }  
-        return 
+        }
+        return
         $agenda;
     }
 
@@ -332,7 +339,7 @@ class SeguimientoInstitucionController extends Controller
            $otra_institucion->institucion_id = $institucion_id;
            $otra_institucion->institucion_id_temporal = "";
            $otra_institucion->nombre_institucion_temporal = "";
-           
+
        }
        $otra_institucion->save();
     }
@@ -340,11 +347,11 @@ class SeguimientoInstitucionController extends Controller
 
 
     public function guardarSeguimiento(Request $request){
-        
+
 
         //para editar el seguimiento
         if($request->id > 0){
-           
+
             $seguimiento = SeguimientoInstitucion::findOrFail($request->id);
             $seguimiento->fecha_genera_visita   = $request->fecha_genera_visita;
             $seguimiento->observacion           = $request->observacion;
@@ -364,41 +371,41 @@ class SeguimientoInstitucionController extends Controller
                 $seguimiento->nombre_institucion_temporal = $request->nombreInstitucion;
                 $seguimiento->institucion_id_temporal = $request->institucion_id;
                 $seguimiento->institucion_id           = "";
-             
+
                 }else{
                     $seguimiento->nombre_institucion_temporal = "";
                     $seguimiento->institucion_id_temporal = "";
                     $seguimiento->institucion_id           = $request->institucion_id;
-            
+
                 }
             $seguimiento->save();
             //para guardar el seguimiento de la visita
            }else{
-               
+
                $encontrarNumeroVisita = $this->listadoSeguimientoTipo($request->institucion_id,$request->asesor_id,$request->periodo_id,$request->tipo_seguimiento,$request->nombreInstitucion);
-          
+
                 if($encontrarNumeroVisita["status"] == 0){
                  $contador = 1;
                 }else{
                     $contador = $encontrarNumeroVisita["datos"][0]->num_visita+1;
-            
+
                 }
-               
-               
+
+
                 $seguimiento = new SeguimientoInstitucion;
                 $seguimiento->num_visita   = $contador;
                 $seguimiento->fecha_genera_visita   = $request->fecha_genera_visita;
                 if($request->observacion == "null"){
-                    $seguimiento->observacion = "";    
+                    $seguimiento->observacion = "";
                 }else{
-                    $seguimiento->observacion = $request->observacion;   
+                    $seguimiento->observacion = $request->observacion;
                 }
-               
+
                 $seguimiento->asesor_id                      = $request->asesor_id;
                 $seguimiento->tipo_seguimiento               = $request->tipo_seguimiento;
                 $seguimiento->periodo_id                     = $request->periodo_id;
                 $seguimiento->opciones                       = $request->opciones;
-              
+
                 //si crean una insitucion temporal
 
                   //comprobar que es una institucion fuera de prolipa
@@ -419,7 +426,7 @@ class SeguimientoInstitucionController extends Controller
                     $seguimiento->estado_institucion_temporal    = '0';
                 }
 
-              
+
                if($request->admin){
                    $seguimiento->usuario_editor  = $request->usuario_editor;
                }
@@ -435,7 +442,7 @@ class SeguimientoInstitucionController extends Controller
 
 
     public function listadoSeguimiento($institucion_id,$asesor_id,$periodo_id,$nombreInstitucion){
-        
+
         //comprobar que es una institucion fuera de prolipa
         $validar = DB::SELECT("SELECT * FROM seguimiento_institucion_temporal t
         WHERE t.institucion_temporal_id = '$institucion_id'
@@ -445,7 +452,7 @@ class SeguimientoInstitucionController extends Controller
 
 
         if(count($validar) >0){
-          
+
             $visitas = DB::SELECT("SELECT  s.*,i.nombreInstitucion FROM seguimiento_cliente s
             LEFT JOIN institucion i ON s.institucion_id = i.idInstitucion
             WHERE s.institucion_id_temporal = '$institucion_id'
@@ -455,7 +462,7 @@ class SeguimientoInstitucionController extends Controller
             ORDER BY s.id DESC
             ");
         }else{
-       
+
             $visitas = DB::SELECT("SELECT  s.*,i.nombreInstitucion FROM seguimiento_cliente s
             LEFT JOIN institucion i ON s.institucion_id = i.idInstitucion
             WHERE s.institucion_id = '$institucion_id'
@@ -464,20 +471,20 @@ class SeguimientoInstitucionController extends Controller
             AND s.estado <> 2
             ORDER BY s.id DESC
             ");
-        } 
-      
+        }
+
 
         if(count($visitas) == 0){
             return ["status" => "0", "message" => "No hay  seguimiento"];
         }else{
             return $visitas;
         }
-       
+
     }
 
-    
+
     public function listadoMuestras($institucion_id,$asesor_id,$periodo_id,$nombreInstitucion){
-  
+
 
         $validar = DB::SELECT("SELECT * FROM seguimiento_institucion_temporal t
         WHERE t.institucion_temporal_id = '$institucion_id'
@@ -501,7 +508,7 @@ class SeguimientoInstitucionController extends Controller
             AND s.periodo_id = '$periodo_id'
             ORDER BY s.muestra_id DESC
             ");
-            
+
         }
 
         if(count($visitas) == 0){
@@ -509,7 +516,7 @@ class SeguimientoInstitucionController extends Controller
         }else{
             return $visitas;
         }
-       
+
     }
 
     public function listadoSeguimientoTipo($institucion_id,$asesor_id,$periodo_id,$tipo,$nombreInstitucion){
@@ -519,7 +526,7 @@ class SeguimientoInstitucionController extends Controller
         AND nombre_institucion = '$nombreInstitucion'
         AND estado = '1'
         ");
-   
+
 
         if(count($validar) >0){
             $visitas = DB::SELECT("SELECT  s.* FROM seguimiento_cliente s
@@ -531,7 +538,7 @@ class SeguimientoInstitucionController extends Controller
             ORDER BY s.id DESC
             ");
         }else{
-        
+
             $visitas = DB::SELECT("SELECT  s.* FROM seguimiento_cliente s
             WHERE s.institucion_id = '$institucion_id'
             AND s.asesor_id = '$asesor_id'
@@ -540,16 +547,16 @@ class SeguimientoInstitucionController extends Controller
             AND s.estado <> 2
             ORDER BY s.id DESC
             ");
-            
+
         }
-      
+
 
         if(count($visitas) == 0){
             return ["status" => "0", "message" => "No hay  seguimiento"];
         }else{
             return ["status" => "1", "message" => "Si hay  seguimiento","datos" => $visitas];
         }
-       
+
     }
 
     public function listadoSeguimientoMuestra($institucion_id,$asesor_id,$periodo_id){
@@ -565,11 +572,11 @@ class SeguimientoInstitucionController extends Controller
         }else{
             return ["status" => "1", "message" => "No hay  seguimiento","datos" => $visitas];
         }
-       
+
     }
 
 
- 
+
     public function store(Request $request)
     {
         //
@@ -584,7 +591,7 @@ class SeguimientoInstitucionController extends Controller
         ];
     }
     public function ReporteVisitaAsesores(Request $request){
-        $asesores = DB::SELECT("SELECT  CONCAT(u.apellidos, ' ', u.nombres) AS asesor ,u.idusuario 
+        $asesores = DB::SELECT("SELECT  CONCAT(u.apellidos, ' ', u.nombres) AS asesor ,u.idusuario
         FROM usuario u
         WHERE u.id_group = '11'
         AND u.estado_idEstado = '1'
@@ -593,7 +600,7 @@ class SeguimientoInstitucionController extends Controller
         $data = [];
         foreach($asesores as $key => $item){
             $conteoAgenda = DB::SELECT("SELECT  COUNT(c.id) AS conteo
-            FROM agenda_usuario c 
+            FROM agenda_usuario c
             WHERE c.id_usuario = '$item->idusuario'
             AND c.estado <> '2'
             AND c.startDate BETWEEN '$request->fromDate' AND '$request->toDate'
@@ -649,5 +656,111 @@ class SeguimientoInstitucionController extends Controller
     public function destroy($id)
     {
         //
+    }
+    //api:get/getReporteAsesores
+    public function getReporteAsesores(Request $request){
+        $unirArrays                 = [];
+        $institucionesProlipa       = [];
+        $institucionesTemporales    = [];
+        //prolipa
+        $institucionesProlipa       = $this->getCapacitaciones(0,$request->fromDate,$request->toDate);
+        //temporales
+        $institucionesTemporales    = $this->getCapacitaciones(1,$request->fromDate,$request->toDate);
+        $unirArrays                 = array_merge(array($institucionesProlipa),array($institucionesTemporales));
+        $coleccionUnir              = collect($unirArrays);
+        //===========TRAER TODO==================
+        if($request->todo)          { return $coleccionUnir->flatten(10); }
+        //============PROCESO INSTITUCIONES PROLIPA======================
+            // Convertir los datos en una colección de Laravel
+            $colecciónProlipa       = collect($institucionesProlipa);
+            // Agrupar los datos por institucion_id y contar la cantidad de elementos en cada grupo
+            $datosAgrupadosConCantidadProlipa = $colecciónProlipa->groupBy('institucion_id')->map(function ($grupo) {
+                return [
+                    'cantidad'  => $grupo->count(),
+                    'datos'     => $grupo,
+                ];
+            });
+
+            $datosProlipa       = $datosAgrupadosConCantidadProlipa->values();
+            $resultado          = [];
+            $resultadoProlipa   = [];
+            $resultadoTemporales = [];
+        //==========FIN PROCESO INSTITUCIONES PROLIPA======================
+        //==========PROCESO INSTITUCIONES TEMPORALES=======================
+            // Convertir los datos en una colección de Laravel
+            $colecciónTemporales       = collect($institucionesTemporales);
+            // Agrupar los datos por institucion_id y contar la cantidad de elementos en cada grupo
+            $datosAgrupadosConCantidadTemporales = $colecciónTemporales->groupBy('institucion_id_temporal')->map(function ($grupo) {
+                return [
+                    'cantidad' => $grupo->count(),
+                    'datos'    => $grupo,
+                ];
+            });
+            $datosTemporales     = $datosAgrupadosConCantidadTemporales->values();
+            $resultadoTemporales = [];
+        //==========FIN PROCESO INSTITUCIONES TEMPORALES=======================
+        //recorrer con un foreach para colocar la cantidad dentro de cada objeto
+        $resultadoProlipa       = $this->procesoParticionar($datosProlipa,0);
+        $resultadoTemporales    = $this->procesoParticionar($datosTemporales,1);
+        $resultado              = array_merge($resultadoProlipa,$resultadoTemporales);
+        return $resultado;
+    }
+    public function getCapacitaciones($tipo,$fromDate,$toDate){
+        $query = DB::table('agenda_usuario as au')
+        ->selectRaw("CONCAT(u.nombres, ' ', u.apellidos) AS asesor,
+            au.title,
+            au.startDate,
+            au.endDate,
+            au.url AS observaciones,
+            au.periodo_id,
+            au.institucion_id,
+            au.institucion_id_temporal,
+            au.nombre_institucion_temporal,
+            au.opciones,
+            t.nombreInstitucion,
+            pe.descripcion AS cicloEscolar,
+            CASE
+                WHEN au.estado = 0 THEN 'Pendiente'
+                WHEN au.estado = 1 THEN 'Finalizado'
+                WHEN au.estado = 2 THEN 'Desactivado'
+            END AS estadoAgenda,
+            IF(au.url = 'null' OR au.url IS NULL, '', au.url) AS observaciones2,
+            IF(au.estado_institucion_temporal = '1', 'Temporal', 'Prolipa') AS tipo,
+            IF(au.estado_institucion_temporal = '1', au.nombre_institucion_temporal, t.nombreInstitucion) AS nombreInstitucion,
+            IF(pe.region_idregion = '1', 'Sierra', 'Costa') AS region,
+            au.fecha_que_visita")
+        ->leftJoin('usuario as u', 'au.id_usuario', '=', 'u.idusuario')
+        ->leftJoin('sys_group_users as su', 'u.id_group', '=', 'su.id')
+        ->leftJoin('institucion as t', 'au.institucion_id', '=', 't.idInstitucion')
+        ->leftJoin('periodoescolar as pe', 'au.periodo_id', '=', 'pe.idperiodoescolar')
+        // ->where('au.periodo_id', '>', 21)
+        ->where('au.estado', '<>', '2')
+        ->whereBetween('au.startDate', [$fromDate, $toDate]);
+        if($tipo == 0){ $resultado = $query->where('au.institucion_id', '>', 0); }
+        if($tipo == 1){ $resultado = $query->Where('au.institucion_id_temporal', '>', 0); }
+        return $resultado->get();
+    }
+    public function procesoParticionar($arrayCapacitaciones,$tipo){
+        $resultado = [];
+        foreach($arrayCapacitaciones as $key => $item){
+            $resultado[$key] = [
+                "cantidad"                       => $item["cantidad"],
+                "asesor"                         => $item["datos"][0]->asesor,
+                 "title"                         => $item["datos"][0]->title,
+                 "startDate"                     => $item["datos"][0]->startDate,
+                 "endDate"                       => $item["datos"][0]->endDate,
+                 "observaciones"                 => $item["datos"][0]->observaciones,
+                 "periodo_id"                    => $item["datos"][0]->periodo_id,
+                 "institucion_id"                => $item["datos"][0]->institucion_id,
+                 "institucion_id_temporal"       => $item["datos"][0]->institucion_id_temporal,
+                 "nombre_institucion_temporal"   => $item["datos"][0]->nombre_institucion_temporal,
+                 "opciones"                      => $item["datos"][0]->opciones,
+                 "nombreInstitucion"             => $tipo == 0 ? $item["datos"][0]->nombreInstitucion : $item["datos"][0]->nombre_institucion_temporal,
+                 "cicloEscolar"                  => $item["datos"][0]->cicloEscolar,
+                 "estadoAgenda"                  => $item["datos"][0]->estadoAgenda,
+                 "tipo"                          => $tipo == 0 ? "Prolipa" : "Temporal",
+            ];
+        }
+        return $resultado;
     }
 }

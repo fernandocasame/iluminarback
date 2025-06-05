@@ -15,15 +15,15 @@ class ContenidoController extends Controller
      */
     public function index(Request $request)
     {
-    
+
         if($request->busqueda == 'asignatura'){
 
-           
+
             $contenido = DB::SELECT("SELECT contenido.idcontenido,contenido.nombre,contenido.url,contenido.unidad,
             contenido.file_ext,contenido.updated_at,asignatura.idasignatura,asignatura.nombreasignatura as asignatura
-            FROM contenido 
-            join asignatura on contenido.idasignatura = asignatura.idasignatura 
-            WHERE contenido.idasignatura IS NOT NULL 
+            FROM contenido
+            join asignatura on contenido.idasignatura = asignatura.idasignatura
+            WHERE contenido.idasignatura IS NOT NULL
             AND contenido.estado = '1'
             AND asignatura.nombreasignatura LIKE '%$request->razonBusqueda%'
             ORDER BY contenido.updated_at DESC
@@ -31,8 +31,8 @@ class ContenidoController extends Controller
             if(count($contenido) == 0){
                 return ["status" => "0", "message" => "No hay contenidos con ese criterio"];
             }
-         
-            
+
+
 
             foreach ($contenido as $key => $post) {
                     try {
@@ -69,9 +69,9 @@ class ContenidoController extends Controller
 
             $contenido = DB::SELECT("SELECT contenido.idcontenido,contenido.nombre,contenido.url,contenido.unidad,
             contenido.file_ext,contenido.updated_at,asignatura.idasignatura,asignatura.nombreasignatura as asignatura
-            FROM contenido 
-            join asignatura on contenido.idasignatura = asignatura.idasignatura 
-            WHERE contenido.idasignatura IS NOT NULL 
+            FROM contenido
+            join asignatura on contenido.idasignatura = asignatura.idasignatura
+            WHERE contenido.idasignatura IS NOT NULL
             AND contenido.estado = '1'
             AND contenido.nombre LIKE '%$request->razonBusqueda%'
             ORDER BY contenido.updated_at DESC
@@ -80,7 +80,7 @@ class ContenidoController extends Controller
             if(count($contenido) == 0){
                 return ["status" => "0", "message" => "No hay contenidos con ese criterio"];
             }
-           
+
             foreach ($contenido as $key => $post) {
                     try {
                         $respuesta = DB::SELECT("SELECT temas.id,temas.nombre_tema FROM temas_has_contenido JOIN temas ON temas.id = temas_has_contenido.temas_id WHERE temas_has_contenido.contenido_idcontenido = ? ",[$post->idcontenido]);
@@ -111,7 +111,7 @@ class ContenidoController extends Controller
             return $data;
 
         }
-        
+
         else{
 
             $contenido = DB::SELECT("CALL `getContenido` ();");
@@ -142,9 +142,9 @@ class ContenidoController extends Controller
                 }
             }
             return $data;
-        
+
         }
-      
+
     }
 
     public function setContenido(Request $request){
@@ -171,7 +171,7 @@ class ContenidoController extends Controller
                 'url' => $url,
                 'file_ext' => $ext
             ];
-            
+
         }else{
             $file = $request->file('archivo');
             //RUTA LINUX
@@ -198,7 +198,7 @@ class ContenidoController extends Controller
      */
     public function create()
     {
-        
+
     }
 
     /**
@@ -208,7 +208,7 @@ class ContenidoController extends Controller
      * @return \Illuminate\Http\Response
      */
     //
-    
+
     public function store(Request $request)
     {
         $datosValidados=$request->validate([
@@ -255,7 +255,7 @@ class ContenidoController extends Controller
         //
     }
 
-    
+
     public function teletareasunidades($id_unidad)
     {
         $teletareas = DB::SELECT("SELECT * FROM contenido c, temas_has_contenido tc, temas t WHERE c.idcontenido = tc.contenido_idcontenido AND tc.temas_id = t.id AND t.id_unidad = $id_unidad");
@@ -278,7 +278,7 @@ class ContenidoController extends Controller
 
         return $teletareas;
     }
-   
+
     /**
      * Show the form for editing the specified resource.
      *

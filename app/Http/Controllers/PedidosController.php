@@ -2016,6 +2016,7 @@ class PedidosController extends Controller
                 'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
                 'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
                 'anticipo_global'                => $item->anticipo_global,
+                'convenioAnulado'                => $item->convenioAnulado,
             ];
         }
         return $response;
@@ -2109,6 +2110,7 @@ class PedidosController extends Controller
                     'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
                     'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
                     'anticipo_global'                => $item->anticipo_global,
+                    'convenioAnulado'                => $item->convenioAnulado,
                 ];
             }
             return $datosMostrar;
@@ -2175,6 +2177,8 @@ class PedidosController extends Controller
         WHERE contrato_generado = '$contrato'
         LIMIT 1
         ");
+
+
         return $pedidos;
     }
     //api:get/getConvenio?pedido=1540
@@ -8295,5 +8299,38 @@ class PedidosController extends Controller
             ]
         ]);
     }
-
+    //api:post/metodosPostPedidos
+    public function metodosPostPedidos(Request $request){
+        if($request->guardarTabAnticipo == 1){ return $this->guardarTabAnticipo($request); }
+    }
+    //api:post/metodosPostPedidos?guardarTabAnticipo=1
+    public function guardarTabAnticipo(Request $request){
+        $id_pedido          = $request->id_pedido;
+        $ifanticipo         = $request->ifanticipo;
+        $anticipoAsesor     = $request->anticipoAsesor ?? 0;
+        $setPedido          = Pedidos::find($id_pedido);
+        if(!$setPedido){
+            return response()->json([
+                'status' => 0,
+                'message' => 'No se encontro el pedido: ',
+                'pedido' => $setPedido
+            ]);
+        }
+        $setPedido->ifanticipo      = $ifanticipo;
+        $setPedido->anticipoAsesor  = $anticipoAsesor;
+        $setPedido->save();
+        if($setPedido){
+            return response()->json([
+                'status' => 1,
+                'message' => 'Se guardo correctamente el anticipo del pedido: ',
+                'pedido' => $setPedido
+            ]);
+        }else{
+            return response()->json([
+                'status' => 0,
+                'message' => 'No se pudo guardar el anticipo del pedido: ',
+                'pedido' => $setPedido
+            ]);
+        }
+    }
 }

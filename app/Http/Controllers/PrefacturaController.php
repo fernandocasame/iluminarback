@@ -43,12 +43,12 @@ class PrefacturaController extends Controller
             $tipoVenta          = $request->get('tipoVenta');
             $empresa            = 1; // O el valor que necesites
             $tipoInstitucion    = $tipoVenta == 1 ? 0 : 1; // 0 para directa, 1 para punto de venta
-            
+
             // Valida que se envíe el periodo_id
             if (!$periodo_id) {
                 return $this->response()->setStatusCode(200)->json(['error' => 'Falta el periodo_id']);
             }
-            
+
             // Obtén las instituciones
             $getInstituciones = $this->proformaRepository->listadoInstitucionesXVenta($periodo_id, $empresa, $tipoInstitucion);
             if (count($getInstituciones) == 0) {
@@ -62,7 +62,7 @@ class PrefacturaController extends Controller
             foreach ($getInstituciones as $key => $item) {
                 // Obtener los datos de venta PREFACTURAS
                 $getDatosVenta = $this->proformaRepository->listadoDocumentosVenta($periodo_id, $empresa, $tipoInstitucion, $item->institucion_id, [1]);
-                
+
                 // Obtener los contratos de la institucion
                 $getContratos = $this->proformaRepository->listadoContratosAgrupadoInstitucion($getDatosVenta );
 
@@ -105,7 +105,7 @@ class PrefacturaController extends Controller
                             'det_ven_dev' => $detVenDev
                         ];
                     }
-                    
+
                     // Agrupamos por precio (det_ven_valor_u) y nombre_serie para cantidad real
                     $clave = $detVenValorU . '|' . $nombreSerie;
 
@@ -140,7 +140,7 @@ class PrefacturaController extends Controller
                         ];
                     }
 
-                   
+
                     // Agrupamos por precio (det_ven_valor_u) y nombre_serie para cantidad perseo
                     $clave = $detVenValorU . '|' . $nombreSerie;
 

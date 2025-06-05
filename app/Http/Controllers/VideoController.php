@@ -39,17 +39,18 @@ class VideoController extends Controller
             }
             return $videos;
         }
-     
+
     }
     //api:get/getAsignaturas
     public function getAsignaturas(Request $request){
-        $asignaturas = DB::SELECT("SELECT DISTINCT a.idasignatura, a.nombreasignatura 
+        $asignaturas = DB::SELECT("SELECT DISTINCT a.idasignatura, a.nombreasignatura
         FROM asignatura  a
         join area on area.idarea = a.area_idarea
          LEFT JOIN libro l ON l.asignatura_idasignatura = a.idasignatura
         LEFT JOIN libros_series ls ON l.idlibro = ls.idLibro
         WHERE a.estado = '1'
         AND (ls.version <> 'PLUS' OR ls.version IS NULL)
+        AND a.tipo_asignatura = '1'
         ");
         return $asignaturas;
     }
@@ -112,10 +113,10 @@ class VideoController extends Controller
     {
         // Video::create($request->all());
         if($request->id > 0){
-            //EDITAR 
+            //EDITAR
             $link = Video::findOrFail($request->id);
         }else{
-            //GUARDAR 
+            //GUARDAR
             $link = new Video();
         }
             $link->nombrevideo              = $request->nombrevideo;
@@ -132,7 +133,7 @@ class VideoController extends Controller
             }else{
                 return ["status" => "1", "message" => "No se pudo guardar"];
             }
-        
+
     }
 
     /**
@@ -147,18 +148,18 @@ class VideoController extends Controller
     }
 
 
-    
+
     public function videos_libro_unidad($id)
     {
         $videos = DB::SELECT("SELECT v . * FROM video v, temas t WHERE v.id_tema = t.id AND t.id_unidad = $id");
-        
+
         return $videos;
     }
 
     public function videos_libro_tema($id)
     {
         $videos = DB::SELECT("SELECT * FROM video WHERE id_tema = $id");
-        
+
         return $videos;
     }
 

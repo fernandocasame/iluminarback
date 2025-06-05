@@ -143,6 +143,11 @@ trait TraitPedidosGeneral
             SELECT con.anticipo_global FROM pedidos_convenios con
             WHERE con.id = p.pedidos_convenios_id
         ) AS anticipo_global,
+        (
+            SELECT COUNT(p.id) AS convenioAnulado FROM pedidos_convenios p
+            WHERE p.id = p.pedidos_convenios_id
+            AND p.estado = 2
+        ) AS convenioAnulado,
         pe.periodoescolar as periodo,pe.codigo_contrato,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
         i.region_idregion as region,uf.iniciales as iniciales_facturador,

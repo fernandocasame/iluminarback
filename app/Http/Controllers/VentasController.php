@@ -2899,8 +2899,7 @@ class VentasController extends Controller
                     fdv.det_ven_valor_u,
                     fdv.id_empresa
                 FROM f_detalle_venta fdv
-                INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo
-                AND fv.id_empresa = fdv.id_empresa
+                INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo AND fv.id_empresa = fdv.id_empresa
                 INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
                  WHERE fv.periodo_id = $request->periodo
                 AND fv.tip_ven_codigo =  $request->tipoVenta
@@ -3017,41 +3016,110 @@ class VentasController extends Controller
         }
 
 
-    // Buscar asesores por periodo y empresa
-    if ($request->busquedaAsesorPeriodo) {
-        $query = DB::select("SELECT DISTINCT u.idusuario AS id_asesor,
-            CONCAT(u.nombres, ' ', u.apellidos) AS asesor
-            FROM f_venta fv
-            INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
-            INNER JOIN usuario u ON i.asesor_id = u.idusuario
-            WHERE fv.periodo_id = ?
-            AND fv.id_empresa = ?
-            AND fv.est_ven_codigo <> 3
-            AND fv.institucion_id IS NOT NULL
-            AND fv.idtipodoc IN (1, 3, 4)",
-            [$request->periodo, $request->empresa]);
-    }
+        // Buscar asesores por periodo y empresa
+        if ($request->busquedaAsesorPeriodo) {
+            $query = DB::select("SELECT DISTINCT u.idusuario AS id_asesor,
+                CONCAT(u.nombres, ' ', u.apellidos) AS asesor
+                FROM f_venta fv
+                INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+                INNER JOIN pedidos p ON p.id_institucion = i.idInstitucion
+                INNER JOIN usuario u ON p.id_asesor = u.idusuario
+                WHERE  p.id_periodo = ?
+                AND fv.periodo_id = ?
+                AND fv.id_empresa = ?
+                AND fv.est_ven_codigo <> 3
+                AND fv.institucion_id IS NOT NULL
+                AND fv.idtipodoc IN (1, 3, 4)",
+                [$request->periodo, $request->periodo, $request->empresa]);
+        }
 
-    // Buscar ventas por asesor
-    if($request->Xasesor){
-        $query = DB::select("SELECT fv.institucion_id, fdv.*, p.pro_nombre, 
-            SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal, fv.tip_ven_codigo,
-            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
-            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
-            SUM( fdv.det_ven_dev) AS cantidadDevuelta,
-            i.asesor_id
-            FROM f_detalle_venta fdv
-            INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo
-            AND fv.id_empresa = fdv.id_empresa
-            INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
-            LEFT JOIN institucion i ON i.idInstitucion = fv.institucion_id
-            WHERE fv.periodo_id = ?
-            AND i.asesor_id = ?
-            AND fv.idtipodoc IN (1, 3, 4)
-            AND fv.est_ven_codigo <> 3
-            GROUP BY fdv.det_ven_codigo, p.pro_nombre",
-            [$request->periodo, $request->asesor]);
-    }
+        // Buscar ventas por asesor
+        if($request->Xasesor){
+
+            $institucionesPedidos = DB::table('pedidos')
+                ->where('id_asesor', $request->asesor)
+                ->where('id_periodo', $request->periodo)
+                ->where('tipo_venta', 1)
+                ->pluck('id_institucion')
+                ->unique();
+
+            $institucionesObsequios = DB::table('pedidos')
+                ->join('p_libros_obsequios', 'p_libros_obsequios.id_pedido', '=', 'pedidos.id_pedido')
+                ->where('pedidos.id_asesor', $request->asesor)
+                ->where('p_libros_obsequios.id_periodo', $request->periodo)
+                ->where('pedidos.tipo_venta', 1)
+                ->pluck('pedidos.id_institucion');
+
+            $instituciones = $institucionesPedidos
+                ->merge($institucionesObsequios)
+                ->unique()
+                ->values();
+
+            // return $instituciones;
+
+            $results = collect();
+
+            if ($instituciones->isNotEmpty()) {
+                foreach ($instituciones as $institucion_id) {
+                    $query = DB::select("
+                        SELECT fv.institucion_id, fdv.*, p.pro_nombre, 
+                            SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal,
+                            fv.tip_ven_codigo,
+                            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
+                            ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
+                            SUM(fdv.det_ven_dev) AS cantidadDevuelta,
+                            COALESCE( ROUND(
+                            (SUM(fdv.det_ven_valor_u * fdv.det_ven_cantidad)-
+                            ((SUM(fdv.det_ven_valor_u * fdv.det_ven_cantidad)*fv.ven_desc_por)/100)), 2),0) AS valorNeto,
+                            COALESCE(ROUND(
+                                fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) -
+                                fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) * fv.ven_desc_por / 100,
+                                2),0) AS precioDevolucionNeto,
+                            fv.ven_desc_por
+                        FROM f_venta fv
+                        INNER JOIN f_detalle_venta fdv ON fv.ven_codigo = fdv.ven_codigo AND fv.id_empresa = fdv.id_empresa
+                        INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
+                        WHERE fv.institucion_id = ?
+                        AND fv.id_empresa = ?
+                        AND fv.idtipodoc IN (1, 3, 4)
+                        AND fv.est_ven_codigo <> 3
+                        AND fv.periodo_id = ?
+                        GROUP BY fv.ven_codigo, p.pro_nombre, fv.institucion_id, fv.tip_ven_codigo, fv.ven_desc_por
+                    ", [$institucion_id, $request->empresa, $request->periodo]);
+
+                    // Puedes hacer merge o push de resultados
+                    $results = $results->merge($query);
+                }
+            }
+
+            // Ahora $results contiene todos los resultados para cada institución individualmente consultada
+
+            return $results;
+
+        }
+
+    //     $query = DB::select("SELECT fv.institucion_id, fdv.*, p.pro_nombre, 
+    //         SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal, fv.tip_ven_codigo,
+    //         ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
+    //         ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
+    //         SUM( fdv.det_ven_dev) AS cantidadDevuelta,
+    //         i.asesor_id
+    //         FROM f_detalle_venta fdv
+    //         INNER JOIN f_venta fv ON fv.ven_codigo = fdv.ven_codigo and fv.id_empresa = fdv.id_empresa
+    //         AND fv.id_empresa = fdv.id_empresa
+    //         INNER JOIN 1_4_cal_producto p ON fdv.pro_codigo = p.pro_codigo
+    //         INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
+    //         INNER JOIN pedidos pe ON pe.id_institucion = i.idInstitucion
+    //         INNER JOIN usuario u ON pe.id_asesor = u.idusuario
+    //         WHERE fv.periodo_id = ?
+    //         AND pe.id_asesor = ?
+    //         AND fv.id_empresa = ?
+    //         AND fv.idtipodoc IN (1, 3, 4)
+    //         AND fv.est_ven_codigo <> 3
+    //         and fv.tip_ven_codigo = 1
+    //         GROUP BY fdv.det_ven_codigo, p.pro_nombre",
+    //         [$request->periodo, $request->asesor, $request->empresa]);
+    // }
 
 
         // Consulta para buscar instituciones y periodo

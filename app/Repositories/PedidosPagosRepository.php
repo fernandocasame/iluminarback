@@ -1,6 +1,6 @@
 <?php
 namespace App\Repositories;
-use DB;
+use Illuminate\Support\Facades\DB;
 use App\Models\Models\Pagos\VerificacionPago;
 use App\Models\Models\Pedidos\PedidosDocumentosLiq;
 use App\Models\Pedidos;
@@ -31,7 +31,8 @@ class  PedidosPagosRepository extends BaseRepository
             'tipoPagos',
             'formaPagos',
             'pedidoPagosHijo',
-            'userCierre:idusuario,nombres,apellidos'
+            'userCierre:idusuario,nombres,apellidos',
+            'detallePago',
         ])
         ->where('ven_codigo',$contrato)
         ->where('forma_pago_id','>','0')
@@ -43,7 +44,8 @@ class  PedidosPagosRepository extends BaseRepository
         $pagos = PedidosDocumentosLiq::with([
             'tipoPagos',
             'formaPagos',
-            'pedidoPagosHijo'
+            'pedidoPagosHijo',
+            'detallePago',
         ])
         ->where('forma_pago_id','>','0')
         ->where('1_4_documento_liq.institucion_id','=',$institucion)
@@ -167,13 +169,49 @@ class  PedidosPagosRepository extends BaseRepository
     }
     //api:get>>/pedigo_Pagos?getVentaRealXAsesor=1&idAsesor=1&idPeriodo=1
     public function getVentaRealXAsesor($idusuario,$periodo){
-        $query = DB::SELECT("SELECT p.id_pedido, p.id_institucion, p.tipo_venta, p.id_periodo, p.contrato_generado, p.TotalVentaReal,p.total_venta
-        FROM pedidos p
-        WHERE p.id_asesor = ?
-        AND p.tipo ='0'
-        AND p.estado = '1'
-        AND p.id_periodo = ?
-        AND p.contrato_generado IS NOT NULL
+        // $query = DB::SELECT("SELECT p.id_pedido, p.id_institucion, p.tipo_venta, p.id_periodo, p.contrato_generado, p.TotalVentaReal,p.total_venta
+        // FROM pedidos p
+        // WHERE p.id_asesor = ?
+        // AND p.tipo ='0'
+        // AND p.estado = '1'
+        // AND p.id_periodo = ?
+        // AND p.contrato_generado IS NOT NULL
+        // ",[$idusuario,$periodo]);
+        $query = DB::SELECT("SELECT
+            p.id_pedido,
+            p.id_institucion,
+            p.tipo_venta,
+            p.id_periodo,
+            p.contrato_generado,
+            p.TotalVentaReal,
+            p.total_venta,
+
+            -- Total Venta Alcance por pedido
+            (
+                SELECT SUM(pp.venta_bruta)
+                FROM pedidos_alcance pp
+                WHERE pp.estado_alcance = '1'
+                AND pp.id_pedido = p.id_pedido
+            ) AS totalVentaAlcance,
+
+            -- total_venta + totalVentaAlcance
+            (
+                p.total_venta +
+                COALESCE((
+                SELECT SUM(pp.venta_bruta)
+                FROM pedidos_alcance pp
+                WHERE pp.estado_alcance = '1'
+                    AND pp.id_pedido = p.id_pedido
+                ), 0)
+            ) AS total_venta_con_alcance
+
+            FROM pedidos p
+            WHERE p.id_asesor = ?
+            AND p.tipo = '0'
+            AND p.estado = '1'
+            AND p.id_periodo = ?
+            AND p.contrato_generado IS NOT NULL;
+
         ",[$idusuario,$periodo]);
         return $query;
     }
@@ -301,6 +339,19 @@ class  PedidosPagosRepository extends BaseRepository
         // $valor      = 0;
         // foreach ($deudas as $deuda) { $valor += abs($deuda->doc_valor); }
         // return $valor;
+    }
+    public function getSubPagos($doc_codigo){
+        $query = DB::SELECT("SELECT d.*,
+        CONCAT(u.nombres , ' ', u.apellidos) AS usuario_creador,
+        CONCAT(ue.nombres , ' ', ue.apellidos) AS usuario_editor
+        FROM pedidos_pagos_detalles d
+        LEFT JOIN usuario u ON u.idusuario = d.user_created
+        LEFT JOIN usuario ue ON ue.idusuario = d.user_edit
+        WHERE d.id_pago = ?
+        ORDER BY d.id_pedido_pago_detalle DESC
+        ",
+        [$doc_codigo]);
+        return $query;
     }
 }
 ?>

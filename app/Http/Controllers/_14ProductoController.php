@@ -20,6 +20,31 @@ class _14ProductoController extends Controller {
         return $query;
     }
 
+    public function GetProducto_Reportes(Request $request) {
+        $grupoCodigos = $request->input('grupo_codigo_selected');
+        $tipoReporte = $request->input('tipoReporte');
+        // return $tipoReporte;
+        if ($tipoReporte == 1) {
+            $query = DB::select("SELECT pr.*, gp.gru_pro_nombre FROM 1_4_cal_producto pr
+                LEFT JOIN 1_4_grupo_productos gp ON pr.gru_pro_codigo = gp.gru_pro_codigo
+                ORDER BY pr.pro_nombre ASC");
+            return $query;
+        }
+        // Verifica que haya elementos
+        if (is_array($grupoCodigos) && count($grupoCodigos) > 0) {
+            $placeholders = implode(',', array_fill(0, count($grupoCodigos), '?'));
+
+            $query = DB::select("SELECT pr.*, gp.gru_pro_nombre FROM 1_4_cal_producto pr
+                LEFT JOIN 1_4_grupo_productos gp ON pr.gru_pro_codigo = gp.gru_pro_codigo
+                WHERE pr.gru_pro_codigo IN ($placeholders)
+                ORDER BY pr.pro_nombre ASC", $grupoCodigos);
+
+            return $query;
+        }
+        // Si no hay grupos seleccionados, devuelve todos
+        return DB::select("SELECT * FROM 1_4_cal_producto ORDER BY pro_nombre ASC");
+    }
+
     public function Mover_Stock_SoloTxt_Todo_A_DepositoCALMED() {
         // 1. Obtener productos antes del cambio
         $productosAntes = DB::table('1_4_cal_producto')

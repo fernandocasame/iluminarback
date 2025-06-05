@@ -48,7 +48,9 @@ class LinkAcortadorController extends Controller
      */
     public function store(Request $request)
     {
-        $serve = $request->url();
+        // $serve = $request->url();
+        //$serve = "http://localhost:9000/p";
+        $serve = "https://cal.lat/p";
         if(($request->id) > 0){
             //EDITAR LINK
             $link = LinkAcortador::findOrFail($request->id);
@@ -74,7 +76,8 @@ class LinkAcortadorController extends Controller
             $link->libro_id       = $request->libro_id;
             $link->unidad         = $request->unidad;
             //generar link
-            $codigo = uniqid();
+            // $codigo = uniqid();
+            $codigo               = LinkAcortador::generateUniqueCode();
             $url                  = $serve.'/'.$codigo;
             $link->codigo         = $codigo;
             $link->link_acortado  = $url;
@@ -92,7 +95,7 @@ class LinkAcortadorController extends Controller
     public function show($id)
     {
         //buscar link del acortardor
-        $link  = DB::SELECT("SELECT l.* 
+        $link  = DB::SELECT("SELECT l.*
         FROM links_acortadores l
         WHERE l.codigo = '$id'
         ");
@@ -102,7 +105,7 @@ class LinkAcortadorController extends Controller
         }else{
             return ["status" => "0", "message" => "El link no existe"];
         }
-      
+
     }
 
     public function filtroLibros(Request $request){
@@ -114,6 +117,14 @@ class LinkAcortadorController extends Controller
         AND a.estado = '1'
         ");
         return $filtrar;
+    }
+
+    public function verDataLink($id){
+        $link  = DB::SELECT("SELECT l.*
+        FROM links_acortadores l
+        WHERE l.codigo = '$id'
+        ");
+        return $link;
     }
 
     /**

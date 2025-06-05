@@ -76,6 +76,9 @@ Route::get('/bliquidacion/{contrato}','TemporadaController@bliquidacion_milton')
 Route::post('bliquidacionSistema','TemporadaController@bliquidacionSistema');
 //==============FIN DE APIS BARCODE LIQUIDACION=============================
 
+//notificacion capacitador
+Route::post('notificar_capacitador', 'CapacitacionController@notificar_capacitador');
+Route::get('TraerCapacionesAsesor', 'CapacitacionController@TraerCapacionesAsesor');
 
 //==============RUTAS PARA COLEGIO =============================
 Route::resource('colegio-docente','ColegiosController');
@@ -1233,6 +1236,9 @@ Route::get('get_VerificacionAntesEliminarPedido','PedidosController@get_Verifica
 Route::get('getSeries_EdicionStock','SeriesController@getSeries_EdicionStock');
 Route::get('VerifcarMetodosGet_UsuarioController','UsuarioController@VerifcarMetodosGet_UsuarioController');
 Route::get('Get_Estado_Venta','Pedidos2Controller@Get_Estado_Venta');
+Route::get('GetGrupoProducto_SoloActivos','_14GrupoProductoController@GetGrupoProducto_SoloActivos');
+Route::get('GetProducto_Reportes','_14ProductoController@GetProducto_Reportes');
+Route::get('AreaDisponibles_Asignacion','AreaController@AreaDisponibles_Asignacion');
 Route::post('Post_modificar_cabecera_devolucion', 'DevolucionController@Post_modificar_cabecera_devolucion');
 Route::post('GuardarDatosEdicionStockMasiva', '_14ProductoController@GuardarDatosEdicionStockMasiva');
 Route::post('MoverInstitucionxAsesor', 'InstitucionController@MoverInstitucionxAsesor');
@@ -1242,6 +1248,7 @@ Route::post('anularretencion_quitarevidencia','AbonoController@anularretencion_q
 Route::post('VerifcarMetodosPost_AbonoRetencionPorcentaje','AbonoRetencionPorcentajeController@VerifcarMetodosPost_AbonoRetencionPorcentaje');
 Route::post('EliminarPedidoCompleto_SinContrato','PedidosController@EliminarPedidoCompleto_SinContrato');
 Route::post('Regresar_A_Pendiente_Documento','VentasController@Regresar_A_Pendiente_Documento');
+Route::post('asignar_asignatura_docentes_xarea_disponible','AsignaturaDocenteController@asignar_asignatura_docentes_xarea_disponible');
 //FIN APIS JEYSON LARA
 
 //GUARDAR ANTICIPOS APROBADOS DESPUES DE GENERAR EL CONTRATO
@@ -1841,7 +1848,7 @@ Route::get('guias_remision_list', 'RemisionController@guias_remision_list');
 
 //fin remision
 
-//Finalizar pendientes de venta 
+//Finalizar pendientes de venta
 Route::post('ActualizarVenta','VentasController@ActualizarVenta');
 Route::get('ObtenerDetallesProformaVenta','VentasController@ObtenerDetallesProformaVenta');
 Route::get('GetVentaOfProforma','VentasController@GetVentaOfProforma');
@@ -2102,3 +2109,5 @@ Route::get('cod_evaluacion_institucion/{id}','InstitucionController@cod_evaluaci
 Route::post('contarLibrosPorPeriodo','PedidosController@contarLibrosPorPeriodo');
 Route::post('edit_fecha_evaluacion_admin','EvaluacionController@edit_fecha_evaluacion_admin');
 require_once "others/codigos/RouterCodigos.php";
+
+Route::post('metodosPostPedidos','PedidosController@metodosPostPedidos');
