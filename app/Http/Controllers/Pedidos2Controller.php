@@ -75,9 +75,6 @@ class Pedidos2Controller extends Controller
         if($request->getInfoVendidoFacturadoXyear)  { return $this->getInfoVendidoFacturadoXyear($request); }
         if($request->getCobradoXyear)               { return $this->getCobradoXyear($request); }
 
-        //OBSEQUIOS
-        if($request->getLibrosObsequiosPedidos)      { return $this->getLibrosObsequiosPedidos($request); }
-
     }
     //API:GET/pedidos2/pedidos?getReportePedidos=1&periodo_id=26&ifContratos=1
     public function getReportePedidos($request) {
@@ -1861,98 +1858,5 @@ class Pedidos2Controller extends Controller
         return $query;
     }
     //FIN METODOS JEYSON
-    //OBSEQUIOS
-    //api:get/pedidos2/pedidos?getLibrosObsequiosPedidos=1&id_pedido=1712&idVerificacion=3020
-    //api:get/pedidos2/pedidos?getLibrosObsequiosPedidos=1&id_pedido=1712&mostrarSolo100=1&contratoEscuela=C-S24-0000046-CHL
-    public function getLibrosObsequiosPedidos($request)
-    {
-        // Validaciones
-        $validated = $request->validate([
-            'id_pedido' => 'required',
-        ]);
-
-        $idVerificacion     = $request->idVerificacion;
-        $mostrarSolo100     = $request->mostrarSolo100;
-        $contratoEscuela    = $request->contratoEscuela;
-        $tipoDescuento      = 0;
-
-        //aqui voy solo a obtener solo los obsequios 100% si es que esta activado el permiso en alguna verificacion
-        if($mostrarSolo100){
-            $getValidacionDescuento = DB::SELECT("SELECT * FROM verificaciones v
-            WHERE v.contrato = '$contratoEscuela'
-            AND v.estado = '0'
-            AND v.permiso_acta_obsequios_100_descuento = '1'
-            ");
-            if(count($getValidacionDescuento) > 0){
-                $tipoDescuento  = 2;
-                $idVerificacion = $getValidacionDescuento[0]->id;
-            }
-        }
-        // Obtener datos de verificación
-        $datosVerificacion = Verificacion::where('id', $idVerificacion)->first();
-        if (!$datosVerificacion) {
-            return ["status" => "0", "message" => "No existe la verificación con ese id"];
-        }
-
-        // si no hago el proceso normal
-        if(!$mostrarSolo100){
-            // documentos 100%
-            $permiso_acta_obsequios_100_descuento    = $datosVerificacion->permiso_acta_obsequios_100_descuento;
-            // documentos otros descuentos diferentes a 100%
-            $permiso_acta_obsequios_otros_descuentos = $datosVerificacion->permiso_acta_obsequios_otros_descuentos;
-
-            // Determinar tipo de descuento
-            if ($permiso_acta_obsequios_100_descuento && $permiso_acta_obsequios_otros_descuentos) {
-                $tipoDescuento = 1; // Todos los descuentos
-            } elseif ($permiso_acta_obsequios_100_descuento) {
-                $tipoDescuento = 2; // Solo los 100%
-            } elseif ($permiso_acta_obsequios_otros_descuentos) {
-                $tipoDescuento = 3; // Solo los otros descuentos
-            }
-        }
-
-        $datosVerificacion->permiso_acta_obsequios = $tipoDescuento > 0 ? 1 : 0;
-        try {
-            // Consulta de detalle de venta
-            $query = DB::table('f_detalle_venta as d')
-                ->select(
-                    'd.pro_codigo as codigo',
-                    DB::raw('CONCAT(ls.nombre, " - ", f.ven_desc_por, "%") AS nombre_libro'),
-                    DB::raw('SUM(d.det_ven_cantidad) AS cantidad'),
-                    'd.det_ven_valor_u AS precio',
-                    'f.ven_desc_por'
-                )
-                ->join('f_venta as f', 'd.ven_codigo', '=', 'f.ven_codigo')
-                ->join('p_libros_obsequios as o', 'o.id', '=', 'f.ven_p_libros_obsequios')
-                ->join('pedidos as p', 'p.id_pedido', '=', 'o.id_pedido')
-                ->leftJoin('libros_series as ls', 'ls.codigo_liquidacion', '=', 'd.pro_codigo')
-                ->where('p.id_pedido', $request->id_pedido)
-                ->where('f.est_ven_codigo', '<>', 3)
-                ->where('o.estado_libros_obsequios', '<>', 2)
-                // Condiciones de descuento
-                ->when($tipoDescuento == 1, function ($query) {
-                    // Lógica para cuando el tipo de descuento es '1' (todos los descuentos)
-                    return $query;
-                })
-                ->when($tipoDescuento == 2, function ($query) {
-                    // Lógica para cuando el tipo de descuento es '2' (solo 100%)
-                    return $query->where('f.idtipodoc', '=', '2');
-                })
-                ->when($tipoDescuento == 3, function ($query) {
-                    // Lógica para cuando el tipo de descuento es '3' (otros descuentos)
-                    return $query->whereIn('f.idtipodoc', [3, 4]);
-                })
-                ->groupBy('d.pro_codigo', 'ls.nombre', 'd.det_ven_valor_u', 'f.ven_desc_por')
-                ->get();
-
-            return [
-                "actas" => $query,
-                "datosVerificacion" => $datosVerificacion
-            ];
-
-        } catch (\Exception $e) {
-            return ["status" => "0", "message" => "Error al obtener los datos: " . $e->getMessage()];
-        }
-    }
 
 }

@@ -27,6 +27,7 @@ use App\Repositories\Facturacion\VentaRepository;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use App\Http\Controllers\_14ProductoController;
+use App\Models\Usuario;
 
 class VentasController extends Controller
 {
@@ -518,7 +519,12 @@ class VentasController extends Controller
                     "message" => "El ven_codigo no existe en la base de datos"
                 ], 200);
             }
-
+            if($venta->est_ven_codigo == 3){
+                return response()->json([
+                    "status" => "0",
+                    "message" => "El documento ya fue anulado"
+                ], 200);
+            }
             // Actualizar la tabla f_venta
             DB::table('f_venta')
                 ->where('ven_codigo', $request->ven_codigo)
@@ -912,6 +918,8 @@ class VentasController extends Controller
                 ini_set('max_execution_time', 6000000);
                 $miarray=json_decode($request->dat);
                 $id_usuario = $request->id_usuario;
+                $datosUsuario  = Usuario::find($id_usuario);
+                $id_group      = $datosUsuario->id_group;
                 DB::beginTransaction();
                 $venta = Ventas::where('ven_codigo', $request->ven_codigo)
                 ->where('id_empresa', $request->empresa)
@@ -919,6 +927,22 @@ class VentasController extends Controller
                     if (!$venta){
                         return "El ven_codigo no existe en la base de datos";
                     }
+                    // Si el venta fue despachada, no se puede anular
+                    // if($id_group == 22 || $id_group == 23){
+                    if($venta->est_ven_codigo != 2){
+                        return ["status" => "0", "message" => "No puede anular el documento por que fue despachado"];
+                    }
+                    $validateDevuelto = DB::SELECT("SELECT * FROM f_detalle_venta v
+                        WHERE v.ven_codigo = '$request->ven_codigo'
+                        AND v.det_ven_dev > 0
+                        AND v.id_empresa =  '$request->empresa'
+                    ");
+                    if(count($validateDevuelto) > 0){
+                        // Si ya se ha devuelto, devolver error
+                        DB::rollBack();
+                        return ["status" => "0", "message" => "El documento $request->ven_codigo tiene devoluciones registradas, no se anular"];
+                    }
+                    // }
                     DB::table('f_venta')
                     ->where('ven_codigo', $request->ven_codigo)
                     ->where('id_empresa', $request->empresa)
@@ -970,9 +994,15 @@ class VentasController extends Controller
             }
 
         }else{
+            $datosUsuario  = Usuario::find($request->user_despacha);
+            $id_group      = $datosUsuario->id_group;
             $venta= Ventas::where('ven_codigo',$request->ven_codigo)->where('id_empresa', $request->id_empresa)->first();
             if (!$venta){
                 return "El ven_codigo no existe en la base de datos";
+            }
+            // si el documento de venta fue anulado, no se puede desapachar
+            if($venta->est_ven_codigo == 3){
+                return ["status" => "0", "message" => "No puede desapachar el documento por que fue anulado"];
             }
             DB::table('f_venta')
             ->where('ven_codigo', $request->ven_codigo)
@@ -2503,24 +2533,28 @@ class VentasController extends Controller
                     $empresaProducto = $request->id_empresa;
                     $cantProductoCambio = $devolucion['cantidadConvertir'];
 
-                    // Verifica qué empresa es y actualiza los campos correspondientes
-                    if ($empresaProducto == 1) {
-                        // Para la empresa 1, actualizamos 'pro_stock' y 'pro_deposito'
-                        DB::table('1_4_cal_producto')
-                            ->where('pro_codigo', $codigo)
-                            ->update([
-                                'pro_stock' => DB::raw('pro_stock - ' . $devolucion['cantidadConvertir']),
-                                'pro_deposito' => DB::raw('pro_deposito + ' . $devolucion['cantidadConvertir']),
-                            ]);
-                    } elseif ($empresaProducto == 3) {
-                        // Para la empresa 3, actualizamos 'pro_stockCalmed' y 'pro_depositoCalmed'
-                        DB::table('1_4_cal_producto')
-                            ->where('pro_codigo', $codigo)
-                            ->update([
-                                'pro_stockCalmed' => DB::raw('pro_stockCalmed - ' . $devolucion['cantidadConvertir']),
-                                'pro_depositoCalmed' => DB::raw('pro_depositoCalmed + ' . $devolucion['cantidadConvertir']),
-                            ]);
-                    }
+                    // // Verifica qué empresa es y actualiza los campos correspondientes
+                    // if ($empresaProducto == 1) {
+                    //     // Para la empresa 1, actualizamos 'pro_stock' y 'pro_deposito'
+                    //     DB::table('1_4_cal_producto')
+                    //         ->where('pro_codigo', $codigo)
+                    //         ->update([
+                    //             'pro_stock' => DB::raw('pro_stock - ' . $devolucion['cantidadConvertir']),
+                    //             'pro_deposito' => DB::raw('pro_deposito + ' . $devolucion['cantidadConvertir']),
+                    //         ]);
+                    // } elseif ($empresaProducto == 3) {
+                    //     // Para la empresa 3, actualizamos 'pro_stockCalmed' y 'pro_depositoCalmed'
+                    //     DB::table('1_4_cal_producto')
+                    //         ->where('pro_codigo', $codigo)
+                    //         ->update([
+                    //             'pro_stockCalmed' => DB::raw('pro_stockCalmed - ' . $devolucion['cantidadConvertir']),
+                    //             'pro_depositoCalmed' => DB::raw('pro_depositoCalmed + ' . $devolucion['cantidadConvertir']),
+                    //         ]);
+                    // }
+                    // SECCION PARA ACTUALIZAR STOCK
+                    $productoController = new _14ProductoController();
+                    // Llamar al método Mover_Stock_SoloTxt_Todo_A_DepositoCALMED
+                    $productoController->Mover_Stock_SoloTxt_Todo_A_DepositoCALMED();
 
                 }
 
@@ -3062,7 +3096,7 @@ class VentasController extends Controller
             if ($instituciones->isNotEmpty()) {
                 foreach ($instituciones as $institucion_id) {
                     $query = DB::select("
-                        SELECT fv.institucion_id, fdv.*, p.pro_nombre, 
+                        SELECT fv.institucion_id, fdv.*, p.pro_nombre,
                             SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal,
                             fv.tip_ven_codigo,
                             ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
@@ -3098,7 +3132,7 @@ class VentasController extends Controller
 
         }
 
-    //     $query = DB::select("SELECT fv.institucion_id, fdv.*, p.pro_nombre, 
+    //     $query = DB::select("SELECT fv.institucion_id, fdv.*, p.pro_nombre,
     //         SUM(fdv.det_ven_cantidad - fdv.det_ven_dev) AS cantidadReal, fv.tip_ven_codigo,
     //         ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad), 2) AS precio,
     //         ROUND(fdv.det_ven_valor_u * SUM(fdv.det_ven_cantidad - fdv.det_ven_dev), 2) AS precioDevolucion,
@@ -3271,7 +3305,20 @@ class VentasController extends Controller
                 // Si no se encuentra, hacer rollback y devolver error
                 DB::rollBack();
                 return response()->json([
-                    'message' => 'No se encontró la venta con los datos proporcionados'
+                    'error' => 'No se encontró la venta con los datos proporcionados'
+                ], 404);
+            }
+            // Validar si ya el documento ha sido devuelto no poder volver a pendiente
+            $validateDevuelto = DB::SELECT("SELECT * FROM f_detalle_venta v
+            WHERE v.ven_codigo = '$request->ven_codigo'
+            AND v.det_ven_dev > 0
+            AND v.id_empresa =  '$request->id_empresa'
+            ");
+            if(count($validateDevuelto) > 0){
+                // Si ya se ha devuelto, devolver error
+                DB::rollBack();
+                return response()->json([
+                    'error' => "El documento $request->ven_codigo tiene devoluciones registradas, no se puede volver a pendiente"
                 ], 404);
             }
             // Actualizar los campos requeridos

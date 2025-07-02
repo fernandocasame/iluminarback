@@ -315,16 +315,16 @@ class  CodigosRepository extends BaseRepository
         }
 
         // Si los registros principales y unidos se guardaron correctamente, procesar la proforma
-        if ($ifsetProforma == 1 && $estadoIngreso == 1) {
-            $getDevolucion = DetalleVentas::getLibroDetalle($codigo_proforma, $proforma_empresa, $codigo_liquidacion);
+        // if ($ifsetProforma == 1 && $estadoIngreso == 1) {
+        //     $getDevolucion = DetalleVentas::getLibroDetalle($codigo_proforma, $proforma_empresa, $codigo_liquidacion);
 
-            if (!empty($getDevolucion) && isset($getDevolucion[0]->det_ven_dev)) {
+        //     if (!empty($getDevolucion) && isset($getDevolucion[0]->det_ven_dev)) {
 
-            } else {
-                $estadoIngreso = 2;
-                $message .= "No se encontró el detalle del libro con código de proforma: $codigo_proforma. ";
-            }
-        }
+        //     } else {
+        //         $estadoIngreso = 2;
+        //         $message .= "No se encontró el detalle del libro con código de proforma: $codigo_proforma. ";
+        //     }
+        // }
 
         // Retornar resultados
         return [
@@ -709,8 +709,20 @@ class  CodigosRepository extends BaseRepository
                     'c.quitar_de_reporte',
                     'c.combo',
                     'c.codigo_combo',
+                    'c.codigo_proforma',
+                    'c.proforma_empresa',
                     'ls.year',
                     'ls.id_libro_plus',
+                    DB::raw("(SELECT v.ven_desc_por FROM f_venta v WHERE v.ven_codigo = c.codigo_proforma AND v.id_empresa = c.proforma_empresa LIMIT 1) AS descuento"),
+                    DB::raw('
+                        CASE
+                            WHEN c.verif1 > 0 THEN "verif1"
+                            WHEN c.verif2 > 0 THEN "verif2"
+                            WHEN c.verif3 > 0 THEN "verif3"
+                            WHEN c.verif4 > 0 THEN "verif4"
+                            WHEN c.verif5 > 0 THEN "verif5"
+                        END AS verificacion
+                    '),
                     DB::raw('0 as tipo_codigo'), // Lógica para la nueva columna
                     DB::raw("CASE WHEN c.plus = 1 THEN ls.id_libro_plus ELSE c.libro_idlibro END AS libro_idReal"), // Lógica para la nueva columna
                     DB::raw("CASE WHEN c.plus = 1 THEN l_plus.nombre ELSE l.nombrelibro END AS nombrelibro"), // Lógica para la nueva columna
@@ -1264,8 +1276,8 @@ class  CodigosRepository extends BaseRepository
         // AND c.codigo_combo IS NOT NULL
         // AND c.bc_periodo = '26'
         // GROUP BY c.codigo_combo, c.combo;
-         $query = DB::select("SELECT 
-            sub.combo AS codigo, 
+         $query = DB::select("SELECT
+            sub.combo AS codigo,
             COUNT(DISTINCT sub.codigo_combo) AS cantidad,
             SUM(sub.cantidad) AS total_codigos,
             pr.codigos_combos,
@@ -1284,8 +1296,8 @@ class  CodigosRepository extends BaseRepository
         LEFT JOIN `1_4_cal_producto` pr ON pr.pro_codigo = sub.combo
         LEFT JOIN libros_series ls ON ls.codigo_liquidacion = pr.pro_codigo
         LEFT JOIN f_detalle_venta v ON v.pro_codigo = pr.pro_codigo
-        LEFT JOIN f_venta v2 ON v2.ven_codigo = v.ven_codigo 
-            AND v.id_empresa = v2.id_empresa 
+        LEFT JOIN f_venta v2 ON v2.ven_codigo = v.ven_codigo
+            AND v.id_empresa = v2.id_empresa
             AND v2.periodo_id = '$periodo'  -- Aseguramos que solo se tomen los precios del periodo específico
         WHERE v2.periodo_id = '$periodo'  -- Filtro adicional para asegurar que se obtienen solo los datos del periodo correcto
         GROUP BY sub.combo, pr.codigos_combos, pr.pro_nombre, ls.idLibro, v.det_ven_valor_u;

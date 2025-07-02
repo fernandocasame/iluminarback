@@ -21,6 +21,7 @@ trait TraitPedidosGeneral
     //=====END SOLINFA======
     public $ipProlipa                   = "http://186.4.218.168:9095/api/";
     public $ipPerseo                    = "http://45.184.225.106:8181/api/";
+    public $tr_periodoPedido            = 26;
     public $gl_perseoProduccion         = 1;
     // public $ipLocal        = "http://localhost:5000/api/";
     public function FacturacionGet($endpoint)
@@ -148,7 +149,7 @@ trait TraitPedidosGeneral
             WHERE p.id = p.pedidos_convenios_id
             AND p.estado = 2
         ) AS convenioAnulado,
-        pe.periodoescolar as periodo,pe.codigo_contrato,
+        pe.periodoescolar as periodo,pe.codigo_contrato, pe.regaladosReporteNuevo,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
         i.region_idregion as region,uf.iniciales as iniciales_facturador,
         ph.fecha_generar_contrato,

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use DB;
 use App\Quotation;
 use App\Models\Configuracion_salle;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 class InstitucionController extends Controller
@@ -493,7 +494,7 @@ class InstitucionController extends Controller
         // return $configuracion;
         return $configuracion;
     }
-  
+
 
     public function listaInsitucion(Request $request)
     {
@@ -504,13 +505,13 @@ class InstitucionController extends Controller
             ->leftJoin('ciudad as c', 'i.ciudad_id', '=', 'c.idciudad')
             ->leftJoin('region as r', 'i.region_idregion', '=', 'r.idregion')
             ->leftJoin('usuario as u', 'i.vendedorInstitucion', '=', 'u.cedula')
-            
+
             // Último periodo configurado por región
             ->leftJoin('institucion_configuracion_periodo as ic', function ($join) {
                 $join->on('i.region_idregion', '=', 'ic.region')
-                    ->whereRaw('ic.id = (SELECT id FROM institucion_configuracion_periodo 
-                                    WHERE region = i.region_idregion 
-                                    AND estado = 1 
+                    ->whereRaw('ic.id = (SELECT id FROM institucion_configuracion_periodo
+                                    WHERE region = i.region_idregion
+                                    AND estado = 1
                                     ORDER BY id DESC LIMIT 1)');
             })
             ->leftJoin('periodoescolar as pec', 'ic.periodo_configurado', '=', 'pec.idperiodoescolar')
@@ -519,7 +520,7 @@ class InstitucionController extends Controller
             ->leftJoinSub(
                 DB::table('periodoescolar_has_institucion as phi')
                     ->selectRaw('phi.institucion_idInstitucion, phi.periodoescolar_idperiodoescolar as periodo_id')
-                    ->whereRaw('phi.id = (SELECT MAX(id) FROM periodoescolar_has_institucion 
+                    ->whereRaw('phi.id = (SELECT MAX(id) FROM periodoescolar_has_institucion
                                         WHERE institucion_idInstitucion = phi.institucion_idInstitucion)')
                 , 'last_periodo', 'i.idInstitucion', '=', 'last_periodo.institucion_idInstitucion'
             )
@@ -603,9 +604,9 @@ class InstitucionController extends Controller
         return $datos->where('estadoInstitucion', '1')->values();
     }
 
-    
-    
-    
+
+
+
     public function listaInsitucionAsesor(Request $request)
     {
         if($request->porCedula){
@@ -779,24 +780,50 @@ class InstitucionController extends Controller
         ->delete();
         return $dato;
     }
+    // public function institucion_conf_periodo(Request $request)
+    // {
+    //     $valores = [
+    //         'id' => $request->id,
+    //         'region' => $request->region,
+    //         'periodo_configurado' => $request->periodo_configurado,
+    //         'estado' => $request->estado
+    //     ];
+    //     if ($request->id > 0) {
+    //         $dato = DB::table('institucion_configuracion_periodo')
+    //         ->where('id',$request->id)
+    //         ->update($valores);
+    //         return [ 'dato'=>$dato, 'mensaje'=>'Datos actualizados'];
+    //     }else {
+    //         $dato = DB::table('institucion_configuracion_periodo')->insert($valores);
+    //         return [ 'dato'=>$dato, 'mensaje'=>'Datos registrados'];
+    //     }
+    // }
+
     public function institucion_conf_periodo(Request $request)
     {
+        $ahora = Carbon::now();
+
         $valores = [
-            'id' => $request->id,
             'region' => $request->region,
             'periodo_configurado' => $request->periodo_configurado,
             'estado' => $request->estado
         ];
+
         if ($request->id > 0) {
+            $valores['updated_at'] = $ahora;
+
             $dato = DB::table('institucion_configuracion_periodo')
-            ->where('id',$request->id)
-            ->update($valores);
-            return [ 'dato'=>$dato, 'mensaje'=>'Datos actualizados'];
-        }else {
+                ->where('id', $request->id)
+                ->update($valores);
+
+            return ['dato' => $dato, 'mensaje' => 'Datos actualizados'];
+        } else {
             $dato = DB::table('institucion_configuracion_periodo')->insert($valores);
-            return [ 'dato'=>$dato, 'mensaje'=>'Datos registrados'];
+
+            return ['dato' => $dato, 'mensaje' => 'Datos registrados'];
         }
     }
+
     public function InstitucionesXCobranzas(Request $request)
     {
         // $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.punto_venta
@@ -1033,7 +1060,7 @@ class InstitucionController extends Controller
             'message' => 'Novedad creada exitosamente'
         ], 201);
     }
-    public function cod_evaluacion_institucion($id){ 
+    public function cod_evaluacion_institucion($id){
         $dato = DB::table('institucion')
         ->where('idInstitucion','=',$id)
         ->select([
@@ -1043,5 +1070,70 @@ class InstitucionController extends Controller
         ])
         ->get();
         return $dato;
+    }
+    //API:POST/metodosPostInstitucion
+    public function metodosPostInstitucion(Request $request){
+        $action = $request->input('action');
+
+        switch ($action) {
+            case 'Post_TrarAgrupadoVisitas':
+                return $this->Post_TrarAgrupadoVisitas($request);
+            default:
+                return response()->json(['error' => 'Acción no válida','message' => 'Acción no válida'], 400);
+        }
+    }
+    // @action: Post_TrarAgrupadoVisitas
+    // @arraySendPeriodos: [{ id: '24', descripcion: '2024' }, ...]
+    // @institucion_id: 12
+    // API:POST/metodosGetInstitucion?action=Post_TrarAgrupadoVisitas
+    public function Post_TrarAgrupadoVisitas($request) {
+        $periodos = json_decode($request->arraySendPeriodos); // Ej: [{ idperiodoescolar: '24', periodoescolar: '2024' }, ...]
+
+        $institucion_id = $request->institucion_id;
+
+        // Validación
+        if (!is_array($periodos) || empty($periodos)) {
+            return response()->json(['error' => 'Datos de periodos inválidos','message'=> 'No se pudieron obtener los datos del periodo'], 400);
+        }
+
+        $selectParts = [];
+        $ids = [];
+
+        foreach ($periodos as $p) {
+            $id = $p->idperiodoescolar;
+            $desc = preg_replace('/\W+/', '_', $p->periodoescolar); // limpiar descripción para alias
+            $ids[] = $id;
+            $selectParts[] = "COUNT(CASE WHEN h.periodo_id = '$id' THEN h.id END) AS visitas_$desc";
+        }
+
+        $selectString = implode(",\n", $selectParts);
+        $inClause = implode("','", $ids);
+
+        // Profesores
+        $queryProfesores = DB::select("
+            SELECT
+                $selectString
+            FROM historico_visitas h
+            WHERE h.periodo_id IN ('$inClause')
+            AND h.institucion_id = ?
+            AND h.recurso = '15'
+            AND h.id_group = '6'
+        ", [$institucion_id]);
+
+        // Estudiantes
+        $queryEstudiantes = DB::select("
+            SELECT
+                $selectString
+            FROM historico_visitas h
+            WHERE h.periodo_id IN ('$inClause')
+            AND h.institucion_id = ?
+            AND h.recurso = '15'
+            AND h.id_group = '4'
+        ", [$institucion_id]);
+
+        return [
+            'profesores' => $queryProfesores[0] ?? [],
+            'estudiantes' => $queryEstudiantes[0] ?? []
+        ];
     }
 }

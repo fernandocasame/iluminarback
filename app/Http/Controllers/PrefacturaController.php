@@ -13,6 +13,7 @@ use App\Repositories\Facturacion\ProformaRepository;
 use App\Traits\Codigos\TraitCodigosGeneral;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\_14ProductoController;
 use Validator;
 
 class PrefacturaController extends Controller
@@ -543,9 +544,13 @@ class PrefacturaController extends Controller
                 ];
                 //NOTA EL disminuir NO SE CAMBIA PORQUE SOLO SE INTERCAMBIA LOS VALORES DE NOTAS SE DESCUENTA Y SE MUEVAN A LA PREFACTURA
                 //metodo aumentar stock en notas
-                $this->proformaRepository->restaStock($datosStockNota,1);
-                //metodo aumentar stock en prefacturas
-                $this->proformaRepository->sumaStock($datosStockPrefactura,1);
+                // $this->proformaRepository->restaStock($datosStockNota,1);
+                // //metodo aumentar stock en prefacturas
+                // $this->proformaRepository->sumaStock($datosStockPrefactura,1);
+                  // SECCION PARA ACTUALIZAR STOCK
+                $productoController = new _14ProductoController();
+                // Llamar al método Mover_Stock_SoloTxt_Todo_A_DepositoCALMED
+                $productoController->Mover_Stock_SoloTxt_Todo_A_DepositoCALMED();
             }
             //SUMAR SECUENCIA
             // ACTUALIZAR SECUENCIAL

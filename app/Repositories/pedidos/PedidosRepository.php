@@ -45,6 +45,52 @@ class  PedidosRepository extends BaseRepository
         }
         return $precio;
     }
+    public function getLibroPedidosVal($plan_lector,$id_periodo,$id_serie,$id_area,$year){
+        if($plan_lector > 0 ){
+            $getPlanlector = DB::SELECT("SELECT l.nombrelibro,l.idlibro,l.asignatura_idasignatura,
+            (
+                SELECT f.pvp AS precio
+                FROM pedidos_formato f
+                WHERE f.id_serie = '6'
+                AND f.id_area = '69'
+                AND f.id_libro = '$plan_lector'
+                AND f.id_periodo = '$id_periodo'
+            )as precio, ls.codigo_liquidacion,ls.version,ls.year
+            FROM libro l
+            left join libros_series ls  on ls.idLibro = l.idlibro
+            WHERE l.idlibro = '$plan_lector'
+            ");
+            $valores = $getPlanlector;
+        }else{
+            $getLibros = DB::SELECT("SELECT ls.*, l.nombrelibro, l.idlibro,l.asignatura_idasignatura,
+            (
+                SELECT f.pvp AS precio
+                FROM pedidos_formato f
+                WHERE f.id_serie = ls.id_serie
+                AND f.id_area = a.area_idarea
+                AND f.id_periodo = '$id_periodo'
+            )as precio
+            FROM libros_series ls
+            LEFT JOIN libro l ON ls.idLibro = l.idlibro
+            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+            WHERE ls.id_serie = '$id_serie'
+            AND a.area_idarea  = '$id_area'
+            AND l.Estado_idEstado = '1'
+            AND a.estado = '1'
+            AND ls.year = '$year'
+            LIMIT 1
+            ");
+            $valores = $getLibros;
+        }
+        $datos[0] = (Object)[
+            "idlibro"           => $valores[0]->idlibro,
+            "nombrelibro"       => $valores[0]->nombrelibro,
+            "precio"            => $valores[0]->precio,
+            "idasignatura"      => $valores[0]->asignatura_idasignatura,
+            "codigo_liquidacion"=> $valores[0]->codigo_liquidacion,
+        ];
+        return $datos;
+    }
     public function getLibrosNormalesFormato($periodo){
         $series = DB::SELECT("SELECT * FROM series s WHERE s.id_serie != 6"); // omitir plan lector
         $datos  = [];

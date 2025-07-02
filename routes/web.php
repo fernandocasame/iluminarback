@@ -2111,3 +2111,7 @@ Route::post('edit_fecha_evaluacion_admin','EvaluacionController@edit_fecha_evalu
 require_once "others/codigos/RouterCodigos.php";
 
 Route::post('metodosPostPedidos','PedidosController@metodosPostPedidos');
+Route::post('metodosPostInstitucion','InstitucionController@metodosPostInstitucion');
+
+Route::get('metodoGetEvaluacion','EvaluacionController@metodoGetEvaluacion');
+Route::get('getPeriodoInstitucion/{id}','PeriodoController@getPeriodoInstitucion');
