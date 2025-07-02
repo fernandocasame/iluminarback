@@ -21,7 +21,7 @@ trait TraitPedidosGeneral
     //=====END SOLINFA======
     public $ipProlipa                   = "http://186.4.218.168:9095/api/";
     public $ipPerseo                    = "http://45.184.225.106:8181/api/";
-    public $tr_periodoPedido            = 26;
+    public $tr_periodoPedido            = 4;
     public $gl_perseoProduccion         = 1;
     // public $ipLocal        = "http://localhost:5000/api/";
     public function FacturacionGet($endpoint)
