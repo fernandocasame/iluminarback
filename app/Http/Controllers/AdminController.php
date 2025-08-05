@@ -31,6 +31,7 @@ use App\Models\Temporada;
 use App\Models\User;
 use App\Models\Usuario;
 use App\Models\Verificacion;
+use App\Models\Video;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Facturacion\DevolucionRepository;
 use DB;
@@ -479,30 +480,44 @@ class AdminController extends Controller
         return $result;
     }
     public function pruebaData(Request $request){
-        $getCodigos = 'SMLL2-P4P6X5N6X8,
-        PSMLL2-2MW3S3BMY8,
-        SMLL2-U2UD5HCMRD,
-        PSMLL2-YF9BA2HNAF,
-        SMLL2-XDBG7CE3AN,
-        PSMLL2-S3NU2HGKYN,
-        SMM2-AMB4RTE8ME,
-        PSMM2-UFY99MA4S4,
-        SMM2-DX787E5Y4R,
-        PSMM2-SP5M8TX4BD,
-        SMM2-KBWHCUAXBR,
-        PSMM2-H3TDA2FB79,
-        SMCN2-XSS6KZYHEW,
-        PSMCN2-DXAB4VE9PH,
-        SMCN2-YUY6ZTGGN2,
-        PSMCN2-BFXXYDT2KM,
-        SMCN2-ATPH88HZDY,
-        PSMCN2-22XG4KNYY7,
-        SMES2-PURKMWD8V9,
-        PSMES2-VB4NYVW9BK,
-        SMES2-GY8ZTTNSFB,
-        PSMES2-E9Y8STK78G,
-        SMES2-UXMSNZBPDA,
-        PSMES2-WHBHEUE9MN,
+        $query = DB::SELECT("SELECT * FROM video t
+        WHERE t.id_tema > 0
+        AND t.unidad_id = '0';
+        ");
+        $contador = 0;
+        foreach($query as $key => $item){
+            $id_tema = $item->id_tema;
+            $id_unidad = 0;
+            $query2 = DB::SELECT("SELECT * FROM temas te WHERE te.id = $id_tema");
+            if(count($query2) > 0){
+                $id_unidad = $query2[0]->id_unidad;
+                Video::where('idvideo', $item->idvideo)
+                    ->update(['unidad_id' => $id_unidad]);
+                $contador++;
+            }
+        }
+        return response()->json([
+            'status' => '1',
+            'message' => "Se actualizaron $contador videos correctamente"
+        ]);
+        return $query;
+        return;
+        $getCodigos = 'SMCLL3-7FY2HVKDHK,
+        PSMCLL3-BV8BUM2SZB,
+        SMCLL3-9DXESD9D7X,
+        PSMCLL3-3GFG8GVB24,
+        SMCM3-966G7FZGAC,
+        PSMCM3-VKRWVUMUZK,
+        SMCM3-VV8HG53RZC,
+        PSMCM3-VT9MN4A68T,
+        SMCM3-966G7FZGAC,
+        PSMCM3-VKRWVUMUZK,
+        SMCM3-VV8HG53RZC,
+        PSMCM3-VT9MN4A68T,
+        SMCB3-H5VEY2DKNM,
+        PSMCB3-YDNWHX3TFK,
+        SMCB3-H7AWXNPUFT,
+        PSMCB3-4BWTKP3PSN
         ';
         $lineas = explode(",", $getCodigos); // Separar por coma
         // Recorrer y armar el array
@@ -512,14 +527,12 @@ class AdminController extends Controller
                 $codigos[] = ['codigo' => $codigoLimpio];
             }
         }
-
         // Los combos que quieres añadir, excluyendo el combo 'CMB-5YZAW6'
         $combos = [
-            'CMB-W4WWGE',
-            'CMB-FVEGW4',
-            'CMB-YFEVEZ',
+            'CMB-V394YH',
+            'CMB-U72WRM',
         ];
-        $libro = 'CFA2';
+        $libro = 'CFAC3';
         $getLibrosCombo = _14Producto::findOrFail($libro);
         if(!$getLibrosCombo){
             return ["status" => "0", "message" => "No se encontro el libro $libro"];
@@ -598,7 +611,7 @@ class AdminController extends Controller
             'combos_sin_codigos' => $combosSinCodigos,
             'codigos_problemas' => $codigosProblemas
         ]);
-        
+
 
         // Retorna el array con la propiedad 'codigo'
         return;

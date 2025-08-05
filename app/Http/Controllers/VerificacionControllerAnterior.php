@@ -443,22 +443,53 @@ class VerificacionControllerAnterior extends Controller
             $columnaVerificacion = "verif".$request->num_verificacion;
             $codigos = DB::table('codigoslibros as c')
             //  ->select('codigo','estado_liquidacion','venta_estado','factura')
-            ->select(DB::RAW('
-                c.codigo,c.estado_liquidacion,c.venta_estado,c.factura,c.contrato,
-                c.libro_idlibro, c.libro as nombre_libro,
+            ->select(DB::raw('
+                c.codigo,
+                c.estado_liquidacion,
+                c.venta_estado,
+                c.factura,
+                c.contrato,
+                c.libro_idlibro,
+                c.libro as nombre_libro,
+                c.porcentaje_personalizado_regalado,
+                c.codigo_proforma,
+                c.proforma_empresa,
+
                 (
                     SELECT
-                        (case when (ci.verif1 > "0") then "verif1"
-                        when (ci.verif2 > 0) then "verif2"
-                        when (ci.verif3 > 0) then "verif3"
-                        when (ci.verif4 > 0) then "verif4"
-                        when (ci.verif5 > 0) then "verif5"
-                        end) as verificacion
+                        CASE
+                            WHEN ci.verif1 > 0 THEN "verif1"
+                            WHEN ci.verif2 > 0 THEN "verif2"
+                            WHEN ci.verif3 > 0 THEN "verif3"
+                            WHEN ci.verif4 > 0 THEN "verif4"
+                            WHEN ci.verif5 > 0 THEN "verif5"
+                        END
                     FROM codigoslibros ci
                     WHERE ci.codigo = c.codigo
                 ) AS verificacion,
-                c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,
-                c.quitar_de_reporte
+
+                c.verif1,
+                c.verif2,
+                c.verif3,
+                c.verif4,
+                c.verif5,
+                c.quitar_de_reporte,
+
+                (
+                    CASE
+                        WHEN c.porcentaje_personalizado_regalado = 0 THEN
+                            (SELECT v.ven_desc_por FROM f_venta v
+                            WHERE v.ven_codigo = c.codigo_proforma
+                            AND v.id_empresa = c.proforma_empresa
+                            LIMIT 1)
+                        WHEN c.porcentaje_personalizado_regalado = 1 THEN 100
+                        WHEN c.porcentaje_personalizado_regalado = 2 THEN
+                            (SELECT p.descuento FROM pedidos p
+                            WHERE p.contrato_generado = c.contrato
+                            LIMIT 1)
+                        ELSE NULL
+                    END
+                ) AS descuento
             '))
              ->where($columnaVerificacion, $verificacion_id)
              ->where('contrato', $request->contrato)
@@ -588,6 +619,7 @@ class VerificacionControllerAnterior extends Controller
                     'cantidad_subitems'         => $item->cantidad_subitems?? null,
                     'verificacion'              => $item->verificacion?? null,
                     'descuento'                 => $item->descuento?? null,
+                    'porcentaje_personalizado_regalado' => $item->porcentaje_personalizado_regalado?? null,
                 ];
                 $contador++;
             }
@@ -2472,6 +2504,7 @@ class VerificacionControllerAnterior extends Controller
                     'cantidad_subitems'         => $item->cantidad_subitems?? null,
                     'verificacion'              => $item->verificacion?? null,
                     'descuento'                 => $item->descuento?? null,
+                    'porcentaje_personalizado_regalado' => $item->porcentaje_personalizado_regalado?? null,
                 ];
                 $contador++;
             }

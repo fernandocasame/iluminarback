@@ -2017,7 +2017,7 @@ class VentasController extends Controller
         $query = DetalleVentas::where('ven_codigo', $ven_codigo)
             ->leftjoin('1_4_cal_producto as p','p.pro_codigo','=','f_detalle_venta.pro_codigo')
             ->where('id_empresa', $id_empresa)
-            ->select('f_detalle_venta.*','p.ifcombo',DB::raw('CONCAT(p.pro_codigo, " - ", p.pro_nombre )as combolibro'))
+            ->select('f_detalle_venta.*','p.ifcombo','p.codigos_combos','p.pro_codigo as codigo_liquidacion','p.pro_nombre as nombre',DB::raw('CONCAT(p.pro_codigo, " - ", p.pro_nombre )as combolibro'))
             ->get(); // Usar 'get()' si esperas varios resultados
 
         // Retornar la respuesta
@@ -3677,4 +3677,286 @@ class VentasController extends Controller
             return response()->json(["status" => "0", 'message' => 'Error al obtener detalles: ' . $e->getMessage()], 500);
         }
     }
+
+public function getVentasContratosDetallado(Request $request)
+{
+    $periodo = $request->periodo_id;
+
+    // 1. Ventas del periodo 25
+    $ventas = \DB::table('f_venta')
+        ->where('periodo_id', $periodo)
+        ->wherein('idtipodoc', [1, 3, 4])
+        ->where('est_ven_codigo', '<>', 3)
+        ->get();
+
+    // Sacar los ven_codigo de esas ventas para buscar proformas
+    $venCodigosProformas = $ventas->pluck('ven_idproforma')->toArray();
+
+    // 2. Proformas relacionadas a esas ventas (prof_id = ven_codigo)
+    $proformas = \DB::table('f_proforma')
+        ->whereIn('prof_id', $venCodigosProformas)
+        ->get();
+
+    // Sacar idPuntoventa de esas proformas para contratos agrupados
+    $idPuntoventas = $proformas->pluck('idPuntoventa')->toArray();
+
+    // 3. Contratos agrupados relacionados a esas proformas (ca_codigo_agrupado = idPuntoventa)
+    $contratosAgrupados = \DB::table('f_contratos_agrupados')
+        ->whereIn('ca_codigo_agrupado', $idPuntoventas)
+        ->get();
+
+    // Sacar los códigos agrupados para buscar pedidos
+    $codigosAgrupados = $contratosAgrupados->pluck('ca_codigo_agrupado')->toArray();
+
+    // 4. Pedidos relacionados a esos contratos agrupados (ca_codigo_agrupado)
+    $pedidos = \DB::table('pedidos')
+        ->whereIn('ca_codigo_agrupado', $codigosAgrupados)
+        ->get();
+
+    $pedidos = \DB::table('pedidos')
+    ->whereIn('ca_codigo_agrupado', $codigosAgrupados)
+    ->get();
+
+    // 5. Sacar id_asesor y otros datos que quieras mostrar
+    $asesoresIds = $pedidos->pluck('id_asesor')->unique()->toArray();
+
+
+
+    $venCodigosPedidosObsequios = $ventas->pluck('ven_p_libros_obsequios')
+        ->filter(function($value) {
+            return !is_null($value) && $value !== '';
+        })
+        ->values()
+        ->toArray();
+
+    $pedidosObsequios = \DB::table('p_libros_obsequios')
+    ->whereIn('id', $venCodigosPedidosObsequios)
+    ->get();
+
+
+    $obsequiosUnicos = $pedidosObsequios->pluck('id_pedido')->unique()->toArray();
+
+
+    $pedidosObsquiosContratos = \DB::table('pedidos')
+        ->whereIn('id_pedido', $obsequiosUnicos)
+        ->get();
+
+    $asesoresObsequios = $pedidosObsquiosContratos->pluck('id_asesor')->unique()->toArray();
+
+    $asesoresIdsObsequiosContratos = array_merge($asesoresIds, $asesoresObsequios);
+
+     // Por ejemplo, sacar datos de asesores (si tienes tabla usuarios o asesores)
+    $asesores = \DB::table('usuario') // Cambia 'usuario' por tabla real de asesores/usuarios
+        ->whereIn('idusuario', $asesoresIdsObsequiosContratos)
+        ->get();
+
+
+    // Finalmente, puedes devolver un array con toda la info
+    return response()->json([
+        'ventas' => $ventas,
+        'proformas' => $proformas,
+        'contratosAgrupados' => $contratosAgrupados,
+        'pedidos' => $pedidos,
+        'asesores' => $asesores,
+    ]);
+}
+// public function getDetallePorAsesor()
+// {
+//     $periodo = 26;
+
+//     // 1. Obtener ventas filtradas igual que antes
+//     $ventas = \DB::table('f_venta')
+//         ->where('periodo_id', $periodo)
+//         ->whereIn('idtipodoc', [1, 3, 4])
+//         ->where('est_ven_codigo', '<>', 3)
+//         ->get();
+
+//     // Ven códigos para proformas
+//     $venCodigosProformas = $ventas->pluck('ven_idproforma')->filter()->values()->toArray();
+
+//     // Obtener proformas
+//     $proformas = \DB::table('f_proforma')
+//         ->whereIn('prof_id', $venCodigosProformas)
+//         ->get();
+
+//     // Sacar idPuntoventa para contratos agrupados
+//     $idPuntoventas = $proformas->pluck('idPuntoventa')->unique()->toArray();
+
+//     // Contratos agrupados
+//     $contratosAgrupados = \DB::table('f_contratos_agrupados')
+//         ->whereIn('ca_codigo_agrupado', $idPuntoventas)
+//         ->get();
+
+//     // Codigos agrupados para pedidos
+//     $codigosAgrupados = $contratosAgrupados->pluck('ca_codigo_agrupado')->unique()->toArray();
+
+//     // Pedidos
+//     $pedidos = \DB::table('pedidos')
+//         ->whereIn('ca_codigo_agrupado', $codigosAgrupados)
+//         ->get();
+
+//     // Obtener asesores únicos de pedidos
+//     $asesoresIds = $pedidos->pluck('id_asesor')->unique()->toArray();
+
+//     // Armar estructura: por cada asesor, sus pedidos, contratos, proformas y ventas
+
+//     $resultado = [];
+
+//     // Traer usuarios (asesores)
+//     $usuarios = \DB::table('usuarios')
+//         ->select('idusuario', 'name', 'apellido')
+//         ->get()
+//         ->keyBy('idusuario');
+
+//     // Traer instituciones
+//     $instituciones = \DB::table('institucion')
+//         ->select('idInstitucion', 'nombreInstitucion')
+//         ->get()
+//         ->keyBy('idInstitucion');
+
+//     foreach ($asesoresIds as $asesorId) {
+//         // Pedidos del asesor
+//         $pedidosAsesor = $pedidos->where('id_asesor', $asesorId);
+
+//         // Obtener códigos agrupados de esos pedidos
+//         $codigosAgrupadosAsesor = $pedidosAsesor->pluck('ca_codigo_agrupado')->unique()->toArray();
+
+//         // Contratos agrupados relacionados a esos códigos
+//         $contratosAsesor = $contratosAgrupados->whereIn('ca_codigo_agrupado', $codigosAgrupadosAsesor);
+
+//         // Obtener idPuntoventa de contratos para buscar proformas
+//         $idPuntoventasAsesor = $contratosAsesor->pluck('ca_codigo_agrupado')->unique()->toArray();
+
+//         // Proformas relacionados a esos contratos
+//         $proformasAsesor = $proformas->whereIn('idPuntoventa', $idPuntoventasAsesor);
+
+//         // Ven códigos de esas proformas para ventas
+//         $venCodigosProformasAsesor = $proformasAsesor->pluck('prof_id')->unique()->toArray();
+
+//         // Ventas relacionadas a esas proformas
+//         $ventasAsesor = $ventas->whereIn('ven_idproforma', $venCodigosProformasAsesor);
+
+//         // Guardar todo en el resultado
+//         $resultado[$asesorId] = [
+//             'pedidos' => $pedidosAsesor->values(),
+//             'contratosAgrupados' => $contratosAsesor->values(),
+//             'proformas' => $proformasAsesor->values(),
+//             'ventas' => $ventasAsesor->values(),
+//         ];
+//     }
+
+//     return response()->json($resultado);
+// }
+
+public function getDetallePorAsesor(Request $request)
+{
+    $periodo = $request->periodo_id;
+
+    // 1. Obtener ventas válidas
+    $ventas = \DB::table('f_venta')
+        ->where('periodo_id', $periodo)
+        ->whereIn('idtipodoc', [1, 3, 4])
+        ->where('est_ven_codigo', '<>', 3)
+        ->get();
+
+    $venCodigosProformas = $ventas->pluck('ven_idproforma')->filter()->values()->toArray();
+    $venObsequioIds = $ventas->pluck('ven_p_libros_obsequios')->filter()->unique()->toArray();
+
+    // 2. Obtener obsequios con su id_pedido
+    $obsequios = \DB::table('p_libros_obsequios')
+        ->whereIn('id', $venObsequioIds)
+        ->get()
+        ->keyBy('id'); // clave por ID del obsequio
+
+    $proformas = \DB::table('f_proforma')
+        ->whereIn('prof_id', $venCodigosProformas)
+        ->get();
+
+    $idPuntoventas = $proformas->pluck('idPuntoventa')->unique()->toArray();
+
+    $contratosAgrupados = \DB::table('f_contratos_agrupados')
+        ->whereIn('ca_codigo_agrupado', $idPuntoventas)
+        ->get();
+
+    $codigosAgrupados = $contratosAgrupados->pluck('ca_codigo_agrupado')->unique()->toArray();
+
+    $pedidos = \DB::table('pedidos')
+        ->join('f_contratos_agrupados as fc', 'pedidos.ca_codigo_agrupado', '=', 'fc.ca_codigo_agrupado')
+        ->select('pedidos.*', 'fc.ca_descripcion','fc.ca_tipo_pedido')
+        ->whereIn('pedidos.ca_codigo_agrupado', $codigosAgrupados)
+        ->get();
+
+    $asesoresIds = $pedidos->pluck('id_asesor')->unique()->toArray();
+    $institucionesIds = $pedidos->pluck('id_institucion')->unique()->toArray();
+
+    $usuarios = \DB::table('usuario')
+        ->select('idusuario', 'nombres', 'apellidos')
+        ->whereIn('idusuario', $asesoresIds)
+        ->get()
+        ->keyBy('idusuario');
+
+    $instituciones = \DB::table('institucion')
+        ->select('idInstitucion', 'nombreInstitucion')
+        ->whereIn('idInstitucion', $institucionesIds)
+        ->get()
+        ->keyBy('idInstitucion');
+
+    $resultado = [];
+
+    foreach ($asesoresIds as $asesorId) {
+        $pedidosAsesor = $pedidos->where('id_asesor', $asesorId)->map(function ($pedido) use ($instituciones) {
+            $institucion = $instituciones[$pedido->id_institucion] ?? null;
+            $pedido->nombre_institucion = $institucion ? $institucion->nombreInstitucion : 'Desconocida';
+            return $pedido;
+        });
+
+        $codigosAgrupadosAsesor = $pedidosAsesor->pluck('ca_codigo_agrupado')->unique()->toArray();
+        $contratosAsesor = $contratosAgrupados->whereIn('ca_codigo_agrupado', $codigosAgrupadosAsesor);
+        $idPuntoventasAsesor = $contratosAsesor->pluck('ca_codigo_agrupado')->unique()->toArray();
+        $proformasAsesor = $proformas->whereIn('idPuntoventa', $idPuntoventasAsesor);
+        $venCodigosProformasAsesor = $proformasAsesor->pluck('prof_id')->unique()->toArray();
+
+        // ➕ Ventas con proforma (agrupadas)
+        $ventasAgrupadas = $ventas->whereIn('ven_idproforma', $venCodigosProformasAsesor)->map(function ($v) {
+            $v->tipo_fuente = 'proforma';
+            return $v;
+        });
+
+        // ➕ Ventas de obsequios: solo las que no están asociadas a proformas
+        $ventasObsequioIndependientes = $ventas->filter(function ($venta) use ($obsequios, $pedidosAsesor) {
+            if ($venta->ven_idproforma || !$venta->ven_p_libros_obsequios) return false;
+            $obsequio = $obsequios[$venta->ven_p_libros_obsequios] ?? null;
+            return $obsequio && $pedidosAsesor->pluck('id_pedido')->contains($obsequio->id_pedido);
+        })->map(function ($venta) use ($obsequios) {
+            $venta->tipo_fuente = 'obsequio';
+
+            // ✅ Agregar manualmente el id_pedido desde el obsequio relacionado
+            $obsequio = $obsequios[$venta->ven_p_libros_obsequios] ?? null;
+            $venta->id_pedido = $obsequio ? $obsequio->id_pedido : null;
+
+            return $venta;
+        });
+
+
+        $usuario = $usuarios[$asesorId] ?? null;
+        $nombreAsesor = $usuario ? trim($usuario->nombres . ' ' . $usuario->apellidos) : "Asesor $asesorId";
+
+        $resultado[] = [
+            'id_asesor' => $asesorId,
+            'nombre_asesor' => $nombreAsesor,
+            'pedidos' => $pedidosAsesor->values(),
+            'contratosAgrupados' => $contratosAsesor->values(),
+            'proformas' => $proformasAsesor->values(),
+            'ventasAgrupadas' => $ventasAgrupadas->values(),
+            'ventasObsequioIndependientes' => $ventasObsequioIndependientes->values(),
+        ];
+    }
+
+    return response()->json($resultado);
+}
+
+
+
+
+
 }

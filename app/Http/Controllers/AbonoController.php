@@ -740,7 +740,24 @@ class AbonoController extends Controller
             OR fv.institucion_id = '$item->idInstitucion'
             AND fv.periodo_id = '$request->id_periodo'
             AND (fv.idtipodoc = 3 or fv.idtipodoc = 4 or fv.idtipodoc = 1)
-            AND fv.est_ven_codigo <> 3"); }
+            AND fv.est_ven_codigo <> 3"); 
+
+            // Nueva validación si tiene ventas
+            $ventas = DB::table('f_venta')
+                ->where(function($q) use ($item) {
+                    $q->where('institucion_id', $item->idInstitucion)
+                    ->orWhere('id_ins_depacho', $item->idInstitucion);
+                })
+                ->where('periodo_id', $id_periodo)
+                ->whereIn('idtipodoc', [1,2,3,4])
+                ->where('est_ven_codigo', '<>', 3)
+                ->exists();
+
+            // Añadir campo al objeto
+            $query[$key]->estado_ventas = $ventas ? 'Tiene ventas' : 'No tiene ventas';
+            
+        }
+
         return $query;
 
         // $lista = DB::SELECT("SELECT i.idInstitucion, i.nombreInstitucion,i.punto_venta
@@ -864,6 +881,7 @@ class AbonoController extends Controller
             'abono_documento' => 'nullable|string|max:100',
             'abono_concepto' => 'nullable|string|max:500',
             'abono_cuenta' => 'nullable|integer',
+            'notasOfactura' => 'required|integer|in:0,1'
         ]);
 
         if ($validator->fails()) {
@@ -898,7 +916,8 @@ class AbonoController extends Controller
 
             // Actualizar los campos
             $abono->abono_fecha = $request->abono_fecha;
-            $abono->abono_facturas = $request->abono_facturas;
+            $abono->abono_facturas = $request->notasOfactura == 0 ? $request->abono_facturas : 0;
+            $abono->abono_notas = $request->notasOfactura == 1 ? $request->abono_facturas : 0;
             $abono->abono_tipo = $request->abono_tipo;
             $abono->abono_documento = $request->abono_documento;
             $abono->abono_concepto = $request->abono_concepto;
@@ -936,7 +955,8 @@ class AbonoController extends Controller
             'abono_documento' => 'required|string|max:100',
             'abono_concepto' => 'nullable|string|max:500',
             'abono_cuenta' => 'nullable|integer',
-            'abono_id' => 'required'
+            'abono_id' => 'required',
+            'notasOfactura' => 'required|integer|in:0,1'
         ]);
 
         if ($validator->fails()) {
@@ -971,7 +991,8 @@ class AbonoController extends Controller
 
             // Actualizar los campos
             $abono->abono_fecha = $request->abono_fecha;
-            $abono->abono_notas = $request->abono_notas;
+            $abono->abono_facturas = $request->notasOfactura == 0 ? $request->abono_notas : 0;
+            $abono->abono_notas = $request->notasOfactura == 1 ? $request->abono_notas : 0;
             $abono->abono_tipo = $request->abono_tipo;
             $abono->abono_documento = $request->abono_documento;
             $abono->abono_concepto = $request->abono_concepto;

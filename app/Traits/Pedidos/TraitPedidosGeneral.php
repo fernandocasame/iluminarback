@@ -133,6 +133,13 @@ trait TraitPedidosGeneral
             AND l.id_pedido = p.id_pedido
         ) AS contadorPendientesConvenio,
         (
+            SELECT COUNT(l.doc_codigo) AS contadorPendientesConvenio
+            FROM 1_4_documento_liq l
+            WHERE l.tipo_pago_id = "4"
+            AND l.estado ="1"
+            AND l.id_pedido = p.id_pedido
+        ) AS contadorAprobadosConvenio,
+        (
             SELECT COUNT(l.doc_codigo) AS contadorPendientesAnticipos
             FROM 1_4_documento_liq l
             WHERE l.tipo_pago_id = "1"
@@ -141,14 +148,44 @@ trait TraitPedidosGeneral
             AND l.id_pedido = p.id_pedido
         ) AS contadorPendientesAnticipos,
         (
-            SELECT con.anticipo_global FROM pedidos_convenios con
-            WHERE con.id = p.pedidos_convenios_id
-        ) AS anticipo_global,
+        SELECT COUNT(c.id) FROM  pedidos_convenios  c
+            where  c.id = p.pedidos_convenios_id
+            AND c.estado <> 2
+            AND c.convenio_aprobado = 0
+         ) AS contadorConvenioPendientes,
+        (
+           SELECT COUNT(c.id) FROM  pedidos_convenios  c
+            where  c.id = p.pedidos_convenios_id
+            AND c.estado <> 2
+            AND c.convenio_aprobado = 1
+        ) AS contadorConvenioSolicitadoGerencia,
+        (
+           SELECT COUNT(c.id) FROM  pedidos_convenios  c
+            where  c.id = p.pedidos_convenios_id
+            AND c.estado <> 2
+            AND c.convenio_aprobado = 3
+        ) AS contadorConvenioAprobadoGerencia,
+        (
+           SELECT COUNT(c.id) FROM  pedidos_convenios  c
+            where  c.id = p.pedidos_convenios_id
+            AND c.estado <> 2
+            AND c.convenio_aprobado = 4
+        ) AS contadorConvenioAprobadoFacturador,
         (
             SELECT COUNT(p.id) AS convenioAnulado FROM pedidos_convenios p
             WHERE p.id = p.pedidos_convenios_id
             AND p.estado = 2
         ) AS convenioAnulado,
+         (
+            SELECT COUNT(p.id) AS convenioFinalizados FROM pedidos_convenios p
+            WHERE p.id = p.pedidos_convenios_id
+            AND p.estado = 0
+        ) AS convenioFinalizados,
+        (
+            SELECT con.anticipo_global FROM pedidos_convenios con
+            WHERE con.id = p.pedidos_convenios_id
+        ) AS anticipo_global,
+
         pe.periodoescolar as periodo,pe.codigo_contrato, pe.regaladosReporteNuevo,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
         i.region_idregion as region,uf.iniciales as iniciales_facturador,

@@ -2027,6 +2027,7 @@ class PedidosController extends Controller
                 'contadorHijosDocentesAbiertosEnviados' => $item->contadorHijosDocentesAbiertosEnviados,
                 'contadorObsequiosAbiertosEnviados'    => $item->contadorObsequiosAbiertosEnviados,
                 'contadorPendientesConvenio'     => $item->contadorPendientesConvenio,
+                'contadorAprobadosConvenio'     => $item->contadorAprobadosConvenio,
                 'contadorPendientesAnticipos'    => $item->contadorPendientesAnticipos,
                 'periodo'                        => $item->periodo,
                 'facturador'                     => $item->facturador,
@@ -2039,8 +2040,14 @@ class PedidosController extends Controller
                 'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
                 'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
                 'anticipo_global'                => $item->anticipo_global,
-                'convenioAnulado'                => $item->convenioAnulado,
                 'regaladosReporteNuevo'          => $item->regaladosReporteNuevo,
+
+                'contadorConvenioPendientes'       => $item->contadorConvenioPendientes,
+                'contadorConvenioSolicitadoGerencia' => $item->contadorConvenioSolicitadoGerencia,
+                'contadorConvenioAprobadoGerencia' => $item->contadorConvenioAprobadoGerencia,
+                'contadorConvenioAprobadoFacturador' => $item->contadorConvenioAprobadoFacturador,
+                'convenioAnulado'                => $item->convenioAnulado,
+                'convenioFinalizados'             => $item->convenioFinalizados
             ];
         }
         return $response;
@@ -2134,8 +2141,14 @@ class PedidosController extends Controller
                     'permitir_editar_despues_contrato' => $item->permitir_editar_despues_contrato,
                     'ca_codigo_agrupado'             => $item->ca_codigo_agrupado,
                     'anticipo_global'                => $item->anticipo_global,
-                    'convenioAnulado'                => $item->convenioAnulado,
                     'regaladosReporteNuevo'          => $item->regaladosReporteNuevo,
+
+                    'contadorConvenioPendientes'       => $item->contadorConvenioPendientes,
+                    'contadorConvenioSolicitadoGerencia' => $item->contadorConvenioSolicitadoGerencia,
+                    'contadorConvenioAprobadoGerencia' => $item->contadorConvenioAprobadoGerencia,
+                    'contadorConvenioAprobadoFacturador' => $item->contadorConvenioAprobadoFacturador,
+                    'convenioAnulado'                => $item->convenioAnulado,
+                    'convenioFinalizados'            => $item->convenioFinalizados,
                 ];
             }
             return $datosMostrar;
@@ -4402,6 +4415,7 @@ class PedidosController extends Controller
                     //CERRAR ALCANCE
                     $alcance = PedidoAlcance::findOrFail($id_alcance);
                     $alcance->estado_alcance = 1;
+                    $alcance->fecha_aprobacion = date('Y-m-d H:i:s');
                     $alcance->save();
                     return $alcance;
                 }else{
@@ -4465,6 +4479,7 @@ class PedidosController extends Controller
                     //CERRAR ALCANCE
                     $alcance = PedidoAlcance::findOrFail($id_alcance);
                     $alcance->estado_alcance = 1;
+                    $alcance->fecha_aprobacion = date('Y-m-d H:i:s');
                     $alcance->save();
                     return $alcance;
                 }else{
@@ -4525,20 +4540,20 @@ class PedidosController extends Controller
         $contador   = 0;
         foreach($query as $key => $item){
             //estado alcance => 0 = abierto; 1 = cerrado; 2 = rechazado;
-            $estado_alcance = $item->estado_alcance;
+            // $estado_alcance = $item->estado_alcance;
             //si el alcance esta cerrado o aprobado
-            $fecha_aprobacion = "";
-            if($estado_alcance == 1){
-                $historico = DB::SELECT("SELECT * FROM pedidos_alcance_historico ha
-                WHERE ha.id_pedido = '$id_pedido'
-                AND ha.alcance_id = '$item->id'
-                ");
-                if(!empty($historico)){
-                    $fecha_aprobacion = $historico[0]->created_at;
-                }else{
-                    $fecha_aprobacion  ="";
-                }
-            }
+            $fecha_aprobacion = $item->fecha_aprobacion;
+            // if($estado_alcance == 1){
+            //     $historico = DB::SELECT("SELECT * FROM pedidos_alcance_historico ha
+            //     WHERE ha.id_pedido = '$id_pedido'
+            //     AND ha.alcance_id = '$item->id'
+            //     ");
+            //     if(!empty($historico)){
+            //         $fecha_aprobacion = $historico[0]->created_at;
+            //     }else{
+            //         $fecha_aprobacion  ="";
+            //     }
+            // }
             $datos[$key] = [
                 "id"                    => $item->id,
                 "id_periodo"            => $item->id_periodo,
@@ -8513,5 +8528,12 @@ class PedidosController extends Controller
                 'pedido' => $setPedido
             ]);
         }
+    }
+    public function change_asesor_en_pedido(Request $request){
+         // Buscar el pedido usando Eloquent (findOrFail lanza una excepción si no se encuentra)
+            $pedido = Pedidos::findOrFail($request->id_pedido);
+            $pedido->id_asesor = $request->id_asesor;
+            $pedido->save();
+            return $pedido;
     }
 }
