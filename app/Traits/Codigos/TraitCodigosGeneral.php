@@ -30,12 +30,12 @@ trait TraitCodigosGeneral{
     public function getCodigosVerificaciones($codigo){
         $consulta = DB::SELECT("SELECT
         c.venta_lista_institucion,
-        c.anio,c.serie, c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.serie,
+        c.codigos_barras,c.anio,c.serie, c.codigo,c.bc_estado,c.estado,c.estado_liquidacion,contador,c.serie,
         c.venta_estado,c.bc_periodo,c.bc_institucion,c.idusuario,c.id_periodo,c.contrato,c.libro as book,c.libro_idlibro,
         CONCAT(u.nombres, ' ', u.apellidos) as estudiante, CONCAT(ucr.nombres, ' ', ucr.apellidos) as creador,
          u.email,u.cedula, ib.nombreInstitucion as institucion_barras,c.created_at,
         i.nombreInstitucion, p.periodoescolar as periodo,pb.periodoescolar as periodo_barras,c.bc_fecha_ingreso,
-        c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,
+        c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10,
         IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
         (case when (c.estado_liquidacion = '0') then 'liquidado'
             when (c.estado_liquidacion = '1') then 'sin liquidar'
@@ -46,6 +46,9 @@ trait TraitCodigosGeneral{
         (case when (c.bc_estado = '2') then 'codigo leido'
         when (c.bc_estado = '1') then 'codigo sin leer'
         end) as barrasEstado,
+        (case when (c.codigos_barras = '1') then 'con código de barras'
+            when (c.codigos_barras = '0')  then 'sin código de barras'
+        end) as status,
         (case when (c.venta_estado = '0') then ''
             when (c.venta_estado = '1') then 'Venta directa'
             when (c.venta_estado = '2') then 'Venta por lista'
@@ -55,8 +58,7 @@ trait TraitCodigosGeneral{
         IF(c.prueba_diagnostica ='1', 'Prueba de diagnóstico','Código normal') as tipoCodigo,
         c.porcentaje_descuento,  c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,
         c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma, ls.codigo_liquidacion,
-        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo, c.codigo_combo, c.documento_devolucion, c.plus,
-        c.quitar_de_reporte
+        CONCAT(ase.nombres, ' ', ase.apellidos) as asesor, c.combo, c.codigo_combo, c.documento_devolucion, c.plus
         FROM codigoslibros c
         LEFT JOIN usuario u ON c.idusuario = u.idusuario
         LEFT JOIN usuario ucr ON c.idusuario_creador_codigo = ucr.idusuario
@@ -71,7 +73,7 @@ trait TraitCodigosGeneral{
         return $consulta;
     }
     //conDevolucion => 1 si; 0 no;
-    public function getCodigos($codigo,$conDevolucion,$busqueda = 0,$primerParametro=0,$segundoParametro=0,$request=null){
+    public function getCodigos($codigo,$conDevolucion,$busqueda = 0,$primerParametro=0,$segundoParametro=0){
         $resultado = DB::table('codigoslibros as c')
         ->select(DB::raw('c.factura, c.prueba_diagnostica,c.contador,c.codigo_union,
         IF(c.prueba_diagnostica ="1", "Prueba de diagnóstico","Código normal") as tipoCodigo,
@@ -93,6 +95,9 @@ trait TraitCodigosGeneral{
         (case when (c.bc_estado = "2") then "codigo leido"
         when (c.bc_estado = "1") then "codigo sin leer"
         end) as barrasEstado,
+        (case when (c.codigos_barras = "1") then "con código de barras"
+            when (c.codigos_barras = "0")  then "sin código de barras"
+        end) as status,
         (case when (c.venta_estado = "0") then ""
             when (c.venta_estado = "1") then "Venta directa"
             when (c.venta_estado = "2") then "Venta por lista"
@@ -104,6 +109,11 @@ trait TraitCodigosGeneral{
                 when (ci.verif3 > 0) then "verif3"
                 when (ci.verif4 > 0) then "verif4"
                 when (ci.verif5 > 0) then "verif5"
+                when (ci.verif6 > 0) then "verif6"
+                when (ci.verif7 > 0) then "verif7"
+                when (ci.verif8 > 0) then "verif8"
+                when (ci.verif9 > 0) then "verif9"
+                when (ci.verif10 > 0) then "verif10"
                 end) as verificacion
             FROM codigoslibros ci
             WHERE ci.codigo = c.codigo
@@ -112,7 +122,7 @@ trait TraitCodigosGeneral{
         p.periodoescolar as periodo,
         pb.periodoescolar as periodo_barras,ivl.nombreInstitucion as InstitucionLista,
         c.codigo_paquete,c.fecha_registro_paquete,c.liquidado_regalado,c.codigo_proforma,c.proforma_empresa, c.devuelto_proforma,
-        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo,c.codigo_combo,c.documento_devolucion, c.plus, c.quitar_de_reporte'
+        ls.codigo_liquidacion, CONCAT(ase.nombres, " ", ase.apellidos) as asesor, c.combo,c.codigo_combo,c.documento_devolucion, c.plus'
         ))
         ->leftJoin('usuario as  u',         'c.idusuario',                  'u.idusuario')
         ->leftJoin('usuario as  ase',       'c.asesor_id',                  'ase.idusuario')
@@ -136,15 +146,6 @@ trait TraitCodigosGeneral{
         if($busqueda == 5) {  $resultado->where('c.codigo_combo', '=', $codigo)->where('prueba_diagnostica','0'); }
         //todos los codigos de un combo
         if($busqueda == 6) {  $resultado->where('c.codigo_combo', '=', $codigo); }
-        //reporte detalle de venta
-        if($busqueda == 7) {
-            $resultado->where(function($query) use ($request) {
-                $query->where('c.bc_institucion', '=', $request->institucion_id)
-                      ->orWhere('venta_lista_institucion', '=', $request->institucion_id);
-            })
-            ->where('c.bc_periodo', '=', $request->periodo_id)
-            ->where('c.prueba_diagnostica', '=', '0');
-        }
         $consulta = $resultado->get();
         if(empty($consulta)){
             return $consulta;
@@ -197,6 +198,7 @@ trait TraitCodigosGeneral{
                 "porcentaje_descuento"          => $item->porcentaje_descuento,
                 "prueba_diagnostica"            => $item->prueba_diagnostica,
                 "serie"                         => $item->serie,
+                "status"                        => $item->status,
                 "tipoCodigo"                    => $item->tipoCodigo,
                 "ventaEstado"                   => $item->ventaEstado,
                 "venta_estado"                  => $item->venta_estado,
@@ -214,8 +216,7 @@ trait TraitCodigosGeneral{
                 'codigo_combo'                  => $item->codigo_combo,
                 'documento_devolucion'          => $item->documento_devolucion,
                 'devuelto_proforma'             => $item->devuelto_proforma,
-                'plus'                          => $item->plus,
-                'quitar_de_reporte'             => $item->quitar_de_reporte,
+                'plus'                          => $item->plus
             ];
         }
         return $datos;
@@ -240,6 +241,9 @@ trait TraitCodigosGeneral{
             (case when (c.bc_estado = '2') then 'codigo leido'
             when (c.bc_estado = '1') then 'codigo sin leer'
             end) as barrasEstado,
+            (case when (c.codigos_barras = '1') then 'con código de barras'
+                when (c.codigos_barras = '0')  then 'sin código de barras'
+            end) as status,
             (case when (c.venta_estado = '0') then ''
                 when (c.venta_estado = '1') then 'Venta directa'
                 when (c.venta_estado = '2') then 'Venta por lista'
@@ -251,6 +255,11 @@ trait TraitCodigosGeneral{
                     when (ci.verif3 > 0) then 'verif3'
                     when (ci.verif4 > 0) then 'verif4'
                     when (ci.verif5 > 0) then 'verif5'
+                    when (ci.verif6 > 0) then 'verif6'
+                    when (ci.verif7 > 0) then 'verif7'
+                    when (ci.verif8 > 0) then 'verif8'
+                    when (ci.verif9 > 0) then 'verif9'
+                    when (ci.verif10 > 0) then 'verif10'
                     end) as verificacion
                 FROM codigoslibros ci
                 WHERE ci.codigo = c.codigo
@@ -307,6 +316,7 @@ trait TraitCodigosGeneral{
                 "porcentaje_descuento"          => $item->porcentaje_descuento,
                 "prueba_diagnostica"            => $item->prueba_diagnostica,
                 "serie"                         => $item->serie,
+                "status"                        => $item->status,
                 "tipoCodigo"                    => $item->tipoCodigo,
                 "ventaEstado"                   => $item->ventaEstado,
                 "venta_estado"                  => $item->venta_estado,
@@ -332,7 +342,7 @@ trait TraitCodigosGeneral{
         ");
         return $query;
     }
-    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values,$devueltos_liquidados=null,$verificacion_liquidada=null,$combo=null){
+    public function GuardarEnHistorico ($id_usuario,$institucion_id,$periodo_id,$codigo,$usuario_editor,$comentario,$old_values,$new_values,$devueltos_liquidados=null,$verificacion_liquidada=null){
         $historico = new HistoricoCodigos();
         $historico->id_usuario              =  $id_usuario;
         $historico->usuario_editor          =  $institucion_id;
@@ -344,7 +354,6 @@ trait TraitCodigosGeneral{
         $historico->new_values              =  $new_values;
         $historico->devueltos_liquidados    = $devueltos_liquidados;
         $historico->verificacion_liquidada  = $verificacion_liquidada;
-        $historico->combo                   = $combo;
         $historico->save();
         return "Guardado en historico";
     }
@@ -364,7 +373,7 @@ trait TraitCodigosGeneral{
         $historico->save();
         return "Guardado en historico";
     }
-    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion,$estado_codigo,$codigo_combo,$plus){
+    public function tr_GuardarDevolucionHijos($id_devolucion,$codigo,$pro_codigo,$id_cliente,$combo,$factura,$documento,$id_empresa,$tipo_venta,$id_periodo,$prueba_diagnostico,$codigo_union,$id_libro,$codigo_paquete,$estado_liquidacion,$regalado_liquidado,$precio,$tipo_importacion,$estado_codigo,$codigo_combo){
         //validar que si el codigo ya existe no guardar
         $validate = CodigosLibrosDevolucionSon::where('codigo',$codigo)->where('id_cliente',$id_cliente)->where('codigoslibros_devolucion_id',$id_devolucion)->first();
         if($validate){
@@ -375,6 +384,7 @@ trait TraitCodigosGeneral{
             $devolucionH->codigo                        = $codigo;
             $devolucionH->pro_codigo                    = $pro_codigo;
             $devolucionH->id_cliente                    = $id_cliente;
+            $devolucionH->combo                         = $combo;
             $devolucionH->factura                       = $factura;
             $devolucionH->documento                     = $documento;
             $devolucionH->id_empresa                    = $id_empresa;
@@ -389,15 +399,7 @@ trait TraitCodigosGeneral{
             $devolucionH->precio                        = $precio;
             $devolucionH->tipo_importacion              = $tipo_importacion;
             $devolucionH->estado_codigo                 = $estado_codigo;
-            if($tipo_importacion == 3){
-                $devolucionH->codigo_combo              = $codigo_combo;
-                $devolucionH->combo                     = $combo;
-            }
-            if($plus == 1){
-                $devolucionH->plus = 1;
-            }else{
-                $devolucionH->plus = 0;
-            }
+            $devolucionH->codigo_combo                  = $codigo_combo;
             $devolucionH->save();
             return "Guardado en devolucion hijo";
         }

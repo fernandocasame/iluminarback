@@ -31,9 +31,7 @@ class _14Producto extends Model
         'pro_costo',
         'pro_peso',
         'pro_estado',
-        'user_created',
-        'ifcombo',
-        'codigos_combos',
+        'user_created'
         // Agrega cualquier otro campo que sea fillable
     ];
     // Define el método como estático
@@ -104,7 +102,7 @@ class _14Producto extends Model
         if (!is_numeric($cantidadEmpresa)) {
             throw new \InvalidArgumentException('La cantidad empresa debe ser un número.');
         }
-
+       
         $setEmpresa = '';
         // Determina la columna a actualizar basada en la empresa
         if($tipo == 0){

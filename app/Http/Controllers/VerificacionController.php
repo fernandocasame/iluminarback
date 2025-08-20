@@ -84,7 +84,8 @@ class VerificacionController extends Controller
                 
                 
                 $buscarcodigosLibros = DB::select("SELECT contrato, codigoslibros.codigo, ls.codigo_liquidacion, libro.nombrelibro, libro.idlibro, 
-                    codigoslibros.verif1, codigoslibros.verif2,codigoslibros.verif3,codigoslibros.verif4,codigoslibros.verif5
+                    codigoslibros.verif1, codigoslibros.verif2,codigoslibros.verif3,codigoslibros.verif4,codigoslibros.verif5, codigoslibros.verif6,
+                    codigoslibros.verif7,codigoslibros.verif8,codigoslibros.verif9,codigoslibros.verif10
                     FROM codigoslibros, libro,  libros_series ls
             
             
@@ -657,7 +658,7 @@ class VerificacionController extends Controller
 
 
                 $code =  $codigosDelLibro[$contador17]->codigo;
-                $buscarVerificacion = DB::select("SELECT verif1,verif2,verif3,verif4,verif5,idusuario FROM codigoslibros WHERE codigo = '$code'");
+                $buscarVerificacion = DB::select("SELECT verif1,verif2,verif3,verif4,verif5,verif6,verif7,verif8,verif9,verif10 ,idusuario FROM codigoslibros WHERE codigo = '$code'");
                  
                 $datoVerificacion =  $buscarVerificacion[0]->$columnaVerificacion;
         
@@ -776,7 +777,7 @@ class VerificacionController extends Controller
 
 
                     $code =  $codigosDelLibro[$contador17]->codigo;
-                    $buscarVerificacion = DB::select("SELECT verif1,verif2,verif3,verif4,verif5,idusuario FROM codigoslibros WHERE codigo = '$code'");
+                    $buscarVerificacion = DB::select("SELECT verif1,verif2,verif3,verif4,verif5,verif6,verif7,verif8,verif9,verif10 ,idusuario FROM codigoslibros WHERE codigo = '$code'");
                     
                     $datoVerificacion =  $buscarVerificacion[0]->$columnaVerificacion;
                     $VerificacionUsuario = $buscarVerificacion[0]->idusuario;
@@ -951,7 +952,20 @@ class VerificacionController extends Controller
       
      }
 
-   
+     //APIS
+     //api:Get>> liquidacion/codigosperdidos/{contrato}
+     public function codigosperdidos($contrato){
+        $buscarCodigosPerdidos = DB::select("SELECT h.* , u.cedula,u.nombres,u.apellidos
+         FROM hist_codlibros h, usuario u
+         WHERE h.contrato_actual = '$contrato'
+         and u.idusuario = h.id_usuario
+         ");
+        if(!empty($buscarCodigosPerdidos)){
+            return  ["status"=>"1","codigos" => $buscarCodigosPerdidos];
+        }else{
+            return  ["status"=>"0","message" => "No hay historial de codigos perdidos para ese contrato"];
+        }
+     }
 
      //api:Get>> liquidacion/codigosmovidos/contrato
      public function codigosmovidos($contrato){

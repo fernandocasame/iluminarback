@@ -90,16 +90,16 @@ class DocumentosController extends Controller
             $documento->descripcion = $request->descripcion;
             $documento->status = $request->status;
             $documento->save();
-
+            
             foreach ($data['files'] as $key => $value) {
                 $dt = new DocumentosArchivo();
                 $dt->documento = $documento->id;
                 $dt->archivo = $value['id'];
                 $dt->save();
             }
-
+            
             $asignaturas = $request->asignaturas;
-
+            
             foreach ($asignaturas as $key => $value) {
                 $asig = new DocumentosAsignaturas();
                 $asig->iddocumento = $documento->id;
@@ -119,7 +119,7 @@ class DocumentosController extends Controller
             DB::DELETE("DELETE FROM `documentos_asignatura` WHERE `iddocumento` = ?",[$request->id]);
 
             $asignaturas = $request->asignaturas;
-
+            
             foreach ($asignaturas as $key => $value) {
                 $asig = new DocumentosAsignaturas();
                 $asig->iddocumento = $request->id;

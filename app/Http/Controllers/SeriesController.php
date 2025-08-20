@@ -30,42 +30,6 @@ class SeriesController extends Controller
         $datos = array();
         foreach($series as $key => $value){
             $areas = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,
-            t.nombretipoarea, pf.*, pr.codigos_combos
-            FROM area ar
-            INNER JOIN asignatura a ON ar.idarea = a.area_idarea
-            INNER JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
-            INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
-            INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
-            INNER JOIN pedidos_formato pf ON pf.id_area = ar.idarea
-            LEFT JOIN 1_4_cal_producto pr ON pr.pro_codigo = ls.codigo_liquidacion
-            WHERE ls.id_serie = ?
-            AND pf.id_periodo = ?
-            AND pf.id_serie = ?
-            AND ar.estado = '1'
-            AND a.estado = '1'
-            AND pf.pvp <> 0
-            AND l.Estado_idEstado = 1
-            GROUP BY ar.idarea
-            ORDER BY pf.orden ASC", [$value->id_serie, $periodo, $value->id_serie]);
-            if( $areas ){
-                $datos[$key] = [
-                    "id_serie" => $value->id_serie,
-                    "nombre_serie" => $value->nombre_serie,
-                    "areas" => $areas
-                ];
-            }
-        }
-        return $datos;
-    }
-
-    public function series_formato_periodo_guias($periodo)
-    {//SOLO FORMATOS YA CONFIGURADOS INNER
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $series = DB::SELECT("SELECT * FROM series s WHERE s.id_serie != 6 ORDER BY s.nombre_serie DESC"); // omitir plan lector
-        $datos = array();
-        foreach($series as $key => $value){
-            $areas = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,
             t.nombretipoarea, pf.*
             FROM area ar
             INNER JOIN asignatura a ON ar.idarea = a.area_idarea
@@ -73,7 +37,6 @@ class SeriesController extends Controller
             INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
             INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
             INNER JOIN pedidos_formato pf ON pf.id_area = ar.idarea
-            INNER JOIN 1_4_cal_producto pr ON pr.pro_codigo = CONCAT('G', ls.codigo_liquidacion)
             WHERE ls.id_serie = ?
             AND pf.id_periodo = ?
             AND pf.id_serie = ?
@@ -166,10 +129,9 @@ class SeriesController extends Controller
             $serie = new Series();
         }
         $serie->nombre_serie        = $request->nombre_serie;
-        // $serie->longitud_numeros    = $request->longitud_numeros;
-        // $serie->longitud_letras     = $request->longitud_letras;
-        $serie->longitud_codigo             = $request->longitud_codigo;
-        $serie->longitud_codigo_grafitext   = $request->longitud_codigo_grafitext;
+        $serie->longitud_numeros    = $request->longitud_numeros;
+        $serie->longitud_letras     = $request->longitud_letras;
+        $serie->longitud_codigo     = $request->longitud_codigo;
         $serie->save();
         if($serie){
             return ["status" => "1", "message" => "Se guardo correctamente"];
@@ -255,7 +217,7 @@ class SeriesController extends Controller
     public function getSeriesBasicas($periodo){
         $series = DB::SELECT("SELECT sb.*, s.nombre_serie
             FROM pedidos_series_basicas sb
-            INNER JOIN series s ON sb.id_serie = s.id_serie
+            LEFT JOIN series s ON sb.id_serie = s.id_serie
             WHERE sb.periodo_id = '$periodo'
         ");
         return $series;
@@ -322,107 +284,86 @@ class SeriesController extends Controller
     }
 
     //METODOS JEYSON
-    public function areasxSerie_FomatoPedido(Request $request)
-    {
-        // AREAS
-        $query = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea, ls.id_serie
-            FROM libros_series ls
-            LEFT JOIN libro l ON ls.idLibro = l.idlibro
-            LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-            LEFT JOIN area ar ON a.area_idarea = ar.idarea
-            WHERE ls.id_serie = ?
-            AND l.Estado_idEstado = '1'
-            AND a.estado = '1'", [$request->id_serie]);
-        $datos = [];
-        $libros = [];
-        $contador = 0;
-        foreach ($query as $key => $item) {
-            $contador2 = 0;
-            for ($i = 1; $i <= 10; $i++) {
-                $query2 = DB::SELECT("SELECT l.nombrelibro, l.idlibro, l.asignatura_idasignatura, ls.*, pro.codigos_combos, l.descripcionlibro
-                    FROM libros_series ls
-                    LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                    LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
-                    LEFT JOIN area ar ON a.area_idarea = ar.idarea
-                    LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
-                    WHERE ls.id_serie = ?
-                    AND a.area_idarea = ?
-                    AND l.Estado_idEstado = '1'
-                    AND a.estado = '1'
-                    AND ls.year = ?", [$request->id_serie, $item->idarea, $i]);
-                if (empty($query2)) {
+    public function areasxSerie_FomatoPedido(Request $request){
+        //AREAS
+        $query = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,ls.id_serie
+        FROM libros_series ls
+        LEFT JOIN libro l ON ls.idLibro = l.idlibro
+        LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+        LEFT JOIN area ar ON a.area_idarea = ar.idarea
+        WHERE ls.id_serie = '$request->id_serie'
+        AND l.Estado_idEstado = '1'
+        AND a.estado = '1'
+        ");
+        $datos      = [];
+        $libros     = [];
+        $contador   = 0;
+        foreach($query as $key => $item){
+            $contador2  = 0;
+            for($i =1; $i<=10; $i++){
+                $query2 = DB::SELECT("SELECT l.nombrelibro,  l.idlibro,l.asignatura_idasignatura , ls.*
+                FROM libros_series ls
+                LEFT JOIN libro l ON ls.idLibro = l.idlibro
+                LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
+                LEFT JOIN area ar ON a.area_idarea = ar.idarea
+                WHERE ls.id_serie = '$request->id_serie'
+                AND a.area_idarea  = '$item->idarea'
+                AND l.Estado_idEstado = '1'
+                AND a.estado = '1'
+                AND ls.year = '$i'
+                ");
+                if(empty($query2)){
                     $libros[$contador2] = [
-                        "nivel" => 0,
-                        "nombrelibro" => "",
-                        "formato" => 0,
-                        "selected" => false,
+                        "nivel"             => 0,
+                        "nombrelibro"       => "",
+                        // "id_serie"          => "",
+                        // "pfn_id"    => 0,
+                        // "formato"           => "",
+                        // "selected"          => false
                     ];
-                } else {
-                    $idlibro = $query2[0]->idlibro;
-                    $idasignatura = $query2[0]->asignatura_idasignatura;
-
-                    // Validar si el docente tiene el libro
+                }else{
+                    $idlibro        = $query2[0]->idlibro;
+                    $idasignatura   = $query2[0]->asignatura_idasignatura;
+                    //validar si el docente tiene el libro
                     $query3 = DB::SELECT("SELECT * FROM pedidos_formato_new pfn
-                        WHERE pfn.idperiodoescolar = ?
-                        AND pfn.idlibro = ?", [$request->periodo_id, $idlibro]);
-                    $pfn_id = 0;
-                    $selected = false;
-                    $pfn_pvp = 0.00;
-                    $pfn_estado = null;
-
-                    if (count($query3) > 0) {
-                        $pfn_id = $query3[0]->pfn_id;
-                        $selected = true;
-                        $pfn_pvp = $query3[0]->pfn_pvp;
-                        $pfn_estado = $query3[0]->pfn_estado;
-                        $pfn_estado = $pfn_estado == 1 ? true : false;
-                    }
-                    // Procesar codigos_combos
-                    $codigos_combos = $query2[0]->codigos_combos;
-                    $pro_codigos_desglose = [];
-                    if (!empty($codigos_combos)) {
-                        $codigos_array = explode(',', $codigos_combos);
-
-                        foreach ($codigos_array as $codigo) {
-                            $desglose = DB::SELECT("SELECT ls.codigo_liquidacion, l.nombrelibro
-                                FROM libros_series ls
-                                LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                                WHERE ls.codigo_liquidacion = ?", [$codigo]);
-
-                            if (empty($desglose)) {
-                                // ⚠️ Si no se encuentra el código, lanzar error
-                                throw new \Exception("⚠️ Código '$codigo' asociado al combo '{$query2[0]->nombrelibro}' no fue encontrado. 'Verifica los códigos del combo.");
-                            }
-
-                            $pro_codigos_desglose[] = [
-                                "codigo_liquidacion" => $desglose[0]->codigo_liquidacion,
-                                "nombrelibro" => $desglose[0]->nombrelibro,
-                            ];
+                    WHERE pfn.idperiodoescolar = '$request->periodo_id'
+                    AND pfn.idlibro = '$idlibro'");
+                    $pfn_id         = 0;
+                    $selected       = false;
+                    $pfn_pvp        = 0.00;
+                    $pfn_estado     = null; // Inicializar la variable
+                    if(count($query3) > 0){
+                        $pfn_id         = $query3[0]->pfn_id;
+                        $selected       = true;
+                        $pfn_pvp        = $query3[0]->pfn_pvp;
+                        $pfn_estado     = $query3[0]->pfn_estado; // Asegúrate de que este campo existe en la tabla
+                        if ($pfn_estado == 0) {
+                            $pfn_estado = false;
+                        }elseif ($pfn_estado == 1) {
+                            $pfn_estado = true;
                         }
                     }
                     $libros[$contador2] = [
-                        "nivel" => $query2[0]->year,
-                        "nombrelibro" => $query2[0]->nombrelibro,
-                        "codigos_combos" => $codigos_combos,
-                        "idlibro" => $idlibro,
-                        "idasignatura" => $idasignatura,
-                        "pfn_id" => $pfn_id,
-                        "pfn_pvp" => $pfn_pvp,
-                        "pfn_estado" => $pfn_estado,
-                        "formato" => 0,
-                        "descripcionlibro" => $query2[0]->descripcionlibro,
-                        "selected" => $selected,
-                        "pro_codigos_desglose" => $pro_codigos_desglose
+                        "nivel"             => $query2[0]->year,
+                        "nombrelibro"       => $query2[0]->nombrelibro,
+                        "idlibro"           => $idlibro,
+                        "idasignatura"      => $idasignatura,
+                        "pfn_id"            => $pfn_id,
+                        "pfn_pvp"           => $pfn_pvp,
+                        "pfn_estado"        => $pfn_estado,
+                        //si no ha seleccionado es 0 si ha seleccionado es 1
+                        "formato"           => 0,
+                        "selected"          => $selected
                     ];
                 }
                 $contador2++;
             }
             $getLibros = $this->setearValores($libros);
             $datos[$contador] = [
-                "idarea" => $item->idarea,
-                "nombrearea" => $item->nombrearea,
-                "id_serie" => $item->id_serie,
-                "libros" => $getLibros
+                "idarea"        => $item->idarea,
+                "nombrearea"    => $item->nombrearea,
+                "id_serie"      => $item->id_serie,
+                "libros"        => $getLibros
             ];
             $contador++;
         }
@@ -522,6 +463,7 @@ class SeriesController extends Controller
         // Obtener las series, excluyendo la serie con id 6
         $series = DB::SELECT("SELECT * FROM series s ORDER BY s.nombre_serie DESC");
         $datos = array();
+
         foreach($series as $key => $value) {
             // Obtener las áreas y libros correspondientes
             $areas = DB::SELECT("SELECT DISTINCT
@@ -529,19 +471,16 @@ class SeriesController extends Controller
                     ar.nombrearea,
                     t.nombretipoarea,
                     l.idlibro,
-                    l.descripcionlibro,
                     l.nombrelibro,
                     pf.pfn_pvp,
                     pf.pfn_estado,
-                    ls.year,
-                    pr.codigos_combos
+                    ls.year
                 FROM area ar
                 INNER JOIN asignatura a ON ar.idarea = a.area_idarea
                 INNER JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
                 INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
                 INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
                 INNER JOIN pedidos_formato_new pf ON pf.idlibro = l.idlibro
-                LEFT JOIN 1_4_cal_producto pr ON ls.codigo_liquidacion = pr.pro_codigo
                 WHERE ls.id_serie = ?
                 AND pf.idperiodoescolar = ?
                 AND ar.estado = '1'
@@ -549,72 +488,6 @@ class SeriesController extends Controller
                 AND pf.pfn_estado = 1
                 AND l.Estado_idEstado = 1
                 ORDER BY ar.idarea, pf.pfn_orden ASC", [$value->id_serie, $periodo]);
-
-            if ($areas) {
-                $datos[$key] = [
-                    "id_serie" => $value->id_serie,
-                    "nombre_serie" => $value->nombre_serie,
-                    "areas" => $this->organizeAreas($areas)
-                ];
-
-                // Obtener y asignar el valor de pvn_cantidad de la tabla pedidos_val_area_new
-                foreach ($datos[$key]['areas'] as &$area) {
-                    foreach ($area['libros'] as &$libro) {
-                        $pedidoVal = DB::table('pedidos_val_area_new')
-                            ->where('idlibro', $libro['idlibro'])
-                            ->where('id_pedido', $id_pedido) // Asegúrate de tener el id del pedido correcto
-                            ->where('pvn_tipo', $pvn_tipo) // Asegúrate de tener el id del tipo pedido correcto
-                            ->first();
-
-                        // Verificar si se encontró un registro en pedidos_val_area_new para este libro
-                        if ($pedidoVal) {
-                            $libro['pvn_cantidad'] = $pedidoVal->pvn_cantidad;
-                        } else {
-                            // Si no se encontró un registro, asignar 0 a pvn_cantidad
-                            $libro['pvn_cantidad'] = 0;
-                        }
-                    }
-                }
-            }
-        }
-
-        return $datos;
-    }
-
-    public function series_formato_periodo_new_guias($periodo, $id_pedido, $pvn_tipo) {
-        // Obtener las series, excluyendo la serie con id 6
-        $series = DB::SELECT("SELECT * FROM series s ORDER BY s.nombre_serie DESC");
-        $datos = array();
-
-        foreach($series as $key => $value) {
-            // Obtener las áreas y libros correspondientes
-            $areas = DB::SELECT("SELECT DISTINCT
-                ar.idarea,
-                ar.nombrearea,
-                t.nombretipoarea,
-                l.idlibro,
-                l.nombrelibro,
-                pf.pfn_pvp,
-                pf.pfn_estado,
-                ls.year,
-                l.descripcionlibro,
-                pr.codigos_combos
-            FROM area ar
-            INNER JOIN asignatura a ON ar.idarea = a.area_idarea
-            INNER JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
-            INNER JOIN libros_series ls ON l.idlibro = ls.idLibro
-            INNER JOIN tipoareas t ON ar.tipoareas_idtipoarea = t.idtipoarea
-            INNER JOIN pedidos_formato_new pf ON pf.idlibro = l.idlibro
-            INNER JOIN 1_4_cal_producto pr ON pr.pro_codigo = CONCAT('G', ls.codigo_liquidacion)
-            WHERE ls.id_serie = ?
-            AND pf.idperiodoescolar = ?
-            AND ar.estado = '1'
-            AND a.estado = '1'
-            AND pf.pfn_estado = 1
-            AND l.Estado_idEstado = 1
-            ORDER BY ar.idarea, pf.pfn_orden ASC", [$value->id_serie, $periodo]);
-
-
 
             if ($areas) {
                 $datos[$key] = [
@@ -658,43 +531,23 @@ class SeriesController extends Controller
                     "libros" => []
                 ];
             }
-            // Desglosar los códigos del combo
-            $desglose_codigos_combos = [];
-            if (!empty($area->codigos_combos)) {
-                $codigos_array = explode(',', $area->codigos_combos);
-                foreach ($codigos_array as $codigo) {
-                    $desglose = DB::SELECT("
-                        SELECT ls.codigo_liquidacion, l.nombrelibro
-                        FROM libros_series ls
-                        LEFT JOIN libro l ON ls.idLibro = l.idlibro
-                        WHERE ls.codigo_liquidacion = ?
-                    ", [$codigo]);
-                    if (empty($desglose)) {
-                        throw new \Exception("⚠️ Código '$codigo' asociado al combo '{$area->nombrelibro}' no fue encontrado. Verifica los códigos del combo. Comunica este error a soporte..");
-                    }
-                    $desglose_codigos_combos[] = [
-                        "codigo_liquidacion" => $desglose[0]->codigo_liquidacion,
-                        "nombrelibro" => $desglose[0]->nombrelibro,
-                    ];
-                }
-            }
+
             $organizedAreas[$area->idarea]['libros'][] = [
                 "idlibro" => $area->idlibro,
                 "nombrelibro" => $area->nombrelibro,
-                "descripcionlibro" => $area->descripcionlibro,
                 "pfn_pvp" => $area->pfn_pvp,
                 "pfn_estado" => $area->pfn_estado,
                 "year" => $area->year,
-                "codigos_combos" => $area->codigos_combos,
-                "pro_codigos_desglose" => $desglose_codigos_combos,
             ];
         }
+
         // Ordenar los libros de cada área por 'year'
         foreach ($organizedAreas as &$area) {
             usort($area['libros'], function($a, $b) {
                 return $a['year'] <=> $b['year'];
             });
         }
+
         return array_values($organizedAreas);
     }
 
@@ -880,51 +733,29 @@ class SeriesController extends Controller
         return $query;
     }
 
-    public function GetSacarAreasxSerieComboProducto(Request $request){
-        $id_serie = $request->query('id_serie');  // O también puedes usar $request->input('id_serie')
-        $query = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea
-        FROM libro li
-        LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
-        LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
-        LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
-        LEFT JOIN area ar ON asi.area_idarea = ar.idarea
-        LEFT JOIN series se ON ls.id_serie = se.id_serie
-        WHERE ar.idarea IS NOT NULL AND se.id_serie = $id_serie AND pro.ifcombo = 1
-        ORDER BY ar.nombrearea ASC");
-        return $query;
-    }
-
     public function GetObtenerProductosxSerieoArea(Request $request){
-        // return $request;
-        $id_serie = $request->query('id_serie');
+        $id_serie = $request->query('id_serie');  // O también puedes usar $request->input('id_serie')
         $idarea = $request->query('idarea');
-        $tipo_producto = $request->query('tipo_producto', 1); // Valor predeterminado a 1
-        //tipo 1 = grupos; tipo 2 = combos
-        $tipo = $request->query('tipo', 1); // Valor predeterminado a 1
-        // Condición adicional si $tipo es 2
-        $condicionIfCombo = ($tipo == 2) ? "AND pro.ifcombo = 1" : "";
-
+        $tipo_producto = $request->query('tipo_producto', 1); // Valor predeterminado a 3
         if($id_serie && $idarea){
             $query = DB::SELECT("SELECT pro.pro_codigo
             FROM libro li
             LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
-            INNER JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
             LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
             LEFT JOIN area ar ON asi.area_idarea = ar.idarea
             LEFT JOIN series se ON ls.id_serie = se.id_serie
-            WHERE pro.pro_codigo IS NOT NULL AND pro.gru_pro_codigo = 1 AND se.id_serie = $id_serie AND ar.idarea = $idarea
-            $condicionIfCombo
+            WHERE (pro.pro_codigo IS NOT NULL AND pro.pro_codigo NOT LIKE 'G%') AND se.id_serie = $id_serie AND ar.idarea = $idarea
             ORDER BY pro.pro_nombre");
         }else if($id_serie && !$idarea){
             $query = DB::SELECT("SELECT pro.pro_codigo
             FROM libro li
             LEFT JOIN libros_series ls ON li.idlibro = ls.idLibro
-            INNER JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
+            LEFT JOIN 1_4_cal_producto pro ON ls.codigo_liquidacion = pro.pro_codigo
             LEFT JOIN asignatura asi ON li.asignatura_idasignatura = asi.idasignatura
             LEFT JOIN area ar ON asi.area_idarea = ar.idarea
             LEFT JOIN series se ON ls.id_serie = se.id_serie
-            WHERE pro.pro_codigo IS NOT NULL AND pro.gru_pro_codigo = 1 AND se.id_serie = $id_serie
-            $condicionIfCombo
+            WHERE (pro.pro_codigo IS NOT NULL AND pro.pro_codigo NOT LIKE 'G%') AND se.id_serie = $id_serie
             ORDER BY pro.pro_nombre");
         }
         if (!$query) {
@@ -942,27 +773,23 @@ class SeriesController extends Controller
         foreach ($codigos as $codigo) {
             if ($tipo_producto == 2) {
                 // Buscar código original
-                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
-                    pro.gru_pro_codigo
+                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigo]);
             } else if ($tipo_producto == 3) {
                 // Buscar código con 'G' al inicio
                 $codigoConG = "G" . $codigo;
-                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
-                    pro.gru_pro_codigo
+                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigoConG]);
             } else if ($tipo_producto == 1) {
                 // Buscar código original y con 'G' al inicio
                 $codigoConG = "G" . $codigo;
-                $productoDetallesOriginal = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
-                    pro.gru_pro_codigo
+                $productoDetallesOriginal = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigo]);
 
-                $productoDetallesConG = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed,
-                    pro.gru_pro_codigo
+                $productoDetallesConG = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar, pro.pro_stock, pro.pro_stockCalmed
                     FROM 1_4_cal_producto pro
                     WHERE pro.pro_codigo = ?", [$codigoConG]);
 
@@ -979,14 +806,6 @@ class SeriesController extends Controller
                     $productosFinales[] = $productoDetallesConG[0]; // Añadir código con 'G' al inicio
                     $codigosAgregados[] = $productoDetallesConG[0]->pro_codigo; // Registrar el código como añadido
                 }
-            } else if ($tipo_producto == 4) {
-                // Buscar código original junto con los nombres correspondientes a las iniciales de codigos_combos
-                $productoDetalles = DB::select("SELECT pro.pro_codigo, pro.pro_deposito, pro.pro_depositoCalmed, pro.pro_nombre, pro.pro_reservar,
-                    pro.pro_stock, pro.pro_stockCalmed, pro.gru_pro_codigo, pro.pro_descripcion as iniciales_con_nombres
-                    -- ,(SELECT GROUP_CONCAT(concat(cmb.pro_codigo, '(', cmb.pro_nombre, ')') SEPARATOR ', ') FROM 1_4_cal_producto cmb
-                    --     WHERE FIND_IN_SET(cmb.pro_codigo, REPLACE(pro.codigos_combos, ' ', ''))) AS iniciales_con_nombres
-                FROM 1_4_cal_producto pro
-                WHERE pro.pro_codigo = ?", [$codigo]);
             } else {
                 // Si no es un tipo_producto válido, continuar
                 continue;
@@ -1002,29 +821,9 @@ class SeriesController extends Controller
     }
 
     public function getSeries_new(){
-        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('conexiones')");
-        return $query;
-    }
-
-    public function getSeries_EdicionStock(){
-        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('Combos')");
+        $query = DB::SELECT("SELECT * FROM series s WHERE s.nombre_serie NOT IN ('ruta', 'ruta PLUS', 'conexiones')");
         return $query;
     }
 
     //FIN METODOS JEYSON
-    //API:GET/librosPorSerie?id_serie=1
-    public function librosPorSerie(Request $request)
-    {
-        $id_serie = $request->id_serie;
-
-        if (!$id_serie) {
-            return ["status" => "0", "message" => "El parámetro id_serie es requerido"];
-        }
-
-        $libros = DB::SELECT("SELECT l.* FROM libro l
-        LEFT JOIN libros_series ls ON ls.idLibro = l.idlibro
-        WHERE ls.id_serie = ?", [$id_serie]);
-
-        return response()->json($libros);
-    }
 }

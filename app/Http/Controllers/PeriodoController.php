@@ -45,7 +45,7 @@ class PeriodoController extends Controller
              FROM periodoescolar p
               WHERE p.region_idregion = '$request->region'
               ORDER BY p.idperiodoescolar DESC
-
+         
             ");
             return $periodos;
         }
@@ -54,22 +54,14 @@ class PeriodoController extends Controller
             $periodo = DB::SELECT("SELECT * FROM periodoescolar ORDER BY idperiodoescolar  DESC");
             return $periodo;
         }
+      
+    
     }
 
-    public function GetPeriodo_xID(Request $request){
-        $query = DB::SELECT("SELECT * FROM periodoescolar where idperiodoescolar = $request->idperiodorecibido");
-        return $query;
-    }
-
-    public function GetPeriodoescolarTodo(){
-        $query = DB::SELECT("SELECT * FROM periodoescolar");
-        return $query;
-    }
-
-
+    
 
     public function usuariosXperiodoSierra(Request $request){
-
+        
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);;
         if($request->periodoSierra == ""){
@@ -98,13 +90,13 @@ class PeriodoController extends Controller
                     "cantidad" => "0",
                     "periodo" => "0",
                     "nombre_periodo" => "0"
-                ];
+                ];   
             }else{
                 $estudiantes =[
                     "cantidad" => count($estudiantePeriodo),
                     "periodo" => $estudiantePeriodo[0]->id_periodo,
                     "nombre_periodo" => $estudiantePeriodo[0]->periodoescolar
-                ];
+                ];  
             }
             if(count($DocentePeriodo) == 0){
                 $docentes =[
@@ -112,7 +104,7 @@ class PeriodoController extends Controller
                     "periodo" => "0",
                     "nombre_periodo" => "0"
                 ];
-            }else{
+            }else{  
                 $docentes =[
                     "cantidad" => count($DocentePeriodo),
                     "periodo" => $DocentePeriodo[0]->id_periodo,
@@ -124,7 +116,7 @@ class PeriodoController extends Controller
 
 
     public function usuariosXperiodoCosta(Request $request){
-
+        
         set_time_limit(6000);
         ini_set('max_execution_time', 6000);
 
@@ -157,8 +149,8 @@ class PeriodoController extends Controller
                     "cantidad" => "0",
                     "periodo" => "0",
                     "nombre_periodo" => "0"
-                ];
-
+                ];   
+               
             }else{
                 $estudiantes =[
                     "cantidad" => count($estudiantePeriodo),
@@ -172,7 +164,7 @@ class PeriodoController extends Controller
                     "periodo" => "0",
                     "nombre_periodo" => "0"
                 ];
-            }else{
+            }else{  
                 $docentes =[
                     "cantidad" => count($DocentePeriodo),
                     "periodo" => $DocentePeriodo[0]->id_periodo,
@@ -192,14 +184,14 @@ class PeriodoController extends Controller
         if($request->region =="SIERRA"){
             $periodo = DB::SELECT("SELECT * FROM periodoescolar
             WHERE  region_idregion  = '1'
-
+           
              ORDER BY idperiodoescolar  DESC");
             return $periodo;
         }
         if($request->region =="COSTA"){
             $periodo = DB::SELECT("SELECT * FROM periodoescolar
             WHERE  region_idregion  = '2'
-
+            
              ORDER BY idperiodoescolar  DESC");
             return $periodo;
         }else{
@@ -255,7 +247,7 @@ class PeriodoController extends Controller
     }
     public function institucion(Request $request)
     {
-
+         
         $id=$request->idInstitucion;
         $getPeriodo = $this->getPeriodoInstitucion($id);
         $periodo = $getPeriodo[0]->periodo;
@@ -272,7 +264,7 @@ class PeriodoController extends Controller
         if($id == 66){
             return 1;
         }else{
-            $periodo = DB::select("SELECT *
+            $periodo = DB::select("SELECT * 
             FROM periodoescolar_has_institucion
             INNER JOIN periodoescolar ON periodoescolar.idperiodoescolar = periodoescolar_has_institucion.periodoescolar_idperiodoescolar
             WHERE institucion_idInstitucion = ? AND periodoescolar.estado = '1' ",[$id]);
@@ -283,7 +275,7 @@ class PeriodoController extends Controller
             }
         }
     }
-
+ 
     public function getPeriodoInstitucion($institucion){
         $periodoInstitucion = DB::SELECT("SELECT idperiodoescolar AS periodo ,(SELECT nombreInstitucion FROM institucion where idInstitucion = '$institucion' ) as nombreInstitucion, periodoescolar AS descripcion ,
         (SELECT imgenInstitucion FROM institucion where idInstitucion = '$institucion' ) as imgenInstitucion
@@ -303,7 +295,7 @@ class PeriodoController extends Controller
         ->where('idperiodoescolar', $idperiodoescolar)
         ->update(['estado' => "1"]);
          return $res;
-
+        
     }
 
     public function desactivar(Request $request){
@@ -314,7 +306,7 @@ class PeriodoController extends Controller
          return $res;
     }
 
-
+ 
     public function UsuariosPeriodo(Request $request){
         // return "hola mundo2";
         set_time_limit(6000000);
@@ -377,7 +369,7 @@ class PeriodoController extends Controller
         }
         $datos = [
             "estudiantes" => $estudiantes,
-            "docentes" => $docentes
+            "docentes" => $docentes  
         ];
         return $datos;
     }
@@ -469,23 +461,18 @@ class PeriodoController extends Controller
         if($request->region =="SIERRA"){
             $periodo = DB::SELECT("SELECT descripcion, idperiodoescolar,periodoescolar,estado,region_idregion FROM periodoescolar
             WHERE  region_idregion  = '1' AND estado = '1'
-
+           
              ORDER BY idperiodoescolar  DESC");
             return $periodo;
         }
         if($request->region =="COSTA"){
             $periodo = DB::SELECT("SELECT descripcion, idperiodoescolar,periodoescolar,estado,region_idregion FROM periodoescolar
             WHERE  region_idregion  = '2' AND estado = '1'
-
+            
              ORDER BY idperiodoescolar  DESC");
             return $periodo;
         }else{
             return ["status"=> "0", "message"=>"NO SE ENCONTRO LA REGiON"];
         }
-    }
-    public function periodo2()
-    {
-        $periodo = Periodo::all('idperiodoescolar','periodoescolar');
-        return $periodo;
     }
 }

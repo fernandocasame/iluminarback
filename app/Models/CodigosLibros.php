@@ -19,18 +19,21 @@ class CodigosLibros extends Model implements Auditable
         'verif3',
         'verif4',
         'verif5',
+        'verif6',
+        'verif7',
+        'verif8',
+        'verif9',
+        'verif10',
         'bc_estado',
         'bc_fecha_ingreso',
         'bc_periodo',
         'bc_institucion'
     ];
-    const CODIGO_NO_EXISTE          = 'El código no existe';
     const CODIGO_LIQUIDADO          = 'El código se encuentra liquidado';
     const CODIGO_REGALADO           = 'El código se encuentra regalado';
     const CODIGO_GUIA               = 'El código se encuentra como GUIA';
     const CODIGO_DEVUELTO           = 'El código se encuentra como DEVUELTO';
     const CODIGO_LIQUIDADO_REGALADO = 'El código se encuentra liquidado y regalado';
-    const CODIGO_BLOQUEADO          = 'El código se encuentra bloqueado';
 
     const CODIGO_ACTIVACION         = 'Problema con el código de activación';
     const CODIGO_DIAGNOSTICA        = 'Problema con el código de diagnóstico';

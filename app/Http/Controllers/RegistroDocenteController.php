@@ -42,7 +42,7 @@ class RegistroDocenteController extends Controller
             LEFT JOIN institucion i ON i.idInstitucion = u.institucion_idInstitucion
             LEFT JOIN sys_group_users g ON u.id_group = g.id
             WHERE u.cedula LIKE '%$cedula%'
-            AND (u.id_group = '6' OR u.id_group = '10')
+            AND (u.id_group = '6' OR u.id_group = '10') 
             AND u.institucion_idInstitucion = '$institucion'
         ");
         return $query;
@@ -50,7 +50,7 @@ class RegistroDocenteController extends Controller
     //api:get>>registroDocente?areasxSerie=yes&id_serie=1&docente_id=6625&periodo_id=22
     public function areasxSerie($id_serie,$periodo,$docente){
         //AREAS
-        $query = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,ls.id_serie
+        $query = DB::SELECT("SELECT DISTINCT ar.idarea, ar.nombrearea,ls.id_serie 
         FROM libros_series ls
         LEFT JOIN libro l ON ls.idLibro = l.idlibro
         LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
@@ -65,7 +65,7 @@ class RegistroDocenteController extends Controller
         foreach($query as $key => $item){
             $contador2  = 0;
             for($i =1; $i<=10; $i++){
-                $query2 = DB::SELECT("SELECT l.nombrelibro,  l.idlibro,l.asignatura_idasignatura , ls.*
+                $query2 = DB::SELECT("SELECT l.nombrelibro,  l.idlibro,l.asignatura_idasignatura , ls.* 
                 FROM libros_series ls
                 LEFT JOIN libro l ON ls.idLibro = l.idlibro
                 LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
@@ -122,15 +122,15 @@ class RegistroDocenteController extends Controller
             $contador++;
         }
         return $datos;
-    }
+    }   
     public function setearValores($array){
         $librosFiltrados = array_filter($array, function ($libro) {
             return $libro["nivel"] > 0;
         });
         return array_values($librosFiltrados);
-    }
+    }    
     public function areasxSeriePlanLector($id_serie,$periodo,$docente){
-        $query = DB::SELECT("SELECT l.nombrelibro,  l.idlibro,l.asignatura_idasignatura , ls.*
+        $query = DB::SELECT("SELECT l.nombrelibro,  l.idlibro,l.asignatura_idasignatura , ls.* 
             FROM libros_series ls
             LEFT JOIN libro l ON ls.idLibro = l.idlibro
             LEFT JOIN asignatura a ON l.asignatura_idasignatura = a.idasignatura
@@ -155,7 +155,7 @@ class RegistroDocenteController extends Controller
                 $idasiguser = $query2[0]->idasiguser;
                 $selected   = true;
             }
-            $datos[$contador] = [
+            $datos[$contador] = [ 
                 "nombrelibro"       => $item->nombrelibro,
                 "idlibro"           => $item->idlibro,
                 "idasignatura"      => $idasignatura,
@@ -240,7 +240,7 @@ class RegistroDocenteController extends Controller
     {
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        $getbooks = json_decode($request->data_libros);
+        $getbooks = json_decode($request->data_libros);  
         foreach($getbooks as $key => $item){
             $docenteBook = [];
             if($item->selected == "1" ){
@@ -249,8 +249,8 @@ class RegistroDocenteController extends Controller
                 if(empty($docenteBook)){
                     $asignatura = new AsignaturaDocente();
                     $asignatura->usuario_idusuario       = $request->docente;
-                    $asignatura->asignatura_idasignatura = $item->idasignatura;
-                    $asignatura->periodo_id              = $request->periodo;
+                    $asignatura->asignatura_idasignatura = $item->idasignatura;   
+                    $asignatura->periodo_id              = $request->periodo;            
                     $asignatura->save();
                 }
             }
@@ -262,7 +262,7 @@ class RegistroDocenteController extends Controller
                 }
             }
         }
-
+        
     }
     public function getDocenteLibro($docente,$periodo,$idasignatura){
         $query = DB::SELECT("SELECT * FROM asignaturausuario ad
@@ -272,7 +272,7 @@ class RegistroDocenteController extends Controller
        ");
        return $query;
     }
-
+   
 
     /**
      * Display the specified resource.

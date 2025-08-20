@@ -61,20 +61,12 @@ class ComboController extends Controller
         set_time_limit(300);
         ini_set('max_execution_time', 300);
 
-        $id_usuario                 = $request->id_usuario;
-        $periodo_id                 = $request->periodo_id;
-        $permitirRemplazarCombo     = $request->permitirRemplazarCombo ?? 0;
-        $permitirReemplazarEtiqueta = $request->permitirReemplazarEtiqueta ?? 0;
-        $codigosConProblemas        = [];
-        $observacion                = $request->observacion ?? '';
-
+        $id_usuario             = $request->id_usuario;
+        $periodo_id             = $request->periodo_id;
+        $codigosConProblemas    = [];
         // Validación del request
         $request->validate([
-            'data_codigos'               => 'required|json',
-            'id_usuario'                 => 'required|integer',
-            'periodo_id'                 => 'required|integer',
-            'permitirRemplazarCombo'     => 'boolean',
-            'permitirReemplazarEtiqueta' => 'boolean',
+            'data_codigos' => 'required|json',
         ]);
 
         $codigos = json_decode($request->data_codigos);
@@ -96,92 +88,49 @@ class ComboController extends Controller
             $contadorEditados = 0;
 
             foreach ($codigos as $item) {
-                $codigo       = $busqueda->firstWhere('codigo', $item->codigo);
-                $combo        = $item->combo;
-                $codigo_combo = $item->combo_etiqueta;
-
-                // Validar que el combo exista
-                $validateCombo = LibroSerie::where('codigo_liquidacion', $combo)->first();
-                if (!$validateCombo) {
-                    $item->error = "El combo $combo no existe";
-                    $codigosConProblemas[] = $item;
-                    continue;
-                }
-
-                // Validar que codigo_combo exista
-                $validateCodigoCombo = CombosCodigos::where('codigo', $codigo_combo)->first();
-                if (!$validateCodigoCombo) {
-                    $item->error = "La etiqueta del combo $codigo_combo no existe";
-                    $codigosConProblemas[] = $item;
-                    continue;
-                }
+                $codigo     = $busqueda->firstWhere('codigo', $item->codigo);
+                $combo      = $item->combo;
                 if ($codigo) {
-                    // Datos actuales en la BD
-                    $comboBD        = $codigo->combo;
-                    $codigo_comboBD = $codigo->codigo_combo;
 
-                    // Validar si el combo ya está asignado
-                   if (!is_null($comboBD) && $combo != $comboBD && $permitirRemplazarCombo == 0) {
-                        $item->error = "El combo del libro $comboBD ya está asignado al código $codigo->codigo";
-                        $codigosConProblemas[] = $item;
-                        continue;
-                    }
-
-
-                    // Validar si la etiqueta ya está asignada
-                    if (!is_null($codigo_comboBD) && $codigo_combo != $codigo_comboBD && $permitirReemplazarEtiqueta == 0){
-                        $item->error = "El combo del código $codigo_comboBD ya está asignado al combo $combo";
-                        $codigosConProblemas[] = $item;
-                        continue;
-                    }
-
-                    // Validar combo nuevamente antes de guardar
+                    //validra si el combo existe
                     $validateCombo = LibroSerie::where('codigo_liquidacion', $combo)->first();
                     if ($validateCombo) {
-                        $getCodigoUnion   = $codigo->codigo_union;
-
-                        // Si tiene código_union, también actualizar
-                        if ($getCodigoUnion && $getCodigoUnion != "") {
-                            $codigoUnion = CodigosLibros::where('codigo', $getCodigoUnion)->first();
-                            if ($codigoUnion) {
-                                $this->actualizarComboYGuardarHistorico(
-                                    $codigoUnion,
-                                    $combo,
-                                    $codigo_combo,
-                                    $periodo_id,
-                                    $id_usuario,
-                                    "Se asigna el combo $combo y etiqueta $codigo_combo - $observacion"
-                                );
+                        $comboAnterior  = $codigo->combo;
+                        $getCodigoUnion = $codigo->codigo_union;
+                        //si el combo es nulo vacio o es igual al combo anterior guardar
+                        if ($comboAnterior == "" || $combo == $comboAnterior) {
+                            // Si el código tiene `codigo_union`, actualizar
+                            if ($getCodigoUnion && $getCodigoUnion != "") {
+                                $codigoUnion = CodigosLibros::where('codigo', $getCodigoUnion)->first();
+                                if ($codigoUnion) {
+                                    $this->actualizarComboYGuardarHistorico($codigoUnion, $combo, $periodo_id, $id_usuario, "Se asigna el combo $combo");
+                                }
                             }
+                            // Actualizar el código principal
+                            $this->actualizarComboYGuardarHistorico($codigo, $combo, $periodo_id, $id_usuario, "Se asigna el combo $combo");
+
+                            $contadorEditados++;
+                        }else{
+                            //error porque el comobo ya existe y es distinto al anterior
+                            $item->error = "El código ya existe con el combo $comboAnterior";
+                            $codigosConProblemas[] = $item;
                         }
-
-                        // Actualizar el código principal
-                        $this->actualizarComboYGuardarHistorico(
-                            $codigo,
-                            $combo,
-                            $codigo_combo,
-                            $periodo_id,
-                            $id_usuario,
-                            "Se asigna el combo $combo y etiqueta $codigo_combo - $observacion"
-                        );
-
-                        $contadorEditados++;
-                    } else {
-                        // Error porque el combo no existe
+                    }else{
+                        //error porque el combo no existe
                         $item->error = "El combo $combo no existe";
                         $codigosConProblemas[] = $item;
                     }
                 }
-            } // <-- LLAVE FALTANTE CERRANDO EL FOREACH
+            }
 
             DB::commit();
 
             return response()->json([
-                "status"              => 1,
-                "message"             => "Operación exitosa",
-                "codigoNoExiste"      => $codigosNoEncontrados,
-                "cambiados"           => $contadorEditados,
-                "codigosConProblemas" => $codigosConProblemas
+                "status"                => 1,
+                "message"               => "Operación exitosa",
+                "codigoNoExiste"        => $codigosNoEncontrados,
+                "cambiados"             => $contadorEditados,
+                "codigosConProblemas"   => $codigosConProblemas
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -191,20 +140,15 @@ class ComboController extends Controller
             ], 200); // Status de error
         }
     }
-
     //api:post/combos?AsignarComboCodigosLibrosSon=1
     public function AsignarComboCodigosLibrosSon(Request $request)
     {
         set_time_limit(300);
         ini_set('max_execution_time', 300);
         $codigosConProblemas    = [];
-        $permitirRemplazarCombo = $request->permitirRemplazarCombo ?? 0;
-        $permitirReemplazarEtiqueta = $request->permitirReemplazar ?? 0;
         // Validación del request
         $request->validate([
             'data_codigos' => 'required|json',
-            'permitirRemplazarCombo' => 'boolean',
-            'permitirReemplazarEtiqueta' => 'boolean',
         ]);
 
         $codigos = json_decode($request->data_codigos);
@@ -227,57 +171,34 @@ class ComboController extends Controller
             foreach ($codigos as $item) {
                 $codigo     = $busqueda->firstWhere('codigo', $item->codigo);
                 $combo      = $item->combo;
-                $codigo_combo = $item->combo_etiqueta;
-                //validar que el combo exista
-                $validateCombo = LibroSerie::where('codigo_liquidacion', $combo)->first();
-                if (!$validateCombo) {
-                    $item->error = "El combo $combo no existe";
-                    $codigosConProblemas[] = $item;
-                    continue;
-                }
-                //validar que codigo_combo exista
-                $validateCodigoCombo = CombosCodigos::where('codigo', $codigo_combo)->first();
-                if (!$validateCodigoCombo) {
-                    $item->error = "La etiqueta del combo $codigo_combo no existe";
-                    $codigosConProblemas[] = $item;
-                    continue;
-                }
                 if ($codigo) {
-                    // Datos actuales en la BD
-                    $comboBD        = $codigo->combo;
-                    $codigo_comboBD = $codigo->combo_etiqueta;
-
-                    // Validar si el combo ya está asignado
-                    if ($combo == $comboBD && $permitirRemplazarCombo == 0) {
-                        $item->error = "El combo del libro $combo ya está asignado al código $codigo->codigo";
-                        $codigosConProblemas[] = $item;
-                        continue;
-                    }
-
-                    // Validar si la etiqueta ya está asignada
-                    if ($codigo_combo == $codigo_comboBD && $permitirReemplazarEtiqueta == 0) {
-                        $item->error = "El combo del código $codigo->codigo ya está asignado al combo $combo";
-                        $codigosConProblemas[] = $item;
-                        continue;
-                    }
                     $estado     = $codigo->estado;
                     if($estado == 0){
                          //validar si el combo existe
                          $validateCombo = LibroSerie::where('codigo_liquidacion', $combo)->first();
                          if ($validateCombo) {
-                            // Si el código tiene `codigo_union`, actualizar
-                            //Actualizar codigslibroson si tiene estado 0
-                            $getCodigosLibrosSon = CodigosLibrosDevolucionSon::where('codigo', $item->codigo)
-                            ->where('estado', '0');
+                             $comboAnterior  = $codigo->combo;
+                             //si el combo es nulo vacio o es igual al combo anterior guardar
+                             if ($comboAnterior == "" || $combo == $comboAnterior) {
+                                // Si el código tiene `codigo_union`, actualizar
+                                //Actualizar codigslibroson si tiene estado 0
+                                $getCodigosLibrosSon = CodigosLibrosDevolucionSon::where('codigo', $item->codigo)
+                                ->where('estado', '0');
 
-                            if ($getCodigosLibrosSon->exists()) {
-                                $getCodigosLibrosSon->update(['combo' => $combo, 'combo_etiqueta' => $codigo_combo]);
-                                $contadorEditados++;
-                            }else{
-                                //error porque el codigo ya no esta en estado creado
-                                $item->error = "El código ya no esta en en estado creado";
+                                if ($getCodigosLibrosSon->exists()) {
+                                    $getCodigosLibrosSon->update(['combo' => $combo]);
+                                    $contadorEditados++;
+                                }else{
+                                    //error porque el codigo ya no esta en estado creado
+                                    $item->error = "El código ya no esta en en estado creado";
+                                    $codigosConProblemas[] = $item;
+                                }
+
+                             }else{
+                                //error porque el comobo ya existe y es distinto al anterior
+                                $item->error = "El código ya existe con el combo $comboAnterior";
                                 $codigosConProblemas[] = $item;
-                            }
+                             }
                          }else{
                              //error porque el combo no existe
                              $item->error = "El combo $combo no existe";
@@ -312,12 +233,11 @@ class ComboController extends Controller
     /**
      * Actualiza el combo y guarda en el histórico.
      */
-    private function actualizarComboYGuardarHistorico($codigo, $combo, $codigo_combo, $periodo_id, $id_usuario, $comentario)
+    private function actualizarComboYGuardarHistorico($codigo, $combo, $periodo_id, $id_usuario, $comentario)
     {
         $oldValues = $codigo->getAttributes(); // Capturar valores actuales
         $oldValues = json_encode($oldValues);
         $codigo->combo = $combo; // Actualizar combo
-        $codigo->codigo_combo = $codigo_combo;
         if ($codigo->save()) {
             $this->GuardarEnHistorico(0, 0, $periodo_id, $codigo->codigo, $id_usuario, $comentario, $oldValues, json_encode($codigo->getAttributes()) );
         }
@@ -385,7 +305,7 @@ class ComboController extends Controller
         $contadorErrCombos          = 0;
         $contadorResumen            = 0;
         $institucion_id             = 0;
-        $variosCodigos              = $request->varios_codigos;
+        $variosCodigos              =  $request->varios_codigos;
 
         try {
             DB::beginTransaction();
@@ -421,14 +341,7 @@ class ComboController extends Controller
                         $tipoRegalado           = $tr->tipoRegalado;
                         $errorA                 = 1;
                         $errorB                 = 1;
-                        $mensajeRegalado        = '';
-                        if($libroSeleccionado == '1'){
-                            $mensajeRegalado = '_Regalado';
-                        }
-                        IF($tipoRegalado == '2'){
-                            $mensajeRegalado = '_Regalado_y_bloqueado';
-                        }
-                        $comentario             = "Se agregó al combo " . $codigoCombo.$mensajeRegalado;
+                        $comentario             = "Se agregó al combo " . $codigoCombo;
                         if($variosCodigos == '1'){
                             $codigoA            = strtoupper($tr->codigoActivacion);
                             $codigoB            = strtoupper($tr->codigoDiagnostico);
@@ -476,7 +389,7 @@ class ComboController extends Controller
                                     //CODIGO_LIQUIDADO_REGALADO
                                     if($if_liquidado_regaladoA == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorA = 1; }
                                     //bloqueado
-                                    // if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorA = 1; }
+                                    if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorA = 1; }
                                     //if($if_estado_liquidacionA == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorA = 1; }
                                     if($if_estado_liquidacionA == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorA = 1; }
                                     //codigo B
@@ -484,7 +397,7 @@ class ComboController extends Controller
                                     //CODIGO_LIQUIDADO_REGALADO
                                     if($if_liquidado_regaladoB == 1)    { $mensajeError = CodigosLibros::CODIGO_LIQUIDADO_REGALADO;  $errorB = 1; }
                                     //bloqueado
-                                    // if($ifestado == 2 && $if_estado_liquidacionA !=3)  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
+                                    if($ifestado == 2)                  { $mensajeError = CodigosLibros::CODIGO_BLOQUEADO;  $errorB = 1; }
                                     // if($if_estado_liquidacionB == 3){ $mensajeError = CodigosLibros::CODIGO_DEVUELTO;   $errorB = 1; }
                                     if($if_estado_liquidacionB == 4)    { $mensajeError = CodigosLibros::CODIGO_GUIA;       $errorB = 1; }
                                     //institucion si bc_institucion o venta_lista_institucion es mayor a 0  seria mensajeError
@@ -511,12 +424,10 @@ class ComboController extends Controller
                                     $ingresoB       = $this->updatecodigosCombo($codigoCombo, $codigoB, $codigoA, $libroSeleccionado, $tipoRegalado,$comboIgualAnteriorB);
 
                                     if($ingresoA && $ingresoB){
-                                        // if($comboIgualAnteriorA){}
-                                        // else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null); }
-                                        // if($comboIgualAnteriorB){}
-                                        // else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null); }
-                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null);
-                                        $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null);
+                                        if($comboIgualAnteriorA){}
+                                        else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoB, $usuario_editor, $comentario, $old_valuesB, null); }
+                                        if($comboIgualAnteriorB){}
+                                        else{ $this->GuardarEnHistorico(0, $institucion_id, $periodo_id, $codigoA, $usuario_editor, $comentario, $old_valuesA, null); }
                                         $contadorA++;
                                         $contadorB++;
                                     }
@@ -624,9 +535,9 @@ class ComboController extends Controller
         $combo->save();
     }
     public function updatecodigosCombo($codigoCombo,$codigo,$codigo_union, $libroSeleccionado, $tipoRegalado,$comboIgualAnterior){
-        // if($comboIgualAnterior){
-        //     return 1;
-        // }
+        if($comboIgualAnterior){
+            return 1;
+        }
         $codigoLibro = CodigosLibros::where('codigo', '=', $codigo)->first();
         $fecha = date('Y-m-d H:i:s');
         if ($codigoLibro) {

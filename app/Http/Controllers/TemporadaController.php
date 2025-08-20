@@ -646,18 +646,15 @@ class TemporadaController extends Controller
             ]
         );
     }
-     public function  CleanRegalado(Request $request){
+    public function  CleanRegalado(Request $request){
         Cache::flush();
-        $codigos                = json_decode($request->data_codigos);
-        foreach($codigos as $key => $item){
-            $this->quitarRegalado($item->codigo);
-            $getCodigo = CodigosLibros::findOrFail($item->codigo);
-            $codigo_union = $getCodigo->codigo_union;
-            //si tiene codigo de diagnostico
-            if($codigo_union == null || $codigo_union == "null" || $codigo_union == ""){
-            }else{
-                $this->quitarRegalado($codigo_union);
-            }
+        $this->quitarRegalado($request->codigo);
+        $getCodigo = CodigosLibros::findOrFail($request->codigo);
+        $codigo_union = $getCodigo->codigo_union;
+        //si tiene codigo de diagnostico
+        if($codigo_union == null || $codigo_union == "null" || $codigo_union == ""){
+        }else{
+            $this->quitarRegalado($codigo_union);
         }
         return ["status" => "0", "message" => "Se guardo correctamente"];
     }
@@ -671,6 +668,11 @@ class TemporadaController extends Controller
                 "verif3"       => null,
                 "verif4"       => null,
                 "verif5"       => null,
+                "verif6"       => null,
+                "verif7"       => null,
+                "verif8"       => null,
+                "verif9"       => null,
+                "verif10"       => null,
                 'liquidado_regalado' => "0",
                 "bc_fecha_ingreso"=>null,
                 "contrato"      => null,
@@ -692,12 +694,9 @@ class TemporadaController extends Controller
             //     AND c.prueba_diagnostica = '0'
             //     AND c.contrato = ?
             // ",[$contrato, $contrato]);
-            $devueltos = DB::SELECT("SELECT h.codigo_libro,h.devueltos_liquidados, h.verificacion_liquidada,h.observacion,h.created_at,
-            h.combo,
-            CONCAT(u.nombres,' ',u.apellidos) AS editor
+            $devueltos = DB::SELECT("SELECT h.codigo_libro,h.devueltos_liquidados, h.verificacion_liquidada,h.observacion,h.created_at
             FROM hist_codlibros h
             LEFT JOIN codigoslibros c ON h.codigo_libro = c.codigo
-            LEFT JOIN usuario u ON h.idInstitucion = u.idusuario
             WHERE h.devueltos_liquidados = ?
             AND c.prueba_diagnostica = '0'
         ",[$contrato]);
@@ -735,6 +734,8 @@ class TemporadaController extends Controller
                 ]);
             }
         }
+        //COLOCAR EL CAMPO datos_verificacion_por_ingresar EN ESTADO 0 PARA QUE YA SE EJECUTO Y SE GUARDO LOS VALORES
+        $this->updateDatosVerificacionPorIngresar($contrato,0);
     }
     public function updateVerificacion(Request $request){
         $verificacionId = $request->verificacion_id;
@@ -767,10 +768,6 @@ class TemporadaController extends Controller
         if ($request->actualizarTresCampo) {
             $fieldsToUpdate = [$campo, $campo2, $campo3];
             $valuesToUpdate = [$valor, $valor2, $valor3];
-        }
-        if ($request->actualizarCincoCampo) {
-            $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4, $campo5];
-            $valuesToUpdate = [$valor, $valor2, $valor3, $valor4, $valor5];
         }
         if($request->actualizarSieteCampo){
             $fieldsToUpdate = [$campo, $campo2, $campo3, $campo4 ,$campo5 ,$campo6, $campo7];

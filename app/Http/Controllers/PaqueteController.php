@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Support\Facades\DB;
+use DB;
 use App\Models\CodigoLibros;
 use Illuminate\Http\Request;
 use App\Models\CodigosLibros;
@@ -14,6 +14,7 @@ use App\Traits\Codigos\TraitCodigosGeneral;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\Codigos\PaquetesRepository;
 
+use function Symfony\Component\VarDumper\Dumper\esc;
 
 class PaqueteController extends Controller
 {
@@ -126,10 +127,6 @@ class PaqueteController extends Controller
                             $ifcodigo_paqueteD = $validarD[0]->codigo_paquete;
                             $codigo_unionD = strtoupper($validarD[0]->codigo_union);
 
-                            $ifcodigo_combo = $validarA[0]->codigo_combo;
-                            if($ifcodigo_combo){
-                                return ["status" => "0", "message" => "El paquete $codigoPaquete ya tiene un combo asociado"];
-                            }
                             //===VALIDACION====
                             if ($ifcodigo_paqueteA == null && (($codigo_unionA == $codigoDiagnostico) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) {
                                 $errorA = 0;
@@ -296,16 +293,11 @@ class PaqueteController extends Controller
 
                             if (count($validarB) > 0) {
                                 //VARIABLES PARA EL PROCESO
-                                $ifcodigo_combo     = $validarA[0]->codigo_combo;
                                 $ifcodigo_paqueteA  = strtoupper($validarA[0]->codigo_paquete);
                                 $codigo_unionA      = strtoupper($validarA[0]->codigo_union);
                                 $ifcodigo_paqueteB  = strtoupper($validarB[0]->codigo_paquete);
                                 $codigo_unionB      = strtoupper($validarB[0]->codigo_union);
 
-                                ///VALIDAR SI UN CODIGO TIENE COMBO NO DEJAR PASAR
-                                if($ifcodigo_combo){
-                                    return ["status" => "0", "message" => "El paquete $codigoPaquete ya tiene un combo asociado"];
-                                }
                                 //===VALIDACION====
                                 if ($ifcodigo_paqueteA == null && (($codigo_unionA == $codigoB) || ($codigo_unionA == null || $codigo_unionA == "" || $codigo_unionA == "0"))) $errorA = 0;
                                 if ($ifcodigo_paqueteB == null && (($codigo_unionB == $codigoA) || ($codigo_unionB == null || $codigo_unionB == "" || $codigo_unionB == "0"))) $errorB = 0;
@@ -944,14 +936,10 @@ class PaqueteController extends Controller
         set_time_limit(600000);
         ini_set('max_execution_time', 600000);
         $miArrayDeObjetos           = json_decode($request->data_codigos);
-        $tipoBodega                 = $request->tipoBodega;
         $arregloProblemaPaquetes    = [];
-        $arregloResumen             = [];
         $informacion                = [];
-        $arrayPaqueteComboSinHijos  = [];
         $contadorErrPaquetes        = 0;
         $contadorResumen            = 0;
-        $letraProceso               = $tipoBodega == 3 ? 'paquete' : 'combo';
         //====PROCESO===================================
         foreach($miArrayDeObjetos as $key => $item){
             $problemasconCodigo         = [];
@@ -960,24 +948,10 @@ class PaqueteController extends Controller
             $contadorD                  = 0;
             $noExisteA                  = 0;
             $noExisteD                  = 0;
-            $codigoPaquete              = strtoupper($item->codigoPaquete);
-            if($tipoBodega == 3){
-                $getExistsPaquete = $this->getExistsPaquete($codigoPaquete);
-            }else{
-                $getExistsPaquete = $this->getExistsCombo($codigoPaquete);
-            }
+            $getExistsPaquete   = $this->getExistsPaquete($item->codigoPaquete);
             if(!empty($getExistsPaquete)){
-                //tipoBodega => 3 paquete; 4 = combo
-                if($tipoBodega == 3){
-                    $codigosHijos = $this->getCodigos($codigoPaquete, 0, 3);
-                    $arrayDiagnosticos = collect($this->getCodigos($codigoPaquete, 0, 4));
-                }else{
-                    $codigosHijos = $this->getCodigos($codigoPaquete, 0, 5);
-                    $arrayDiagnosticos = collect($this->getCodigos($codigoPaquete, 0, 6));
-                }
-                if(count($codigosHijos) == 0){
-                    $arrayPaqueteComboSinHijos[] = [ "codigo" => $codigoPaquete];
-                }
+                //codigos hijos del paquete
+                $codigosHijos =  $this->getCodigos($item->codigoPaquete,0,3);
                 foreach($codigosHijos as $key2 => $tr){
                     $validarA               = [];
                     $validarD               = [];
@@ -1024,8 +998,8 @@ class PaqueteController extends Controller
                 $contadorResumen++;
             }else{
                 $arregloProblemaPaquetes [$contadorErrPaquetes] = [
-                    "paquete"  => $item->codigoPaquete,
-                    "problema" => $letraProceso." no existe"
+                    "paquete"   => $item->codigoPaquete,
+                    "problema" => 'Paquete no existe'
                 ];
                 $contadorErrPaquetes++;
             }
@@ -1034,7 +1008,6 @@ class PaqueteController extends Controller
             "arregloResumen"                   => $arregloResumen,
             "informacion"                      => $informacion,
             "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
-            "arrayPaqueteComboSinHijos"        => $arrayPaqueteComboSinHijos,
         ];
     }
     //API:POST/paquetes/devolucion_paquete
@@ -1042,7 +1015,6 @@ class PaqueteController extends Controller
         set_time_limit(600000);
         ini_set('max_execution_time', 600000);
         $miArrayDeObjetos           = json_decode($request->data_codigos);
-        $codigos_inviduales         = json_decode($request->codigos_inviduales);
         $arregloProblemaPaquetes    = [];
         $codigoConProblemas         = collect();
         $contadorErrPaquetes        = 0;
@@ -1051,14 +1023,8 @@ class PaqueteController extends Controller
         $periodo_id                 = $request->periodo_id;
         $usuario_editor             = $request->id_usuario;
         $comentario                 = $request->observacion;
-        // tipoBodega => 3 paquete; 4 = combo
-        $tipoBodega                 = $request->tipoBodega;
-        $letraProceso               = $tipoBodega == 3 ? 'paquete' : 'combo';
         $fecha                      = date('Y-m-d H:i:s');
         $arregloResumen             = [];
-        $arrayCodigosDesarmados     = [];
-        $codigoslibros_devolucion_desarmados_header_id = null;
-
         //====PROCESO===================================
         try{
             DB::beginTransaction();
@@ -1069,24 +1035,15 @@ class PaqueteController extends Controller
                 $contadorD                  = 0;
                 $noExisteA                  = 0;
                 $noExisteD                  = 0;
-                $codigoPaquete              = strtoupper($item->codigoPaquete);
-                // VALIDAR QUE EL CODIGO DE PAQUETE EXISTE
-                if($tipoBodega == 3){
-                    $getExistsPaquete = $this->getExistsPaquete($codigoPaquete);
-                }
-                // VALIDAR QUE EL COMBO EXISTE
-                else{
-                    $getExistsPaquete = $this->getExistsCombo($codigoPaquete);
-                }
+                $getExistsPaquete   = $this->getExistsPaquete($item->codigoPaquete);
                 if(!empty($getExistsPaquete)){
                     $codigosHijos           = [];
                     $arrayDiagnosticos      = collect();
                     $mensajePadre           = "";
                     //codigos hijos del paquete activacion
-                    // TipoBodega => 3 paquete; 4 = combo
-                    $codigosHijos           = $this->getCodigos($codigoPaquete, 0, $tipoBodega == 3 ? 3 : 5);
+                    $codigosHijos           = $this->getCodigos($item->codigoPaquete,0,3);
                     //Codigos hijos del paquete diagnostico
-                    $arrayDiagnosticos      = collect($this->getCodigos($item->codigoPaquete,0,$tipoBodega == 3 ? 4 : 6));
+                    $arrayDiagnosticos   = collect($this->getCodigos($item->codigoPaquete,0,4));
                     if(count($codigosHijos) > 0){
                         foreach($codigosHijos as $key2 => $tr){
                             $validarA               = [];
@@ -1108,7 +1065,12 @@ class PaqueteController extends Controller
                             //validacion
                             $validarA               = [$tr];
                             $validarD               = $codeDiagnostico;
+                            $ifErrorProformaA       = 0;
+                            $messageProformaA       = "";
                             $ifsetProformaA         = 0;
+                            $ifErrorProformaD       = 0;
+                            $messageProformaD       = "";
+                            $ifsetProformaD         = 0;
                             //======si ambos codigos existen========
                             if(count($validarA) > 0 && count($validarD) > 0){
                                 $mensajeFront               = "";
@@ -1119,8 +1081,12 @@ class PaqueteController extends Controller
                                 $ifContratoA                = $validarA[0]->contrato;
                                 //numero de verificacion
                                 $ifVerificacion             = $validarA[0]->verificacion;
+                                //numero de verificacion
+                                $ifVerificacionA            = $validarA[0]->verificacion;
                                 //para ver la empresa de la proforma
                                 $ifproforma_empresaA        = $validarA[0]->proforma_empresa;
+                                //para ver el estado devuelto proforma
+                                $ifdevuelto_proformaA       = $validarA[0]->devuelto_proforma;
                                 ///para ver el codigo de proforma
                                 $ifcodigo_proformaA         = $validarA[0]->codigo_proforma;
                                 //para ver el codigo de liquidacion
@@ -1130,7 +1096,12 @@ class PaqueteController extends Controller
                                 //validar si el codigo se encuentra liquidado
                                 $ifDevueltoD                = $validarD[0]->estado_liquidacion;
                                 $ifliquidado_regaladoD      = $validarD[0]->liquidado_regalado;
-
+                                //para ver la empresa de la proforma
+                                $ifproforma_empresaD        = $validarD[0]->proforma_empresa;
+                                //para ver el estado devuelto proforma
+                                $ifdevuelto_proformaD       = $validarD[0]->devuelto_proforma;
+                                ///para ver el codigo de proforma
+                                $ifcodigo_proformaD         = $validarD[0]->codigo_proforma;
                                 //===VALIDACION====
 
                                 if($request->dLiquidado ==  '1'){
@@ -1170,27 +1141,6 @@ class PaqueteController extends Controller
                                         //====CODIGO UNION=====
                                         $this->GuardarEnHistorico(0,$institucion_id,$periodo_id,$codigoDiagnostico,$usuario_editor,$comentario,$old_valuesD,$newValuesDiagnostico,$setContrato,$verificacion_liquidada);
                                         $this->codigosRepository->saveDevolucion($codigoDiagnostico,$request->cliente,$request->institucion_id,$request->periodo_id,$fecha,$request->observacion,$request->id_usuario);
-                                        //GUARDAR EN UN ARRAY PARA DEVOLUCION CON COMBOS DESARMADOS
-                                        $info_individual = collect($codigos_inviduales)->firstWhere('codigo', $codigoActivacion);
-
-                                        if(!($info_individual)){
-                                            return [
-                                                "status" => 0,
-                                                "message" => "El codigo no se fue encontrado en los codigos individuales",
-                                            ];
-                                        }
-                                        $arrayCodigosDesarmados[] = (object)[
-                                            "codigo"             => $codigoActivacion,
-                                            "codigo_union"       => $codigoDiagnostico,
-                                            "libro_id"           => $info_individual ? $info_individual->libro_idReal : null,
-                                            "estado_liquidacion" => $validarA[0]->estado_liquidacion,
-                                            "liquidado_regalado" => $validarA[0]->liquidado_regalado,
-                                            "estado"             => $validarA[0]->estado,
-                                            "plus"               => $validarA[0]->plus,
-                                            "precio"             => $info_individual ? $info_individual->precio : null,
-                                            "combo"              => $validarA[0]->codigo_combo,
-                                            "codigo_combo"       => $validarA[0]->codigo_combo,
-                                        ];
                                     }else{
                                         //SI NO INGRESA ALGUNO DE LOS CODIGOS ENVIO AL FRONT
                                         $problemasconCodigo[$contadorProblemasCodigos] = [
@@ -1230,7 +1180,7 @@ class PaqueteController extends Controller
                             }
                         }
                     }else{
-                        $mensajePadre = "El $letraProceso no tiene codigos";
+                        $mensajePadre = "El paquete no tiene codigos";
                     }
                     //codigos resumen
                     $arregloResumen[$contadorResumen] = [
@@ -1248,35 +1198,25 @@ class PaqueteController extends Controller
                 }else{
                     $arregloProblemaPaquetes [$contadorErrPaquetes] = [
                         "paquete"   => $item->codigoPaquete,
-                        "problema"  => $letraProceso.' no existe'
+                        "problema" => 'Paquete no existe'
                     ];
                     $contadorErrPaquetes++;
                 }
             }
-            //fin foreach
-             //si hay codigos desarmados
-            if(count($arrayCodigosDesarmados) > 0){
-                //desarmar los codigos de los combos
-                $codigoslibros_devolucion_desarmados_header_id =$this->codigosRepository->save_devolucion_codigos_desarmados($arrayCodigosDesarmados,$request->id_usuario,$request->institucion_id,$request->periodo_id,$request->observacion);
-            }
             DB::commit();
             if(count($codigoConProblemas) == 0){
                 return [
-                    "arregloResumen"                                => $arregloResumen,
-                    "codigoConProblemas"                            => [],
-                    "arregloErroresPaquetes"                        => $arregloProblemaPaquetes,
-                    "arrayCodigosDesarmados"                        => $arrayCodigosDesarmados,
-                    "codigoslibros_devolucion_desarmados_header_id" => $codigoslibros_devolucion_desarmados_header_id
+                    "arregloResumen"                   => $arregloResumen,
+                    "codigoConProblemas"               => [],
+                    "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
                 ];
             }else{
                 $resultado = collect($codigoConProblemas);
                 $send      = $resultado->flatten(10);
                 return [
-                    "arregloResumen"                                => $arregloResumen,
-                    "codigoConProblemas"                            => $send,
-                    "arregloErroresPaquetes"                        => $arregloProblemaPaquetes,
-                    "arrayCodigosDesarmados"                        => $arrayCodigosDesarmados,
-                    "codigoslibros_devolucion_desarmados_header_id" => $codigoslibros_devolucion_desarmados_header_id
+                    "arregloResumen"                   => $arregloResumen,
+                    "codigoConProblemas"               => $send,
+                    "arregloErroresPaquetes"           => $arregloProblemaPaquetes,
                 ];
             }
         }
@@ -1418,7 +1358,7 @@ class PaqueteController extends Controller
                                     $old_valuesA = json_encode($validarA);
                                     $old_valuesD = json_encode($validarD);
                                     // Transactional operation
-                                    $ingreso = $this->codigosRepository->updateActivacion($codigoActivacion, $codigoDiagnostico, $validarD, $ifOmitirA, 0,$request);
+                                    $ingreso = $this->codigosRepository->updateActivacion($codigoActivacion, $codigoDiagnostico, $validarD, $ifOmitirA, 0);
 
                                     if ($ingreso == 1) {
                                         $contadorA++;
@@ -1461,7 +1401,7 @@ class PaqueteController extends Controller
                             }
                         }
                     } else {
-                        $mensajePadre = "El $letraProceso no tiene códigos";
+                        $mensajePadre = "El paquete no tiene códigos";
                     }
 
                     // Summary record

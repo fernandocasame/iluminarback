@@ -17,6 +17,5 @@ class f_movimientos_detalle_producto extends Model
         'emp_id',
         'fmdp_cantidad',
         'fmdp_tipo_bodega',
-        'fmdp_tipo_codigo_combo',
     ];
 }

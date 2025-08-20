@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\_14Producto;
-use App\Models\_14ProductoStockHistorico;
 use App\Models\f_tipo_documento;
 use Illuminate\Http\Request;
 use DB;
@@ -13,9 +12,7 @@ use App\Models\PedidoGuiaDevolucionDetalle;
 use App\Models\PedidoHistoricoActas;
 use App\Models\PedidoGuiaTemp;
 use App\Models\Pedidos;
-use App\Models\Pedidos_val_area_new;
 use App\Models\PedidosGuiasBodega;
-use App\Models\PedidoValArea;
 use App\Repositories\pedidos\GuiaRepository;
 use App\Traits\Pedidos\TraitGuiasGeneral;
 use App\Traits\Pedidos\TraitPedidosGeneral;
@@ -89,7 +86,6 @@ class GuiasController extends Controller
                 $codigoFact         = "G".$codigo;
                 $nombrelibro        = $arregloCodigos[$contador]["nombrelibro"];
                 $cantidad_pendiente = $arregloCodigos[$contador]["cantidad_pendiente"];
-                $valor              = $arregloCodigos[$contador]["valor"];
                 //get stock
                 $getStock           = _14Producto::obtenerProducto($codigoFact);
                 //prolipa
@@ -101,7 +97,7 @@ class GuiasController extends Controller
                     $stockAnterior  = $getStock->pro_stockCalmed;
                 }
                 $valorNew           = $arregloCodigos[$contador]["valor"];
-                $nuevoStock         = ($stockAnterior < 0 ? 0 : $stockAnterior) - $valorNew;
+                $nuevoStock         = $stockAnterior - $valorNew;
                 $form_data_stock[$contador] = [
                 "id"                => $id,
                 "nombrelibro"       => $nombrelibro,
@@ -110,8 +106,7 @@ class GuiasController extends Controller
                 "nuevoStock"        => $nuevoStock,
                 "codigoFact"        => $codigoFact,
                 "codigo"            => $codigo,
-                "cantidad_pendiente" => $cantidad_pendiente,
-                "valor"             => $valor,
+                "cantidad_pendiente" => $cantidad_pendiente
                 ];
                 $contador++;
             }
@@ -196,7 +191,6 @@ class GuiasController extends Controller
     public function listadoGuias(){
         $query = DB::SELECT("SELECT pd.*,
         CONCAT(u.nombres,' ',u.apellidos) as asesor,
-        u.cedula,
         (
             SELECT SUM(pg.cantidad_devuelta) AS cantidad
             FROM pedidos_guias_devolucion_detalle  pg
@@ -373,7 +367,6 @@ class GuiasController extends Controller
     public function store(Request $request)
     {
        if($request->guardarGuiasPendientes) { return $this->guardarGuiasPendientes($request); }
-       if($request->anularPedidoAprobado)   { return $this->anularPedidoAprobado($request); }
     }
     //api:post/guias?guardarGuiasPendientes=1
     public function guardarGuiasPendientes(Request $request)
@@ -470,109 +463,6 @@ class GuiasController extends Controller
             return response()->json(["status" => "0", "message" => "Error: " . $ex->getMessage()], 200);
         }
     }
-    //api:post/guias?anularPedidoAprobado=1
-
-    public function anularPedidoAprobado(Request $request){
-        try {
-            DB::beginTransaction();
-
-            $id_pedido          = $request->id_pedido;
-            $ifnuevo            = $request->ifnuevo;
-            $user_created       = $request->user_created;
-            $message_anulado    = $request->message_anulado;
-
-            if (!$id_pedido) {
-                return ["status" => "0", "message" => "El pedido no existe"];
-            }
-
-            $getPedido = Pedidos::findOrFail($id_pedido);
-
-            if ($getPedido->estado_entrega == '2') {
-                return ["status" => "0", "message" => "El pedido ya fue entregado"];
-            }
-
-            $id_empresa = $getPedido->empresa_id;
-            $arrayDetalles = $ifnuevo == '0'
-                ? $this->verStock($id_pedido, $id_empresa)
-                : $this->verStock_new($id_pedido, $id_empresa);
-
-            if (empty($arrayDetalles)) {
-                return ["status" => "0", "message" => "No hay detalle de pedido de guias para el pedido $id_pedido"];
-            }
-
-            $arrayDetalles = array_map(fn($item) => (object) $item, $arrayDetalles);
-            if(count($arrayDetalles) == 0){
-                return ["status" => "0", "message" => "No hay detalle de pedido de guias para el pedido $id_pedido"];
-            }
-            $arrayOldValues = [];
-            $arrayNewValues = [];
-            foreach ($arrayDetalles as $item) {
-                $codigo        = $item->codigoFact;
-                $valorAumentar = $item->valor - $item->cantidad_pendiente;
-                $producto = _14Producto::obtenerProducto($codigo);
-
-                if (!$producto) {
-                    return ["status" => "0", "message" => "No se pudo obtener el producto $codigo"];
-                }
-
-                $oldValues = [
-                    'pro_codigo'         => $producto->pro_codigo,
-                    'pro_reservar'       => $producto->pro_reservar ?? 0,
-                    'pro_stock'          => $producto->pro_stock ?? 0,
-                    'pro_stockCalmed'    => $producto->pro_stockCalmed ?? 0,
-                    'pro_deposito'       => $producto->pro_deposito ?? 0,
-                    'pro_depositoCalmed' => $producto->pro_depositoCalmed ?? 0,
-                ];
-
-                $stockReserva = $producto->pro_reservar + $valorAumentar;
-
-                if ($id_empresa == 1) {
-                    $stockEmpresa = $producto->pro_stock + $valorAumentar;
-                } elseif ($id_empresa == 3) {
-                    $stockEmpresa = $producto->pro_stockCalmed + $valorAumentar;
-                } else {
-                    $stockEmpresa = 0;
-                }
-                // Actualizar stock
-                _14Producto::updateStock($codigo, $id_empresa, $stockReserva, $stockEmpresa);
-
-                $getNuevo = _14Producto::obtenerProducto($codigo);
-                $newValues = [
-                    'pro_codigo'         => $getNuevo->pro_codigo,
-                    'pro_reservar'       => $getNuevo->pro_reservar,
-                    'pro_stock'          => $getNuevo->pro_stock,
-                    'pro_stockCalmed'    => $getNuevo->pro_stockCalmed,
-                    'pro_deposito'       => $getNuevo->pro_deposito,
-                    'pro_depositoCalmed' => $getNuevo->pro_depositoCalmed,
-                ];
-                // Guardar en historico en el array
-                $arrayOldValues[] = $oldValues;
-                $arrayNewValues[] = $newValues;
-            }
-            // Historico
-            _14ProductoStockHistorico::insert([
-                'psh_old_values' => json_encode($arrayOldValues),
-                'psh_new_values' => json_encode($arrayNewValues),
-                'psh_tipo'       => 5,
-                'id_pedido'      => $id_pedido,
-                'user_created'   => $user_created,
-                'created_at'     => now(),
-                'updated_at'     => now(),
-            ]);
-            // Actualizar en pedido de guias a anulado
-            Pedidos::where('id_pedido', $id_pedido)->update([
-                'estado' => '2',
-                'user_anulado' => $user_created,
-                'message_anulado' => $message_anulado
-            ]);
-
-            DB::commit();
-            return ["status" => "1", "message" => "Se anuló correctamente el pedido aprobado"];
-        } catch (\Exception $ex) {
-            DB::rollBack();
-            return ["status" => "0", "message" => "Error al anular el pedido aprobado".$ex->getMessage()];
-        }
-    }
 
     //api:post/saveDevolucionGuiasBodega
     public function saveDevolucionGuiasBodega(Request $request){
@@ -636,23 +526,15 @@ class GuiasController extends Controller
         $devolucion = PedidoGuiaDevolucion::findOrFail($request->id)->delete();
         DB::DELETE("DELETE FROM pedidos_guias_devolucion_detalle WHERE pedidos_guias_devolucion_id = '$request->id'");
     }
+
     /**
      * Display the specified resource.
      *
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    //api:get/guias/{id}
     public function show($id)
     {
-        $Devolucion = PedidoGuiaDevolucion::findOrFail($id);
-        $detalleDevolucion = DB::SELECT("SELECT d.*, ls.nombre AS nombrelibro
-        FROM pedidos_guias_devolucion_detalle d
-        LEFT JOIN libros_series ls ON ls.codigo_liquidacion = d.pro_codigo
-        WHERE d.pedidos_guias_devolucion_id = '$id'
-        ");
-        $Devolucion->detalleDevolucion = $detalleDevolucion;
-        return $Devolucion;
     }
 
     /**
@@ -663,7 +545,7 @@ class GuiasController extends Controller
      */
     public function edit($id)
     {
-
+        //
     }
 
     /**
@@ -677,6 +559,7 @@ class GuiasController extends Controller
     {
         //
     }
+
     /**
      * Remove the specified resource from storage.
      *
@@ -778,7 +661,6 @@ class GuiasController extends Controller
                 $codigo             = $arregloCodigos[$contador]["codigo_liquidacion"];
                 $codigoFact         = "G".$codigo;
                 $nombrelibro        = $arregloCodigos[$contador]["nombrelibro"];
-                $valor              = $arregloCodigos[$contador]["valor"];
                 //get stock
                 $getStock           = _14Producto::obtenerProducto($codigoFact);
                 //prolipa
@@ -789,9 +671,8 @@ class GuiasController extends Controller
                 if($empresa == 3){
                     $stockAnterior  = $getStock->pro_stockCalmed;
                 }
-
                 $valorNew           = $arregloCodigos[$contador]["valor"];
-                $nuevoStock         = ($stockAnterior < 0 ? 0 : $stockAnterior) - $valorNew;
+                $nuevoStock         = $stockAnterior - $valorNew;
                 $form_data_stock[$contador] = [
                 "id"                => $id,
                 "nombrelibro"       => $nombrelibro,
@@ -800,8 +681,7 @@ class GuiasController extends Controller
                 "nuevoStock"        => $nuevoStock,
                 "codigoFact"        => $codigoFact,
                 "codigo"            => $codigo,
-                "cantidad_pendiente" => $cantidad_pendiente,
-                "valor"             => $valor,
+                "cantidad_pendiente" => $cantidad_pendiente
                 ];
                 $contador++;
             }

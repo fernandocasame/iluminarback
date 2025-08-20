@@ -38,7 +38,6 @@ class Libro extends Model
         'demo',
         'creado_at',
         'actualizado_at',
-        'id_folleto'
     ];
 	public $timestamps = false;
 }

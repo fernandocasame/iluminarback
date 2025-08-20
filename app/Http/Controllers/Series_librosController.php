@@ -63,8 +63,7 @@ class Series_librosController extends Controller
     public function show($id)
     {
         $libros_series = DB::SELECT("SELECT ls.*, l.nombre_imprimir,
-        l.nombre_imprimir as  nombrelibro,
-        CONCAT(l.nombrelibro, ' - ' , ls.codigo_liquidacion) as libroProCodigo
+        l.nombre_imprimir as  nombrelibro
         from libros_series ls
         LEFT JOIN libro l ON ls.idLibro = l.idlibro
         WHERE id_serie = $id

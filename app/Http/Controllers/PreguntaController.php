@@ -13,8 +13,6 @@ use Illuminate\Provider\Image;
 use Illuminate\Support\Facades\File;
 
 use App\Models\Preguntas;//modelo Evaluaciones.php
-use App\Models\PreguntasOpciones;
-use App\Models\Temas;
 use App\Repositories\Evaluaciones\PreguntasRepository;
 
 class PreguntaController extends Controller
@@ -178,7 +176,7 @@ class PreguntaController extends Controller
                 AND p.id_tema = te.id
                 AND p.estado = 1
                 AND u.idusuario = p.idusuario
-                AND p.grupo_user = '1'
+                AND u.id_group = '1'
                 ORDER BY p.descripcion
                 DESC
             ");
@@ -261,15 +259,14 @@ class PreguntaController extends Controller
         if(count($query) == 0){
             return [];
         }
-        return $query;
         //solo traer el pregunta_id
-        // $colección = collect($query);
-        // $resultado = $colección->map(function ($objeto) {
-        //     return [
-        //         'id' => $objeto['pregunta_id']
-        //     ];
-        // });
-        // return $resultado->all();
+        $colección = collect($query);
+        $resultado = $colección->map(function ($objeto) {
+            return [
+                'id' => $objeto['pregunta_id']
+            ];
+        });
+        return $resultado->all();
     }
     public function preguntas_x_tema_Docente(Request $request){
         $id_group                       = $request->id_group;
@@ -299,7 +296,7 @@ class PreguntaController extends Controller
                 AND p.id_tema = te.id
                 -- AND p.estado = 1
                 AND p.idusuario = u.idusuario
-                AND (p.grupo_user = 1 OR p.idusuario = '$request->usuario')
+                AND (u.id_group = 1 OR p.idusuario = '$request->usuario')
                 ORDER BY p.id DESC
             ");
             break;
@@ -315,7 +312,7 @@ class PreguntaController extends Controller
                 AND p.id_tema = te.id
                 -- AND p.estado = 1
                 AND p.idusuario = u.idusuario
-                AND p.grupo_user = 1
+                AND u.id_group = 1
                 ORDER BY p.id DESC
             ");
             break;
@@ -637,7 +634,7 @@ class PreguntaController extends Controller
                 AND te.unidad <= '$max'
                 AND p.estado = 1
                 AND p.idusuario = u.idusuario
-                AND p.grupo_user = 1
+                AND u.id_group = 1
                 AND t.id_tipo_pregunta = $value->id
                 AND p.id IN (select pregunta_id from institucion_evaluacion_asignada where institucion_id = $institucion_id AND estado = '1')
                 GROUP BY p.id_tipo_pregunta");
@@ -663,7 +660,7 @@ class PreguntaController extends Controller
                 AND te.unidad <= '$max'
                 AND p.estado = 1
                 AND p.idusuario = u.idusuario
-                AND p.grupo_user = 1
+                AND u.id_group = 1
                 AND t.id_tipo_pregunta = $value->id
                 GROUP BY p.id_tipo_pregunta");
                 if(count($tipos) == 0){
@@ -673,9 +670,81 @@ class PreguntaController extends Controller
                 }
             }
             return $getTipos;
+
+            // $tipos = DB::SELECT("SELECT t.id_tipo_pregunta as id, t.nombre_tipo as label,
+            // COUNT(p.id_tipo_pregunta) AS cantidad, t.puntaje
+            // FROM tipos_preguntas t, preguntas p, temas te,usuario u
+            // WHERE t.id_tipo_pregunta = p.id_tipo_pregunta
+            // AND p.id_tema = te.id
+            // AND te.id_asignatura = '$asignatura'
+            // AND te.unidad >= '$min'
+            // AND te.unidad <= '$max'
+            // AND p.estado = 1
+            // AND p.idusuario = u.idusuario
+            // AND u.id_group = 1
+            // GROUP BY p.id_tipo_pregunta");
+            // return $tipos;
          }
+        // $tipos = DB::SELECT("CALL tipospreguntas_cantidad($asignatura, $min, $max)");
 
     }
+
+    // public function tipospreguntas($asignatura, $unidades,$grupo,$institucion)
+    // {
+    //     $unidad_v = explode(",", $unidades);
+    //     sort($unidad_v, SORT_NUMERIC);
+    //     $max = $unidad_v[count($unidad_v)-1];
+    //     $min = $unidad_v[0];
+
+    //     if( !isset($max) ){
+    //         $max = $min;
+    //     }
+
+    //     $id_group                       = $grupo;
+    //     $institucion_id                 = $institucion;
+    //     $evaluacion_personalizada       = 0;
+    //     //si es profesor
+    //     if($id_group == 6){
+    //         $getInstitucion = Institucion::findOrfail($institucion_id);
+    //         $evaluacion_personalizada   = $getInstitucion->evaluacion_personalizada;
+    //     }
+    //     //si hay evaluacion personalizada esta activada en la institucion
+    //     if($evaluacion_personalizada == 1){
+    //         $tipos = DB::SELECT("SELECT t.id_tipo_pregunta as id, t.nombre_tipo as label,
+    //         COUNT(p.id_tipo_pregunta) AS cantidad, t.puntaje
+    //         FROM tipos_preguntas t, preguntas p, temas te,usuario u
+    //         WHERE t.id_tipo_pregunta = p.id_tipo_pregunta
+    //         AND p.id_tema = te.id
+    //         AND te.id_asignatura = '$asignatura'
+    //         AND te.unidad >= '$min'
+    //         AND te.unidad <= '$max'
+    //         AND p.estado = 1
+    //         AND p.idusuario = u.idusuario
+    //         AND u.id_group = 1
+    //         AND p.id IN (select pregunta_id from institucion_evaluacion_asignada where institucion_id = $institucion_id AND estado = '1')
+    //         GROUP BY p.id_tipo_pregunta");
+    //         return $tipos;
+    //     }
+    //     else
+    //     {
+    //         $tipos = DB::SELECT("SELECT t.id_tipo_pregunta as id, t.nombre_tipo as label,
+    //         COUNT(p.id_tipo_pregunta) AS cantidad, t.puntaje
+    //         FROM tipos_preguntas t, preguntas p, temas te,usuario u
+    //         WHERE t.id_tipo_pregunta = p.id_tipo_pregunta
+    //         AND p.id_tema = te.id
+    //         AND te.id_asignatura = '$asignatura'
+    //         AND te.unidad >= '$min'
+    //         AND te.unidad <= '$max'
+    //         AND p.estado = 1
+    //         AND p.idusuario = u.idusuario
+    //         AND u.id_group = 1
+    //         GROUP BY p.id_tipo_pregunta");
+    //         return $tipos;
+    //      }
+
+    //     // $tipos = DB::SELECT("CALL tipospreguntas_cantidad($asignatura, $min, $max)");
+
+    // }
 
     public function obtenerPreguntaAleatoria($tipo, $evaluacion, $unidad, $i, $intentos)
     {
@@ -689,7 +758,8 @@ class PreguntaController extends Controller
         AND t.unidad = ?
         AND p.id NOT IN (SELECT pr.id_pregunta FROM pre_evas pr WHERE pr.id_evaluacion = $evaluacion AND pr.grupo = $i)
         AND p.idusuario = u.idusuario
-        AND p.grupo_user = 1
+        AND u.id_group = 1
+        -- AND u.institucion_idInstitucion = 66
         ORDER BY RAND() LIMIT 1",[$tipo, $evaluacion, $unidad]);
 
         $this->guardarPreguntaRand($pregunta, $tipo, $evaluacion, $unidad, $i, $intentos);
@@ -730,7 +800,10 @@ class PreguntaController extends Controller
         if($evaluacion_personalizada == 1){
             for( $i=1; $i<=$request->grupos; $i++ ){
                 for( $j=0; $j<count($tipos); $j++ ){
+                    echo "test $j "."<br>";
                     for( $k=0; $k<$cantidades[$j]; $k++ ){
+                        echo "entro";
+                        echo "hola $j "."<br>";
                         $unidad_rand = rand(0, count($unidades)-1);
                         $this->preguntasRepository->obtenerPreguntaAleatoriaPersonalizada($tipos[$j], $request->evaluacion, $unidades[$unidad_rand], $i, $intentos,$institucion_id);
                     }
@@ -821,179 +894,5 @@ class PreguntaController extends Controller
         ");
         if(count($query) > 0){ return ["status" => "0", "message" => "La pregunta esta siendo utilizada en una evaluación personalizada"]; }
         $pregunta = EvaluacionInstitucionAsignada::findOrFail($request->id)->delete();
-    }
-    //api:get>>/metodosGetPreguntas
-    public function metodosGetPreguntas(Request $request){
-        $action = $request->input('action');
-        switch ($action) {
-            case 'Get_Preguntas_x_Asignatura':
-                return $this->Get_Preguntas_x_Asignatura($request);
-            default:
-                return response()->json(['error' => 'Acción no válida'], 400);
-        }
-    }
-    //api:get>>//metodosGetPreguntas?action=Get_Preguntas_x_Asignatura&id_asignatura=1285
-    // public function Get_Preguntas_x_Asignatura(Request $request)
-    // {
-    //     $id_asignatura = $request->input('id_asignatura');
-
-    //     if (!$id_asignatura) {
-    //         return ["status" => "0", "message" => "El id de la asignatura es requerido"];
-    //     }
-
-    //     // Obtener preguntas usando Eloquent
-    //     $preguntas = Preguntas::whereHas('tema', function ($q) use ($id_asignatura) {
-    //             $q->where('id_asignatura', $id_asignatura)
-    //             ->where('estado', 1);
-    //         })
-    //         ->where('estado', 1)
-    //         ->where('grupo_user', 1)
-    //         ->get();
-
-    //     // Obtener temas con Eloquent
-    //     $temas = Temas::where('id_asignatura', $id_asignatura)
-    //         ->where('estado', 1)
-    //         ->get();
-
-    //     return [
-    //         'preguntas' => $preguntas,
-    //         'temas' => $temas
-    //     ];
-    // }
-    public function Get_Preguntas_x_Asignatura(Request $request)
-    {
-        $id_asignatura = $request->input('id_asignatura');
-
-        if (!$id_asignatura) {
-            return ["status" => "0", "message" => "El id de la asignatura es requerido"];
-        }
-
-        // Obtener preguntas usando Eloquent
-        $preguntas = Preguntas::whereHas('tema', function ($q) use ($id_asignatura) {
-                $q->where('id_asignatura', $id_asignatura)
-                ->where('estado', 1);
-            })
-            ->where('estado', 1)
-            ->where('grupo_user', 1)
-            ->get();
-
-        // Obtener temas con Eloquent
-        $temas = Temas::where('id_asignatura', $id_asignatura)
-            ->where('estado', 1)
-            ->get();
-
-        // Crear un mapa de temas por id
-        $temasMap = $temas->keyBy('id');
-
-        // Añadir 'unidad' y 'nombre_tema' a cada pregunta si el tema existe
-        $preguntasConDatos = $preguntas->map(function ($pregunta) use ($temasMap) {
-            $tema = $temasMap->get($pregunta->id_tema);
-            if ($tema) {
-                $pregunta->unidad = $tema->unidad;
-                $pregunta->nombre_tema = $tema->nombre_tema;
-            } else {
-                $pregunta->unidad = null;
-                $pregunta->nombre_tema = null;
-            }
-            return $pregunta;
-        });
-
-        return [
-            'preguntas' => $preguntasConDatos,
-            'temas' => $temas
-        ];
-    }
-
-
-    //api:post>>/metodosPostPreguntas
-    public function metodosPostPreguntas(Request $request){
-        $action = $request->input('action');
-        switch ($action) {
-            case 'Post_Preguntas_x_Asignatura':
-                return $this->Post_Preguntas_x_Asignatura($request);
-            default:
-                return response()->json(['error' => 'Acción no válida'], 400);
-        }
-    }
-
-    //api:post>>/metodosPostPreguntas?action=Post_Preguntas_x_Asignatura
-    public function Post_Preguntas_x_Asignatura(Request $request)
-    {
-        DB::beginTransaction();
-
-        try {
-            $arrayPreguntas = json_decode($request->arrayPreguntas);
-            $idusuario      = $request->idusuario;
-            $contador       = 0;
-            $arrayPreguntasExistentes = [];
-
-            foreach ($arrayPreguntas as $pregunta) {
-                $tema = Temas::where('id_asignatura', $pregunta->id_asignatura_to)
-                    ->where('estado', 1)
-                    ->where('unidad', $pregunta->unidad)
-                    ->where('nombre_tema', $pregunta->nombre_tema)
-                    ->first();
-
-                if (!$tema) {
-                    DB::rollBack();
-                    return response()->json([
-                        'status'  => '0',
-                        'message' => "No se encontró el tema {$pregunta->nombre_tema} de la unidad {$pregunta->unidad} para la asignatura especificada."
-                    ], 200);
-                }
-
-                // validar si la pregunta ya existe
-                $preguntaExistente = Preguntas::where('descripcion', $pregunta->descripcion)
-                    ->where('id_tema', $tema->id)
-                    ->where('idPreguntaMovida', $pregunta->id)
-                    ->first();
-                if ($preguntaExistente) {
-                    // Si la pregunta ya existe, no la volvemos a crear
-                    $arrayPreguntasExistentes[] = $preguntaExistente;
-                    continue;
-                }
-                $nuevaPregunta                   = new Preguntas();
-                $nuevaPregunta->idusuario        = $idusuario;
-                $nuevaPregunta->idPreguntaMovida = $pregunta->id;
-                $nuevaPregunta->id_tipo_pregunta = $pregunta->id_tipo_pregunta;
-                $nuevaPregunta->descripcion      = $pregunta->descripcion;
-                $nuevaPregunta->img_pregunta     = $pregunta->img_pregunta;
-                $nuevaPregunta->puntaje_pregunta = $pregunta->puntaje_pregunta;
-                $nuevaPregunta->estado           = 1;
-                $nuevaPregunta->grupo_user       = $pregunta->grupo_user;
-                $nuevaPregunta->id_tema          = $tema->id;
-                $nuevaPregunta->save();
-
-                if ($nuevaPregunta) {
-                    $contador++;
-                    $opciones = DB::select("SELECT * FROM opciones_preguntas WHERE id_pregunta = ?", [$pregunta->id]);
-                    foreach ($opciones as $opcion) {
-                        $nuevaOpcion                     = new PreguntasOpciones();
-                        $nuevaOpcion->id_pregunta        = $nuevaPregunta->id;
-                        $nuevaOpcion->opcion             = $opcion->opcion;
-                        $nuevaOpcion->img_opcion         = $opcion->img_opcion;
-                        $nuevaOpcion->tipo               = $opcion->tipo;
-                        $nuevaOpcion->cant_coincidencias = $opcion->cant_coincidencias;
-                        $nuevaOpcion->save();
-                    }
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                "status"  => "1",
-                "message" => "Se han movido $contador preguntas correctamente.",
-                "preguntas_existentes" => $arrayPreguntasExistentes
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status'  => '0',
-                'message' => 'Ocurrió un error al procesar las preguntas.',
-                'error'   => $e->getMessage()
-            ], 200);
-        }
     }
 }

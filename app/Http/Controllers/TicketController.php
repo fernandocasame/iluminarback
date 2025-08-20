@@ -18,13 +18,13 @@ class TicketController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function index(Request $request)
-    {
+    {   
         //para informacion del usuario
         if($request->informacionUsuario){
              //para obtener los datos del estudiante para abrir el ticket
             $datosEstudiante = DB::SELECT("SELECT CONCAT(e.nombres,' ', e.apellidos) as usuario,
             e.name_usuario,e.cedula,e.idusuario, i.nombreInstitucion,i.idInstitucion
-            FROM usuario e, institucion i
+            FROM usuario e, institucion i 
             WHERE e.idusuario = $request->idusuario
             AND e.institucion_idInstitucion = i.idInstitucion
         ");
@@ -80,7 +80,7 @@ class TicketController extends Controller
             $estadoTicket->estado = $request->estado;
             $estadoTicket->save();
             //Si se cierrar el ticket actualizo la fecha
-            $fechaActual  = date('Y-m-d');
+            $fechaActual  = date('Y-m-d'); 
             if($request->estado == '0'){
                 DB::table('tickets')
                 ->where('ticket_id', $request->ticket_id)
@@ -95,15 +95,15 @@ class TicketController extends Controller
         //para la busqueda de ticket por filtro de fechas
         if($request->busqueda == 'fecha'){
             $ticketCerrado = DB::SELECT("SELECT t.*,
-            CONCAT(u.nombres,' ', u.apellidos) as usuario , (SELECT TIME(fecha)
-            FROM ticket_respuesta  WHERE ticket_id = t.ticket_id
-            AND group_id <> '1'
+            CONCAT(u.nombres,' ', u.apellidos) as usuario , (SELECT TIME(fecha) 
+            FROM ticket_respuesta  WHERE ticket_id = t.ticket_id 
+            AND group_id <> '1' 
             AND group_id <> '11'
             ORDER BY ticket_res_id DESC  LIMIT 1)  AS ultima_hora ,
-            (SELECT COUNT(ticket_id) as c
-            FROM ticket_respuesta
+            (SELECT COUNT(ticket_id) as c 
+            FROM ticket_respuesta 
             WHERE ticket_id = t.ticket_id
-            AND group_id <> '1'
+            AND group_id <> '1' 
             AND group_id <> '11'
             ) as cantidad ,
             u.email,u.name_usuario,u.cedula,u.idusuario, i.nombreInstitucion,
@@ -123,7 +123,7 @@ class TicketController extends Controller
         }
         //para la busqueda de tickets por el numero
         if($request->busqueda == 'numero'){
-            $ticketCerrado = DB::SELECT("SELECT t.*,
+            $ticketCerrado = DB::SELECT("SELECT t.*, 
             CONCAT(u.nombres,' ', u.apellidos) as usuario,u.email ,
             u.name_usuario,u.cedula,u.idusuario, i.nombreInstitucion, g.deskripsi as rol,
             t.ticket_asesor, i.vendedorInstitucion, t.datos_ticket
@@ -143,7 +143,7 @@ class TicketController extends Controller
 
         //para la busqueda de tickets cerrados por cedula
         if($request->busqueda == 'cedula'){
-            $ticketCerrado = DB::SELECT("SELECT t.*,
+            $ticketCerrado = DB::SELECT("SELECT t.*, 
             CONCAT(u.nombres,' ', u.apellidos) as usuario,u.email,
             u.name_usuario,u.cedula,u.idusuario, i.nombreInstitucion, g.deskripsi as rol,
             t.ticket_asesor, i.vendedorInstitucion, t.datos_ticket
@@ -196,11 +196,11 @@ class TicketController extends Controller
         //para la busqueda de ticket cerrados para el reporte general por filtro de fechas
         if($request->reporteGeneral){
             $ticketCerrado = DB::SELECT("SELECT t.*,
-            DATEDIFF(t.fecha_ticket_final,t.fecha_ticket) as dias,
-            (SELECT COUNT(ticket_id)
-            FROM ticket_respuesta WHERE ticket_id = t.ticket_id) as cantidad,
+            DATEDIFF(t.fecha_ticket_final,t.fecha_ticket) as dias, 
+            (SELECT COUNT(ticket_id) 
+            FROM ticket_respuesta WHERE ticket_id = t.ticket_id) as cantidad, 
             CONCAT(u.nombres,' ', u.apellidos) as usuario,
-            u.email ,u.name_usuario,u.cedula,u.idusuario, i.nombreInstitucion,
+            u.email ,u.name_usuario,u.cedula,u.idusuario, i.nombreInstitucion, 
             g.deskripsi as rol, t.ticket_asesor, i.vendedorInstitucion, t.datos_ticket
             FROM tickets t
             LEFT JOIN institucion i ON t.institucion_id = i.idInstitucion
@@ -225,7 +225,7 @@ class TicketController extends Controller
              FROM tickets t
              LEFT JOIN institucion i ON t.institucion_id = i.idInstitucion
              WHERE estado = '1'
-
+            
             ");
             return $abiertos;
         }
@@ -236,10 +236,10 @@ class TicketController extends Controller
             return $cerrados;
         }
         //=================FIN CONTAR TICKETS=====================================
-        //para ver la cantidad de mensajes por ticket
+        //para ver la cantidad de mensajes por ticket 
         if($request->cantidadTicketNotificacion){
-            $ticketAbierto = DB::SELECT("SELECT t.*,
-            CONCAT(u.nombres,' ', u.apellidos) as usuario ,
+            $ticketAbierto = DB::SELECT("SELECT t.*, 
+            CONCAT(u.nombres,' ', u.apellidos) as usuario , 
             (SELECT COUNT(ticket_id) FROM ticket_respuesta
             WHERE ticket_id = t.ticket_id AND (group_id ='1' OR group_id ='11')) as cantidad,
             u.email,u.name_usuario,u.cedula,u.idusuario,
@@ -248,7 +248,7 @@ class TicketController extends Controller
             LEFT JOIN institucion i ON t.institucion_id = i.idInstitucion
             LEFT JOIN usuario u ON t.usuario_id = u.idusuario
             LEFT JOIN sys_group_users g ON t.group_id = g.id
-            WHERE t.usuario_id = $request->id
+            WHERE t.usuario_id = $request->id 
             AND  t.estado = '1'
             ORDER BY t.fecha_update DESC
             ");
@@ -283,30 +283,22 @@ class TicketController extends Controller
             }
         }
     }
-    //api:get/>>getInfoTicket/9
-    public function getInfoTicket($id_ticket){
-        //informacion de la tabla ticket enviando el id del ticket
-        $query = DB::SELECT("SELECT * FROM tickets
-        where ticket_id = $id_ticket
-        ");
-        return $query;
-    }
     public function getTicketsAbiertos(){
         $ticketAbierto = DB::SELECT("SELECT t.*,
-            CONCAT(u.nombres,' ', u.apellidos) as usuario ,
+            CONCAT(u.nombres,' ', u.apellidos) as usuario , 
             (
-                SELECT TIME(fecha)
-                FROM ticket_respuesta
+                SELECT TIME(fecha) 
+                FROM ticket_respuesta 
                 WHERE ticket_id = t.ticket_id
-                AND group_id <> '11'
+                AND group_id <> '11' 
                 AND group_id <> '1'
-                ORDER BY ticket_res_id DESC  LIMIT 1)
-            AS ultima_hora ,
+                ORDER BY ticket_res_id DESC  LIMIT 1) 
+            AS ultima_hora , 
             (
                 SELECT COUNT(ticket_id) as c
                 FROM ticket_respuesta
                 WHERE ticket_id = t.ticket_id
-                AND group_id <> '11'
+                AND group_id <> '11' 
                 AND group_id <> '1'
             )as cantidad,
             u.email,u.name_usuario,u.cedula,u.idusuario,
@@ -346,11 +338,8 @@ class TicketController extends Controller
             $ticketRespuesta = new TicketRespuesta;
             $ticketRespuesta->ticket_id =   $request->ticket_id;
             $ticketRespuesta->descripcion = $request->descripcion;
-            $ticketRespuesta->group_id =    $request->group_id;
-            $ticketRespuesta->usuario_id =  $request->usuario_id;
-            if($request->estado){
-                $ticketRespuesta->estado =  $request->estado;
-            }
+            $ticketRespuesta->group_id =    $request->group_id;   
+            $ticketRespuesta->usuario_id =  $request->usuario_id;  
             $ticketRespuesta->save();
             if($ticketRespuesta){
                 return "Se genero la respuesta correctamente";
@@ -358,9 +347,9 @@ class TicketController extends Controller
                 return "No se pudo guardar la respuesta";
             }
         }else{
-            $fechaActual  = date('Y-m-d');
+            $fechaActual  = date('Y-m-d'); 
             $ticket = new Ticket;
-            $ticket->fecha_ticket       = $fechaActual;
+            $ticket->fecha_ticket       = $fechaActual;  
             $ticket->cedula             = $request->cedula;
             if($request->codigo){
                 $ticket->codigo         = $request->codigo;
@@ -385,7 +374,7 @@ class TicketController extends Controller
                 $ticketRespuesta->usuario_id =  $request->usuario_id;
                 $ticketRespuesta->save();
             }
-        }
+        } 
         if($ticket){
             return "Se genero el ticket correctamente";
         }else{
@@ -403,12 +392,12 @@ class TicketController extends Controller
     {
         $ticketAbierto = DB::SELECT("SELECT t.*, CONCAT(u.nombres,' ', u.apellidos) as usuario,
         (
-            SELECT TIME(fecha)
-            FROM ticket_respuesta
+            SELECT TIME(fecha) 
+            FROM ticket_respuesta 
             WHERE ticket_id = t.ticket_id
             AND (group_id = '1' OR group_id = '11')
             ORDER BY ticket_res_id DESC  LIMIT 1
-            )  AS ultima_hora,
+            )  AS ultima_hora, 
         (SELECT COUNT(ticket_id) FROM ticket_respuesta WHERE ticket_id = t.ticket_id AND (group_id ='1' OR group_id ='11' )) as cantidad ,u.email,u.name_usuario,u.cedula,u.idusuario, i.nombreInstitucion, g.deskripsi as rol
         FROM tickets t
         LEFT JOIN institucion i ON t.institucion_id = i.idInstitucion
@@ -431,7 +420,7 @@ class TicketController extends Controller
      */
     public function edit($id)
     {
-
+        
     }
 
     /**

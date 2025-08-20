@@ -25,8 +25,7 @@ class Seminarios extends Model
         'cant_asistentes',
         'asistencia_activa',
         'id_usuario',
-        'tipo',
-        'notificado'
+        'tipo'
     ];
 
     public function institucion(): BelongsTo

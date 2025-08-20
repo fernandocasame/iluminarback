@@ -4,13 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\CodigosLibros;
-use App\Models\Contratos_agrupados;
 use App\Models\Models\Pedidos\PedidosDocumentosLiq;
 use App\Models\Institucion;
 use App\Models\User;
 use App\Models\Usuario;
 use App\Models\Ventas;
-use App\Models\Verificacion;
 use App\Repositories\Codigos\CodigosRepository;
 use App\Repositories\pedidos\PedidosRepository;
 use App\Traits\Pedidos\TraitPedidosGeneral;
@@ -38,24 +36,21 @@ class Pedidos2Controller extends Controller
     {
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
-        if($request->getReportePedidos)             { return $this->getReportePedidos($request); }
-        if($request->getReportePedidos_new)         { return $this->getReportePedidos_new($request); }
         if($request->getLibrosFormato)              { return $this->getLibrosFormato($request->periodo_id); }
         if($request->getLibrosFormato_new)          { return $this->getLibrosFormato_new($request->periodo_id); }
         if($request->geAllLibrosxAsesorEscuelas)    { return $this->geAllLibrosxAsesorEscuelas($request->asesor_id,$request->periodo_id); }
         if($request->geAllGuiasxAsesor)             { return $this->geAllGuiasxAsesor($request->asesor_id,$request->periodo_id); }
         if($request->geAllLibrosxAsesor)            { return $this->geAllLibrosxAsesor($request->asesor_id,$request->periodo_id); }
+        if($request->getLibrosXAreaXSerieUsados)    { return $this->getLibrosXAreaXSerieUsados($request->periodo_id,$request->area,$request->serie); }
         //api:get/pedidos2/pedidos?getAsesoresPedidos=1
         if($request->getAsesoresPedidos)            { return $this->getAsesoresPedidos(); }
-        if($request->getAsesoresVentasPeriodo)      { return $this->getAsesoresVentasPeriodo($request->id_periodo); }
         if($request->getInstitucionesDespacho)      { return $this->getInstitucionesDespacho($request); }
         if($request->getLibrosXDespacho)            { return $this->getLibrosXDespacho($request); }
         if($request->getLibrosXDespacho_new)        { return $this->getLibrosXDespacho_new($request); }
         if($request->getLibrosXInstituciones)       { return $this->getLibrosXInstituciones($request->id_periodo,$request->tipo_venta); }
         if($request->getLibrosXInstitucionesAsesor) { return $this->getLibrosXInstitucionesAsesor($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
-        if($request->getLibrosXInstitucionesAsesor_new) { return $this->getLibrosXInstitucionesAsesor_new($request->id_periodo,$request->tipo_venta,$request->id_asesor); }
         if($request->getLibrosXPerido) { return $this->getLibrosXPerido($request->id_periodo); }
-        if($request->formatoPrecioXPeriodo)         { return $this->formatoPrecioXPeriodo($request); }
+
 
         if($request->getproStockReserva)            { return $this->getproStockReserva($request); }
         if($request->getPuntosVentaDespachadosComparativo) { return $this->getPuntosVentaDespachadosComparativo($request); }
@@ -78,150 +73,6 @@ class Pedidos2Controller extends Controller
         if($request->getCobradoXyear)               { return $this->getCobradoXyear($request); }
 
     }
-    //API:GET/pedidos2/pedidos?getReportePedidos=1&periodo_id=26&ifContratos=1
-    public function getReportePedidos($request) {
-        // 1. Validar que el periodo_id esté presente
-        $periodo_id = $request->periodo_id;
-        $ifContratos = $request->ifContratos;
-
-        if (!$periodo_id) {
-            return ["status" => "0", "message" => "Falta el periodo_id"];
-        }
-
-        // 2. Obtener los pedidos
-        if ($ifContratos == 1) {
-            // Con contratos
-            $getPedidos = DB::SELECT("
-                SELECT p.*
-                FROM pedidos p
-                WHERE p.id_periodo = ?
-                AND p.estado = '1'
-                AND p.tipo = '0'
-                AND p.contrato_generado IS NOT NULL
-            ", [$periodo_id]);
-        } else {
-            // Sin contratos
-            $getPedidos = DB::SELECT("
-                SELECT p.*
-                FROM pedidos p
-                WHERE p.id_periodo = ?
-                AND p.estado = '1'
-                AND p.tipo = '0'
-                AND p.contrato_generado IS NULL
-            ", [$periodo_id]);
-        }
-
-        $arrayDetalles = [];
-
-        // 3. Recorrer los pedidos y obtener los detalles de cada uno
-        foreach ($getPedidos as $key => $item10) {
-            $pedido = $item10->id_pedido;
-            $libroSolicitados = $this->pedidosRepository->obtenerLibroxPedidoTodo($pedido);
-            $arrayDetalles[$key] = $libroSolicitados;
-        }
-
-        $agrupado = [];
-        $arrayDetalles = collect($arrayDetalles)->flatten(10);
-
-        // 4. Agrupar los datos por código de liquidación
-        foreach ($arrayDetalles as $detalle) {
-            $codigo_liquidacion = $detalle->codigo_liquidacion;
-
-            if (isset($agrupado[$codigo_liquidacion])) {
-                $agrupado[$codigo_liquidacion]['valor'] += $detalle->valor;
-                $agrupado[$codigo_liquidacion]['total'] += $detalle->valor * $detalle->precio;
-
-                if (empty($agrupado[$codigo_liquidacion]['nombrelibro'])) {
-                    $agrupado[$codigo_liquidacion]['nombrelibro'] = $detalle->nombrelibro;
-                }
-            } else {
-                $agrupado[$codigo_liquidacion] = [
-                    'codigo_liquidacion' => $codigo_liquidacion,
-                    'valor' => $detalle->valor,
-                    'nombrelibro' => $detalle->nombrelibro,
-                    'precio' => $detalle->precio,
-                    'total' => $detalle->valor * $detalle->precio,
-                ];
-            }
-        }
-
-        // 5. Retornar los datos agrupados
-        return array_values($agrupado);
-    }
-
-    //API:GET/pedidos2/pedidos?getReportePedidos_new=1&periodo_id=26&ifContratos=1
-    public function getReportePedidos_new($request) {
-        // 1. Validar que el periodo_id esté presente
-        $periodo_id = $request->periodo_id;
-        $ifContratos = $request->ifContratos;
-
-        if (!$periodo_id) {
-            return ["status" => "0", "message" => "Falta el periodo_id"];
-        }
-
-        // 2. Obtener los pedidos
-        if ($ifContratos == 1) {
-            // Con contratos
-            $getPedidos = DB::SELECT("
-                SELECT p.*
-                FROM pedidos p
-                WHERE p.id_periodo = ?
-                AND p.estado = '1'
-                AND p.tipo = '0'
-                AND p.contrato_generado IS NOT NULL
-            ", [$periodo_id]);
-        } else {
-            // Sin contratos
-            $getPedidos = DB::SELECT("
-                SELECT p.*
-                FROM pedidos p
-                WHERE p.id_periodo = ?
-                AND p.estado = '1'
-                AND p.tipo = '0'
-                AND p.contrato_generado IS NULL
-            ", [$periodo_id]);
-        }
-
-        $arrayDetalles = [];
-
-        // 3. Recorrer los pedidos y obtener los detalles de cada uno
-        foreach ($getPedidos as $key => $item10) {
-            $pedido = $item10->id_pedido;
-            $libroSolicitados = $this->pedidosRepository->obtenerLibroxPedidoTodo_new($pedido);
-            $arrayDetalles[$key] = $libroSolicitados;
-        }
-
-        $agrupado = [];
-        $arrayDetalles = collect($arrayDetalles)->flatten(10);
-
-        // 4. Agrupar los datos por código de liquidación
-        foreach ($arrayDetalles as $detalle) {
-            $codigo_liquidacion = $detalle->codigo_liquidacion;
-
-            if (isset($agrupado[$codigo_liquidacion])) {
-                $agrupado[$codigo_liquidacion]['valor'] += $detalle->valor;
-                $agrupado[$codigo_liquidacion]['total'] += $detalle->valor * $detalle->precio;
-
-                if (empty($agrupado[$codigo_liquidacion]['nombrelibro'])) {
-                    $agrupado[$codigo_liquidacion]['nombrelibro'] = $detalle->nombrelibro;
-                }
-            } else {
-                $agrupado[$codigo_liquidacion] = [
-                    'codigo_liquidacion' => $codigo_liquidacion,
-                    'valor' => $detalle->valor,
-                    'nombrelibro' => $detalle->nombrelibro,
-                    'precio' => $detalle->precio,
-                    'total' => $detalle->valor * $detalle->precio,
-                ];
-            }
-        }
-
-        // 5. Retornar los datos agrupados
-        return array_values($agrupado);
-    }
-
-
-
     //API:GET/pedidos2/pedidos?getLibrosFormato=yes&periodo_id=22
     /**
      * Get the libros formato for a given periodo.
@@ -243,28 +94,26 @@ class Pedidos2Controller extends Controller
     //api:get/pedidos2/pedidos?getInstitucionesDespacho=1
     public function getInstitucionesDespacho($request){
         $id_periodo = $request->id_periodo;
-        $query      = $this->tr_getAgrupadoPeriodo($id_periodo);
+        $query      = $this->tr_getInstitucionesDespacho($id_periodo);
         $datos = [];
         //sacar el id de pedido de cada ca_codigo_agrupado
         foreach($query as $key => $item){
             $datos[$key] = [
-                'ca_id'             => $item->ca_id,
                 'ca_codigo_agrupado' => $item->ca_codigo_agrupado,
-                'ca_estado'         => $item->ca_estado,
                 'id_periodo'        => $item->id_periodo,
                 'codigo_contrato'   => $item->codigo_contrato,
                 'pedidos'           => $this->tr_pedidosXDespacho($item->ca_codigo_agrupado,$id_periodo),
                 'preproformas'      => $this->tr_getPreproformas($item->ca_codigo_agrupado),
-                'datoAgrupado'      => $this->tr_getAgrupado($item->ca_codigo_agrupado,$item->ca_id),
+                'datoAgrupado'      => $this->tr_getAgrupado($item->ca_codigo_agrupado),
                 'Instituciones'     => $this->tr_getPreproformasInstitucion($item->ca_codigo_agrupado),
                 'documentos'        => $this->tr_getDocumentos($item->ca_codigo_agrupado),
-                'ruc_ci'            => $this->tr_getDocumentosRuc($item->ca_codigo_agrupado),
                 'ca_descripcion'    => $item->ca_descripcion,
                 'ca_tipo_pedido'    => $item->ca_tipo_pedido,
+                'ca_id'             => $item->ca_id,
             ];
         }
         //que sean unicos
-        // $datos = collect($datos)->unique('ca_codigo_agrupado')->values();
+        $datos = collect($datos)->unique('ca_codigo_agrupado')->values();
         return $datos;
     }
     public function editarInstitucionDespacho(Request $request){
@@ -343,22 +192,6 @@ class Pedidos2Controller extends Controller
         $id_pedidos = implode(",",$id_pedidos->toArray());
         $query2 = $this->geAllLibrosxAsesor(0,$id_periodo,1,$id_pedidos);
         return $query2;
-    }
-    //api:get/pedidos2/pedidos?formatoPrecioXPeriodo=1&periodo_id=28&nuevo=1
-    public function formatoPrecioXPeriodo(Request $request){
-        $periodo_id = $request->periodo_id;
-        $nuevo      = $request->nuevo;
-        if($nuevo == 1){
-            $query = DB::SELECT("SELECT * FROM pedidos_formato_new p
-            WHERE p.idperiodoescolar = '$periodo_id'
-            AND p.pfn_estado = 1
-            ");
-        }else{
-            $query = DB::SELECT("SELECT * FROM pedidos_formato p
-            WHERE p.id_periodo = '$periodo_id';
-            ");
-        }
-        return $query;
     }
     //API:GET/pedidos2/pedidos?getproStockReserva=yes
     public function getproStockReserva($pro_codigo){
@@ -950,6 +783,9 @@ class Pedidos2Controller extends Controller
     }
 
 
+
+
+
     //API:GET/pedidos2/pedidos?geAllLibrosxAsesorEscuelas=1&asesor_id=4179&periodo_id=24
     public function geAllLibrosxAsesorEscuelas($asesor_id,$periodo_id){
         //traer las escuelas del asesor
@@ -1171,7 +1007,27 @@ class Pedidos2Controller extends Controller
         // $coleccion  = collect($resultado);
         // return $coleccion->values();
     }
-
+    //API:GET/pedidos2/pedidos?getLibrosXAreaXSerieUsados=yes&periodo_id=24&area=19&serie=169
+    public function getLibrosXAreaXSerieUsados($periodo,$area,$serie){
+        $query = DB::SELECT("SELECT pv.valor,
+        pv.id_area, pv.tipo_val, pv.id_serie, pv.year,pv.plan_lector,pv.alcance,
+        p.id_periodo,
+        CONCAT(se.nombre_serie,' ',ar.nombrearea) as serieArea,
+        se.nombre_serie,p.id_pedido
+        FROM pedidos_val_area pv
+        LEFT JOIN area ar ON  pv.id_area = ar.idarea
+        LEFT JOIN series se ON pv.id_serie = se.id_serie
+        LEFT JOIN pedidos p ON pv.id_pedido = p.id_pedido
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        WHERE  p.id_periodo  = '$periodo'
+        AND p.tipo        = '0'
+        AND p.estado      = '1'
+        AND ar.idarea     = '$area'
+        AND se.id_serie   = '$serie'
+        GROUP BY pv.id
+        ");
+        return $query;
+    }
     public function getAlcanceAbiertoXId($id){
         $query = DB::SELECT("SELECT * FROM pedidos_alcance a
         WHERE a.id = '$id'
@@ -1202,10 +1058,8 @@ class Pedidos2Controller extends Controller
         if($request->getValoresLibrosContratosDespacho_new)             { return $this->getValoresLibrosContratosDespacho_new($request); }
         if($request->getValoresLibrosContratosInstituciones)            { return $this->getValoresLibrosContratosInstituciones($request); }
         if($request->getValoresLibrosContratosInstitucionesAsesor)      { return $this->getValoresLibrosContratosInstitucionesAsesor($request); }
-        if($request->getValoresLibrosContratosInstitucionesAsesor_new)  { return $this->getValoresLibrosContratosInstitucionesAsesor_new($request); }
         if($request->crearUsuario)                                      { return $this->crearUsuario($request); }
         if($request->updateClienteInstitucion)                          { return $this->updateClienteInstitucion($request); }
-        if($request->cambiarEstadoAgrupado )                            { return $this->cambiarEstadoAgrupado($request); }
     }
       //API:POST/pedidos2/pedidos?getValoresLibrosContratos
       public function getValoresLibrosContratos($asesor_id,$periodo_id,$request){
@@ -1352,27 +1206,6 @@ class Pedidos2Controller extends Controller
             return ["status" => "0", "message" => "No se pudo actualizar"];
         }
     }
-    //API:POST/pedidos2/pedidos/cambiarEstadoAgrupado=1
-    public function cambiarEstadoAgrupado($request){
-        $estado = $request->estado;
-        $ca_id     = $request->ca_id;
-        $user_edited = $request->user_edited;
-        // desactivar
-        if($estado == 0){
-            $Contratos_agrupados = Contratos_agrupados::find($ca_id);
-            $Contratos_agrupados->ca_estado = 0;
-            $Contratos_agrupados->user_edited = $user_edited;
-            $Contratos_agrupados->save();
-        }
-        // activar
-        else{
-            $Contratos_agrupados = Contratos_agrupados::find($ca_id);
-            $Contratos_agrupados->ca_estado = 1;
-            $Contratos_agrupados->user_edited = $user_edited;
-            $Contratos_agrupados->save();
-        }
-        return ["status" => "1", "message" => "Se actualizó correctamente"];
-    }
     //api:get/pedidosDespacho?ca_codigo_agrupado=1265&id_periodo=23
     public function pedidosDespacho(Request $request){
         $ca_codigo_agrupado = $request->id_despacho;
@@ -1445,7 +1278,7 @@ class Pedidos2Controller extends Controller
     public function obtenerValores($arrayLibros,$id_pedido){
         $validate               = [];
         $libroSolicitados       = [];
-        $libroSolicitados       = $this->pedidosRepository->obtenerLibroxPedidoTodo_new($id_pedido);
+        $libroSolicitados       = $this->pedidosRepository->obtenerLibroxPedidoTodo($id_pedido);
         foreach($arrayLibros as $key =>  $item){
             $validate[$key] = $this->validarIfExistsLibro($item,$libroSolicitados);
         }
@@ -1685,7 +1518,7 @@ class Pedidos2Controller extends Controller
                 "valor"             => $item->valor,
                 // "tipo_val"          => $item->tipo_val,
                 "id_serie"          => $item->id_serie,
-                "year"              => $item->year,
+                // "year"              => $item->year,
                 // "anio"              => $valores[0]->year,
                 // "version"           => $valores[0]->version,
                 // "plan_lector"       => $item->plan_lector,
@@ -1959,11 +1792,5 @@ class Pedidos2Controller extends Controller
         return $query;
 
     }
-
-    public function Get_Estado_Venta(){
-        $query = DB::SELECT("SELECT * FROM `1_4_estado_venta` WHERE est_ven_codigo NOT IN (5, 6, 7, 8, 9, 11, 13, 14, 15)");
-        return $query;
-    }
     //FIN METODOS JEYSON
-
 }

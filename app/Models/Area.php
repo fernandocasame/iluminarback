@@ -11,8 +11,7 @@ class Area extends Model
     protected $fillable = [
         'nombrearea',
         'tipoareas_idtipoarea',
-        'estado',
-        'permiso_visible_asignacion_libros',
+        'estado'
     ];
 	public $timestamps = false;
 }

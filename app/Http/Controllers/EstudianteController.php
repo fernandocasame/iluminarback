@@ -2,19 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Usuario;
 use App\Models\estudiante;
-use App\Models\CodigoLibros;
-use Illuminate\Http\Request;
 use App\Models\CodigosLibros;
-use App\Models\Institucion;
-use App\Models\TareaEstudiante;
-use Illuminate\Support\Facades\DB;
-use App\Traits\Codigos\TraitCodigosGeneral;
+use Illuminate\Http\Request;
+use DB;
+use Illuminate\Auth\EloquentUserProvider;
+use PhpParser\Node\Stmt\Else_;
 
 class EstudianteController extends Controller
 {
-    use TraitCodigosGeneral;
     /**
      * Display a listing of the resource.
      *
@@ -25,153 +21,7 @@ class EstudianteController extends Controller
         $usuarios = DB::select("CALL `estudiantes` ();");
         return $usuarios;
     }
-    //api:get/estudianteMetodosGet
-    public function estudianteMetodosGet(Request $request){
-        if($request->getMateriasAsignadas){ return $this->getMateriasAsignadas($request->idusuario); }
-        if($request->getTareasEstudiante) { return $this->getTareasEstudiante($request->idusuario); }
-    }
-    //api:get/estudianteMetodosGet?getMateriasAsignadas=1&idusuario=1
-    public function getMateriasAsignadas($idusuario){
-        $todo                   = $this->getMaterias($idusuario);
-        $coleccionTodo          = collect($todo);
-        //nuevo array de materias donde quiero la propiedad idasignatura y nombrelibro
-        $materias               = [];
-        $arrayMaterias          = [];
-        foreach($todo as $key => $item){
-            $materias[$key] = (Object)[
-                "idasignatura" => $item->idasignatura,
-                "nombrelibro"  => $item->nombrelibro,
-                "accion"       => 0,
-            ];
-        }
-        //array unico
-        $arrayMaterias          = array_unique($materias, SORT_REGULAR);
-        $datos                  = [];
-        foreach($arrayMaterias as $key => $item){
-            $evaluaciones       = [];
-            $getCodigos         = [];
-            $resultado          = [];
-            //traer las evaluaciones por codigo utilizando el array todo donde en la tabla calificaciones no exista el id_estudiante con el id de evaluacion
-            $getCodigos  = $coleccionTodo->filter(function ($p) use ($item) {
-                return $p->idasignatura == $item->idasignatura;
-            });
-            foreach($getCodigos as $key2 => $item2){
-                $evaluaciones[] = $this->evaluacionesxCodigo($item2->codigo,$idusuario);
-            }
-            $resultado          = collect($evaluaciones);
-            //unir arrays las evaluaciones con merge
-            $resultado          = $resultado->flatten(10);
-            if($resultado->count() > 0){
-                $datos[$key] = [
-                    "idasignatura" => $item->idasignatura,
-                    "nombrelibro"  => $item->nombrelibro,
-                    "accion"       => 0,
-                    "evaluaciones" => $resultado
-                ];
-            }
-        }
-        $resultadoValores = collect($datos);
-        $resultadoValores = $resultadoValores->values();
-        return $resultadoValores;
-    }
-    //api:get/estudianteMetodosGet?getTareasEstudiante=1&idusuario=43978
-    public function getTareasEstudiante($idusuario){
-        $cursos = DB::SELECT("SELECT e.*, c.idcurso
-        FROM estudiante e
-        LEFT JOIN curso c ON e.codigo = c.codigo
-        LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
-        WHERE e.usuario_idusuario = ?
-        AND pe.estado = '1'
-        AND c.estado  = '1'
-        ",[$idusuario]);
-        $datos = [];
-        //por cada curso voy a contar los pendientes y realizados
-        $contadorPendientes = 0;
-        $contadorRealizadas = 0;
-        foreach($cursos as $key => $item){
-            $pendientes = [];
-            $realizadas = [];
-            $pendientes = $this->getTareasP($item->idcurso,$idusuario,0);
-            $realizadas = $this->getTareasR($item->idcurso,$idusuario,1);
-            $contadorPendientes += count($pendientes);
-            $contadorRealizadas += count($realizadas);
-        }
-        $datos = [
-            "pendientes" => $contadorPendientes,
-            "realizadas" => $contadorRealizadas
-        ];
-        return $datos;
-    }
-    public function getTareasP($idCurso,$idEstudiante,$tipo){
-        //tipo 0 => tareas pendientes, 1 => tareas realizadas
-        $query = DB::SELECT("SELECT t.* FROM tarea t
-        WHERE t.curso_idcurso = '$idCurso'
-        AND t.estado ='1'
-         AND( t.usuario_idusuario IS NULL
-         OR t.usuario_idusuario = '$idEstudiante')
-         AND t.usuario_idusuario NOT IN
-         (
-             SELECT c.usuario_idusuario
-             FROM usuario_tarea c
-             WHERE c.tarea_idtarea = t.idtarea
-             AND c.usuario_idusuario = '$idEstudiante'
-         )
-        ");
-        return $query;
-    }
-    public function getTareasR($idCurso,$idEstudiante,$tipo){
-        //tipo 0 => tareas pendientes, 1 => tareas realizadas
-        $query = DB::SELECT("SELECT t.* FROM tarea t
-        WHERE t.curso_idcurso = '$idCurso'
-        AND t.estado ='1'
-         AND( t.usuario_idusuario IS NULL
-         OR t.usuario_idusuario = '$idEstudiante')
-         AND t.usuario_idusuario IN
-         (
-             SELECT c.usuario_idusuario
-             FROM usuario_tarea c
-             WHERE c.tarea_idtarea = t.idtarea
-             AND c.usuario_idusuario = '$idEstudiante'
-         )
-        ");
-        return $query;
-    }
 
-    public function getMaterias($idusuario){
-        $query = DB::SELECT("SELECT e.codigo,a.idasignatura, l.nombrelibro
-            FROM estudiante e
-            LEFT JOIN curso c ON e.codigo = c.codigo
-            LEFT JOIN asignatura a ON c.id_asignatura = a.idasignatura
-            LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
-            LEFT JOIN libro l ON a.idasignatura = l.asignatura_idasignatura
-            WHERE e.usuario_idusuario = '$idusuario'
-            AND pe.estado = '1'
-            ORDER BY l.nombrelibro
-        ",[$idusuario]);
-        return $query;
-    }
-    public function evaluacionesxCodigo($codigo,$estudiante){
-        $query = DB::SELECT("SELECT e.*, CONCAT(d.nombres, ' ', d.apellidos) as docente,a.nombreasignatura, c.idcurso
-            FROM evaluaciones e
-            LEFT JOIN estudiante es ON es.codigo = e.codigo_curso
-            LEFT JOIN usuario d ON e.id_docente  = d.idusuario
-            LEFT JOIN asignatura a ON a.idasignatura = e.id_asignatura
-            LEFT JOIN curso c ON c.codigo = e.codigo_curso
-            WHERE e.codigo_curso = '$codigo'
-            AND es.codigo = '$codigo'
-            AND es.usuario_idusuario NOT IN (SELECT c.id_estudiante from calificaciones c WHERE c.id_evaluacion = e.id AND c.estado = '1')
-            AND es.usuario_idusuario = '$estudiante'
-            AND e.estado = '1'
-            AND e.fecha_fin >= NOW()
-            AND e.fecha_inicio <= NOW()
-        ");
-        if(count($query) > 0){
-            foreach ($query as $resultado) {
-                unset($resultado->codigo_evaluacion);
-            }
-        }
-        return $query;
-    }
     /**
      * Show the form for creating a new resource.
      *
@@ -375,15 +225,8 @@ class EstudianteController extends Controller
 
     public function estudiantesEvalCurso(Request $request)
     {
-        $estudiantes = DB::SELECT("SELECT DISTINCT u.idusuario as id, CONCAT(u.nombres, ' ', u.apellidos) as label, c.grupo, c.fecha_inicio_evaluacion,c.ip,
-        u.cedula, c.updated_at as fecha_finalizar
-        FROM estudiante e, usuario u, calificaciones c
-        WHERE e.codigo = '$request->codigo'
-        AND e.usuario_idusuario = u.idusuario
-        AND c.id_estudiante = e.usuario_idusuario
-        AND c.id_evaluacion = $request->evaluacion
-        AND c.estado = 1
-        AND e.usuario_idusuario IN (SELECT c.id_estudiante FROM calificaciones c WHERE c.id_evaluacion = $request->evaluacion AND c.estado = 1) ORDER BY u.nombres");
+        $estudiantes = DB::SELECT("SELECT DISTINCT u.idusuario as id, CONCAT(u.nombres, ' ', u.apellidos) as label, c.grupo FROM estudiante e, usuario u, calificaciones c WHERE e.codigo = '$request->codigo' AND e.usuario_idusuario = u.idusuario AND c.id_estudiante = e.usuario_idusuario AND c.id_evaluacion = $request->evaluacion AND e.usuario_idusuario IN (SELECT c.id_estudiante FROM calificaciones c WHERE c.id_evaluacion = $request->evaluacion) ORDER BY u.nombres");
+
         return $estudiantes;
     }
 
@@ -558,77 +401,49 @@ class EstudianteController extends Controller
     //api para filtrar busqueda del estudiante
     public function busquedaFiltroEstudiante(Request $request){
         if($request->libroEstudiante){
-            $traercodigos = DB::select("SELECT c.idusuario,c.codigo, c.updated_at, p.descripcion,
-            IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
-            (case when (c.estado_liquidacion = '0') then 'liquidado'
-                when (c.estado_liquidacion = '1') then 'sin liquidar'
-                when (c.estado_liquidacion = '2') then 'codigo regalado'
-            end) as liquidacion,c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,
-            l.nombrelibro
+           //PARA BUSCAR LOS LIBROS DE LOS LIBROS
+            $estudiante = DB::select("SELECT COUNT(c.codigo) as cantidad_libros
             FROM codigoslibros c
             LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
-            LEFT JOIN libro l ON c.libro_idlibro = l.idlibro
             WHERE c.idusuario = $request->idusuario
             and c.estado <> '2'
             ");
-            return ["codigos" => $traercodigos];
+            foreach($estudiante as $clave => $valor ){
+                $traercodigos = DB::select("SELECT c.idusuario,c.codigo, c.updated_at, p.descripcion,
+                IF(c.estado ='2', 'bloqueado','activo') as codigoEstado,
+                (case when (c.estado_liquidacion = '0') then 'liquidado'
+                    when (c.estado_liquidacion = '1') then 'sin liquidar'
+                    when (c.estado_liquidacion = '2') then 'codigo regalado'
+                end) as liquidacion,c.verif1,c.verif2,c.verif3,c.verif4,c.verif5,c.verif6,c.verif7,c.verif8,c.verif9,c.verif10
+                FROM codigoslibros c
+                LEFT JOIN periodoescolar p ON p.idperiodoescolar = c.id_periodo
+                WHERE c.idusuario = $request->idusuario
+                and c.estado <> '2'
+                ");
+            }
+            return [ "cantidad_libros" => $valor,"codigos" => $traercodigos];
         }
-
-        if ($request->busquedaCurso) {
-            // Primero obtenemos los datos básicos agrupados por docente
-            $docentes = DB::table('estudiante as e')
-                ->join('curso as c', 'c.codigo', '=', 'e.codigo')
-                ->join('periodoescolar as pe', 'c.id_periodo', '=', 'pe.idperiodoescolar')
-                ->join('usuario as u', 'c.idusuario', '=', 'u.idusuario')
-                ->join('asignatura as a', 'c.id_asignatura', '=', 'a.idasignatura')
-                ->where('e.usuario_idusuario', $request->idusuario)
-                ->where('e.estado', '1')
-                ->where('c.estado', '1')
-                ->where('pe.estado', '1')
-                ->groupBy('c.idusuario', 'u.nombres', 'u.apellidos', 'u.name_usuario', 'u.cedula')
-                ->select(
-                    'u.nombres as docente_nombres',
-                    'u.apellidos as docente_apellidos',
-                    'u.name_usuario as docente_name_usuario',
-                    'u.cedula as docente_cedula',
-                    'c.idusuario'
-                )
-                ->get();
-
-            // Luego para cada docente, obtenemos sus cursos
-            $resultados = $docentes->map(function ($docente) {
-                $cursos = DB::table('estudiante as e')
-                    ->join('curso as c', 'c.codigo', '=', 'e.codigo')
-                    ->join('periodoescolar as pe', 'c.id_periodo', '=', 'pe.idperiodoescolar')
-                    ->join('asignatura as a', 'c.id_asignatura', '=', 'a.idasignatura')
-                    ->where('e.usuario_idusuario', request('idusuario'))
-                    ->where('e.estado', '1')
-                    ->where('c.estado', '1')
-                    ->where('pe.estado', '1')
-                    ->where('c.idusuario', $docente->idusuario)
-                    ->select(
-                        'c.codigo',
-                        'a.idasignatura',
-                        'a.nombreasignatura',
-                        'c.id_periodo',
-                        'pe.periodoescolar',
-                        'e.created_at as fecha_asignacion'
-                    )
-                    ->orderBy('e.created_at', 'desc') // Orden descendente por fecha de asignación
-                    ->get();
-
-                return [
-                    'docente_nombres' => $docente->docente_nombres,
-                    'docente_apellidos' => $docente->docente_apellidos,
-                    'docente_name_usuario' => $docente->docente_name_usuario,
-                    'docente_cedula' => $docente->docente_cedula,
-                    'cursos' => $cursos->toArray()
-                ];
-            });
-
-            return [
-                "data_cursos" => $resultados
-            ];
+        //para buscar los cursos del estudiante
+        if($request->busquedaCurso){
+            $cantidad = DB::SELECT("SELECT  COUNT(DISTINCT e.codigo) as cantidad_cursos
+            FROM estudiante e
+              LEFT JOIN curso c ON c.codigo = e.codigo
+              LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
+              WHERE  usuario_idusuario  = '$request->idusuario'
+              AND e.estado = '1'
+              AND c.estado = '1'
+              AND pe.estado = '1'
+            ");
+            $codigos = DB::SELECT("SELECT DISTINCT c.codigo, e.usuario_idusuario FROM
+                estudiante e
+                LEFT JOIN curso c ON c.codigo = e.codigo
+                LEFT JOIN periodoescolar pe ON c.id_periodo = pe.idperiodoescolar
+                WHERE  usuario_idusuario  = '$request->idusuario'
+                AND e.estado = '1'
+                AND c.estado = '1'
+                AND pe.estado = '1'
+            ");
+            return ["cantidad" => $cantidad , "codigos" => $codigos];
         }
 
         //para buscar por email
@@ -636,13 +451,13 @@ class EstudianteController extends Controller
             if($request->asesor){
                 $estudiantes =  DB::SELECT("SELECT DISTINCT   u.idusuario, u.nombres,
                  u.apellidos, u.email, u.cedula, u.name_usuario,u.telefono,u.estado_idEstado, u.id_group, u.institucion_idInstitucion ,i.nombreInstitucion, gr.deskripsi as perfil, u.fecha_nacimiento, u.cargo_id, c.cargo, u.iniciales,
-                u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo, u.fecha_nacimiento
+                u.foto_user,u.change_password,u.fecha_change_password,u.capacitador,u.cli_ins_codigo
                 FROM usuario u
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
                 LEFT JOIN institucion_cargos  c ON u.cargo_id = c.id
                 WHERE (u.id_group = '10' OR u.id_group = '6' OR u.id_group = '13' OR u.id_group = '4' OR u.id_group = '9')
-                AND u.email LIKE '%$request->razonBusqueda%'
+                AND email LIKE '%$request->razonBusqueda%'
                 ");
             }else{
                 $estudiantes =  DB::SELECT("SELECT DISTINCT   u.idusuario, u.nombres, u.apellidos,
@@ -654,7 +469,7 @@ class EstudianteController extends Controller
                 LEFT JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
                 LEFT JOIN sys_group_users gr ON gr.id = u.id_group
                 LEFT JOIN institucion_cargos  c ON u.cargo_id = c.id
-                WHERE u.email LIKE '%$request->razonBusqueda%'
+                WHERE email LIKE '%$request->razonBusqueda%'
 
                 ");
             }
@@ -730,183 +545,6 @@ class EstudianteController extends Controller
        }else{
            return ["status"=> "0","message"=> "No se encontro datos"];
        }
+        }
     }
-    public function importCodigosforStudent(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $estudiantes                = json_decode($request->data_codigos);
-        $codigoNoExiste             = [];
-        $cedulasNoExisten           = [];
-        $problemaPeriodos           = [];
-        $codigosProblemas           = [];
-        $contadorCedulasNoExiste    = 0;
-        $contadorNoExisteCodigo     = 0;
-        $contadorPeriodoError       = 0;
-        $contador                   = 0;
-        foreach($estudiantes as $key => $item){
-            $datosEstudiante = [];
-            $datosEstudiante = Usuario::Where('cedula',$item->cedula)->get();
-            if(count($datosEstudiante) > 0){
-                $institucion        = $datosEstudiante[0]->institucion_idInstitucion;
-                //traer periodo
-                $getperiodo         = $this->PeriodoInstitucion($institucion);
-                if(count($getperiodo) > 0){
-                    $periodo_id         = $getperiodo[0]->periodo;
-                    $estadoCodigo       = 0;
-                    $estado_liquidacion = 0;
-                    $prueba_diagnostica = 0;
-                    $idusuarioCode      = 0;
-                    $validate           = $this->getCodigos($item->codigo,0);
-                    if(count($validate) > 0){
-                        $estadoCodigo       = $validate[0]->estado;
-                        $estado_liquidacion = $validate[0]->estado_liquidacion;
-                        $prueba_diagnostica = $validate[0]->prueba_diagnostica;
-                        $idusuarioCode      = $validate[0]->idusuario;
-                        if($estadoCodigo != 2 && $estado_liquidacion != 3 && $prueba_diagnostica == 0 && ($idusuarioCode == 0 || $idusuarioCode == null)){
-                            $contenido = CodigosLibros::find($item->codigo)->update(
-                                [
-                                    'idusuario' => $datosEstudiante[0]->idusuario,
-                                    'id_periodo' => $periodo_id
-                                ]
-                            );
-                            $contador++;
-                        }else{
-                            $codigosProblemas[] = $validate[0];
-                        }
-                    }else{
-                        $codigoNoExiste[$contadorNoExisteCodigo] = [
-                            "codigo" => $item->codigo
-                        ];
-                        $contadorNoExisteCodigo++;
-                    }
-                }else{
-                    $problemaPeriodos[$contadorPeriodoError] = [
-                        "cedula" => $item->cedula
-                    ];
-                    $contadorPeriodoError++;
-                }
-            }else{
-                $cedulasNoExisten[$contadorCedulasNoExiste] = [
-                    "cedula" => $item->cedula
-                ];
-                $contadorCedulasNoExiste++;
-            }
-
-        }//end for
-        return [
-            "codigoNoExiste"    => $codigoNoExiste,
-            "cedulasNoExisten"  => $cedulasNoExisten,
-            "problemaPeriodos"  => $problemaPeriodos,
-            "codigosProblemas"  => $codigosProblemas,
-            "problemaPeriodos"  => $problemaPeriodos,
-            "cambiados"         => $contador,
-        ];
-    }
-    public function importCursosforStudent(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $estudiantes                = json_decode($request->data_codigos);
-        $codigoNoExiste             = [];
-        $cedulasNoExisten           = [];
-        $codigosProblemas           = [];
-        $contadorCedulasNoExiste    = 0;
-        $contadorNoExisteCodigo     = 0;
-        $contador                   = 0;
-        foreach($estudiantes as $key => $item){
-            $datosEstudiante = [];
-            $datosEstudiante = Usuario::Where('cedula',$item->cedula)->get();
-            if(count($datosEstudiante) > 0){
-                $idusuario          = $datosEstudiante[0]->idusuario;
-                $codigo             = $item->codigo;
-                //traer periodo
-                $validate           = DB::SELECT("SELECT * FROM curso WHERE codigo = ? AND estado = '1'  ",["$codigo"]);
-                    if(count($validate) > 0){
-                    //validar que el codigo no este ingresado
-                    $verificarSiexisteCodigoEstudiante = DB::SELECT("SELECT * FROM estudiante WHERE codigo = ? AND usuario_idusuario = $idusuario AND estado = '1' ",["$codigo"]);
-                    //si no se ha ingresado todavia el codigo lo ingresamos
-                    if(count($verificarSiexisteCodigoEstudiante) <=0){
-                        $estudiante = new estudiante();
-                        $estudiante->usuario_idusuario  = $idusuario;
-                        $estudiante->codigo             = $codigo;
-                        $estudiante->save();
-                        $contador++;
-                    }else{
-
-                        $codigosProblemas[] = $item;
-                    }
-                }else{
-                    $codigoNoExiste[$contadorNoExisteCodigo] = [
-                        "codigo" => $item->codigo
-                    ];
-                    $contadorNoExisteCodigo++;
-                }
-            }else{
-                $cedulasNoExisten[$contadorCedulasNoExiste] = [
-                    "cedula" => $item->cedula
-                ];
-                $contadorCedulasNoExiste++;
-            }
-
-        }//end for
-        return [
-            "codigoNoExiste"    => $codigoNoExiste,
-            "cedulasNoExisten"  => $cedulasNoExisten,
-            "codigosProblemas"  => $codigosProblemas,
-            "cambiados"         => $contador,
-        ];
-    }
-    //API:POST/importRegistroUsuarios
-    public function importRegistroUsuarios(Request $request){
-        set_time_limit(6000000);
-        ini_set('max_execution_time', 6000000);
-        $estudiantes                = json_decode($request->data_codigos);
-        $registroProblemas          = [];
-        $contadorProblemas          = 0;
-        $contador                   = 0;
-        foreach($estudiantes as $key => $item){
-            $errorC                     = 0;
-            $errorE                     = 0;
-            $errorI                     = 0;
-            $problema                   = "";
-            //validar si existe la cedula
-            Usuario::Where('cedula',$item->cedula)->count()   > 0 ? $errorC = 1 : $errorC = 0;
-            Usuario::Where('email',$item->correo)->count()     > 0 ? $errorE = 1 : $errorE = 0;
-            //validar si existe la institucion
-            Institucion::Where('idInstitucion',$item->institucion_id)->count() > 0 ? $errorI = 0 : $errorI = 1;
-            if($errorC == 1 && $errorE == 0) { $problema = "cédula ya existen"; }
-            if($errorC == 0 && $errorE == 1) { $problema = "Email ya existen"; }
-            if($errorC == 1 && $errorE == 1) { $problema = "Cédula y email ya existen"; }
-            if($errorI == 1)                 { $problema = "Institución no existe"; }
-            //si no hay errores registro el estudiante
-            if($errorC == 0 && $errorE == 0 && $errorI == 0) {
-                $registro = new Usuario();
-                $registro->nombres                      = $item->nombres;
-                $registro->apellidos                    = $item->apellidos;
-                $registro->email                        = $item->correo;
-                $registro->name_usuario                 = $item->correo;
-                $registro->cedula                       = $item->cedula;
-                $registro->id_group                     = $request->id_group;
-                $registro->password                     = sha1(md5($item->cedula));
-                $registro->institucion_idInstitucion    = $item->institucion_id;
-                $registro->idcreadorusuario             = $request->idusuario;
-                $registro->save();
-                if($registro){ $contador++; }
-                else{
-                    $problema = "Error al registrar";
-                    $item->problema = $problema;
-                    $registroProblemas[$contadorProblemas] = $item;
-                    $contadorProblemas++;
-                }
-            }else{
-                $item->problema                         = $problema;
-                $registroProblemas[$contadorProblemas]  = $item;
-                $contadorProblemas++;
-            }
-        }//end for
-        return [
-            "registroProblemas"     => $registroProblemas,
-            "cambiados"             => $contador,
-        ];
-    }
-}
 

@@ -10,18 +10,17 @@ use Illuminate\Support\Facades\Http;
 trait TraitPedidosGeneral
 {
     //=====PERSEO=======
-    public $api_keyProlipaProduction    = "RfVaC9hIMhn49J4jSq2_I_50FLWFrX8qOhXa9PacnqU-";
-    public $api_keyCalmedProduction     = "RfVaC9hIMhn49J4jSq2_I8kXMeIRjM.3WlDNPyOqfu0";
-    public $api_keyProlipaLocal         = "RfVaC9hIMhn49J4jSq2_IzB1.iNzqGb9M38jmd1DfQs-";
-    public $api_keyCalmedLocal          = "RfVaC9hIMhn49J4jSq2_I5FdjyUYFOLEGVaHnPJ9Pyw-";
+    public $api_keyProlipaProduction    = "RfVaC9hIMhn49J4jSq2_I7GbWYHrlGRtitYwIuTepQg-";
+    public $api_keyCalmedProduction     = "RfVaC9hIMhn49J4jSq2_IzB1.iNzqGb9M38jmd1DfQs-";
+    public $api_keyProlipaLocal         = "RfVaC9hIMhn49J4jSq2_I_.QLazmDGrbZQ8o8ePUEcU-";
+    public $api_keyCalmedLocal          = "RfVaC9hIMhn49J4jSq2_I91geWPRm0IWEft2beVW9NI-";
     //=====END PERSEO=======
     //=====SOLINFA==========
     public $api_KeyGONZALEZ             = "RfVaC9hIMhn49J4jSq2_Iw3h5qF1Dg0ecy.kFTzdqnA-";
     public $api_KeyCOBACANGO            = "RfVaC9hIMhn49J4jSq2_I6jl_oMHwM8TrJbBo8ztdHA-";
     //=====END SOLINFA======
     public $ipProlipa                   = "http://186.4.218.168:9095/api/";
-    public $ipPerseo                    = "http://45.184.225.106:8181/api/";
-    public $tr_periodoPedido            = 4;
+    public $ipPerseo                    = "http://190.12.43.171:8181/api/";
     public $gl_perseoProduccion         = 1;
     // public $ipLocal        = "http://localhost:5000/api/";
     public function FacturacionGet($endpoint)
@@ -111,7 +110,6 @@ trait TraitPedidosGeneral
             OR o.estado_libros_obsequios  = "3"
             OR o.estado_libros_obsequios  = "4"
             OR o.estado_libros_obsequios  = "6"
-            OR o.estado_libros_obsequios  = "7"
             )
         ) as contadorHijosDocentesAbiertosEnviados,
         (
@@ -133,13 +131,6 @@ trait TraitPedidosGeneral
             AND l.id_pedido = p.id_pedido
         ) AS contadorPendientesConvenio,
         (
-            SELECT COUNT(l.doc_codigo) AS contadorPendientesConvenio
-            FROM 1_4_documento_liq l
-            WHERE l.tipo_pago_id = "4"
-            AND l.estado ="1"
-            AND l.id_pedido = p.id_pedido
-        ) AS contadorAprobadosConvenio,
-        (
             SELECT COUNT(l.doc_codigo) AS contadorPendientesAnticipos
             FROM 1_4_documento_liq l
             WHERE l.tipo_pago_id = "1"
@@ -147,51 +138,9 @@ trait TraitPedidosGeneral
             AND l.ifAntAprobado = "1"
             AND l.id_pedido = p.id_pedido
         ) AS contadorPendientesAnticipos,
-        (
-        SELECT COUNT(c.id) FROM  pedidos_convenios  c
-            where  c.id = p.pedidos_convenios_id
-            AND c.estado <> 2
-            AND c.convenio_aprobado = 0
-         ) AS contadorConvenioPendientes,
-        (
-           SELECT COUNT(c.id) FROM  pedidos_convenios  c
-            where  c.id = p.pedidos_convenios_id
-            AND c.estado <> 2
-            AND c.convenio_aprobado = 1
-        ) AS contadorConvenioSolicitadoGerencia,
-        (
-           SELECT COUNT(c.id) FROM  pedidos_convenios  c
-            where  c.id = p.pedidos_convenios_id
-            AND c.estado <> 2
-            AND c.convenio_aprobado = 3
-        ) AS contadorConvenioAprobadoGerencia,
-        (
-           SELECT COUNT(c.id) FROM  pedidos_convenios  c
-            where  c.id = p.pedidos_convenios_id
-            AND c.estado <> 2
-            AND c.convenio_aprobado = 4
-        ) AS contadorConvenioAprobadoFacturador,
-       (
-            SELECT COUNT(pc.id)
-            FROM pedidos_convenios pc
-            WHERE pc.id = p.pedidos_convenios_id
-            AND pc.estado = 2
-        ) AS convenioAnulado,
-
-        (
-            SELECT COUNT(pc.id)
-            FROM pedidos_convenios pc
-            WHERE pc.id = p.pedidos_convenios_id
-            AND pc.estado = 0
-        ) AS convenioFinalizados,
-        (
-            SELECT con.anticipo_global FROM pedidos_convenios con
-            WHERE con.id = p.pedidos_convenios_id
-        ) AS anticipo_global,
-
-        pe.periodoescolar as periodo,pe.codigo_contrato, pe.regaladosReporteNuevo,
+        pe.periodoescolar as periodo,pe.codigo_contrato,
         CONCAT(uf.apellidos, " ",uf.nombres) as facturador,
-        i.region_idregion as region,uf.iniciales as iniciales_facturador,
+        i.region_idregion as region,uf.cod_usuario,
         ph.fecha_generar_contrato,
         (p.TotalVentaReal - ((p.TotalVentaReal * p.descuento)/100)) AS ven_neta,
         (p.TotalVentaReal * p.descuento)/100 as valorDescuento,
@@ -206,11 +155,7 @@ trait TraitPedidosGeneral
         ->leftjoin('pedidos_historico as ph','p.id_pedido',         'ph.id_pedido')
         ->leftjoin('pedidos_solicitudes_gerencia as ps','p.id_solicitud_gerencia_comision','ps.id')
         ->leftJoin('usuario as editComsion',   'ps.user_finaliza',     'editComsion.idusuario')
-        // ->leftjoin('f_contratos_agrupados as des','p.ca_codigo_agrupado','des.ca_codigo_agrupado')
-        ->leftJoin('f_contratos_agrupados as des', function($join) {
-            $join->on('p.ca_codigo_agrupado', '=', 'des.ca_codigo_agrupado')
-                ->where('des.ca_estado', '=', 1);
-        })
+        ->leftjoin('f_contratos_agrupados as des','p.ca_codigo_agrupado','des.ca_codigo_agrupado')
         ->where('p.tipo','=','0');
         //fitlro por x id
         if($filtro == 0) { $resultado->where('p.id_pedido', '=', $parametro1); }
@@ -220,7 +165,6 @@ trait TraitPedidosGeneral
         if($filtro == 2) { $resultado->where('p.id_periodo','=', $parametro1)->where('p.id_asesor','=',$parametro2)->OrderBy('p.id_pedido','DESC'); }
         //filtro facturador no admin
         if($filtro == 3) { $resultado->where('p.id_periodo','=', $parametro1)->where('p.id_asesor','=',$parametro2)->where('p.estado','<>','0')
-
             ->where(function ($query) {
                 $query->where('p.solicitud_gerencia_estado', '0')
                 ->orWhere('p.solicitud_gerencia_estado', '2');
@@ -233,8 +177,6 @@ trait TraitPedidosGeneral
         }
         //filtro x periodo pero el ca_codigo_agrupado es nulo
         if($filtro == 4) { $resultado->where('p.id_periodo','=',$parametro1)->where('p.estado','<>','0')->whereNull('p.ca_codigo_agrupado')->OrderBy('p.id_pedido','DESC'); }
-        //filtro x periodo root
-        if($filtro == 5) { $resultado->where('p.id_periodo','=',$parametro1)->OrderBy('p.id_pedido','DESC'); }
         $consulta = $resultado->get();
         return $consulta;
     }
@@ -301,6 +243,9 @@ trait TraitPedidosGeneral
         ");
         return $query;
     }
+    public function updateDatosVerificacionPorIngresar($contrato,$estado){
+        $query = Pedidos::Where('contrato_generado','=',$contrato)->update(['datos_verificacion_por_ingresar' => $estado]);
+    }
     //asesores que tiene pedidos
     public function getAsesoresPedidos(){
         $query = DB::SELECT("SELECT DISTINCT p.id_asesor,
@@ -347,11 +292,15 @@ trait TraitPedidosGeneral
         ",[$id_periodo]);
         return $query;
     }
-    public function tr_getAgrupadoPeriodo($id_periodo){
-        $query = DB::SELECT("SELECT g.*, pe.codigo_contrato FROM f_contratos_agrupados g
-            LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = g.id_periodo
-            WHERE g.id_periodo = '$id_periodo'
-            -- and g.ca_estado = 1
+    public function tr_getInstitucionesDespacho($id_periodo){
+        $query = DB::SELECT("SELECT DISTINCT p.ca_codigo_agrupado, i.ca_descripcion,p.id_periodo,i.ca_id,
+        pe.codigo_contrato, i.ca_tipo_pedido,p.descuento
+        FROM  pedidos p
+        LEFT JOIN f_contratos_agrupados i ON i.ca_codigo_agrupado = p.ca_codigo_agrupado
+        LEFT JOIN periodoescolar pe ON pe.idperiodoescolar = p.id_periodo
+        WHERE p.ca_codigo_agrupado IS NOT NULL
+        AND p.id_periodo = '$id_periodo'
+        ORDER BY i.ca_id DESC
        ");
         return $query;
     }
@@ -390,7 +339,7 @@ trait TraitPedidosGeneral
         return $query;
     }
     public function tr_getPreproformas($ca_codigo_agrupado){
-        $query = DB::SELECT("SELECT DISTINCT fp.prof_id, fp.emp_id, fp.prof_estado
+        $query = DB::SELECT("SELECT DISTINCT fp.prof_id
         FROM  f_proforma fp
         WHERE fp.idPuntoventa = '$ca_codigo_agrupado'
         ORDER BY fp.created_at DESC
@@ -408,28 +357,17 @@ trait TraitPedidosGeneral
         return $query;
     }
     public function tr_getDocumentos($ca_codigo_agrupado){
-        $query = DB::SELECT("SELECT DISTINCT fv.ven_codigo, fv.est_ven_codigo, ev.est_ven_nombre FROM f_venta fv
+        $query = DB::SELECT("SELECT DISTINCT fv.ven_codigo FROM f_venta fv
         INNER JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
-        LEFT JOIN 1_4_estado_venta ev on fv.est_ven_codigo = ev.est_ven_codigo
-        WHERE fpr.idPuntoventa = '$ca_codigo_agrupado'
-        -- AND fv.est_ven_codigo <> 3
-        ");
-        return $query;
-    }
-    public function tr_getDocumentosRuc($ca_codigo_agrupado){
-        $query = DB::SELECT("SELECT DISTINCT fv.ruc_cliente FROM f_venta fv
-        INNER JOIN f_proforma fpr ON fpr.prof_id = fv.ven_idproforma
-        LEFT JOIN 1_4_estado_venta ev on fv.est_ven_codigo = ev.est_ven_codigo
         WHERE fpr.idPuntoventa = '$ca_codigo_agrupado'
         AND fv.est_ven_codigo <> 3
         ");
         return $query;
     }
-    public function tr_getAgrupado($ca_codigo_agrupado,$ca_id){
+    public function tr_getAgrupado($ca_codigo_agrupado){
         $query = DB::SELECT("SELECT *
         FROM  f_contratos_agrupados fp
         WHERE fp.ca_codigo_agrupado = '$ca_codigo_agrupado'
-        AND fp.ca_id = '$ca_id'
         ORDER BY fp.created_at DESC
        ");
         return $query;
@@ -467,50 +405,19 @@ trait TraitPedidosGeneral
        return $query;
     }
     public function tr_getInstitucionesVentaXTipoVentaAsesor($id_periodo,$tipo_venta,$asesor){
-        if($tipo_venta == 3){
-            $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
-            CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
-            FROM pedidos p
-            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-            WHERE p.tipo_venta IN ('1','2')
-            AND p.estado = '1'
-            AND p.id_periodo = '$id_periodo'
-            AND p.contrato_generado IS NOT NULL
-            AND p.id_asesor = '$asesor'
-            ORDER BY p.id_pedido DESC
-            ");
-        }
-        else if($tipo_venta == 1 || $tipo_venta == 2){
-            $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
-            CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
-            FROM pedidos p
-            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-            WHERE p.tipo_venta = '$tipo_venta'
-            AND p.estado = '1'
-            AND p.id_periodo = '$id_periodo'
-            AND p.contrato_generado IS NOT NULL
-            AND p.id_asesor = '$asesor'
-            ORDER BY p.id_pedido DESC
-            ");
-        }else{
-            $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
-            CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
-            FROM pedidos p
-            LEFT JOIN usuario u ON p.id_asesor = u.idusuario
-            LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
-            LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
-            WHERE p.estado = '1'
-            AND p.id_periodo = '$id_periodo'
-            AND p.contrato_generado IS NOT NULL
-            AND p.id_asesor = '$asesor'
-            ORDER BY p.id_pedido DESC
-            ");
-        }
-
+        $query = DB::SELECT("SELECT p.id_pedido,p.contrato_generado,p.id_asesor,
+        CONCAT(u.nombres,' ',u.apellidos) as asesor, i.nombreInstitucion,c.nombre as ciudad
+        FROM pedidos p
+        LEFT JOIN usuario u ON p.id_asesor = u.idusuario
+        LEFT JOIN institucion i ON p.id_institucion = i.idInstitucion
+        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        WHERE p.tipo_venta = '$tipo_venta'
+        AND p.estado = '1'
+        AND p.id_periodo = '$id_periodo'
+        AND p.contrato_generado IS NOT NULL
+        AND p.id_asesor = '$asesor'
+        ORDER BY p.id_pedido DESC
+        ");
        return $query;
     }
     public function tr_getInstitucionesPeriodo($id_periodo){
@@ -943,32 +850,6 @@ trait TraitPedidosGeneral
             $item->precio_total = number_format($precio * $item->cantidad, 2, '.', '');
         }
 
-        return $query;
-    }
-
-    public function tr_institucionesVentasPeriodo($id_periodo){
-        $query = DB::SELECT("SELECT DISTINCT i.idInstitucion AS id_institucion, i.nombreInstitucion
-            FROM  f_venta fv
-            INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
-            WHERE fv.periodo_id = ?
-            AND fv.est_ven_codigo <> 3
-            AND fv.idtipodoc IN (1, 2, 3, 4)
-        ",[$id_periodo]);
-        return $query;
-    }
-
-    //asesores que tiene Ventas
-    public function getAsesoresVentasPeriodo($id_periodo){
-        $query = DB::SELECT("SELECT DISTINCT u.idusuario AS id_asesor,
-            CONCAT(u.nombres, ' ', u.apellidos) AS asesor
-            FROM f_venta fv
-            INNER JOIN institucion i ON i.idInstitucion = fv.institucion_id
-            INNER JOIN usuario u ON i.asesor_id = u.idusuario
-            WHERE fv.periodo_id = ?
-            AND fv.est_ven_codigo <> 3
-            AND fv.institucion_id IS NOT NULL
-            AND fv.idtipodoc IN (1, 2, 3, 4);
-        ",[$id_periodo]);
         return $query;
     }
 
