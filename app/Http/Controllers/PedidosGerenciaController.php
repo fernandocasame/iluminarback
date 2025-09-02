@@ -44,8 +44,10 @@ class PedidosGerenciaController extends Controller
     }
     //api:get/pedidos_gerencia?listarSolicitudesPedido=1&id_pedido=1&tipo=0
     public function listarSolicitudesPedido($request){
-        $id_pedido  = $request->id_pedido;
-        $tipo       = $request->tipo;
+        $pedido               = Pedidos::find($request->id_pedido);
+        $id_pedido            = $request->id_pedido;
+        $tipo                 = $request->tipo;
+        $ca_codigo_agrupado   = $pedido->ca_codigo_agrupado;
         $query = DB::SELECT("SELECT pedidos_solicitudes_gerencia.*,
         pedidos.contrato_generado,institucion.nombreInstitucion,pedidos.id_pedido,
         CONCAT(usuario.nombres,' ',usuario.apellidos) as asesor,
@@ -59,8 +61,14 @@ class PedidosGerenciaController extends Controller
         AND pedidos_solicitudes_gerencia.tipo = $tipo
         ORDER BY pedidos_solicitudes_gerencia.id DESC
         ");
-        //la fecha created_at coloca formato de fecha y-m-d h:i:s
-        return $query;
+        $agrupado = DB::SELECT("SELECT * from f_proforma p
+            WHERE p.idPuntoventa = '$ca_codigo_agrupado'
+            AND p.prof_estado <> '0'
+        ");
+        return [
+            "arregloComision" => $query,
+            "agrupado"        => $agrupado
+        ];
     }
     /**
      * Show the form for creating a new resource.
@@ -126,16 +134,21 @@ class PedidosGerenciaController extends Controller
     //api:post/pedidos_gerencia/aprobarSolicitud
     public function aprobarSolicitud($request){
         try{
+            $aprobadoDespues                    = $request->aprobadoDespues;
             //transaccion
             DB::beginTransaction();
             $solicitud                          = PedidosSolicitudesGerencia::findOrFail($request->id);
             $id_pedido                          = $solicitud->id_pedido;
             $solicitud->cantidad_finalizada     = $request->cantidad_finalizada;
             $solicitud->estado                  = $request->estado;
-            $solicitud->user_finaliza           = $request->user_finaliza;
             $solicitud->observacion_finaliza    = $request->observacion_finaliza;
             $solicitud->fecha_finaliza          = date("Y-m-d H:i:s");
-            $solicitud->id_grupo_finaliza       = $request->id_grupo_finaliza;
+            if($aprobadoDespues == 1){
+                // si aprueba despues el root no cambio quien aprueba mantengo
+            }else{
+                $solicitud->id_grupo_finaliza       = $request->id_grupo_finaliza;
+                $solicitud->user_finaliza           = $request->user_finaliza;
+            }
             $solicitud->save();
             //convenio autorizar cierre
             if($solicitud->tipo == 1){

@@ -35,7 +35,7 @@ class PregEvaluacionController extends Controller
      * @return \Illuminate\Http\Response
      */
     public function store(Request $request)
-    {   
+    {
         $preguntas = DB::SELECT("SELECT * FROM `pre_evas` WHERE `id_evaluacion` = $request->id_evaluacion AND `grupo` = $request->grupo AND `id_pregunta` = $request->id_pregunta");
 
         if( count($preguntas) > 0 ){
@@ -46,7 +46,7 @@ class PregEvaluacionController extends Controller
             $pregunta->id_pregunta = $request->id_pregunta;
             $pregunta->grupo = $request->grupo;
             $pregunta->save();
-    
+
             return $pregunta;
         }
 
@@ -76,7 +76,7 @@ class PregEvaluacionController extends Controller
                     'id_tipo_pregunta' => $value->id_tipo_pregunta,
                     'nombre_tipo' => $value->nombre_tipo,
                     'opciones'=>$opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -85,14 +85,27 @@ class PregEvaluacionController extends Controller
 
     }
 
-    
+
     public function pregEvaluacionGrupo(Request $request)
     {
-        $preguntas = DB::SELECT("SELECT p.id as id, p.id_tema, p.descripcion, p.puntaje_pregunta, p.img_pregunta, pe.id as 'id_pre_evas', p.id_tipo_pregunta, pe.id_evaluacion, ti.nombre_tipo, ti.indicaciones, t.clasificacion, t.nombre_tema FROM preguntas p, pre_evas pe, tipos_preguntas ti, temas t WHERE t.id = p.id_tema AND pe.id_pregunta = p.id AND ti.id_tipo_pregunta = p.id_tipo_pregunta AND pe.id_evaluacion = $request->evaluacion AND p.estado=1 AND pe.grupo = $request->grupo ORDER BY RAND()");
-
+        $preguntas = DB::SELECT("SELECT p.id as id, p.id_tema, p.descripcion, p.puntaje_pregunta,
+        p.img_pregunta, pe.id as 'id_pre_evas', p.id_tipo_pregunta, pe.id_evaluacion, ti.nombre_tipo, ti.indicaciones, t.clasificacion,
+        t.nombre_tema, a.nombreasignatura, t.id_asignatura
+        FROM preguntas p, pre_evas pe, tipos_preguntas ti, temas t, asignatura a
+        WHERE t.id = p.id_tema
+        AND pe.id_pregunta = p.id
+        AND ti.id_tipo_pregunta = p.id_tipo_pregunta
+        AND t.id_asignatura = a.idasignatura
+        AND pe.id_evaluacion = $request->evaluacion
+        AND p.estado=1
+        AND pe.grupo = $request->grupo
+        ORDER BY RAND()");
         if(!empty($preguntas)){
             foreach ($preguntas as $key => $value) {
-                $opciones = DB::SELECT("SELECT id_opcion_pregunta, id_pregunta, opcion, img_opcion, tipo FROM opciones_preguntas WHERE opciones_preguntas.id_pregunta = ? ORDER BY RAND()",[$value->id]);
+                $opciones = DB::SELECT("SELECT id_opcion_pregunta, id_pregunta, opcion, img_opcion, tipo
+                FROM opciones_preguntas
+                WHERE opciones_preguntas.id_pregunta = ?
+                ORDER BY RAND()",[$value->id]);
                 $data['items'][$key] = [
                     'id' => $value->id,
                     'id_pre_evas' => $value->id_pre_evas,
@@ -105,15 +118,16 @@ class PregEvaluacionController extends Controller
                     'nombre_tema' => $value->nombre_tema,
                     'puntaje_pregunta' => $value->puntaje_pregunta,
                     'clasificacion' => $value->clasificacion,
+                    'nombreasignatura' => $value->nombreasignatura,
+                    'id_asignatura' => $value->id_asignatura,
                     'opciones'=>$opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
         }
         return $data;
     }
-
 
 
     public function pregEvaluacionEstudiante(Request $request)
@@ -139,7 +153,7 @@ class PregEvaluacionController extends Controller
                     'respuestas_seleccion' => $value->respuestas_seleccion,
                     'respuestas_escritas' => $value->respuestas_escritas,
                     'opciones'=>$opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -149,7 +163,7 @@ class PregEvaluacionController extends Controller
 
 
 
-    
+
     public function verRespEstudianteEval(Request $request)
     {
         $respuestas = DB::SELECT("SELECT p.id_tipo_pregunta, COUNT(op.id_opcion_pregunta) as cantidadTipo, COUNT(DISTINCT op.id_pregunta) as cantPregTipo FROM preguntas p, pre_evas pe, opciones_preguntas op WHERE op.id_pregunta = pe.id_pregunta AND op.tipo = 1 AND pe.id_pregunta = p.id AND pe.id_evaluacion = $request->evaluacion GROUP BY p.id_tipo_pregunta");
@@ -163,7 +177,7 @@ class PregEvaluacionController extends Controller
                     'cantidadTipo' => $value->cantidadTipo,
                     'cantPregTipo' => $value->cantPregTipo,
                     'opciones'=>$opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -173,7 +187,7 @@ class PregEvaluacionController extends Controller
     }
 
 
-    
+
     public function getRespuestasGrupo(Request $request)
     {
         $respuestas = DB::SELECT("SELECT p.id_tipo_pregunta, COUNT(op.id_opcion_pregunta) as cantidadTipo, COUNT(DISTINCT op.id_pregunta) as cantPregTipo FROM preguntas p, pre_evas pe, opciones_preguntas op WHERE op.id_pregunta = pe.id_pregunta AND op.tipo = 1 AND pe.id_pregunta = p.id AND pe.id_evaluacion = $request->evaluacion AND pe.grupo = $request->grupo AND p.estado=1 GROUP BY p.id_tipo_pregunta");
@@ -187,7 +201,7 @@ class PregEvaluacionController extends Controller
                     'cantidadTipo' => $value->cantidadTipo,
                     'cantPregTipo' => $value->cantPregTipo,
                     'opciones' => $opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -210,7 +224,7 @@ class PregEvaluacionController extends Controller
                     'cantidadTipo' => $value->cantidadTipo,
                     'cantPregTipo' => $value->cantPregTipo,
                     'opciones' => $opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -231,7 +245,7 @@ class PregEvaluacionController extends Controller
 
 
     public function clasifGrupEstEval(Request $request)
-    {   
+    {
         $estudiantes = explode(",",$request->estudiantes);
         $interval = intval(intval($request->cantidad) / intval($request->grupos));
         $ini_interval = 0;
@@ -240,7 +254,7 @@ class PregEvaluacionController extends Controller
         for( $i=1; $i<=$request->grupos; $i++ ){
             for( $j=$ini_interval; $j<$fin_interval; $j++ ){
                 if( $request->cantidad > $j ){
-                    
+
                     DB::UPDATE("UPDATE estudiante SET grupo = ? WHERE usuario_idusuario = ? AND codigo = ?",[$i, $estudiantes[$j], $request->codigo]);
 
                 }
@@ -252,81 +266,123 @@ class PregEvaluacionController extends Controller
 
 
 
-    
-    public function preguntasxbancoDocente(Request $request)
-    {   
-        if( $request->tipo == 'null' ){
-            $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema, preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta, evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura FROM preguntas, evaluaciones, temas, tipos_preguntas ti WHERE preguntas.idusuario = $request->usuario AND ti.id_tipo_pregunta = preguntas.id_tipo_pregunta AND evaluaciones.id_asignatura = temas.id_asignatura AND preguntas.id_tema = temas.id AND preguntas.estado = 1 AND evaluaciones.id = $request->evaluacion AND temas.estado=1 AND temas.unidad = $request->unidad AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo) ORDER BY preguntas.descripcion DESC");
-        }else{
-            $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema, preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta, evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura FROM preguntas, evaluaciones, temas, tipos_preguntas ti WHERE preguntas.idusuario = $request->usuario AND ti.id_tipo_pregunta = preguntas.id_tipo_pregunta AND evaluaciones.id_asignatura = temas.id_asignatura AND preguntas.id_tema = temas.id AND preguntas.estado = 1 AND evaluaciones.id = $request->evaluacion AND temas.estado=1 AND temas.unidad = $request->unidad AND preguntas.id_tipo_pregunta = $request->tipo AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo) ORDER BY preguntas.descripcion DESC");
-        }
 
-        if(!empty($preguntas)){
-            foreach ($preguntas as $key => $value) {
-                $opciones = DB::SELECT("SELECT id_opcion_pregunta, id_pregunta, opcion, img_opcion, tipo FROM opciones_preguntas WHERE opciones_preguntas.id_pregunta = ?",[$value->id]);
-                $data['items'][$key] = [
-                    'id' => $value->id,
-                    'idusuario' => $request->idusuario,
-                    'id_tema' => $value->id_tema,
-                    'unidad' => $value->unidad,
-                    'nombre_tema' => $value->nombre_tema,
-                    'nombre_evaluacion' => $value->nombre_evaluacion,
-                    'id_asignatura' => $value->id_asignatura,
-                    'descripcion' => $value->descripcion,
-                    'img_pregunta' => $value->img_pregunta,
-                    'id_tipo_pregunta' => $value->id_tipo_pregunta,
-                    'nombre_tipo' => $value->nombre_tipo,
-                    'descripcion_tipo' => $value->descripcion_tipo,
-                    'puntaje_pregunta' => $value->puntaje_pregunta,
-                    'clasificacion' => $value->clasificacion,    
-                    'opciones'=>$opciones,
-                ];            
-            }
-        }else{
-            $data = [];
-        }
-        return $data;
-    }
+    // public function preguntasxbancoDocente(Request $request)
+    // {
+    //     if( $request->tipo == 'null' ){
+    //         $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema,
+    //          preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta,
+    //           evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura
+    //            FROM preguntas, evaluaciones, temas, tipos_preguntas ti
+    //             WHERE preguntas.idusuario = $request->usuario
+    //              AND ti.id_tipo_pregunta = preguntas.id_tipo_pregunta
+    //              AND evaluaciones.id_asignatura = temas.id_asignatura
+    //               AND preguntas.id_tema = temas.id
+    //               AND preguntas.estado = 1
+    //                AND evaluaciones.id = $request->evaluacion
+    //                AND temas.estado=1
+    //                AND temas.unidad = $request->unidad
+    //                 AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo) ORDER BY preguntas.descripcion DESC");
+    //     }else{
+    //         $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema, preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta, evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura FROM preguntas, evaluaciones, temas, tipos_preguntas ti WHERE preguntas.idusuario = $request->usuario AND ti.id_tipo_pregunta = preguntas.id_tipo_pregunta AND evaluaciones.id_asignatura = temas.id_asignatura AND preguntas.id_tema = temas.id AND preguntas.estado = 1 AND evaluaciones.id = $request->evaluacion AND temas.estado=1 AND temas.unidad = $request->unidad AND preguntas.id_tipo_pregunta = $request->tipo AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo) ORDER BY preguntas.descripcion DESC");
+    //     }
 
-
-    
-    public function preguntasxbancoProlipa(Request $request)
-    {   
-        if( $request->tipo == 'null' ){
-            $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema, preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta, evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura FROM preguntas, evaluaciones, temas, tipos_preguntas ti, usuario u WHERE ti.id_tipo_pregunta = preguntas.id_tipo_pregunta AND evaluaciones.id_asignatura = temas.id_asignatura AND preguntas.id_tema = temas.id AND preguntas.estado = 1 AND preguntas.idusuario = u.idusuario AND u.idusuario != $request->usuario AND evaluaciones.id = $request->evaluacion AND temas.estado=1 AND temas.unidad = $request->unidad AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo) ORDER BY preguntas.descripcion DESC");
-        }else{
-            $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema, preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta, evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura FROM preguntas, evaluaciones, temas, tipos_preguntas ti, usuario u WHERE ti.id_tipo_pregunta = preguntas.id_tipo_pregunta AND evaluaciones.id_asignatura = temas.id_asignatura AND preguntas.id_tema = temas.id AND preguntas.estado = 1 AND preguntas.idusuario = u.idusuario AND u.idusuario != $request->usuario AND evaluaciones.id = $request->evaluacion AND preguntas.id_tipo_pregunta = $request->tipo AND temas.estado=1 AND temas.unidad = $request->unidad AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo) ORDER BY preguntas.descripcion DESC");
-        }
-        
-
-        if(!empty($preguntas)){
-            foreach ($preguntas as $key => $value) {
-                $opciones = DB::SELECT("SELECT id_opcion_pregunta, id_pregunta, opcion, img_opcion, tipo FROM opciones_preguntas WHERE opciones_preguntas.id_pregunta = ?",[$value->id]);
-                $data['items'][$key] = [
-                    'id' => $value->id,
-                    'id_tema' => $value->id_tema,
-                    'unidad' => $value->unidad,
-                    'nombre_tema' => $value->nombre_tema,
-                    'nombre_evaluacion' => $value->nombre_evaluacion,
-                    'id_asignatura' => $value->id_asignatura,
-                    'descripcion' => $value->descripcion,
-                    'img_pregunta' => $value->img_pregunta,
-                    'id_tipo_pregunta' => $value->id_tipo_pregunta,
-                    'nombre_tipo' => $value->nombre_tipo,
-                    'descripcion_tipo' => $value->descripcion_tipo,
-                    'puntaje_pregunta' => $value->puntaje_pregunta,
-                    'clasificacion' => $value->clasificacion,    
-                    'opciones'=>$opciones,
-                ];            
-            }
-        }else{
-            $data = [];
-        }
-        return $data;
-    }
+    //     if(!empty($preguntas)){
+    //         foreach ($preguntas as $key => $value) {
+    //             $opciones = DB::SELECT("SELECT id_opcion_pregunta, id_pregunta, opcion, img_opcion, tipo
+    //             FROM opciones_preguntas WHERE opciones_preguntas.id_pregunta = ?",[$value->id]);
+    //             $data['items'][$key] = [
+    //                 'id' => $value->id,
+    //                 'idusuario' => $request->idusuario,
+    //                 'id_tema' => $value->id_tema,
+    //                 'unidad' => $value->unidad,
+    //                 'nombre_tema' => $value->nombre_tema,
+    //                 'nombre_evaluacion' => $value->nombre_evaluacion,
+    //                 'id_asignatura' => $value->id_asignatura,
+    //                 'descripcion' => $value->descripcion,
+    //                 'img_pregunta' => $value->img_pregunta,
+    //                 'id_tipo_pregunta' => $value->id_tipo_pregunta,
+    //                 'nombre_tipo' => $value->nombre_tipo,
+    //                 'descripcion_tipo' => $value->descripcion_tipo,
+    //                 'puntaje_pregunta' => $value->puntaje_pregunta,
+    //                 'clasificacion' => $value->clasificacion,
+    //                 'opciones'=>$opciones,
+    //             ];
+    //         }
+    //     }else{
+    //         $data = [];
+    //     }
+    //     return $data;
+    // }
 
 
-    
+
+    // public function preguntasxbancoProlipa(Request $request)
+    // {
+    //     if( $request->tipo == 'null' ){
+    //         $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema,
+    //         preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta,
+    //         evaluaciones.nombre_evaluacion, temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura
+    //         FROM preguntas, evaluaciones, temas, tipos_preguntas ti, usuario u
+    //         WHERE ti.id_tipo_pregunta = preguntas.id_tipo_pregunta
+    //         AND evaluaciones.id_asignatura = temas.id_asignatura
+    //         AND preguntas.id_tema = temas.id
+    //         AND preguntas.estado = 1
+    //         AND preguntas.idusuario = u.idusuario
+    //         AND u.idusuario != $request->usuario
+    //         AND evaluaciones.id = $request->evaluacion
+    //         AND temas.estado=1
+    //         AND temas.unidad = $request->unidad
+    //         AND u.id_group = '1'
+    //         AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo)
+    //         ORDER BY preguntas.descripcion DESC");
+    //     }else{
+    //         $preguntas = DB::SELECT("SELECT ti.nombre_tipo, ti.descripcion_tipo, preguntas.id, preguntas.id_tema,
+    //         preguntas.descripcion, preguntas.img_pregunta, preguntas.id_tipo_pregunta, preguntas.puntaje_pregunta, evaluaciones.nombre_evaluacion,
+    //         temas.nombre_tema, temas.clasificacion, temas.unidad, evaluaciones.id_asignatura
+    //         FROM preguntas, evaluaciones, temas, tipos_preguntas ti, usuario u
+    //         WHERE ti.id_tipo_pregunta = preguntas.id_tipo_pregunta
+    //          AND evaluaciones.id_asignatura = temas.id_asignatura
+    //          AND preguntas.id_tema = temas.id
+    //           AND preguntas.estado = 1
+    //           AND preguntas.idusuario = u.idusuario
+    //           AND u.idusuario != $request->usuario
+    //           AND evaluaciones.id = $request->evaluacion
+    //           AND preguntas.id_tipo_pregunta = $request->tipo
+    //            AND temas.estado=1 AND temas.unidad = $request->unidad
+    //            AND preguntas.id NOT IN (select id_pregunta from pre_evas where id_evaluacion = $request->evaluacion AND grupo = $request->grupo)
+    //             ORDER BY preguntas.descripcion DESC");
+    //     }
+
+
+    //     if(!empty($preguntas)){
+    //         foreach ($preguntas as $key => $value) {
+    //             $opciones = DB::SELECT("SELECT id_opcion_pregunta, id_pregunta, opcion, img_opcion, tipo FROM opciones_preguntas WHERE opciones_preguntas.id_pregunta = ?",[$value->id]);
+    //             $data['items'][$key] = [
+    //                 'id' => $value->id,
+    //                 'id_tema' => $value->id_tema,
+    //                 'unidad' => $value->unidad,
+    //                 'nombre_tema' => $value->nombre_tema,
+    //                 'nombre_evaluacion' => $value->nombre_evaluacion,
+    //                 'id_asignatura' => $value->id_asignatura,
+    //                 'descripcion' => $value->descripcion,
+    //                 'img_pregunta' => $value->img_pregunta,
+    //                 'id_tipo_pregunta' => $value->id_tipo_pregunta,
+    //                 'nombre_tipo' => $value->nombre_tipo,
+    //                 'descripcion_tipo' => $value->descripcion_tipo,
+    //                 'puntaje_pregunta' => $value->puntaje_pregunta,
+    //                 'clasificacion' => $value->clasificacion,
+    //                 'opciones'=>$opciones,
+    //             ];
+    //         }
+    //     }else{
+    //         $data = [];
+    //     }
+    //     return $data;
+    // }
+
+
+
 
 
     /**
@@ -352,7 +408,7 @@ class PregEvaluacionController extends Controller
         //
     }
 
-    
+
     public function quitarPregEvaluacion($id)
     {
         $pregunta = Pre_eva::find($id);

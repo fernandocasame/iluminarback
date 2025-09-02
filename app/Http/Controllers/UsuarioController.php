@@ -15,6 +15,7 @@ use App\Models\HistoricoVisitas;
 use Illuminate\Http\Request;
 use App\Quotation;
 use App\Traits\Codigos\TraitCodigosGeneral;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Mail;
 use Cookie;
@@ -224,85 +225,121 @@ class UsuarioController extends Controller
         // return $datos;
     }
     //visitas docente
-   //visitas docente
-   public function docentesVisitas(Request $request)
-   {
-       set_time_limit(6000000);
-       ini_set('max_execution_time', 6000000);
+    public function docentesVisitas(Request $request)
+    {
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
 
-       // $idInstitucion = $request->idInstitucion;
-       // $fromDate = $request->fromDate;
-       // $toDate = $request->toDate;
-       // $usuarios = DB::table('usuario')
-       //     ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
-       //     ->leftJoin('historico_visitas', function ($join) use ($fromDate, $toDate) {
-       //         $join->on('usuario.idusuario', '=', 'historico_visitas.idusuario')
-       //             ->where('historico_visitas.recurso', '=', 15)
-       //             ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate]);
-       //     })
-       //     ->select('usuario.*', 'institucion_cargos.cargo', 'institucion_cargos.id as cargo_id', DB::raw('COUNT(historico_visitas.id) as visitas'))
-       //     ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
-       //     ->where('usuario.id_group', '=', 6)
-       //     ->where('usuario.estado_idEstado', '=', '1')
-       //     ->groupBy('usuario.idusuario')
-       //     ->get();
-       // return $usuarios;
 
-       $idInstitucion = $request->idInstitucion;
-       $fromDate = $request->fromDate;
-       $toDate = $request->toDate;
-       $periodoId = $request->periodo_id;
+        // $idInstitucion = $request->idInstitucion;
+        // $fromDate = $request->fromDate;
+        // $toDate = $request->toDate;
+        // $periodoId = $request->periodo_id;
 
-       $result = AsignaturaDocente::select(
-           'asignaturausuario.usuario_idusuario',
-           'asignaturausuario.periodo_id',
-           'usuario.nombres',
-           'usuario.name_usuario',
-           'usuario.apellidos',
-           'usuario.cedula',
-           'usuario.email',
-           'usuario.idusuario',
-           'usuario.created_at',
-           'institucion_cargos.cargo',
-           'institucion_cargos.id as cargo_id'
-       )
-       ->distinct()
-       ->leftJoin('usuario', 'asignaturausuario.usuario_idusuario', '=', 'usuario.idusuario')
-       ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
-       ->where('usuario.id_group', '=', '6')
-       ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
-       ->where('asignaturausuario.periodo_id', '=', $periodoId)
-       ->where('usuario.estado_idEstado', '=', '1')
-       ->get() // Ejecutar la consulta y obtener los resultados
-       ->map(function ($documento) {
-           return(Object) [
-               "usuario_idusuario" => $documento->usuario_idusuario,
-               "periodo_id"        => $documento->periodo_id,
-               "nombres"           => $documento->nombres,
-               "name_usuario"      => $documento->name_usuario,
-               "apellidos"         => $documento->apellidos,
-               "cedula"            => $documento->cedula,
-               "email"             => $documento->email,
-               "idusuario"         => $documento->idusuario,
-               'created_at'        => $documento->created_at->format('Y-m-d H:i:s'), // Formatea la fecha
-               "cargo"             => $documento->cargo,
-               "cargo_id"          => $documento->cargo_id,
-           ];
-       });
+        // $result = AsignaturaDocente::select(
+        //     'asignaturausuario.usuario_idusuario',
+        //     'asignaturausuario.periodo_id',
+        //     'usuario.nombres',
+        //     'usuario.name_usuario',
+        //     'usuario.apellidos',
+        //     'usuario.cedula',
+        //     'usuario.email',
+        //     'usuario.idusuario',
+        //     'usuario.created_at',
+        //     'usuario.updated_at',
+        //     'institucion_cargos.cargo',
+        //     'institucion_cargos.id as cargo_id'
+        // )
+        // ->distinct()
+        // ->leftJoin('usuario', 'asignaturausuario.usuario_idusuario', '=', 'usuario.idusuario')
+        // ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
+        // ->where('usuario.id_group', '=', '6')
+        // ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
+        // ->where('asignaturausuario.periodo_id', '=', $periodoId)
+        // ->where('usuario.estado_idEstado', '=', '1')
+        // ->get() // Ejecutar la consulta y obtener los resultados
+        // ->map(function ($documento) {
+        //     return(Object) [
+        //         "usuario_idusuario" => $documento->usuario_idusuario,
+        //         "periodo_id"        => $documento->periodo_id,
+        //         "nombres"           => $documento->nombres,
+        //         "name_usuario"      => $documento->name_usuario,
+        //         "apellidos"         => $documento->apellidos,
+        //         "cedula"            => $documento->cedula,
+        //         "email"             => $documento->email,
+        //         "idusuario"         => $documento->idusuario,
+        //         'created_at'        => $documento->created_at->format('Y-m-d H:i:s'), // Formatea la fecha
+        //         'updated_at'        => $documento->updated_at->format('Y-m-d H:i:s'), // Formatea la fecha
+        //         "cargo"             => $documento->cargo,
+        //         "cargo_id"          => $documento->cargo_id,
+        //     ];
+        // });
 
-       $result->map(function($item) use ($fromDate, $toDate) {
-           $item->visitas = HistoricoVisitas::where('idusuario', $item->usuario_idusuario)
-               ->where('recurso', 15)
-               ->where('periodo_id', $item->periodo_id)
-               ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate])
-               ->count();
-           return $item;
-       });
+        // $result->map(function($item) use ($fromDate, $toDate) {
+        //     $item->visitas = HistoricoVisitas::where('idusuario', $item->usuario_idusuario)
+        //         ->where('recurso', 15)
+        //         // ->where('periodo_id', $item->periodo_id)
+        //         ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate])
+        //         ->count();
+        //     return $item;
+        // });
 
-       // Devuelve el resultado modificado
-       return $result;
-   }
+        // // Devuelve el resultado modificado
+        // return $result;
+        $idInstitucion = $request->idInstitucion;
+        $fromDate = Carbon::parse($request->fromDate)->startOfDay();
+        $toDate   = Carbon::parse($request->toDate)->endOfDay();
+        $periodoId = $request->periodo_id;
 
+        $result = AsignaturaDocente::select(
+                'asignaturausuario.usuario_idusuario',
+                'asignaturausuario.periodo_id',
+                'usuario.nombres',
+                'usuario.name_usuario',
+                'usuario.apellidos',
+                'usuario.cedula',
+                'usuario.email',
+                'usuario.idusuario',
+                'usuario.created_at',
+                'usuario.updated_at',
+                'institucion_cargos.cargo',
+                'institucion_cargos.id as cargo_id'
+            )
+            ->distinct()
+            ->leftJoin('usuario', 'asignaturausuario.usuario_idusuario', '=', 'usuario.idusuario')
+            ->leftJoin('institucion_cargos', 'usuario.cargo_id', '=', 'institucion_cargos.id')
+            ->where('usuario.id_group', '=', '6')
+            ->where('usuario.institucion_idInstitucion', '=', $idInstitucion)
+            ->where('asignaturausuario.periodo_id', '=', $periodoId)
+            ->where('usuario.estado_idEstado', '=', '1')
+            ->get()
+            ->map(function ($documento) {
+                return (Object) [
+                    "usuario_idusuario" => $documento->usuario_idusuario,
+                    "periodo_id"        => $documento->periodo_id,
+                    "nombres"           => $documento->nombres,
+                    "name_usuario"      => $documento->name_usuario,
+                    "apellidos"         => $documento->apellidos,
+                    "cedula"            => $documento->cedula,
+                    "email"             => $documento->email,
+                    "idusuario"         => $documento->idusuario,
+                    'created_at'        => $documento->created_at->format('Y-m-d H:i:s'),
+                    'updated_at'        => $documento->updated_at->format('Y-m-d H:i:s'),
+                    "cargo"             => $documento->cargo,
+                    "cargo_id"          => $documento->cargo_id,
+                ];
+            });
+
+        $result->map(function ($item) use ($fromDate, $toDate) {
+            $item->visitas = HistoricoVisitas::where('idusuario', $item->usuario_idusuario)
+                ->where('recurso', 15)
+                // ->where('periodo_id', $item->periodo_id)
+                ->whereBetween('historico_visitas.created_at', [$fromDate, $toDate])
+                ->count();
+            return $item;
+        });
+        return $result;
+    }
     public function usuarioVisitas(Request $request){
         $datos = DB::SELECT("SELECT h.*, i.nombreInstitucion, p.periodoescolar AS periodo,
         g.deskripsi AS rol,
@@ -323,30 +360,108 @@ class UsuarioController extends Controller
     public function usuarioVisitasAll(Request $request){
         set_time_limit(6000000);
         ini_set('max_execution_time', 6000000);
+        $id_group = $request->id_group;
         $usuarios = DB::SELECT("SELECT u.idusuario ,CONCAT(u.nombres,' ', u.apellidos) as usuario, u.cedula,u.email,
             u.cedula
             FROM usuario u
             WHERE u.institucion_idInstitucion = '$request->institucion_id'
             AND u.estado_idEstado = '1'
-            AND u.id_group = '6'
+            AND u.id_group = '$id_group'
         ");
         $datos = [];
         foreach($usuarios as $key => $item){
-            $visitas = DB::SELECT("SELECT id,h.recurso FROM historico_visitas h
-            where h.idusuario = '$item->idusuario'
-            AND h.created_at  BETWEEN '$request->fromDate' AND '$request->toDate'
+            // $visitas = DB::SELECT("SELECT id,h.recurso FROM historico_visitas h
+            // where h.idusuario = '$item->idusuario'
+            // AND h.created_at  BETWEEN '$request->fromDate' AND '$request->toDate'
+            // ");
+            // $datos[] = [
+            //     "idusuario"     => $item->idusuario,
+            //     "usuario"       => $item->usuario,
+            //     "cedula"        => $item->cedula,
+            //     "email"         => $item->email,
+            //     "visitas"       => $visitas
+            // ];
+            $from = $request->fromDate;
+            $to   = Carbon::parse($request->toDate)->addDay()->toDateString(); // le sumamos 1 día
+
+            $visitas = DB::select("
+                SELECT id, h.recurso
+                FROM historico_visitas h
+                WHERE h.idusuario = '$item->idusuario'
+                AND h.created_at BETWEEN '$from' AND '$to'
             ");
+
+            $datos[] = [
+                "idusuario" => $item->idusuario,
+                "usuario"   => $item->usuario,
+                "cedula"    => $item->cedula,
+                "email"     => $item->email,
+                "visitas"   => $visitas
+            ];
+        }
+        // Ordenar: primero los que tienen visitas, luego los que no tienen visitas
+        usort($datos, function($a, $b) {
+            $aHasVisitas = !empty($a['visitas']);
+            $bHasVisitas = !empty($b['visitas']);
+            if ($aHasVisitas == $bHasVisitas) return 0;
+            return $aHasVisitas ? -1 : 1;
+        });
+        return $datos;
+    }
+    //api:get/usuarioVisitasXUsuarioRecurso?idusuario=62129&institucion_id=1167&recurso=16&fromDate=2025-08-01&toDate=2025-08-31
+    public function usuarioVisitasXUsuarioRecurso(Request $request){
+        set_time_limit(6000000);
+        ini_set('max_execution_time', 6000000);
+        $idusuario      = $request->idusuario;
+        $institucion_id = $request->institucion_id;
+        $recurso        = $request->recurso;
+        $fromDate       = $request->fromDate;
+        $toDate         = $request->toDate;
+
+        $usuarios = DB::SELECT("SELECT u.idusuario ,CONCAT(u.nombres,' ', u.apellidos) as usuario, u.cedula,u.email,
+            u.cedula
+            FROM usuario u
+            WHERE u.institucion_idInstitucion = '$institucion_id'
+            AND u.estado_idEstado = '1'
+            AND u.idusuario = '$idusuario'
+        ");
+        $datos = [];
+        foreach($usuarios as $key => $item){
+            // $visitas = DB::SELECT("SELECT id,h.recurso, nombreasignatura, created_at
+            // FROM historico_visitas h
+            // where h.idusuario = '$item->idusuario'
+            // AND h.recurso = '$recurso'
+            // AND h.created_at  BETWEEN '$fromDate' AND '$toDate'
+            // ORDER BY h.id DESC
+            // ");
+            // $datos[$key] = [
+            //     "idusuario"     => $item->idusuario,
+            //     "usuario"       => $item->usuario,
+            //     "cedula"        => $item->cedula,
+            //     "email"         => $item->email,
+            //     "visitas"       => $visitas,
+            // ];
+            $fromDate = Carbon::parse($request->fromDate)->startOfDay();
+            $toDate   = Carbon::parse($request->toDate)->endOfDay();
+
+            $visitas = DB::table('historico_visitas as h')
+                ->select('id', 'h.recurso', 'nombreasignatura', 'created_at','datos')
+                ->where('h.idusuario', $item->idusuario)
+                ->where('h.recurso', $recurso)
+                ->whereBetween('h.created_at', [$fromDate, $toDate])
+                ->orderByDesc('h.id')
+                ->get();
+
             $datos[$key] = [
-                "idusuario"     => $item->idusuario,
-                "usuario"       => $item->usuario,
-                "cedula"        => $item->cedula,
-                "email"         => $item->email,
-                "visitas"       => $visitas
+                "idusuario" => $item->idusuario,
+                "usuario"   => $item->usuario,
+                "cedula"    => $item->cedula,
+                "email"     => $item->email,
+                "visitas"   => $visitas,
             ];
         }
         return $datos;
     }
-
     public function datosUsuario(Request $request)
     {
         $idusuario = auth()->user()->idusuario;
@@ -407,6 +522,11 @@ class UsuarioController extends Controller
 
        //para eliminar
        if($request->eliminar){
+            // validar si el usuario ya tiene asignado el cargo
+            $validateUsuario = Usuario::where('cargo_id', $request->id)->first();
+            if($validateUsuario){
+                return ["status" => "0", "message" => "Ya tiene asignado el cargo a otro usuario"];
+            }
             $cargo = Cargo::findOrFail($request->id);
             $cargo->estado = $request->estado;
             $cargo->usuario_editor = $request->usuario_id;
@@ -439,9 +559,7 @@ class UsuarioController extends Controller
         if(!empty($request->idusuario)){
 
             $usuario = Usuario::findOrFail($request->idusuario);
-            $change_password = $usuario->change_password;
-            // $user = $request->all();
-            // $usuario->fill($user)->save();
+            // $change_password = $usuario->change_password;
             $usuario->cedula = $request->cedula;
             $usuario->nombres = $request->nombres;
             $usuario->apellidos = $request->apellidos;
@@ -449,9 +567,9 @@ class UsuarioController extends Controller
             $usuario->name_usuario = $request->name_usuario;
             $usuario->email = $request->email;
             $usuario->id_group = $request->id_group;
-            if($change_password == 1){
-                $usuario->password=sha1(md5($request->cedula));
-            }
+            // if($change_password == 1){
+            //     $usuario->password=sha1(md5($request->cedula));
+            // }
             $usuario->p_ingreso=0;
             $usuario->institucion_idInstitucion = $request->institucion_idInstitucion;
             $usuario->estado_idEstado = $request->estado_idEstado;
@@ -460,7 +578,8 @@ class UsuarioController extends Controller
             $usuario->iniciales = $request->iniciales;
             $usuario->capacitador = $request->capacitador;
             $usuario->cli_ins_codigo = $request->cli_ins_codigo == null || $request->cli_ins_codigo == "null" ? null : $request->cli_ins_codigo;
-            $email = $request->email;
+            $usuario->fecha_nacimiento = $request->fecha_nacimiento;
+            $usuario->cargo_id = $request->cargo_id;
             $usuario->save();
         }else{
             $datosValidados=$request->validate([
@@ -486,23 +605,12 @@ class UsuarioController extends Controller
             $usuario->curso = $request->curso;
             $usuario->iniciales = $request->iniciales;
             $usuario->capacitador = $request->capacitador;
-            $email = $request->email;
+            //fecha de nacimiento
+            $usuario->fecha_nacimiento = $request->fecha_nacimiento;
+            //cargo
+            $usuario->cargo_id = $request->cargo_id;
             $usuario->save();
-            $to_name = "Prolipa";
-            $to_email = $request->email;
-            // $data = array(
-            //     'name'=>"Prolipa",
-            //     'email' => $request->email,
-            //     'codigo' => $request->cedula,
-            //     'nombres' => $request->nombres,
-            //     'apellidos' => $request->apellidos,
-            //     'cedula' => $request->cedula
-            // );
-			// Mail::send('plantilla.registro',$data, function($message) use ($to_name, $to_email) {
-            //     $message->to($to_email, $to_name)
-            //     ->subject('Datos de registro');
-            //     $message->from($to_email, 'Prolipa');
-            // });
+
         }
         return $usuario;
 
@@ -817,24 +925,43 @@ class UsuarioController extends Controller
 
     }
     ///CONSULTAS SALLE
-    public function usuarioSalle()
+    public function usuarioSalle(Request $request)
     {
-        $docentes = DB::select("SELECT u.*, i.idInstitucion, i.nombreInstitucion, i.tipo_institucion,
-         concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion,
-         u.id_group
-         FROM usuario u
-         INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
-         INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
-         lEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
-         WHERE (
-            u.id_group = '13'
-            OR u.id_group = '6'
-        )
-         AND i.tipo_institucion = '2'
-         GROUP BY u.idusuario
-         ");
-        $admins = DB::select("SELECT u.*, i.nombreInstitucion, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad FROM usuario u, institucion i INNER JOIN ciudad c ON i.ciudad_id = c.idciudad WHERE u.id_group = 12 and u.institucion_idInstitucion = i.idInstitucion ");
-        return array('docentes'=>$docentes , 'admins'=>$admins,);
+        if($request->tipoUsuario == "admin"){
+            $admins = DB::select("SELECT u.*, i.nombreInstitucion, concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad
+            FROM usuario u, institucion i INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
+            WHERE u.id_group = 12 and u.institucion_idInstitucion = i.idInstitucion ");
+            return array('admins'=>$admins,);
+        }
+        if($request->tipoUsuario == "docentes"){
+            $docentes = DB::select("SELECT u.*, i.idInstitucion, i.nombreInstitucion, i.tipo_institucion,
+            concat(i.nombreInstitucion,' - ',c.nombre) AS institucion_ciudad, MAX(se.id_evaluacion) AS id_evaluacion,
+            u.id_group
+            FROM usuario u
+            INNER JOIN institucion i ON u.institucion_idInstitucion = i.idInstitucion
+            INNER JOIN ciudad c ON i.ciudad_id = c.idciudad
+            lEFT JOIN salle_evaluaciones se ON u.idusuario = se.id_usuario
+            WHERE (
+                u.id_group = '13'
+                OR u.id_group = '6'
+            )
+            AND i.tipo_institucion = '2'
+            GROUP BY u.idusuario
+            ");
+            return array('docentes'=>$docentes);
+        }
+        if ($request->has('contarUsuarios') && $request->contarUsuarios == true) {
+            $counts = DB::select("
+                SELECT
+                    (SELECT COUNT(*) FROM usuario WHERE id_group = 12) AS contarAdmin,
+                    (SELECT COUNT(*) FROM usuario WHERE id_group = 13) AS contarDocentes,
+                    (SELECT COUNT(*) FROM institucion WHERE tipo_institucion = 2 AND estado_idEstado = 1) AS contarInstituciones,
+                    (SELECT COUNT(*) FROM salle_areas) AS contarAreas,
+                    (SELECT COUNT(*) FROM salle_asignaturas) AS contarAsignaturas
+            ")[0];
+
+            return (array) $counts;
+        }
     }
     //API:GET/usuarioSalle/{n_evaluacion}
     public function usuarioSallexEvaluacion($n_evaluacion){
@@ -884,11 +1011,23 @@ class UsuarioController extends Controller
         }else{
             $usuario = Usuario::find( $request->idusuario );
 
-            $datosValidados=$request->validate([
-                'cedula' => 'required|max:13|unique:usuario,cedula,'.$request->idusuario.',idusuario',
-                'email' => 'required|unique:usuario,email,'.$request->idusuario.',idusuario'
-                // 'email' => ['required','email',Rule::unique('usuario')->ignore($request->idusuario, 'idusuario')] //opcion 2 tambien funciona
-                ]);
+            // $datosValidados=$request->validate([
+            //     'cedula' => 'required|max:13|unique:usuario,cedula,'.$request->idusuario.',idusuario',
+            //     'email' => 'required|unique:usuario,email,'.$request->idusuario.',idusuario'
+            //     // 'email' => ['required','email',Rule::unique('usuario')->ignore($request->idusuario, 'idusuario')] //opcion 2 tambien funciona
+            //     ]);
+            // Versión más legible usando Rule::unique
+            $rules['cedula'] = [
+                'required',
+                'max:13',
+                Rule::unique('usuario')->ignore($request->idusuario, 'idusuario')
+            ];
+
+            $rules['email'] = [
+                'required',
+                'email',
+                Rule::unique('usuario')->ignore($request->idusuario, 'idusuario')
+            ];
         }
         $usuario->cedula = $request->cedula;
         $usuario->nombres = $request->nombre;
@@ -919,7 +1058,7 @@ class UsuarioController extends Controller
     }
     public function asesores()
     {
-        $asesores = Usuario::select(DB::raw("CONCAT(nombres, ' ', apellidos) as nombres, cedula,idusuario "))
+        $asesores = Usuario::select(DB::raw("CONCAT(nombres, ' ', apellidos) as nombres, cedula,idusuario, estado_idEstado as estado "))
         ->where('id_group', 11)
         ->get();
         return $asesores;
@@ -962,6 +1101,7 @@ class UsuarioController extends Controller
         $usuario->estado_idEstado   = $request->estado;
         $usuario->fecha_nacimiento  = $request->fecha_nacimiento;
         $usuario->capacitador       = $request->capacitador;
+        $usuario->iniciales         = $request->iniciales;
         $usuario->cli_ins_codigo    = $request->cli_ins_codigo == null || $request->cli_ins_codigo == "null" || $request->cli_ins_codigo == "" ? null : $request->cli_ins_codigo;
         if($request->grupo == 6){
             $usuario->cargo_id      = $request->cargo_id;
@@ -1048,10 +1188,50 @@ class UsuarioController extends Controller
         ");
         return $consulta;
     }
+
+    public function VerificarDirectorGeneralComiles(Request $request)
+    {
+        $ids_instituciones = [1892, 1865];
+        $query = DB::table('director_has_institucion as dhi')
+            ->where('dhi.director_id', $request->idusuario)
+            ->whereIn('dhi.institucion_id', $ids_instituciones)
+            ->get();
+        if ($query->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró un usuario asignado a esas instituciones',
+                'data' => []
+            ], 200);
+        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Usuario asignado correctamente',
+            'data' => $query
+        ]);
+    }
+
+    public function getTodas_FAE_NAVAL_TERESTRE_BACK() {
+        $query = DB::SELECT("SELECT ins.*, ins.idInstitucion as institucion_id
+            FROM institucion ins
+            WHERE ins.tipo_institucion = 3
+            OR ins.tipo_institucion = 4
+            OR ins.tipo_institucion = 5
+        ");
+        return $query;
+    }
     //para quitar la asignacion al director la institucion
     //api::>>post/quitarAsignacion
     public function quitarAsignacion(Request $request){
         DirectorHasInstitucion::findOrFail($request->id)->delete();
+    }
+    public function institucionesAsesor(Request $request){
+        $instituciones =   DB::SELECT("SELECT i.* , zn.zn_nombre as nombreZona
+        from institucion i
+        LEFT JOIN i_zona zn ON zn.idzona = i.zona_id
+        WHERE i.vendedorInstitucion = '$request->cedula'
+        AND i.estado_idEstado = '1'
+        AND (i.zona_id IS NULL OR i.zona_id ='')");
+        return $instituciones;
     }
     //api:get>>/escuelasAsesor
     public function escuelasAsesor(Request $request){
@@ -1400,7 +1580,6 @@ class UsuarioController extends Controller
         )   AS cantidad_instituciones
         FROM usuario u
         WHERE u.id_group = '11'
-        AND u.estado_idEstado = '1'
         ");
         return $asesoresInstituciones;
     }
@@ -1580,7 +1759,6 @@ class UsuarioController extends Controller
                         "email" => $validar[0]->email,
                         "estado_liquidacion" => $validar[0]->estado_liquidacion,
                         "estado" => $validar[0]->estado,
-                        "status" => $validar[0]->status,
                         "contador" => $validar[0]->contador
                     ];
                     $contador++;
@@ -1696,5 +1874,53 @@ class UsuarioController extends Controller
     })->values(); // Convertimos la colección en un array indexado
 
     return response()->json($docentesAgrupados);
+    }
+
+    //Inicio Metodos Jeyson
+    public function VerifcarMetodosGet_UsuarioController(Request $request)
+    {
+        $action = $request->query('action'); // Leer el parámetro `action` desde la URL
+
+        switch ($action) {
+            case 'Get_Busqueda_Representante_Institucion':
+                return $this->busquedaUsuarioxCedula_Nombre_Apellido($request);
+            case 'Get_Busqueda_Representante_InstitucionxID':
+                return $this->busquedaUsuarioxidusuario($request);
+            default:
+                return response()->json(['error' => 'Acción no válida'], 400);
+        }
+    }
+    public function busquedaUsuarioxCedula_Nombre_Apellido($request)
+    {
+        $busquedarepresentante  = $request->filtrorepresentante;
+        $usuarios = DB::SELECT("SELECT us.*, sg.level
+        FROM usuario us
+        INNER JOIN sys_group_users sg on us.id_group = sg.id
+        WHERE us.nombres LIKE '%$busquedarepresentante%' OR us.cedula LIKE '%$busquedarepresentante%' OR us.apellidos LIKE '%$busquedarepresentante%' ");
+        return $usuarios;
+    }
+    public function busquedaUsuarioxidusuario($request)
+    {
+        $busquedaxid  = $request->idusuario;
+        $usuarios = DB::SELECT("SELECT us.*
+        FROM usuario us
+        WHERE us.idusuario = '$busquedaxid'");
+        return $usuarios;
+    }
+    //Fin Metodos Jeyson
+
+    public function usuarioConVentas($cedula)
+    {
+        $usuarios = DB::SELECT("SELECT fv.ven_codigo,fv.id_empresa, fv.ruc_cliente, u.cedula
+        FROM f_venta fv
+        INNER JOIN usuario u ON fv.ven_cliente = u.idusuario
+        WHERE fv.est_ven_codigo <> 3
+        AND fv.idtipodoc IN (1, 3, 4)
+        AND fv.ruc_cliente = '$cedula'");
+        if(count($usuarios) > 0){
+            return response()->json(['SinVentas' => false, 'ventas' => $usuarios]);
+        }else{
+            return response()->json(['SinVentas' => true]);
+        }
     }
 }

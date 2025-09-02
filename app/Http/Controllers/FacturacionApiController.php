@@ -500,4 +500,45 @@ class FacturacionApiController extends Controller
             return ["status" => "0","message" => "Hubo problemas con la conexión al servidor".$ex];
         }
     }
+    public function Pruebacliapi()
+    {
+        // $cedula = 1707639017;
+        // $institucion=33;
+        // $vendedor='XH';
+        $cedula = 915171920;
+        $institucion=14497;
+        $vendedor='LJ';
+        $dato = Http::get("http://186.4.218.168:9095/api/f2_ClienteInstitucion/Getxclici_inscodigo_vendcodigo?cli_ci=".$cedula."&ins_codigo=".$institucion."&ven_d_codigo=".$vendedor);
+
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
+    public function PruebaInsapi()
+    {
+        $institucion=22898;
+        $dato = Http::get("http://186.4.218.168:9095/api/f_Institucion/".$institucion);
+        // $institucion='JACINTO JIJON';
+        // $form_data = [
+        //     'nameInstitucion' => $institucion,
+        // ];
+        // $dato = Http::get("http://186.4.218.168:9095/api/f_Institucion", $form_data);
+        $prueba_get = json_decode($dato, true);
+        return $prueba_get;
+    }
+
+    public function Post_Cliente_InstitucionCrear()
+    {
+        $cedula = '0915171920';
+        $institucion=14497;
+        $vendedor='LJ';
+        $form_data = [
+            'cliCi'        => $cedula,
+            'insCodigo' => $institucion,
+            'venDCodigo'   => $vendedor
+        ];
+        //return $form_data;
+        $dato = Http::post("http://186.4.218.168:9095/api/f2_ClienteInstitucion/CreateOrUpdateClienteInstitucion", $form_data);
+        $prueba_post = json_decode($dato, true);
+        return $prueba_post;
+    }
 }

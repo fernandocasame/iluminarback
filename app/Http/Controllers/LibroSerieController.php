@@ -35,6 +35,10 @@ class LibroSerieController extends Controller
 
     }
 
+    public function todoLibroSerie(){
+        $librosSerie = LibroSerie::orderBy('id_libro_serie','desc')->get();
+        return $librosSerie;
+    }
     //para ver el libro serie especifico de un libro api:/verLibroSerie
     public function verLibroSerie(Request $request){
         $libro  = DB::select("SELECT ls.*, s.nombre_serie
@@ -43,6 +47,15 @@ class LibroSerieController extends Controller
         and ls.id_serie = s.id_serie
         ");
         return $libro;
+    }
+
+    public function Todo_Libros_Series_Nombre_y_Codigo(){
+        $query = DB::SELECT('SELECT ls.codigo_liquidacion, ls.nombre
+            FROM libros_series ls
+            LEFT JOIN `1_4_cal_producto` pro ON ls.codigo_liquidacion = pro.pro_codigo
+            WHERE pro.ifcombo = 0
+            ORDER BY ls.codigo_liquidacion ASC');
+        return $query;
     }
 
     /**

@@ -34,6 +34,10 @@ class ObsequioController extends Controller
         if($request->listadoObsequioGerencia){
             return $this->listadoObsequioGerencia();
         }
+         //listado obsequios factuador
+         if($request->listadoObsequiofacturador){
+            return $this->listadoObsequioFacturador();
+        }
     }
 
     public function listadoObsequioAsesor($periodo_id){
@@ -159,6 +163,21 @@ class ObsequioController extends Controller
         ");
         return $query;
     }
+    public function listadoObsequioFacturador(){
+        $query = DB::SELECT("SELECT o.*,
+        CONCAT(u.nombres,' ',u.apellidos) as asesor, u.cedula,
+        CONCAT(uf.nombres,' ',uf.apellidos) as facturador,
+        i.nombreInstitucion, c.nombre AS ciudad,pe.periodoescolar as periodo,
+        pe.pedido_facturacion,pe.maximo_porcentaje_autorizado
+        FROM obsequios o
+        LEFT JOIN usuario u ON o.asesor_id = u.idusuario
+        LEFT JOIN usuario uf ON o.id_facturador = uf.idusuario
+        LEFT JOIN institucion i ON o.institucion_id = i.idInstitucion
+        LEFT JOIN ciudad c ON i.ciudad_id = c.idciudad
+        LEFT JOIN periodoescolar pe ON o.periodo_id = pe.idperiodoescolar
+        ORDER BY o.id DESC");
+        return $query;
+    }
 
     /**
      * Show the form for creating a new resource.
@@ -261,6 +280,32 @@ class ObsequioController extends Controller
             return ["status" => "1", "message" => "Se realizo correctamente"];
         }else{
             return ["status" => "0", "message" => "No se puedo guardar"];
+        }
+    }
+    //api:post/metodosPostObsequios/anularPedido
+    public function metodosPostObsequios(Request $request){
+        if($request->anularPedido){
+            return $this->anularPedido($request);
+        }
+    }
+    public function anularPedido(Request $request){
+        try{
+            $ob = Obsequio::findOrFail($request->id);
+            //anular si es estado 3
+            if($ob->estado != 3){
+                return ["status" => "0", "message" => "El pedido de obsequios no se pudo anular solo se puede anular los pedidos en estado aprobado por facturación"];
+            }
+            $ob->estado = 2;
+            $ob->comentario_anulado = $request->comentario_anulado;
+            $ob->id_facturador      = $request->user_created;
+            $ob->save();
+            if($ob){
+                return ["status" => "1", "message" => "Se anulo correctamente"];
+            }else{
+                return ["status" => "0", "message" => "No se puedo anular"];
+            }
+        }catch(\Exception $ex){
+            return ["status" => "0", "message" => "Hubo problemas con anular", "error" => "error: ".$ex];
         }
     }
     /**

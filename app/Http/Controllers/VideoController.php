@@ -39,17 +39,18 @@ class VideoController extends Controller
             }
             return $videos;
         }
-     
+
     }
     //api:get/getAsignaturas
     public function getAsignaturas(Request $request){
-        $asignaturas = DB::SELECT("SELECT DISTINCT a.idasignatura, a.nombreasignatura 
+        $asignaturas = DB::SELECT("SELECT DISTINCT a.idasignatura, a.nombreasignatura
         FROM asignatura  a
         join area on area.idarea = a.area_idarea
          LEFT JOIN libro l ON l.asignatura_idasignatura = a.idasignatura
         LEFT JOIN libros_series ls ON l.idlibro = ls.idLibro
         WHERE a.estado = '1'
         AND (ls.version <> 'PLUS' OR ls.version IS NULL)
+        AND a.tipo_asignatura = '1'
         ");
         return $asignaturas;
     }
@@ -112,10 +113,10 @@ class VideoController extends Controller
     {
         // Video::create($request->all());
         if($request->id > 0){
-            //EDITAR 
+            //EDITAR
             $link = Video::findOrFail($request->id);
         }else{
-            //GUARDAR 
+            //GUARDAR
             $link = new Video();
         }
             $link->nombrevideo              = $request->nombrevideo;
@@ -132,7 +133,7 @@ class VideoController extends Controller
             }else{
                 return ["status" => "1", "message" => "No se pudo guardar"];
             }
-        
+
     }
 
     /**
@@ -147,18 +148,18 @@ class VideoController extends Controller
     }
 
 
-    
+
     public function videos_libro_unidad($id)
     {
         $videos = DB::SELECT("SELECT v . * FROM video v, temas t WHERE v.id_tema = t.id AND t.id_unidad = $id");
-        
+
         return $videos;
     }
 
     public function videos_libro_tema($id)
     {
         $videos = DB::SELECT("SELECT * FROM video WHERE id_tema = $id");
-        
+
         return $videos;
     }
 
@@ -198,4 +199,104 @@ class VideoController extends Controller
         DB::delete("DELETE FROM video WHERE idvideo ='$id'");
         return "Se elimino correctamente";
     }
+
+    //INICIO METODOS JEYSON
+    public function Transferencia_Videos_Asignatura(Request $request)
+    {
+        $origen = $request->asignatura_a_transferir;
+        $destino = $request->asignatura_recibir_transferencia;
+        $user_created = $request->user_created;
+        if (!$origen || !$destino) {
+            return response()->json([
+                "status" => 0,
+                "message" => "Asignaturas no válidas"
+            ]);
+        }
+        // 1. Obtener todos los videos de la asignatura origen con nombre de tema y unidad
+        $videosOrigen = DB::table('video as v')
+            ->join('temas as t', 'v.id_tema', '=', 't.id')
+            ->join('unidades_libros as u', 'v.unidad_id', '=', 'u.id_unidad_libro')
+            ->where('v.asignatura_idasignatura', $origen['idasignatura'])
+            ->select('v.*', 't.nombre_tema', 't.unidad')
+            ->get();
+        $transferibles = [];
+        $videosNoTransferidos = [];
+        // 2. Verificar cuáles son transferibles antes de eliminar nada
+        foreach ($videosOrigen as $video) {
+            $temaDestino = DB::table('temas')
+                ->where('id_asignatura', $destino['idasignatura'])
+                ->where('nombre_tema', $video->nombre_tema)
+                ->where('unidad', $video->unidad)
+                ->first();
+            if ($temaDestino) {
+                $transferibles[] = [
+                    "video" => $video,
+                    "temaDestino" => $temaDestino
+                ];
+            } else {
+                $coincidenciaExacta = DB::table('temas')
+                    ->where('id_asignatura', $destino['idasignatura'])
+                    ->where('nombre_tema', $video->nombre_tema)
+                    ->where('unidad', $video->unidad)
+                    ->exists();
+
+                $motivo = 'No se encontró ';
+                if (!$coincidenciaExacta) {
+                    $existeTema = DB::table('temas')
+                        ->where('id_asignatura', $destino['idasignatura'])
+                        ->where('nombre_tema', $video->nombre_tema)
+                        ->exists();
+                    $existeUnidadParaTema = DB::table('temas')
+                        ->where('id_asignatura', $destino['idasignatura'])
+                        ->where('nombre_tema', $video->nombre_tema)
+                        ->where('unidad', $video->unidad)
+                        ->exists();
+                    if (!$existeTema) {
+                        $motivo .= 'el tema';
+                    } elseif (!$existeUnidadParaTema) {
+                        $motivo .= 'la unidad para ese tema';
+                    } else {
+                        $motivo .= 'una coincidencia exacta entre unidad y tema';
+                    }
+                } else {
+                    $motivo = 'Existe coincidencia exacta entre unidad y tema, pero no se pudo transferir.';
+                }
+                $videosNoTransferidos[] = [
+                    "idvideo" => $video->idvideo,
+                    "nombre_video" => $video->nombrevideo,
+                    "unidad" => $video->unidad,
+                    "tema" => $video->nombre_tema,
+                    "motivo_no_transferencia" => $motivo
+                ];
+            }
+        }
+        // 3. Si hay videos para transferir, eliminar los videos del destino
+        if (count($transferibles) > 0) {
+            Video::where('asignatura_idasignatura', $destino['idasignatura'])->delete();
+        }
+        // 4. Transferir los videos válidos
+        $transferidos = 0;
+        foreach ($transferibles as $item) {
+            $video = $item['video'];
+            $temaDestino = $item['temaDestino'];
+            $nuevoVideo = new Video();
+            $nuevoVideo->nombrevideo              = $video->nombrevideo;
+            $nuevoVideo->descripcionvideo         = $video->descripcionvideo;
+            $nuevoVideo->webvideo                 = $video->webvideo;
+            $nuevoVideo->Estado_idEstado          = $video->Estado_idEstado;
+            $nuevoVideo->asignatura_idasignatura  = $destino['idasignatura'];
+            $nuevoVideo->id_tema                  = $temaDestino->id;
+            $nuevoVideo->unidad_id                = $temaDestino->id_unidad;
+            $nuevoVideo->user_created             = $user_created;
+            $nuevoVideo->save();
+            $transferidos++;
+        }
+        return response()->json([
+            "status" => 1,
+            "message" => "Transferencia completada",
+            "videos_transferidos" => $transferidos,
+            "videos_no_transferidos" => $videosNoTransferidos
+        ]);
+    }
+    //FIN METODOS JEYSON
 }

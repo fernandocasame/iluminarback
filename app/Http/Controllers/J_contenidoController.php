@@ -46,18 +46,18 @@ class J_contenidoController extends Controller
         }else{
             $contenido = new J_contenido();
         }
-        
+
         $contenido->id_juego = $request->id_juego;
         $contenido->pregunta = $request->pregunta;
         $contenido->respuesta = $request->respuesta;
-        
-        $contenido->save();        
-        
+
+        $contenido->save();
+
         return $contenido;
     }
 
 
-    
+
     /**
      * Display the specified resource.
      *
@@ -116,7 +116,7 @@ class J_contenidoController extends Controller
                 $data['items'][$key] = [
                     'pregunta' => $value,
                     'opciones'=>$opciones,
-                ];            
+                ];
             }
         }else{
             $data = [];
@@ -127,13 +127,13 @@ class J_contenidoController extends Controller
 
     public function guardaSeleccionSimple(Request $request)
     {
-        
+
         // guarda pregunta
         if( $request->id_contenido_juego > 0 ){
             $contenido = J_contenido::find($request->id_contenido_juego);
         }else{
             $contenido = new J_contenido();
-        }        
+        }
         $ruta = public_path('/images/imagenes_juegos/seleccionSimple');
         if(!empty($request->file('img_pregunta'))){
             $file = $request->file('img_pregunta');
@@ -141,13 +141,13 @@ class J_contenidoController extends Controller
             $file->move($ruta,$fileName);
             $contenido->imagen  = $fileName;
         }
-        
+
         $contenido->id_juego = $request->id_juego;
         $contenido->pregunta = $request->pregunta;
-        
-        $contenido->save();  
-        // fin guarda pregunta     
-        
+
+        $contenido->save();
+        // fin guarda pregunta
+
         // guarda opciones de pregunta
         //OPCION1
         if( $request->id_opcion1 > 0 ){
@@ -155,7 +155,7 @@ class J_contenidoController extends Controller
         }else{
             $respuestas = new J_opcionesContenidos();
         }
-        
+
         if(!empty($request->file('img_opcion1'))){
             $file = $request->file('img_opcion1');
             $fileName = uniqid().$file->getClientOriginalName();
@@ -166,7 +166,7 @@ class J_contenidoController extends Controller
         $respuestas->nombre_opcion = $request->input1;
         $respuestas->tipo_opcion = $request->check1;
         $respuestas->save();
-        
+
         //OPCION 2
         if( $request->id_opcion2 > 0 ){
             $respuestas = J_opcionesContenidos::find($request->id_opcion2);
@@ -188,7 +188,7 @@ class J_contenidoController extends Controller
         if(!empty($request->file('img_opcion3')) || !empty($request->input3) ){
             if( $request->id_opcion3 > 0 ){
                 $respuestas = J_opcionesContenidos::find($request->id_opcion3);
-               
+
             }else{
                 $respuestas = new J_opcionesContenidos();
             }
@@ -197,7 +197,7 @@ class J_contenidoController extends Controller
                 $fileName = uniqid().$file->getClientOriginalName();
                 $file->move($ruta,$fileName);
                 $respuestas->imagen_opcion = $fileName;
-            }             
+            }
             $respuestas->id_contenido_juegos  = $contenido->id_contenido_juego;
             $respuestas->nombre_opcion = $request->input3;
             $respuestas->tipo_opcion = $request->check3;
@@ -220,7 +220,7 @@ class J_contenidoController extends Controller
                 $fileName = uniqid().$file->getClientOriginalName();
                 $file->move($ruta,$fileName);
                 $respuestas->imagen_opcion = $fileName;
-            }             
+            }
             $respuestas->id_contenido_juegos  = $contenido->id_contenido_juego;
             $respuestas->nombre_opcion = $request->input4;
             $respuestas->tipo_opcion = $request->check4;
@@ -231,7 +231,7 @@ class J_contenidoController extends Controller
             $elimina->delete();
         }
         //fin guarda opciones de pregunta
-        
+
         return ['pregunta'=> $contenido, 'opciones'=>$respuestas];
     }
     public function deleteImagenSeleccionSimple(Request $request)
@@ -241,7 +241,7 @@ class J_contenidoController extends Controller
             if($request->edita_id_pregunta > 0){
                 $contenido = J_contenido::find($request->edita_id_pregunta);
                 $contenido->imagen = NULL;
-                $contenido->save();  
+                $contenido->save();
                 $msj = 'Pregunta actualizada';
             }
             if($request->edita_id_opcion > 0){
@@ -255,6 +255,6 @@ class J_contenidoController extends Controller
             return $msj;
         }
         return 'nuayy la imagen :(';
-        
+
     }
 }

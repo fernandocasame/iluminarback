@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-
 class HomeController extends Controller
 {
     /**
@@ -24,7 +23,12 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return Auth::user();
+        Auth::user();
+         $user = Auth::user()->load([
+            'grupo',
+            'institucion:idInstitucion,nombreInstitucion'
+        ]);
+        return $user;
     }
     public function userInfo()
     {
