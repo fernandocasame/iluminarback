@@ -222,8 +222,9 @@ class AdminController extends Controller
         }
     }
     public function getContratos($id_asesor,$iniciales,$periodo,$codigoContrato=null){
-        if($periodo > 21){  return $this->getContratosAsesorProlipa($id_asesor,$periodo); }
-        else             {  return $this->getContratosFueraProlipa($iniciales,$codigoContrato); }
+        return $this->getContratosAsesorProlipa($id_asesor,$periodo);
+        // if($periodo > 21){  return $this->getContratosAsesorProlipa($id_asesor,$periodo); }
+        // else             {  return $this->getContratosFueraProlipa($iniciales,$codigoContrato); }
     }
     public function getContratosAsesorProlipa($id_asesor,$periodo){
         $query = DB::SELECT("SELECT p.TotalVentaReal as VEN_VALOR, pe.codigo_contrato as PERIODO,
